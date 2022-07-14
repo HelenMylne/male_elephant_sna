@@ -11,7 +11,6 @@ library(zoo)        # sort date columns out
 library(asnipe)     # generating networks
 library(rethinking) # col.alpha
 library(igraph)     # plotting networks
-
 #### Observation Sessions ####
 sessions <- readxl::read_excel("data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 1)
 s <- sessions[,1:4]             # remove summary section
@@ -93,105 +92,71 @@ id$days <- as.numeric(rowSums(id[109:368]))
 
 ### load age data
 ages <- readxl::read_excel("data_raw/Raw_ALERT_ElephantAges_Saunders211019.xlsx", sheet = 1)  # read in age data
-names <- colnames(ages) ; names[7] <- 'age' ; names[8] <- 'comments' ; colnames(ages) <- names # rename columns 7&8
-which(is.na(ages$age_class))               # 137, 374, 427, 476 onwards
-ages$id_no[c(137,374,427)]                 # F137 = no elephant, M154 = no elephant, M207 = no elephant
-ages <- ages[!is.na(ages$age_class),]      # remove empty rows -- 3 more ages than ids
-table(ages$age)                            # Some values incorrectly saved as dates not categories
-ages$age <- ifelse(ages$age == '44228', '1-2',
-                   ifelse(ages$age == '44257', '2-3',
-                          ifelse(ages$age == '44289', '3-4',
-                                 ifelse(ages$age == '44320', '4-5',
-                                        ifelse(ages$age == '44352', '5-6',
-                                               ifelse(ages$age == '44383', '6-7',
-                                                      ifelse(ages$age == '44415', '7-8',
-                                                             ifelse(ages$age == '44447', '8-9',
-                                                                    ifelse(ages$age == '44478', '9-10',
-                                                                           ages$age)))))))))
-table(ages$age)               # Group together <3 yrs 
-ages$age <- ifelse(ages$age == '8-9 months', '0-3',
-                   ifelse(ages$age == '<1', '0-3',
-                          ifelse(ages$age == '1', '0-3',
-                                 ifelse(ages$age == '1-2', '0-3',
-                                        ifelse(ages$age == '2', '0-3',
-                                               ifelse(ages$age == '2-3', '0-3',
-                                                      ages$age))))))
-table(ages$age)               # Check for other mistakes
-ages$age <- ifelse(ages$age == '20-39', '20-35',
-                   ifelse(ages$age == '15-20', '15-19', ages$age))
-table(ages$age)               # all cleaned
-which(ages$age == 'missing')  # 245 414 457
-ages$name[c(245,414,457)] ; ages$id_no[c(245,414,457)]  # "Andrew" "Brad" "Kael", "M0026" "M0196" "M0240"
-ages$age_class[c(245,414,457)]                          # calf, adult, pubescent
+names <- colnames(ages) ; names[8] <- 'comments' ; colnames(ages) <- names                    # rename column 8
+ages <- ages[!is.na(ages$id_no),]      # remove empty rows -- 4 less ages than ids
+table(ages$age_category)               # Some values incorrectly saved as dates not categories
+ages$age_category <- ifelse(ages$age_category == '44228', '1-2',
+                            ifelse(ages$age_category == '44257', '2-3',
+                                   ifelse(ages$age_category == '44289', '3-4',
+                                          ifelse(ages$age_category == '44320', '4-5',
+                                                 ifelse(ages$age_category == '44352', '5-6',
+                                                        ifelse(ages$age_category == '44383', '6-7',
+                                                               ifelse(ages$age_category == '44415', '7-8',
+                                                                      ifelse(ages$age_category == '44447', '8-9',
+                                                                             ifelse(ages$age_category == '44478', '9-10',
+                                                                                    ages$age_category)))))))))
+ages$age_category <- ifelse(ages$age_category == '8-9 months', '0-3',   # group together calves <3 years
+                            ifelse(ages$age_category == '<1', '0-3',
+                                   ifelse(ages$age_category == '1', '0-3',
+                                          ifelse(ages$age_category == '1-2', '0-3',
+                                                 ifelse(ages$age_category == '2', '0-3',
+                                                        ifelse(ages$age_category == '2-3', '0-3',
+                                                               ages$age_category))))))
+ages$age_category <- ifelse(ages$age_category == '20-39', '20-35',
+                            ifelse(ages$age_category == '15-20', '15-19', ages$age_category))
+table(ages$age_category)               # Now correct apart from missing values
 
-which(ages$id_no == 'M0026')       # 245
-ages$age_class[245]                # Calf
-ages$age[245]                      # missing
-ages$age[245] <- '1-2'
+### Add values for missing elephants -- Helen estimated ages from images sent by Bex, 11th November 2021
+ages$id_no[which(ages$age_category == 'missing')]       # "M0026" "M0154" "M0196" "M0240"
+ages$age_class[which(ages$age_category == 'missing')]   # calf, NA, adult, pubescent
 
-which(ages$id_no == 'M0196')       # 414
-ages$age_class[414]                # Adult
-ages$age[414]                      # missing
-ages$age[414] <- '20-25'
+ages$age_category[which(ages$id_no == 'M0026')] <- '1-2'
+ages$age_category[which(ages$id_no == 'M0196')] <- '20-25'
+ages$age_category[which(ages$id_no == 'M0240')] <- '10-15'
 
-which(ages$id_no == 'M0240')       # 457
-ages$age_class[457]                # Pubescent
-ages$age[457]                      # missing
-ages$age[457] <- '10-15'
+ages$id_no[which(is.na(ages$age_category))]      # "F0052"  "F0070" "F0137" "U0008" "M0138" "M0223"  "M0227"
+ages$age_class[which(is.na(ages$age_category))]  #  "Adult" "Pubescent" NA  "Calf"  "Pubescent" "Adult"  "Adult"
 
-which(ages$id_no == 'M0054')       # 273
-ages$age_class[273]                # Adult
-ages$age[273]                      # 25-40
+ages$age_category[which(ages$id_no == 'F0052')] <- '35-50'
+ages$age_category[which(ages$id_no == 'F0070')] <- '6-7'
+ages$age_category[which(ages$id_no == 'M0223')] <- '20-25'
+ages$age_category[which(ages$id_no == 'M0227')] <- '20-25'
 
-which(is.na(ages$age))             # 52, 70, 159, 435, 439
-ages$id_no[which(is.na(ages$age))] # "F0052"  "F0070" "U0008" "M0223"  "M0227"
-ages$name[which(is.na(ages$age))]  # "Sierra" "Janet"  NA     "Dumbo"  "Apollo"
+### 6 elephants don't match ages and ID, or are only a number, no other data -- remove from ages spreadsheet.
+ages <- ages[ages$id_no != 'F0137',]
+ages <- ages[ages$id_no != 'M0013',]
+ages <- ages[ages$id_no != 'M0116',]
+ages <- ages[ages$id_no != 'M0125',]
+ages <- ages[ages$id_no != 'M0154',]
+ages <- ages[ages$id_no != 'M0207',]
 
-which(ages$id_no == 'F0052')       # 52
-ages$age_class[52]                 # Adult
-ages$age[52]                       # NA
-ages$age[52] <- '35-50'
-
-which(ages$id_no == 'F0070')       # 70
-ages$age_class[70]                 # Pubescent
-ages$age[70]                       # NA
-ages$age[70] <- '6-7'
-
-which(ages$id_no == 'M0223')       # 440
-ages$age_class[440]                # Adult
-ages$age[440]                      # NA
-ages$age[440] <- '20-25'
-
-which(ages$id_no == 'M0227')       # 444
-ages$age_class[444]                # Adult
-ages$age[444]                      # NA
-ages$age[444] <- '20-25'
-
-
-### 3 elephants added into age data after ID data completed -- remove from ages:
-ages <- ages[ages$id_no != 'M0013',]    # 3 more ages than IDs
-ages <- ages[ages$id_no != 'M0116',]    # 2 more ages than IDs
-ages <- ages[ages$id_no != 'M0125',]    # 1 more age than IDs
-which(id$id_no != ages$id_no)           # all match
-
-### correct mismatches for merging of spreadsheets
-id$name[88] <- 'Kaitlyn'                                   # name misspelled as 'Kaitlun' in ID sheet
+### Correct mismatches for merging of spreadsheets
+id$name[88]   <- 'Kaitlyn'                                 # name misspelled as 'Kaitlun' in ID sheet
 id$family[11] <- 'U23 F69' ; ages$family[11] <- 'U23 F69'  # Margaret different families recorded in 2 spreadsheets
 
 ### Remove elephants with wrong name in ID/ages sheet -- confusion over names suggests potentially incorrect sightings data
 id <- id[id$id_no != 'F0157',] ; ages <- ages[ages$id_no != 'F0157',]
 id <- id[id$id_no != 'M0138',] ; ages <- ages[ages$id_no != 'M0138',]
 
-### add age data into id sheet
-id <- merge(x = id, y = ages)             # 467 elephants
+### Add age data into id sheet
+id <- merge(x = id, y = ages)             # 468 elephants
 id <- id[,c(1:5,369,6:10,370,11:368)]
 
-### write out processed data
-write_delim(id, "data_processed/motnp_id.csv", delim = ";", col_names = T)
+### Write out processed data
+write_delim(id, "data_processed/motnp_id.csv", delim = ",", col_names = T)
 
 ### Clear Environment
 rm(ages, days.numbers, id, id.raw, names, nkash, days, i, months, weeks)
-
 #### Encounters ####
 encounters <- readxl::read_excel("data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3)
 e <- encounters[c(1:3,8:27)]
@@ -221,6 +186,22 @@ d <- e %>% separate(col = present, sep = '_',
 colnames(d)[23:98] <- group.size
 d$e1 <- ifelse(d$e1 == '', NA, d$e1)
 
+# recount total_id and perc_id
+d$count <- rowSums(!is.na(d[23:98]))
+d$count_mismatch <- d$count-d$total_id
+summary(d$count_mismatch) # range -7 to +8
+d$total_elephants <- as.numeric(d$total_elephants)
+d$perc_id_new <- 100*d$count / d$total_elephants
+d <- d[c(1:7,99:101,8:98)]
+colnames(d[7:11]) <- c('total_id_dy','total_id_hkm','total_id_diff','perc_id_dy','perc_id_hkm')
+
+d <- d %>% 
+  dplyr::rename(total_id_dy = total_id,
+                total_id_hkm = count,
+                total_id_diff = count_mismatch,
+                perc_id_dy = perc_id,
+                perc_id_hkm = perc_id_new)
+
 # correct mis-recorded locations -- 3 which are an order of magnitude from the rest in either east or south direction, one for which the east value started 17 instead of 25 but otherwise did not match south so assume that changing the 25 to 17 was error in recording.
 d$gps_e[232] <- d$gps_e[232]/10 # value was 25470333 -- 2547033 puts it within cluster of all other points
 d$gps_e[480] <- d$gps_e[480]*10 # value was 254665 -- 2546650 puts it within cluster of all other points
@@ -228,11 +209,10 @@ d$gps_s[672] <- d$gps_s[672]*10 # value was 175296 -- 1752960 puts it within clu
 d$gps_e[624] <- d$gps_e[624]+800000 # value started 17 rather than 25 (1745269), but then matched format of other east coordinates -- 2545269 puts it within cluster of all other points
 
 ### write csv
-write_delim(d, 'data_processed/motnp_encounters.csv', na = 'NA', col_names = T, delim = ';')
+write_delim(d, 'data_processed/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
 
 ### clear environment, leave d for mapping
 rm(e, encounters, group.size, i, j)
-
 #### Map sightings ####
 par(mfrow = c(1,1))
 
@@ -292,23 +272,6 @@ rm(d, males, i)
 #### Create dyadic network ####
 ### first load data d (encounters)
 d <- read_csv('data_processed/motnp_encounters.csv')
-d <- separate(d, col = 'date;typ;time;gps_s;gps_e;total_elephants;total_id;perc_id;type;calf_male;calf_female;calf_unknown;juv_male;juv_female;juv_unknown;pub_male;pub_female;pub_unknown;adult_male;adult_female;adult_unknown;unknown;e1;e2;e3;e4;e5;e6;e7;e8;e9;e10;e11;e12;e13;e14;e15;e16;e17;e18;e19;e20;e21;e22;e23;e24;e25;e26;e27;e28;e29;e30;e31;e32;e33;e34;e35;e36;e37;e38;e39;e40;e41;e42;e43;e44;e45;e46;e47;e48;e49;e50;e51;e52;e53;e54;e55;e56;e57;e58;e59;e60;e61;e62;e63;e64;e65;e66;e67;e68;e69;e70;e71;e72;e73;e74;e75;e76',
-              into = c('date','typ','time','gps_s','gps_e','total_elephants','total_id','perc_id','type',
-                       'calf_male','calf_female','calf_unknown','juv_male','juv_female','juv_unknown',
-                       'pub_male','pub_female','pub_unknown','adult_male','adult_female','adult_unknown','unknown',
-                       'e1','e2','e3','e4','e5','e6','e7','e8','e9','e10','e11','e12','e13','e14','e15',
-                       'e16','e17','e18','e19','e20','e21','e22','e23','e24','e25','e26','e27','e28',
-                       'e29','e30','e31','e32','e33','e34','e35','e36','e37','e38','e39','e40','e41',
-                       'e42','e43','e44','e45','e46','e47','e48','e49','e50','e51','e52','e53','e54',
-                       'e55','e56','e57','e58','e59','e60','e61','e62','e63','e64','e65','e66','e67',
-                       'e68','e69','e70','e71','e72','e73','e74','e75','e76'),
-              sep = ';')
-d$date <- as.Date(d$date)
-d$time <- as.numeric(d$time)
-d$gps_s <- as.numeric(d$gps_s)
-d$gps_e <- as.numeric(d$gps_e)
-d$total_id <- as.numeric(d$total_id)
-d$perc_id <- as.numeric(d$perc_id)
 for(j in 2:ncol(d)){
   for(i in 1:nrow(d)){
     d[i,j] <- ifelse(d[i,j] == 'NA',NA,d[i,j])
@@ -329,10 +292,10 @@ eles_long <- eles_long[!is.na(eles_long$elephant),]
 
 # 2 incorrectly labelled elephants: no such code as N or D so N40 and D128 must be wrong. On keyboard, N next to M and D next to F --> assume that D128=F128 and N40=M40.
 eles_long$elephant[which(eles_long$elephant == 'D128')] <- 'F128'  # row 2297
-eles_long$elephant[which(eles_long$elephant == 'N40')]  <- 'M40'   # row 1859
+eles_long$elephant[which(eles_long$elephant == 'N40')] <- 'M40'    # row 1859
 
 # write to csv for use in plotting
-write_delim(eles_long, 'data_processed/motnp_eles_long.csv',col_names = T, delim = ';')
+write_delim(eles_long, 'data_processed/motnp_eles_long.csv',col_names = T, delim = ',')
 
 ### make data frame that matches required structure for asnipe::get_associations_points_tw()
 eles_asnipe <- eles_long[,c(1,3,4,5,11)]
@@ -381,17 +344,15 @@ for(i in 1:nrow(sna)){
 sna_no_duplicates <- separate(sna_no_duplicates, dyad, into = c('id1','id2'), sep = '_', remove = F)
 sna_no_duplicates <- separate(sna_no_duplicates, id1, into = c('sex1','number1'), sep = 1, remove = F)
 sna_no_duplicates <- separate(sna_no_duplicates, id2, into = c('sex2','number2'), sep = 1, remove = F)
-sna_no_duplicates <- sna_no_duplicates[,c(1,2,5,3,6,8)]
+sna_no_duplicates <- sna_no_duplicates[,c(1,4,3,2,5,6)]
 
 sna_no_duplicates$sri <- NA
 for(i in 1:nrow(sna_no_duplicates)) {
   sna_no_duplicates$sri[i] <- sna$sri[match(x = sna_no_duplicates$dyad[i], table = sna$dyad)]
 }
 
-sna_no_duplicates <- sna_no_duplicates[,c(2,3,8,5,6,1)]
-
 write_delim(sna_no_duplicates, "data_processed/motnp_dyads_noduplicates.csv",
-            delim = ";", na = "", append = FALSE, col_names = T, quote_escape = "double")
+            delim = ",", na = "", append = FALSE, col_names = T, quote_escape = "double")
 
 associations <- sna[sna$sri > 0,] # considering only dyads for which there was at least some association
 associations <- associations[!is.na(associations$sri),]
@@ -406,13 +367,11 @@ par(mfrow = c(1,1))
 
 #### Create plotting data -- very slow so do not repeat once files are created ####
 ### notes data frame
-ele_nodes <- read_csv2('data_processed/motnp_id.csv')
+ele_nodes <- read_delim('data_processed/motnp_id_22.01.13.csv', delim = ',')
 ele_nodes <- ele_nodes[,c(1:7,11:12)]
 
 ### edges data frame
-ele_links <- read.csv("data_processed/motnp_dyads_noduplicates.csv", header=T, as.is=T)
-ele_links <- separate(ele_links, 'id1.sex1.sri.id2.sex2.dyad', sep = ';',
-                      into = c('id1','sex1','sri','id2','sex2','dyad'))
+ele_links <- read.csv("data_processed/motnp_6thJan2022/motnp_dyads_22.01.06.csv", header=T, as.is=T)
 ele_links$type <- paste(ele_links$sex1,ele_links$sex2, sep = '')
 ele_links$type <- ifelse(ele_links$type == 'FM', 'MF',
                          ifelse(ele_links$type == 'FU','UF',
@@ -428,7 +387,7 @@ ele_links <- ele_links[,c(12,13,7,3:5,1,2,6)]
 colnames(ele_links)[4] <- 'weight'
 
 ### sightings per elephant
-eles_long <- read_csv2('data_processed/motnp_eles_long.csv')
+eles_long <- read_delim('data_processed/motnp_eles_long_22.01.13.csv', delim = ',')
 eles_long$time <- as.numeric(eles_long$time)
 eles_long$id_no <- eles_long$elephant
 eles_long <- separate(eles_long, id_no, into = c('sex','num'), sep = 1)
@@ -449,42 +408,34 @@ ele_links <- ele_links[which(ele_links$from != 'F0158'),] # remove F0158 from li
 ele_links <- ele_links[which(ele_links$to   != 'F0158'),] # remove F0158 from links -- doesn't exist in IDs
 ele_links <- ele_links[which(ele_links$from != 'F0176'),] # remove F0176 from links -- doesn't exist in IDs
 ele_links <- ele_links[which(ele_links$to   != 'F0176'),] # remove F0176 from links -- doesn't exist in IDs
-ele_links <- ele_links[which(ele_links$from != 'M0125'),] # remove M0125 from links -- doesn't exist in IDs
-ele_links <- ele_links[which(ele_links$to   != 'M0125'),] # remove M0125 from links -- doesn't exist in IDs
 ele_links <- ele_links[which(ele_links$from != 'M0013'),] # remove M0013 from links -- doesn't exist in IDs
 ele_links <- ele_links[which(ele_links$to   != 'M0013'),] # remove M0013 from links -- doesn't exist in IDs
-ele_nodes <- ele_nodes[which(ele_nodes$id_no!= 'M0175'),] # remove M0175 from nodes -- doesn't exist in sightings
-
-length(sort(unique(ele_links$id1))) # 466 + U9
-length(sort(unique(ele_nodes$id)))  # 466
-
-l <- sort(unique(ele_links$id1))
-n <- sort(unique(ele_nodes$id))
-
-which(l != n)   # 192 onwards
-l[192] ; n[192] # M138 vs M139
-which(n == 'M138')
+ele_links <- ele_links[which(ele_links$from != 'M0125'),] # remove M0125 from links -- doesn't exist in IDs
+ele_links <- ele_links[which(ele_links$to   != 'M0125'),] # remove M0125 from links -- doesn't exist in IDs
 ele_links <- ele_links[which(ele_links$from != 'M0138'),] # remove M0138 from links -- doesn't exist in IDs
 ele_links <- ele_links[which(ele_links$to   != 'M0138'),] # remove M0138 from links -- doesn't exist in IDs
+ele_nodes <- ele_nodes[which(ele_nodes$id_no!= 'M0175'),] # remove M0175 from nodes -- doesn't exist in sightings
 
-### insert column for count of sightings
+length(unique(ele_nodes$id_no)) ; length(unique(ele_links$from)) ; length(unique(ele_links$to)) # 466, 465, 465 (One less for from and to because F1 is only in "from" and U9 is only in "to". No elephant is from and to itself.)
+
+### Insert column for count of sightings
 ele_nodes$count <- NA
 for(i in 1:nrow(ele_nodes)){
   ele_nodes$count[i] <- sum(eles_long$id_no == ele_nodes$id_no[i])
 }
 
-### add information about individuals in each dyad
+### Add information about individuals in each dyad
 ele_links$ageclass1 <- NA ; ele_links$ageclass2 <- NA
 ele_links$age1   <- NA ; ele_links$age2   <- NA
 ele_links$days1  <- NA ; ele_links$days2  <- NA
 ele_links$count1 <- NA ; ele_links$count2 <- NA
-# WARNING -- THIS STEP TAKES ABOUT 30-40 MINUTES TO RUN
+# WARNING -- THIS STEP TAKES ABOUT 30 MINUTES TO RUN
 for(i in 1:nrow(ele_links)){
   for(j in 1:nrow(ele_nodes)){
     if(ele_nodes$id_no[j] == ele_links$from[i]) {ele_links$ageclass1[i] <- ele_nodes$age_class[j]}
     if(ele_nodes$id_no[j] == ele_links$to[i])   {ele_links$ageclass2[i] <- ele_nodes$age_class[j]}
-    if(ele_nodes$id_no[j] == ele_links$from[i]) {ele_links$age1[i]      <- ele_nodes$age[j]}
-    if(ele_nodes$id_no[j] == ele_links$to[i])   {ele_links$age2[i]      <- ele_nodes$age[j]}
+    if(ele_nodes$id_no[j] == ele_links$from[i]) {ele_links$age1[i]      <- ele_nodes$age_category[j]}
+    if(ele_nodes$id_no[j] == ele_links$to[i])   {ele_links$age2[i]      <- ele_nodes$age_category[j]}
     if(ele_nodes$id_no[j] == ele_links$from[i]) {ele_links$days1[i]     <- ele_nodes$days[j]}
     if(ele_nodes$id_no[j] == ele_links$to[i])   {ele_links$days2[i]     <- ele_nodes$days[j]}
     if(ele_nodes$id_no[j] == ele_links$from[i]) {ele_links$count1[i]    <- ele_nodes$count[j]}
@@ -533,11 +484,6 @@ dev.off()
 #### Plotting Networks ####
 ### load data
 ele_links <- read_csv('data_processed/motnp_elelinks.csv')
-ele_links$weight <- as.numeric(ele_links$weight)
-ele_links$count1 <- as.numeric(ele_links$count1)
-ele_links$count2 <- as.numeric(ele_links$count2)
-ele_links$days1  <- as.numeric(ele_links$days1)
-ele_links$days2  <- as.numeric(ele_links$days2)
 ele_links$age.dyad   <- as.factor(ele_links$age.dyad)
 ele_links$sex1       <- as.factor(ele_links$sex1)
 ele_links$sex2       <- as.factor(ele_links$sex2)
@@ -546,17 +492,10 @@ ele_links$dem_class2 <- as.factor(ele_links$dem_class2)
 str(ele_links)
 
 ele_nodes <- read_csv('data_processed/motnp_elenodes.csv')
-ele_nodes$days  <- as.numeric(ele_nodes$days)
-ele_nodes$count <- as.numeric(ele_nodes$count)
 ele_nodes$sex       <- as.factor(ele_nodes$sex)
 ele_nodes$age_class <- as.factor(ele_nodes$age_class)
 ele_nodes$dem_class <- as.factor(ele_nodes$dem_class)
 str(ele_nodes)
-
-# remove F157 -- duplicate number -- were originally both called Emily-Ruth, F0157 corrected to "Selo" but unclear where original issue lay so remove both just to be sure
-ele_links <- ele_links[ele_links$from  != 'F0157',]
-ele_links <- ele_links[ele_links$to    != 'F0157',]
-ele_nodes <- ele_nodes[ele_nodes$id_no != 'F0157',]
 
 ### all elephants
 e_edges <- ele_links[,c(1:4)] ; e_edges <- e_edges[!is.na(e_edges$from),]
@@ -980,5 +919,132 @@ b7 <- graph_from_data_frame(d = b7.e, vertices = b7.n, directed = F)
 set.seed(5)
 plot(b7, edge.curved = 0, vertex.label = b7.n$id,
      edge.width = b7.e$weight*8)
+
+#### Comparing SRI ####
+### load data
+ele_links <- read_csv('data_processed/motnp_elelinks.csv')
+ele_links$age.dyad   <- as.factor(ele_links$age.dyad)
+ele_links$sex1       <- as.factor(ele_links$sex1)
+ele_links$sex2       <- as.factor(ele_links$sex2)
+ele_links$dem_class1 <- as.factor(ele_links$dem_class1)
+ele_links$dem_class2 <- as.factor(ele_links$dem_class2)
+str(ele_links)
+
+ele_links$dem_dyad <- paste(ele_links$dem_class1, ele_links$dem_class2, sep = '_')
+sort(unique(ele_links$dem_dyad))
+# put adults before pubescents, juveniles and calves
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'PF_AF', 'AF_PF',
+                             ifelse(ele_links$dem_dyad == 'PF_AM', 'AM_PF',ele_links$dem_dyad))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'PM_AM', 'AM_PM',
+                             ifelse(ele_links$dem_dyad == 'PM_AF', 'AF_PM',ele_links$dem_dyad))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'PU_AM', 'AM_PU',
+                             ifelse(ele_links$dem_dyad == 'PU_AF', 'AF_PU',ele_links$dem_dyad))
+
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'JF_AF', 'AF_JF',
+                             ifelse(ele_links$dem_dyad == 'JF_AM', 'AM_JF',ele_links$dem_dyad))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'JM_AM', 'AM_JM',
+                             ifelse(ele_links$dem_dyad == 'JM_AF', 'AF_JM',ele_links$dem_dyad))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'JU_AM', 'AM_JU',
+                             ifelse(ele_links$dem_dyad == 'JU_AF', 'AF_JU',ele_links$dem_dyad))
+
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CF_AF', 'AF_CF',
+                             ifelse(ele_links$dem_dyad == 'CF_AM', 'AM_CF',ele_links$dem_dyad))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CM_AM', 'AM_CM',
+                             ifelse(ele_links$dem_dyad == 'CM_AF', 'AF_CM',ele_links$dem_dyad))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CU_AM', 'AM_CU',
+                             ifelse(ele_links$dem_dyad == 'CU_AF', 'AF_CU',ele_links$dem_dyad))
+
+# put pubescents before juveniles and calves
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'JF_PM', 'PM_JF',
+                             ifelse(ele_links$dem_dyad == 'JM_PM', 'PM_JM',
+                                    ifelse(ele_links$dem_dyad == 'JU_PM', 'PM_JU',ele_links$dem_dyad)))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'JF_PF', 'PF_JF',
+                             ifelse(ele_links$dem_dyad == 'JM_PF', 'PF_JM',
+                                    ifelse(ele_links$dem_dyad == 'JU_PF', 'PF_JU',ele_links$dem_dyad)))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'JF_PU', 'PU_JF',
+                             ifelse(ele_links$dem_dyad == 'JM_PU', 'PU_JM',
+                                    ifelse(ele_links$dem_dyad == 'JU_PU', 'PU_JU',ele_links$dem_dyad)))
+
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CF_PM', 'PM_CF',
+                             ifelse(ele_links$dem_dyad == 'CM_PM', 'PM_CM',
+                                    ifelse(ele_links$dem_dyad == 'CU_PM', 'PM_CU',ele_links$dem_dyad)))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CF_PF', 'PF_CF',
+                             ifelse(ele_links$dem_dyad == 'CM_PF', 'PF_CM',
+                                    ifelse(ele_links$dem_dyad == 'CU_PF', 'PF_CU',ele_links$dem_dyad)))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CF_PU', 'PU_CF',
+                             ifelse(ele_links$dem_dyad == 'CM_PU', 'PU_CM',
+                                    ifelse(ele_links$dem_dyad == 'CU_PU', 'PU_CU',ele_links$dem_dyad)))
+
+# put juveniles before calves
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CF_JF', 'JF_CF',
+                             ifelse(ele_links$dem_dyad == 'CF_JM', 'JM_CF',
+                                    ifelse(ele_links$dem_dyad == 'CF_JU', 'JU_CF',ele_links$dem_dyad)))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CM_JF', 'JF_CM',
+                             ifelse(ele_links$dem_dyad == 'CM_JM', 'JM_CM',
+                                    ifelse(ele_links$dem_dyad == 'CM_JU', 'JU_CM',ele_links$dem_dyad)))
+ele_links$dem_dyad <- ifelse(ele_links$dem_dyad == 'CU_JF', 'JF_CU',
+                             ifelse(ele_links$dem_dyad == 'CU_JM', 'JM_CU',
+                                    ifelse(ele_links$dem_dyad == 'CU_JU', 'JU_CU',ele_links$dem_dyad)))
+
+#ele_nodes <- read_csv('data_processed/motnp_elenodes.csv')
+#ele_nodes$sex       <- as.factor(ele_nodes$sex)
+#ele_nodes$age_class <- as.factor(ele_nodes$age_class)
+#ele_nodes$dem_class <- as.factor(ele_nodes$dem_class)
+#str(ele_nodes)
+
+associations <- ele_links[ele_links$weight > 0,]
+
+links10 <- ele_links[ele_links$count1 > 9 & ele_links$count2 > 9,]
+assoc10 <- associations[associations$count1 > 9 & associations$count2 > 9,]
+
+### Compare types
+boxplot(weight ~ type, data = ele_links, xlab = 'dyad sex', las = 1,
+        main = 'association strength including all dyads')
+boxplot(weight ~ type, data = associations, xlab = 'dyad sex', las = 1, notch = T,
+        main = 'association strength including all dyads \nobserved together at least once')
+boxplot(weight ~ type, data = links10, xlab = 'dyad sex', las = 1, notch = T,
+        main = 'association strength including all dyads where\nboth members were observed at least 10 times')
+boxplot(weight ~ type, data = assoc10, xlab = 'dyad sex', las = 1, notch = T,
+        main = 'association strength including all dyads where\nboth members were observed at least 10 times and \nobserved together at least once')
+
+
+
+
+
+
+### Compare age dyads
+boxplot(weight ~ age.dyad, data = ele_links, xlab = 'dyad age', las = 1, notch = T,
+        main = 'association strength including all dyads')
+boxplot(weight ~ age.dyad, data = associations, xlab = 'dyad age', las = 1, notch = T,
+        main = 'association strength including all dyads\nobserved together at least once')
+boxplot(weight ~ age.dyad, data = links10, xlab = 'dyad sex', las = 1, notch = T,
+        main = 'association strength including all dyads where\nboth members were observed at least 10 times')
+boxplot(weight ~ age.dyad, data = assoc10, xlab = 'dyad sex', las = 1, notch = T,
+        main = 'association strength including all dyads where\nboth members were observed at least 10 times and \nobserved together at least once')
+
+
+
+
+
+
+### Compare full demography
+boxplot(weight ~ dem_dyad, data = ele_links, xlab = 'dyad type', las = 1, horizontal = T,
+        main = 'association strength including all dyads')
+boxplot(weight ~ dem_dyad, data = associations, xlab = 'dyad age', las = 1, horizontal = T,
+        main = 'association strength including all dyads\nobserved together at least once')
+boxplot(weight ~ dem_dyad, data = links10, xlab = 'dyad sex', las = 1, horizontal = T,
+        main = 'association strength including all dyads where\nboth members were observed at least 10 times')
+boxplot(weight ~ dem_dyad, data = assoc10, xlab = 'dyad sex', las = 1, horizontal = T,
+        main = 'association strength including all dyads where\nboth members were observed at least 10 times and \nobserved together at least once')
+
+
+
+
+### Calculate averages per individual and compare demographic groups
+
+
+
+
+
 
 
