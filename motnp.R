@@ -89,8 +89,69 @@ id$months <- as.numeric(rowSums(id[11:30]))
 id$weeks <- as.numeric(rowSums(id[31:108]))
 id$days <- as.numeric(rowSums(id[109:368]))
 
+### load age data
+ages <- readxl::read_excel("data_raw/Raw_ALERT_ElephantAges_Saunders211019.xlsx", sheet = 1)  # read in age data
+names <- colnames(ages) ; names[8] <- 'comments' ; colnames(ages) <- names                    # rename column 8
+ages <- ages[!is.na(ages$id_no),]      # remove empty rows -- 4 less ages than ids
+table(ages$age_category)               # Some values incorrectly saved as dates not categories
+ages$age_category <- ifelse(ages$age_category == '44228', '1-2',
+                            ifelse(ages$age_category == '44257', '2-3',
+                                   ifelse(ages$age_category == '44289', '3-4',
+                                          ifelse(ages$age_category == '44320', '4-5',
+                                                 ifelse(ages$age_category == '44352', '5-6',
+                                                        ifelse(ages$age_category == '44383', '6-7',
+                                                               ifelse(ages$age_category == '44415', '7-8',
+                                                                      ifelse(ages$age_category == '44447', '8-9',
+                                                                             ifelse(ages$age_category == '44478', '9-10',
+                                                                                    ages$age_category)))))))))
+ages$age_category <- ifelse(ages$age_category == '8-9 months', '0-3',   # group together calves <3 years
+                            ifelse(ages$age_category == '<1', '0-3',
+                                   ifelse(ages$age_category == '1', '0-3',
+                                          ifelse(ages$age_category == '1-2', '0-3',
+                                                 ifelse(ages$age_category == '2', '0-3',
+                                                        ifelse(ages$age_category == '2-3', '0-3',
+                                                               ages$age_category))))))
+ages$age_category <- ifelse(ages$age_category == '20-39', '20-35',
+                            ifelse(ages$age_category == '15-20', '15-19', ages$age_category))
+table(ages$age_category)               # Now correct apart from missing values
+
+### Add values for missing elephants -- Helen estimated ages from images sent by Bex, 11th November 2021
+ages$id_no[which(ages$age_category == 'missing')]       # "M0026" "M0154" "M0196" "M0240"
+ages$age_class[which(ages$age_category == 'missing')]   # calf, NA, adult, pubescent
+
+ages$age_category[which(ages$id_no == 'M0026')] <- '1-2'
+ages$age_category[which(ages$id_no == 'M0196')] <- '20-25'
+ages$age_category[which(ages$id_no == 'M0240')] <- '10-15'
+
+ages$id_no[which(is.na(ages$age_category))]      # "F0052"  "F0070" "F0137" "U0008" "M0138" "M0223"  "M0227"
+ages$age_class[which(is.na(ages$age_category))]  #  "Adult" "Pubescent" NA  "Calf"  "Pubescent" "Adult"  "Adult"
+
+ages$age_category[which(ages$id_no == 'F0052')] <- '35-50'
+ages$age_category[which(ages$id_no == 'F0070')] <- '6-7'
+ages$age_category[which(ages$id_no == 'M0223')] <- '20-25'
+ages$age_category[which(ages$id_no == 'M0227')] <- '20-25'
+
+### 6 elephants don't match ages and ID, or are only a number, no other data -- remove from ages spreadsheet.
+ages <- ages[ages$id_no != 'F0137',]
+ages <- ages[ages$id_no != 'M0013',]
+ages <- ages[ages$id_no != 'M0116',]
+ages <- ages[ages$id_no != 'M0125',]
+ages <- ages[ages$id_no != 'M0154',]
+ages <- ages[ages$id_no != 'M0207',]
+
+### Correct mismatches for merging of spreadsheets
+id$name[88]   <- 'Kaitlyn'                                 # name misspelled as 'Kaitlun' in ID sheet
+id$family[11] <- 'U23 F69' ; ages$family[11] <- 'U23 F69'  # Margaret different families recorded in 2 spreadsheets
+
+### Remove elephants with wrong name in ID/ages sheet -- confusion over names suggests potentially incorrect sightings data
+id <- id[id$id_no != 'F0157',] ; ages <- ages[ages$id_no != 'F0157',]
+id <- id[id$id_no != 'M0138',] ; ages <- ages[ages$id_no != 'M0138',]
+
+### Add age data into id sheet
+id <- merge(x = id, y = ages)             # 468 elephants
+id <- id[,c(1:5,369,6:10,370,11:368)]
+
 ### write out processed data
-id$family[11] <- 'U23 F69' # remove comma from inside cell for correct writing to CSV
 write_delim(id, "data_processed/motnp_id.csv", delim = ";", col_names = T)
 
 ### Clear Environment
