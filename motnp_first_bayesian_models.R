@@ -371,6 +371,18 @@ str(counts_df)
 ### add column for total number of sightings per pair
 counts_df$count_dyad <- (counts_df$count_1 + counts_df$count_2) - counts_df$all_events  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
 
+### add column for total number of sightings per pair where they were NOT together
+counts_df$apart <- counts_df$count_dyad - counts_df$all_events
+
+summary(counts_df$apart) # 0-82
+counts_df$dyad[which(counts_df$apart == 82)]       # M14_M56
+counts_df$all_events[which(counts_df$apart == 82)] # never together
+counts_df$count_1[which(counts_df$apart == 82)]    # 36 sightings
+counts_df$count_2[which(counts_df$apart == 82)]    # 46 sightings
+36+46 # 82 -- correct
+never_together <- counts_df[counts_df$all_events == 0,]
+unique(never_together$apart == never_together$count_1 + never_together$count_2) # all correct
+
 ### create data list for aggregated model (binomial)
 counts_ls <- list(
   #N = ...,                           # Number of observations -- unnecessary for aggregated data?
@@ -489,12 +501,8 @@ summary(dyads$edge)
 rm(families, females, mothers, unknown, cliques_F)
 
 ### Sample observations
-#colnames(dyads)
-#rbinom(1, 6, 0.5) # Randomly draw six trials 1/0 with Pr(1)=0.5 and print number of successes. Only do this once.
-#rbinom(5,10, 0.1) # Randomly draw ten trials 1/0 with Pr(1)=0.1 and print number of successes. Repeat five times.
-
 N <- 20
-dyads$event_count <- rbinom(nrow(dyads), N, prob = dyads$edge) ## Dan: I'd recommend not hard-coding parameters. For example, the population size or the 20 sightings above. Always have a parameter for them so that you can change it if you need to.
+dyads$event_count <- rbinom(nrow(dyads), N, prob = dyads$edge)
 
 ### add additional columns (dyadic sex, age and dem_class)
 head(dyads)
@@ -542,23 +550,9 @@ dyads$sex_dyad <- paste(dyads$sex_1, dyads$sex_2, sep = '_')           # composi
 dyads$sex_diff <- ifelse(dyads$sex_1 == dyads$sex_2, 0, 1)             # binary: same or different
 dyads <- dyads[,c(1:22,25:29)] # remove demf variables -- not needed
 
-# counts per individual -- IGNORE, THIS IS CRAP
-#eles <- c(dyads$id_1, dyads$id_2)
-#eles <- sort(unique(eles))
-#dyads$count_1 <- NA
-#dyads$count_2 <- NA
-#for(i in 1:nrow(dyads)){
-#  for(j in 1:length(eles)){
-#    k <- dyads[dyads$id_1 == eles[j] | dyads$id_2 == eles[j],]
-#    dyads$count_1[i] <- ifelse(dyads$id_1[i] == eles[j], sum(k$event_count), dyads$count_1[i])
-#    dyads$count_2[i] <- ifelse(dyads$id_2[i] == eles[j], sum(k$event_count), dyads$count_2[i])
-#  }
-#}
-#summary(dyads$count_1)
-
 # together vs apart per dyad
-summary(dyads$event_count) # together, all out of 20
-dyads$apart <- N - dyads$event_count # does this work? it's not really the total count of sightings of the 2 individuals... but it is also the maximum number of times that they could potentially have been seen together so I THINK it works?
+summary(dyads$event_count)             # together, all out of 20
+dyads$apart <- N - dyads$event_count   # apart = 20-together
 
 ### convert to data list -- unnecessary now? weight <- beta(together,apart)
 colnames(dyads)
@@ -566,136 +560,224 @@ simdat_ls <- list(
   M = nrow(dyads),               # Number of dyads
   dyad_id  = dyads$dyad_id,      # Vector of dyad IDs
   event    = dyads$event_count,  # Number of sightings of each dyad together
-  dem_dyad = dyads$dem_dyad,     # Dyad demographic pairing
-  dem_diff = dyads$dem_diff,     # Dyad difference in demography (same or different)
-  age_dyad = dyads$age_dyad,     # Dyad age pairing
-  age_diff = dyads$age_diff,     # Dyad difference in age (subtracted categories)
-  sex_dyad = dyads$sex_dyad,     # Dyad sex pairing
-  sex_diff = dyads$sex_diff      # Dyad difference in sex (same or different)
+  apart    = dyads$apart#,        # Number of sightings of each dyad apart
+  #dem_dyad = dyads$dem_dyad,     # Dyad demographic pairing
+  #dem_diff = dyads$dem_diff,     # Dyad difference in demography (same or different)
+  #age_dyad = dyads$age_dyad,     # Dyad age pairing
+  #age_diff = dyads$age_diff,     # Dyad difference in age (subtracted categories)
+  #sex_dyad = dyads$sex_dyad,     # Dyad sex pairing
+  #sex_diff = dyads$sex_diff      # Dyad difference in sex (same or different)
 )
 
 ################ 5-6) Define priors and hyperpriors, run prior predictive checks ################
-### calculate weight from beta distribution -- IGNORE, WRONG DISTRIBUTION #####
-rethinking::rbeta2(n = 1, prob = 0.1, theta = 0.05)  # smaller prob = more extreme values, smaller theta = less variation? So it will be prob = dyads$event_count/(dyads$event_count+dyads$apart), theta = ....?
-theta <- 5
-dyads$weight <- rethinking::rbeta2(n = 1, prob = dyads$event_count/(dyads$event_count+dyads$apart), theta = theta)
-summary(dyads$weight)
-# this gives all zeroes for every value of theta....
-
-theta <- 2
-dyads$prob <- dyads$event_count/(dyads$event_count+dyads$apart)
-summary(dyads$prob)
-rethinking::rbeta2(n = 1, prob = 0.0, theta = theta)
-rethinking::rbeta2(n = 1, prob = 0.1, theta = theta)
-rethinking::rbeta2(n = 1, prob = 0.2, theta = theta)
-rethinking::rbeta2(n = 1, prob = 0.3, theta = theta)
-rethinking::rbeta2(n = 1, prob = 1.0, theta = theta)
-# this works, so why not the whole thing?
-
-for(i in 1:nrow(dyads)){
-  dyads$weight[i] <- rethinking::rbeta2(n = 1, prob = dyads$prob[i], theta = theta)
-}
-summary(dyads$weight) # no idea why this worked and the vectorised one didn't
-# this still has no uncertainty though...
-
-# check quality
-plot(event_count ~ edge, data = dyads,
-     las = 1, xlab = 'simulated edge weight', ylab = 'sightings together',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # looks fine
-
-plot(weight ~ event_count, data = dyads,
-     las = 1, xlab = 'sightings together', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # looks fine
-
-plot(weight ~ edge, data = dyads,
-     las = 1, xlab = 'simulated edge weight', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # oh dear...
-
-### try again.... not sure what I'm going to do differently, but clearly something is wrong if these are the results being returned!
-theta <- 10
-for(i in 1:nrow(dyads)){
-  dyads$weight[i] <- rethinking::rbeta2(n = 1, prob = dyads$prob[i], theta = theta)
-}
-plot(event_count ~ edge, data = dyads,
-     las = 1, xlab = 'simulated edge weight', ylab = 'sightings together',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # looks fine
-plot(weight ~ event_count, data = dyads,
-     las = 1, xlab = 'sightings together', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # looks ok
-plot(weight ~ edge, data = dyads,
-     las = 1, xlab = 'simulated edge weight', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # looks ok
-# increasing theta helps
-
-# I don't know what theta is referring to.. total count of sightings for pairing?
-for(i in 1:nrow(dyads)){
-  dyads$weight[i] <- rethinking::rbeta2(n = 1, prob = dyads$prob[i], theta = N)
-}
-plot(weight ~ event_count, data = dyads,
-     las = 1, xlab = 'sightings together', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # looks fine
-
-plot(weight ~ edge, data = dyads,
-     las = 1, xlab = 'simulated edge weight', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # this doesn't look TOO bad -- still has no uncertainty though, apart from my own about what the hell theta should be!
-
-#### calculate weight from beta distribution ####
+### calculate weight from beta distribution -- no uncertainty
 # weight_ij = beta(together, apart)
-for(i in 1:nrow(dyads)){
-  dyads$weight[i] <- rbeta(n = 1, shape1 = dyads$event_count[i], shape2 = dyads$apart[i])
-}
-
 dyads$weight <- rbeta(n = nrow(dyads), shape1 = dyads$event_count, shape2 = dyads$apart)
 
 plot(event_count ~ edge, data = dyads,
-     las = 1, xlab = 'sightings together', ylab = 'calculated edge weight',
+     las = 1, ylab = 'sightings together', xlab = 'assigned edge weight',
      pch = 16, col = col.alpha(rangi2, 0.2))   # this is good!
 
 plot(weight ~ event_count, data = dyads,
      las = 1, xlab = 'sightings together', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # not great
+     pch = 16, col = col.alpha(rangi2, 0.2))   # yes...
 
 plot(weight ~ edge, data = dyads, xlim = c(0,1), ylim = c(0,1),
-     las = 1, xlab = 'simulated edge weight', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # oh dear...
+     las = 1, xlab = 'assigned edge weight', ylab = 'calculated edge weight',
+     pch = 16, col = col.alpha(rangi2, 0.2))   # yay!
+abline(h = c(0,0.2,0.4,0.6,0.8,1), v = c(0,0.2,0.4,0.6,0.8,1), col = 'gray80', lty = 3)
 
-### Beta distribution:
-# when shape1 > 1, left tail fixed to origin
-# when shape2 > 1, right tail fixed to (1,0)
-# when shape1 < 1, l tail exponential at 0 -- shrinking shape1, reduces variation and consistently closer to 0
-# when shape2 < 1, r tail exponential at 1 -- shrinking shape2, reduces variation and consistently closer to 1
-# when shape1 = shape2 = 1, flat line at 1
-# when event_count is high and apart is low should be skewed towards 1 (exponential, n or u?) --> event_count = shape1
-# when apart is high and event_count is low should be skewed towards 0 (exponential, n or u?) --> apart = shape2
+# to add uncertainty, include it directly in the model, or use beta() instead of rbeta() so it's defining the distribution, not drawing from it
+### calculate weight from beta distribution -- no uncertainty
+# weight_ij = beta(together, apart)
+dyads$weight_dist <- beta(a = dyads$event_count, b = dyads$apart)
+summary(dyads$weight_dist)
+dyads$weight_dist[1] # this still just gives a number, but running it repeatedly always gives the same number... way too small and no variation
 
-# make proportions? -- U-shaped beta distribution
-dyads$together_prop <- dyads$event_count/N
-dyads$apart_prop <- dyads$apart/N
+dens(dyads$weight)
+dens(dyads$weight_dist)
+
+cliques <- dyads[which(dyads$clique_1 == dyads$clique_2), c(1:5,11:16,28:30)]
+dens(cliques$weight_dist)   # nope
+dens(cliques$weight)        # this looks good, it's just not right.... because it's individual values not distributions
+
+### retain rbeta not just beta, put into a proper model instead of just a calculation
+# my method would be to draw many samples from beta using rbeta, and then calculate means and CIs from that (probably only really works for the graphing, not for the actual calculations)
 for(i in 1:nrow(dyads)){
-  dyads$weight[i] <- rbeta(n = 1, shape1 = dyads$event_count, shape2 = dyads$apart)
+  dyads$weight_dist[i] <- rbeta(n = 10, shape1 = dyads$event_count[i], shape2 = dyads$apart[i])
 }
-plot(weight ~ event_count, data = dyads,
-     las = 1, xlab = 'sightings together', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # not great
+dyads$weight_dist[1]     # still only reports a single number -- does it just save the last draw?
+dens(dyads$weight_dist)  # much better
 
-plot(weight ~ edge, data = dyads, xlim = c(0,1), ylim = c(0,1),
-     las = 1, xlab = 'simulated edge weight', ylab = 'calculated edge weight',
-     pch = 16, col = col.alpha(rangi2, 0.2))   # oh dear...
-# basically the same
+for(i in 1:nrow(dyads)){
+  dyads$weight_mean[i] <- mean(dyads$weight_dist[i])
+}
+
+plot(dyads$weight_dist ~ dyads$weight_mean) # only used the single value reported in weight_dist, not the whole distribution
+
+for(i in 1:nrow(dyads)){
+  dyads$weight_dist[i] <- list(rbeta(n = 10, shape1 = dyads$event_count[i], shape2 = dyads$apart[i]))
+}
+dyads$weight_dist[1]       # saves all
+for(i in 1:nrow(dyads)){
+  dyads$weight_mean[i] <- mean(as.numeric(dyads$weight_dist[i])) # doesn't work
+}
+summary(dyads$weight_mean)
+
+
+for(i in 1:nrow(dyads)){
+  j <- rbeta(n = 10, shape1 = dyads$event_count[i], shape2 = dyads$apart[i])
+  dyads$weight_mean[i] <- mean(j)
+  dyads$weight_upr[i]  <- quantile(j,0.945)
+  dyads$weight_lwr[i]  <- quantile(j,0.055)
+}
+summary(dyads$weight_mean)
+summary(dyads$weight_upr)
+summary(dyads$weight_lwr)
+
+plot(dyads$weight_mean ~ dyads$edge, las = 1, pch = 19, col = col.alpha(rangi2, 0.25),
+     xlab = 'assigned edge weight', ylab = 'calculated edge weight', xlim = c(0,1), ylim = c(0,1))
+abline(a = 0, b = 1, lty = 2)
+for(i in 1:nrow(dyads)){  # plot CI lines, but for large lump at the bottom only plot every 10th one so they are vaguely visible
+  if(dyads$edge[i] < 0.5 & i%%10 == 0){
+    lines(x = c(dyads$edge[i],dyads$edge[i]), y = c(dyads$weight_upr[i],dyads$weight_lwr[i]))  
+  } else {
+    if(dyads$edge[i] > 0.5) {
+      lines(x = c(dyads$edge[i],dyads$edge[i]), y = c(dyads$weight_upr[i],dyads$weight_lwr[i]))
+    }
+  }
+}
+
+draws <- 1000
+for(i in 1:nrow(dyads)){
+  j <- rbeta(n = draws, shape1 = dyads$event_count[i], shape2 = dyads$apart[i])
+  dyads$weight_mean[i] <- mean(j)
+  dyads$weight_upr[i]  <- quantile(j,0.945)
+  dyads$weight_lwr[i]  <- quantile(j,0.055)
+}
+summary(dyads$weight_mean)
+summary(dyads$weight_upr)
+summary(dyads$weight_lwr)
+
+plot(dyads$weight_mean ~ dyads$edge, las = 1, pch = 19, col = col.alpha(rangi2, 0.25),
+     xlab = 'assigned edge weight', ylab = 'calculated edge weight', xlim = c(0,1), ylim = c(0,1))
+abline(a = 0, b = 1, lty = 2)
+for(i in 1:nrow(dyads)){  # plot CI lines, but for large lump at the bottom only plot every 10th one so they are vaguely visible
+  if(dyads$edge[i] < 0.5 & i%%10 == 0){
+    lines(x = c(dyads$edge[i],dyads$edge[i]), y = c(dyads$weight_upr[i],dyads$weight_lwr[i]))  
+  } else {
+    if(dyads$edge[i] > 0.5) {
+      lines(x = c(dyads$edge[i],dyads$edge[i]), y = c(dyads$weight_upr[i],dyads$weight_lwr[i]))
+    }
+  }
+}
+
+# Dan recommended using beta(), so try putting that into model
+?beta()
+# weight = beta(together, apart) BUT with additional parameters to avoid a flat prior weight = beta(a+together,b+apart)
+# weight ~ beta(a+together, b+apart)
+# (a,b) ~ rnorm(5,2) -- 5 was the value Dan suggested but I think he may have pulled it from the air with no particular reason/thought beyond it being positive to make a dome shaped beta prior, rather than a flat line (a=b=0). If anything, I would think that the extremes of the beta distribution should be more likely than the centre, in which case want shape values to be <1, but not sure that would work as entire shape value can't be negative?
+
+simdat_ls <- list(together = dyads$event_count ,
+                  apart = dyads$apart,
+                  n_dyads = nrow(dyads))
+
+ew1 <- ulam(alist(
+  weight ~ dbeta(a+event,b+apart),            # nope - can't handle the idea of a real number + integer....
+  a ~ dnorm(5,2),
+  b ~ dnorm(5,2)
+), data = simdat_ls, cores = 4, chains = 1)
+
+ew1 <- ulam(alist(
+  weight ~ dbeta(event,apart)                 # try without additional parameters to start with -- can't handle 0 values?
+), data = simdat_ls, cores = 4, chains = 1)
+
+ew1 <- ulam(alist(
+  weight ~ dbeta(1+event,1+apart)             # nope - can't do this again
+), data = simdat_ls, cores = 4, chains = 1)
+
+simdat_ls$event_1 <- simdat_ls$event+1
+simdat_ls$apart_1 <- simdat_ls$apart+1
+ew1 <- ulam(alist(
+  weight ~ dbeta(event_1,apart_1)                 # this works, but I don't know how just adding 1 to both sides affects the shapes themselves -- would think that it will alter the shapes quite substantially
+), data = simdat_ls, cores = 4, chains = 1)
+precis(ew1)     # pretty poor, SD = 0, mean = 5.5% = 94.5%, n_eff v low
+traceplot(ew1)  # actually doesn't look so bad... 
+
+ew1 <- ulam(alist(
+  weight ~ dbeta(a+event_1,b+apart_1),    # still no, even once already had some added
+  a ~ dnorm(5,2),
+  b ~ dnorm(5,2)
+), data = simdat_ls, cores = 4, chains = 1)
+
+ew1 <- ulam(alist(
+  weight ~ dbeta(a+event,b+apart),    # doesn't complain about this line
+  a ~ dpois(5),                       # parameter can't be integer array
+  b ~ dpois(5)                        # parameter can't be integer array
+), data = simdat_ls, cores = 4, chains = 1)
+
+simdat_ls$event_01 <- simdat_ls$event+0.1
+simdat_ls$apart_01 <- simdat_ls$apart+0.1
+
+ew1 <- ulam(alist(
+  weight ~ dbeta(event_01,apart_01)                 # much smaller change forced on model
+), data = simdat_ls, cores = 4, chains = 1)
+precis(ew1)     # pretty poor, SD = 0, mean = 5.5% = 94.5%, n_eff v low
+traceplot(ew1)  # actually doesn't look so bad... 
+
+### 
+clique1 <- dyads[dyads$clique_1 == 1 | dyads$clique_2 == 1,]
+clique1 <- clique1[!is.na(clique1$clique_1) & !is.na(clique1$clique_2),]
+plot(clique1$weight ~ clique1$edge)
+simdat_cliques <- list()
+
+ew1 <- ulam(alist(
+  weight ~ dbeta(event_01,apart_01)
+), data = simdat_ls, cores = 4, chains = 1)
+precis(ew1)     # pretty poor, SD = 0, mean = 5.5% = 94.5%, n_eff v low
+
+###
+simdat_ls <- list(together = as.numeric(dyads$event_count),
+                  apart = as.numeric(dyads$apart))
+  
+ew1 <- ulam(alist(
+  weight ~ dbeta((1+a+together),(1+b+apart)),
+  a ~ dnorm(5,2),
+  b ~ dnorm(5,2)
+), data = simdat_ls, cores = 4, chains = 4) 
+
+ew1 <- ulam(alist(
+  weight ~ dbeta((1+together),(1+apart))
+), data = simdat_ls, cores = 4, chains = 4) 
+
+simdat_ls$add_1 <- rep(1, nrow(dyads))
+ew1 <- ulam(alist(
+  weight ~ dbeta((add_1+together),(add_1+apart))
+), data = simdat_ls, cores = 4, chains = 4)
 
 
 ################ 8) Run model on real standardised data -- Binomial model to calculate SRI with uncertainty ################
 ### create data list -- can contain no NA values in any column, even if column is not specified in model
 counts_ls <- list(
-  all_dyad  = counts_df$count_dyad,   # D = total number of times one or other of the dyad was observed
-  event_all = counts_df$all_events    # Count number of sightings
-)
+  #total   = counts_df$count_dyad,     # total number of times one or other of the dyad was observed
+  together = counts_df$all_events+0.1, # count number of sightings seen together, adjusted so no 0
+  apart    = counts_df$apart+0.1)      # count number of sightings seen apart, adjusted so no 0
+unique(is.na(counts_ls$together))      # FALSE -- no NA values in data
+unique(is.na(counts_ls$apart))         # FALSE -- no NA values in data
+unique(counts_ls$together)             # 32 levels
+unique(counts_ls$apart)                # 81 levels
 
 ### run model
 sri1 <- ulam(alist(
-  event_all ~ dbinom(all_dyad, p),
-  logit(p) <- w,
-  w ~ dnorm(0,1)
+  weight ~ dbeta(together, apart)
+), data = counts_ls, chains = 1)
+traceplot(sri1)
+precis(sri1)
+
+sri1 <- ulam(alist(
+  weight ~ dbeta(a + together, b + apart),
+  a ~ dnorm(5,2),
+  b ~ dnorm(5,2)
 ), data = counts_ls, chains = 1)
 traceplot(sri1)
 precis(sri1)
@@ -809,8 +891,7 @@ df$type_2 <- factor(df$type_2, levels=c("Lifeform", "Droid"))
 df$location <- factor(df$location, levels=location_names)
 df$event <- as.integer(df$event)
 list(df=df, p=p)
-}
-#####
+
 simulate_count <- function() {
   ## code to prepare `example.4.2` dataset goes here
   node_names <- c("Rey", "Leia", "Obi-Wan", "Luke", "C-3PO", "BB-8", "R2-D2", "D-O")
