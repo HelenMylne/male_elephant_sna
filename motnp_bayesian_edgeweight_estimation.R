@@ -363,29 +363,6 @@ for(i in 1:nrow(df2)){
 }
 
 #####
-
-library(tidyverse)
-df1 <- read_delim('data_processed/mpnp_gbi_to_aggregated_dyad_test_firsthalf.csv', delim = ';')
-df2 <- read_delim('data_processed/mpnp_gbi_to_aggregated_dyad_test_secondhalf.csv', delim = ';')
-
-df <- rbind(df1,df2)
-
-write_csv(df, 'data_processed/test.csv')
-readr::write_csv(df, 'data_processed/test.csv') # may have tried to use the wrong package before when it wouldn't go in
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ### make data frame that matches required structure for asnipe::get_associations_points_tw(): "Input data must be of the following form: Date is an integer for day (usually starting at 1 on the first day). Time are the number of seconds elapsed from the start (continuous across all dates). ID is a unique character string for each individual. Location is a unique character string for each location."
 eles_asnipe <- read_delim('data_processed/motnp_eles_long_correctid.csv', delim = ',')
 eles_asnipe$location <- as.character(paste(eles_asnipe$gps_s, eles_asnipe$gps_e, sep = '_'))
@@ -523,19 +500,15 @@ write_csv2(df1, 'data_processed/mpnp_gbi_to_aggregated_dyad_test_firsthalf.csv')
 write_csv2(df2, 'data_processed/mpnp_gbi_to_aggregated_dyad_test_secondhalf.csv')
 
 
+library(tidyverse)
+df1 <- read_delim('data_processed/mpnp_gbi_to_aggregated_dyad_test_firsthalf.csv', delim = ';')
+df2 <- read_delim('data_processed/mpnp_gbi_to_aggregated_dyad_test_secondhalf.csv', delim = ';')
 
+df <- rbind(df1,df2)
 
+write_csv(df, 'data_processed/test.csv')
+readr::write_csv(df, 'data_processed/test.csv') # may have tried to use the wrong package before when it wouldn't go in
 
-
-
-
-
-target1 <- data.frame(node_1 = c('M1', rep('F9', 8), rep('U8',2)),
-                      node_2 = c('M11','U8','F8','F13','M26','M87','F19','M19','M24','F8','F13'),
-                      type_1 = c('AM', rep('AF',8), rep('CU',2)),
-                      type_2 = c('AM','CU','AF','PF','JM','PM','AF','PM','CM','AF','PF'),
-                      event = c(1,rep(2,10)),
-                      location = c('A',rep('B',10)))
 
 ##### starting over again -- 4th January 2022 #####
 ## sightings
@@ -558,23 +531,94 @@ str(nodes)
 ## links
 links <- read_delim('data_processed/motnp_elelinks.csv', delim = ',')
 
-##### Dan code to convert gbi to target format #####
----
-  title: "Convert group-by-individual data to long format"
-output:
-  rmarkdown::github_document
----
-  
-  ## Simulate some data
-  
-  ```{r}
-obs <- t(sapply(1:20, function(x) rbinom(8, 1, 0.5)))
-obs
-```
+##### Dan Rmd code to convert gbi to target format #####
+#---
+#title: "Convert group-by-individual data to long format"
+#output:
+#rmarkdown::github_document
+#---
+
+## Simulate some data
+#```{r}
+#obs <- t(sapply(1:20, function(x) rbinom(8, 1, 0.5)))
+#obs
+#```
 
 ## Convert to long format
+#```{r}
+#df <- data.frame(node_1=numeric(), node_2=numeric(), social_event=numeric(), obs_id=numeric())
+#for (obs_id in 1:nrow(obs)) {
+#  for (i in which(obs[obs_id, ] == 1)) {
+#    for (j in 1:ncol(obs)) {
+#      if (i != j) {
+#        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+#        if (i < j) {
+#          node_1 <- i
+#          node_2 <- j
+#        } else {
+#          node_1 <- j
+#          node_2 <- i
+#        }
+#        df[nrow(df) + 1, ] <- list(node_1=node_1, node_2=node_2, social_event=(obs[obs_id, i] == obs[obs_id, j]), obs_id=obs_id)
+#      }
+#    }
+#  }
+#}
+#df
+#```
 
-```{r}
+##### make short version of data to test Dan's code #####
+eles_short <- eles[eles$encounter == 2 | eles$encounter == 6 | eles$encounter == 1,]
+length(unique(eles_short$elephant)) # 22 rows, 18 elephants -- F13, F8, M87, M26 seen twice
+
+# create gbi
+eles_asnipe <- eles_short[,c(3,4,2,5)]
+eles_asnipe
+eles_asnipe$Date <- as.integer(eles_asnipe$date)
+eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)
+eles_asnipe$Time <- ifelse(eles_asnipe$time > 1, NA, eles_asnipe$time) # time = proportion of day so anything >1 has to be wrong. 1 visit is recorded at time 1599 -- cannot be corrected, so convert to missing value.
+eles_asnipe$Time <- eles_asnipe$time*(24*60*60)   # convert time values to seconds through day
+eles_asnipe$Time <- eles_asnipe$Time + (eles_asnipe$Date-1)*(24*60*60)
+which(is.na(eles_asnipe$Time))
+
+eles_asnipe <- eles_asnipe[,c(5,6,3,4)]
+colnames(eles_asnipe) <- c('Date','Time','ID','Location')
+eles_asnipe$ID <- as.character(eles_asnipe$ID)
+str(eles_asnipe)
+
+### make data frame that matches required structure for asnipe::get_associations_points_tw(): "Input data must be of the following form: Date is an integer for day (usually starting at 1 on the first day). Time are the number of seconds elapsed from the start (continuous across all dates). ID is a unique character string for each individual. Location is a unique character string for each location."
+a <- get_associations_points_tw(eles_asnipe,            # data to input
+                                time_window = 60,       # >1 minute apart = different groups
+                                which_days = NULL,      # all days
+                                which_locations = NULL) # all locations
+gbi <- a[[1]]  # group-by-individual = first part of a -- gbi is empty
+test <- a[[2]] # empty
+test <- a[[3]] # empty
+test <- a[[4]] # empty
+
+## THIS ISN'T WORKING -- TRY WITH TIME PER DAY RATHER THAN CONTINUOUS:
+eles_asnipe$Time <- eles_short$time
+eles_asnipe$Time <- eles_asnipe$Time*(24*60*60)   # convert time values to seconds through day
+
+a <- get_associations_points_tw(eles_asnipe,            # data to input
+                                time_window = 60,       # >1 minute apart = different groups
+                                which_days = NULL,      # all days
+                                which_locations = NULL) # all locations
+a # still empty
+
+##### alternative way to generate gbi #####
+#get_gbi generates a group by individual matrix. The function accepts a data.table with individual identifiers and a group column. The group by individual matrix can then be used to build a network using asnipe::get_network.
+DT <- as.data.table(eles_asnipe)
+DT$group <- as.integer(as.factor(DT$Time))
+DT <- DT[,c(3,5)]
+DT
+
+gbi <- spatsoc::get_gbi(DT = DT, group = 'group', id = 'ID')
+
+## 
+obs <- t(sapply(1:20, function(x) rbinom(8, 1, 0.5)))
+obs
+
 df <- data.frame(node_1=numeric(), node_2=numeric(), social_event=numeric(), obs_id=numeric())
 for (obs_id in 1:nrow(obs)) {
   for (i in which(obs[obs_id, ] == 1)) {
@@ -594,14 +638,454 @@ for (obs_id in 1:nrow(obs)) {
   }
 }
 df
-```
+# node_1 = smaller value of the two individuals
+# node_2 =  larger value of the two individuals
+# social_event = 1 or 0, did it happen
+# obs_id = event number (row number)
 
+gbi.df <- data.frame(node_1=numeric(), node_2=numeric(), social_event=numeric(), obs_id=numeric())
+for (obs_id in 1:nrow(gbi)) {
+  for (i in which(gbi[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi.df[nrow(gbi.df) + 1, ] <- list(node_1=node_1, node_2=node_2, social_event=(gbi[obs_id, i] == gbi[obs_id, j]), obs_id=obs_id)
+      }
+    }
+  }
+}
+gbi.df
+## seems to have worked, but need to check if numbers in gbi.df match to elephant IDs
+str(gbi.df) ; str(gbi.test)
+gbi.test <- data.frame(id_1 = colnames(gbi), node_1 = as.numeric(1:18))
+gbi.check <- left_join(x = gbi.df, y = gbi.test, by = 'node_1')
+gbi.test <- data.frame(id_2 = colnames(gbi), node_2 = as.numeric(1:18))
+gbi.check <- left_join(x = gbi.check, y = gbi.test, by = 'node_2')
+## check by eye -- should be:
+# 1 for M1 and M11 and no others for that pairing -- yes
+# 1 for all pairs in obs_id 2 and no others -- yes
+# 1 for all pairs in obs_id 3 and no others -- yes
 
+## all duplicated, and obs_id ≠ encounter number (encounters in test = 1, 2 and 6, some numbers missing in raw data, to avoid confusion will need to renumber one or the other)
+gbi.check$unique <- paste(gbi.check$node_1, gbi.check$node_2, gbi.check$social_event, gbi.check$obs_id, sep = '_')
+length(unique(gbi.check$unique)) # 282 (total length = 374)
 
+gbi.distinct <- dplyr::distinct(gbi.check)
 
+encounter.numbers <- data.frame(encounter = unique(eles_short$encounter), obs_id = 1:3)
+gbi.check <- left_join(x = gbi.distinct, y = encounter.numbers, by = 'obs_id')  # perfect!
 
+### TARGET FORM:
+##   node_1 node_2 type_1   type_2   event location dyad_id location_id
+## 1 Rey    Leia   Lifeform Lifeform     1 E              1           5
+## 2 Rey    Leia   Lifeform Lifeform     1 C              1           3
+## 3 Rey    Leia   Lifeform Lifeform     1 D              1           4
+## 4 Rey    Leia   Lifeform Lifeform     1 D              1           4
+## 5 Rey    Leia   Lifeform Lifeform     1 C              1           3
+## 6 Rey    Leia   Lifeform Lifeform     1 F              1           6
 
+### CURRENT FORM:
+head(gbi.check)
+##   node_1 node_2 social_event obs_id id_1 id_2         unique encounter
+## 1      1      6            0      1  F13   M1 1_6_0_1_F13_M1         1
+## 2      2      6            0      1  F19   M1 2_6_0_1_F19_M1         1
+## 3      3      6            0      1  F21   M1 3_6_0_1_F21_M1         1
+## 4      4      6            0      1   F8   M1  4_6_0_1_F8_M1         1
+## 5      5      6            0      1   F9   M1  5_6_0_1_F9_M1         1
+## 6      6      7            1      1   M1  M11 6_7_1_1_M1_M11         1
 
+gbi <- data.frame(node_1 = gbi.check$id_1,
+                  node_2 = gbi.check$id_2,
+                  node_1_id = gbi.check$node_1,
+                  node_2_id = gbi.check$node_2,
+                  event = gbi.check$social_event,
+                  encounter = gbi.check$encounter,
+                  obs_id = gbi.check$obs_id)
+                  #type_1 = NA,
+                  #type_2 = NA,
+                  #dyad_id = NA,
+                  #location_id = NA)
 
+head(eles, 10)  # individual eles, info on encounter
+head(nodes, 10) # age_class = A/P/J/C, age_category = 50+/35-40/25-35/..., sex = M/F/U, dem_class = AF/AM/PF/PM/...
+
+colnames(eles_short)  # "encounter","elephant","date","time","location","type","total_elephants","total_id_hkm","perc_id_hkm"
+gbi.all <- left_join(x = gbi, y = eles_short, by = 'encounter')
+gbi.all <- gbi.all[,c(1:7,9:15)]
+names <- colnames(gbi.all) ; names[11] <- 'herd_type' ; colnames(gbi.all) <- names
+
+nodes$node_1 <- nodes$id
+unique(gbi$node_1)
+nodes_short <- nodes[nodes$id == 'M1' | nodes$id == 'M3' | nodes$id == 'M5' | nodes$id == 'M8' | nodes$id == 'M9' |
+                       nodes$id == 'M11' | nodes$id == 'M15' | nodes$id == 'M19' | nodes$id == 'M24' | nodes$id == 'M26' |
+                       nodes$id == 'M52' | nodes$id == 'M87' | nodes$id ==  'F8' | nodes$id == 'F9' | nodes$id == 'F13' |
+                       nodes$id == 'F19' | nodes$id == 'F21' | nodes$id == 'U8', ]
+nodes_short$node_1 <- nodes_short$id
+colnames(nodes_short) # "id_no","herd","name","age_class","age_category","family","days","comments","sex","num","id","count","dem_class","node_1"
+gbi.all <- left_join(x = gbi.all, y = nodes_short, by = 'node_1')
+gbi.all <- gbi.all[,c(1:14,17:19,23,26:27)]
+names <- colnames(gbi.all)
+names[c(15:20)] <- c('name_1','age_class_1','age_category_1','sex_1','count_1','dem_class_1')
+colnames(gbi.all) <- names
+
+nodes_short$node_2 <- nodes_short$id
+nodes_short <- nodes_short[,c(1:13,15)]
+gbi.all <- left_join(x = gbi.all, y = nodes_short, by = 'node_2')
+colnames(gbi.all)
+gbi.all <- gbi.all[,c(1:20,23:25,29,32:33)]
+names <- colnames(gbi.all)
+names[c(21:26)] <- c('name_2','age_class_2','age_category_2','sex_2','count_2','dem_class_2')
+colnames(gbi.all) <- names
+
+colnames(gbi.all)
+gbi.all <- gbi.all[,c(1:15,21,16,22,17,23,18,24,19,25,20,26)]
+
+##### remove duplicates, convert to final target format #####
+### TARGET FORM:
+##   node_1 node_2 type_1   type_2   event location dyad_id location_id
+## 1 Rey    Leia   Lifeform Lifeform     1 E              1           5
+## 2 Rey    Leia   Lifeform Lifeform     1 C              1           3
+## 3 Rey    Leia   Lifeform Lifeform     1 D              1           4
+## 4 Rey    Leia   Lifeform Lifeform     1 D              1           4
+## 5 Rey    Leia   Lifeform Lifeform     1 C              1           3
+## 6 Rey    Leia   Lifeform Lifeform     1 F              1           6
+
+gbi.all$dyad <- paste(gbi.all$node_1, gbi.all$node_2, sep = '_')
+gbi.all$dyad_id <- as.integer(as.factor(gbi.all$dyad))
+gbi.all$location_id <- as.integer(as.factor(gbi.all$location))
+
+gbi.short <- distinct(gbi.all)
+gbi.dyads <- gbi.short[gbi.short$event == 1,]
+
+df_agg <- gbi.short %>%
+  group_by(node_1, node_2) %>%
+  summarise(event_count=sum(event), dyad_id=cur_group_id()) %>%
+  mutate(node_1_id_int=as.integer(as.factor(node_1)), node_2_id_int=as.integer(as.factor(node_2)))
+head(df_agg)
+##   node_1 node_2 event_count dyad_id node_1_id_int node_2_id_int
+##   <chr>  <chr>        <dbl>   <int>         <int>         <int>
+## 1 F13    F19              1       1             1             1
+## 2 F13    F21              1       2             1             2
+## 3 F13    F8               2       3             1             3
+## 4 F13    F9               1       4             1             4
+## 5 F13    M1               0       5             1             5
+## 6 F13    M11              0       6             1             6
+tail(df_agg)
+##   node_1 node_2 event_count dyad_id node_1_id_int node_2_id_int
+##   <chr>  <chr>        <dbl>   <int>         <int>         <int>
+## 1 M8     M87              1     148             1             1
+## 2 M8     M9               1     149             1             2
+## 3 M8     U8               0     150             1             3
+## 4 M87    M9               1     151             1             1
+## 5 M87    U8               1     152             1             2
+## 6 M9     U8               0     153             1             1
+unique(df_agg$node_1_id_int)
+unique(df_agg$node_2_id_int)
+# yes the counts are correct, have to check dyad_id is correct, node_1_id_int all = 1, node_2_id_int 1-17 but missing 18. Too many are 1:1.
+unique(df_agg$dyad_id)
+df_agg$dyad <- paste(df_agg$node_1, df_agg$node_2, sep = '_')
+which(df_agg$dyad == 'F13_F19')     # 1
+which(gbi.short$dyad == 'F13_F19')  # 34 151
+df_agg$dyad_id[1] == gbi.short$dyad_id[34]
+df_agg$dyad_id[1] == gbi.short$dyad_id[151]
+which(df_agg$dyad == 'M1_M11')      # 76
+which(gbi.short$dyad == 'M1_M11')   # 6
+df_agg$dyad_id[76] == gbi.short$dyad_id[6]
+which(df_agg$dyad == 'M15_M24')     # 100
+which(gbi.short$dyad == 'M15_M24')  # 112 204
+df_agg$dyad_id[100] == gbi.short$dyad_id[112]
+df_agg$dyad_id[100] == gbi.short$dyad_id[204]
+# yes, dyad_id is correct
+
+df_agg <- df_agg[,c(1:4)]
+df_agg_corrected <- left_join(x = df_agg, y = gbi.short, by = 'dyad_id')
+df_agg_corrected <- df_agg_corrected[,c(1:4,7,8)]
+colnames(df_agg_corrected) <- c('node_1','node_2','event_count','dyad_id','node_1_id','node_2_id')
+
+## I THINK this is now correct!
+
+model_data <- list(
+  N = nrow(gbi.short),                    # Number of observations
+  M = nrow(df_agg),                       # Number of dyads
+  L = length(unique(gbi.short$location)), # Number of locations
+  dyad_ids = gbi.short$dyad_id,           # Vector of dyad IDs corresponding to each observation
+  location_ids = gbi.short$location_id,   # Vector of location IDs corresponding to each observation
+  event = gbi.short$event                 # Vector of binary values (0/1, presence/absence) corresponding to each observation
+)
+
+rm(a, df, df_agg, DT, eles_asnipe, encounter.numbers, gbi.check, gbi.df, gbi.distinct, gbi.dyads, gbi.test, obs, i,j,names,node_1,node_2,obs_id)
+##### put into model to check output for 3 encounters only -- NOTE: I HAVEN'T WORKED THORUGH ANY DAGS OR ANYTHING HERE, JUST CAUSAL-SALAD-ED TO SEE IF I CAN REMEMBER HOW TO FIT A MODEL! #####
+#model <- stan_model("../models/binary_model.stan")
+#fit <- sampling(model, model_data, cores=4)
+library(rstan)
+library(rethinking)
+model <- ulam(alist(
+  event ~ dbinom(N, p),
+  logit(p) <- beta_dyad[dyad_ids] + beta_loc[location_ids],
+  beta_dyad[dyad_ids] ~ dnorm(0,2),
+  beta_loc[location_ids] ~ dnorm(0,2)),
+data = model_data, cores = 4, chains = 1, iter = 4000)
+precis(model, 2)
+traceplot(model) # that looks like a whole load of hairy caterpillars to me!
+stancode(model)
+# maybe I'm being overoptimistic, but this does actually look how I would expect it to! Not especially useful I don't think, but a start!
+
+## try again, this time incorporating some information about the dyads other than just ID
+head(df_agg_corrected)
+df <- left_join(x = df_agg_corrected, y = gbi.short, by = 'dyad_id')
+df <- distinct(df)
+df$node_1.x == df$node_1.y
+df$node_2.x == df$node_2.y
+df <- df[,c(1:6,11:34)]
+names <- colnames(df)
+names[c(1,2,5,6)] <- c('node_1','node_2','node_1_id','node_2_id')
+colnames(df) <- names
+df$dem_type <- paste(df$dem_class_1, df$dem_class_2, sep = '_')
+df$dem_type_id <- as.integer(as.factor(df$dem_type))
+df$sex_type <- paste(df$sex_1, df$sex_2, sep = '_')
+df$sex_type_id <- as.integer(as.factor(df$sex_type))
+df$herd_type_id <- as.integer(as.factor(df$herd_type))
+
+model_data_2 <- list(
+  N = nrow(df),                    # Number of observations
+  M = nrow(df),                    # Number of dyads
+  L = length(unique(df$location)), # Number of locations
+  dyad_ids = df$dyad_id,           # Vector of dyad IDs corresponding to each observation
+  location_ids = df$location_id,   # Vector of location IDs corresponding to each observation
+  event = df$event_count,          # Vector of binary values (0/1, presence/absence) corresponding to each observation
+  dem_type = df$dem_type_id,       # add further information about sightings to model data
+  sex_type = df$sex_type_id,
+  herd_type = df$herd_type_id,
+  total_count = df$total_elephants
+)
+
+model2 <- ulam(alist(
+  event ~ dbinom(N, p),
+  logit(p) <- b_dem[dem_type] + b_sex[sex_type] + b_herd[herd_type] + b_size*total_count,
+  b_dem[dem_type] ~ dnorm(0,2),
+  b_sex[sex_type] ~ dnorm(0,2),
+  b_herd[herd_type] ~ dnorm(0,2),
+  b_size ~ dnorm(0,2)),
+  data = model_data_2, cores = 4, chains = 1, iter = 4000)
+precis(model2,2)
+traceplot(model2) # looking good! :D -- now do it again, but properly and actually follow all of the steps including producing DAGs, standardizing the variables, simulating data, performing prior predictive checks, checking the model on simulated data, THEN running it like this!
+stancode(model2)
+
+dev.off()
+##### repeat with complete data, not just 3 encounters #####
+## sightings
+sightings <- read_delim(file = 'data_processed/motnp_encounters_correctid.csv', delim = ',')
+sightings <- sightings[1:22]
+str(sightings)
+
+## elephant encounters
+eles <- read_delim(file = 'data_processed/motnp_eles_long_correctid.csv', delim = ',')
+eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_')
+colnames(eles)
+eles <- eles[c(1,14,2,3,15,12,6,8,11)]
+str(eles)
+
+## nodes
+nodes <- read_delim(file = 'data_processed/motnp_elenodes.csv', delim = ',')
+colnames(nodes)
+str(nodes)
+
+## links
+links <- read_delim('data_processed/motnp_elelinks.csv', delim = ',')
+
+## create gbi
+eles_asnipe <- eles[,c(3,4,2,5)]
+eles_asnipe$Date <- as.integer(eles_asnipe$date)
+eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)         # start from 1, not 1st January 1970
+eles_asnipe$Time <- ifelse(eles_asnipe$time > 1, NA, eles_asnipe$time) # time = proportion of day so anything >1 has to be wrong
+eles_asnipe$Time <- eles_asnipe$Time*(24*60*60)                        # convert time values to seconds through day
+which(is.na(eles_asnipe$Time))                                         # 161 698 1122 1469 1770
+eles_asnipe[c(161,698,1122,1469,1770),]                                # all 1 sighting of B7+M44
+
+eles_asnipe <- eles_asnipe[,c(5,6,3,4)]
+colnames(eles_asnipe) <- c('Date','Time','ID','Location')
+eles_asnipe$ID <- as.character(eles_asnipe$ID)
+str(eles_asnipe)
+
+# get_gbi generates a group by individual matrix. The function accepts a data.table with individual identifiers and a group column. The group by individual matrix can then be used to build a network using asnipe::get_network.
+DT <- as.data.table(eles_asnipe)
+DT$d_pad <- str_pad(DT$Date, 3, pad = '0')
+DT$encounter <- paste(DT$d_pad, DT$Time, DT$Location, sep = '_')
+DT$group <- as.integer(as.factor(DT$encounter))
+max(DT$group) # 574
+DT <- DT[,c(3,7)]
+DT
+
+################ NOTE HERE -- NEED TO CHECK ELES_LONG DATAFRAME -- TOO FEW ENCOUNTERS OVERALL ################
+gbi <- spatsoc::get_gbi(DT = DT, group = 'group', id = 'ID') ## THIS STEP WORKS ASSUMING THAT DT IS CORRECT. POTENTIAL ISSUE IS THAT THIS APPEARS TO INDICATE 574 SIGHTINGS, BUT SIGHITNGS SHEET CONTAINS 1313 ROWS OF DATA. IS THIS AN ERROR IN ELES_LONG??
+length(unique(eles$encounter)) # 574 unique values
+################ NOTE HERE -- NEED TO CHECK ELES_LONG DATAFRAME -- TOO FEW ENCOUNTERS OVERALL ################
+
+myTriangular(472) * 2 # 111156 * 2 rows of data will be produced... I think...
+gbi.df <- data.frame(node_1=numeric(), node_2=numeric(), social_event=numeric(), obs_id=numeric())
+for (obs_id in 1:nrow(gbi)) {
+  for (i in which(gbi[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi.df[nrow(gbi.df) + 1, ] <- list(node_1=node_1, node_2=node_2, social_event=(gbi[obs_id, i] == gbi[obs_id, j]), obs_id=obs_id)
+      }
+    }
+  }
+}
+gbi.df
+write_delim(gbi.df, 'data_processed/gbi.df_first_run_2005989obs_4263individualencounters_22.01.06.csv', delim = ',')
+#test <- read_delim('data_processed/gbi.df_first_run_2005989obs_4263individualencounters_22.01.06.csv', delim = ',')
+
+## seems to have worked, but need to check if numbers in gbi.df match to elephant IDs
+str(gbi.df)
+gbi.test <- data.frame(id_1 = colnames(gbi), node_1 = as.numeric(1:472))
+gbi.check <- left_join(x = gbi.df, y = gbi.test, by = 'node_1')
+gbi.test <- data.frame(id_2 = colnames(gbi), node_2 = as.numeric(1:472))
+gbi.check <- left_join(x = gbi.check, y = gbi.test, by = 'node_2')
+
+# check
+unique(eles_short$elephant)  # "M1","F9","F8","M11","U8","F13","F21","M15","M26","M87","F19","M3","M19","M5","M24","M8","M9","M52"
+gbi.check.e1 <- gbi.check[gbi.check$obs_id == 1,]
+gbi.check.e1[which(gbi.check.e1$social_event == 1),]             # M1 and M11 -- this is correct
+gbi.check.e2 <- gbi.check[gbi.check$obs_id == 2,]
+unique(gbi.check.e2$id_1[which(gbi.check.e2$social_event == 1)]) # "F13" "F19" "F8"  "F9"  "M19" "M24" "M26" "M87" - correct
+unique(gbi.check.e2$id_2[which(gbi.check.e2$social_event == 1)]) # "F19" "F8"  "F9"  "M19" "M24" "M26" "M87" "U8"  - correct
+gbi.check.e6 <- gbi.check[gbi.check$obs_id == 6,]    # 15073-15543
+gbi.check.e6[which(gbi.check.e6$social_event == 1),] # all are 0 -- seems to be showing everyone against F40 and then F40 against everyone else, but that's it? -- because I've had to cut out a load of sightings at some point. Encounter numbers go 1,2,3,5,6,8, so the 6th registered encounter is actually encounter 8 which is 10 elephants of which only F40 was identified.
+gbi.check.e6 <- gbi.check[gbi.check$obs_id == 5,]
+unique(gbi.check.e6$id_1[which(gbi.check.e6$social_event == 1)]) # "F13","F21","F8","M15","M26","M3","M5","M52","M8","M87" - correct
+unique(gbi.check.e6$id_2[which(gbi.check.e6$social_event == 1)]) # "F21","F8","M15","M26","M3","M5","M52","M8","M87","M9"  - correct
+
+eles$obs_id <- as.integer(as.factor(eles$encounter))
+eles <- eles[,c(1,14,2:13)]
+gbi.encounter <- left_join(x = gbi.check, y = eles, by = 'obs_id')
+length(unique(gbi.encounter$encounter)) # 574 -- correct from input data, but input should have been 1313
+
+gbi.encounter$unique <- paste(gbi.encounter$node_1, gbi.encounter$node_2, gbi.encounter$social_event, gbi.encounter$obs_id, sep = '_')
+length(unique(gbi.encounter$unique))           # 1963129 (total length = 42401775)
+gbi.distinct <- dplyr::distinct(gbi.encounter) # 40708781 obs -- this is way too long, this shouldn't be happening -- too many to load, can't inspect visually
+colnames(gbi.distinct) # "node_1","node_2","social_event","obs_id","id_1","id_2","encounter","date","time","gps_s","gps_e","total_elephants","total_id_dy","total_id_hkm","total_id_diff","perc_id_dy","perc_id_hkm","type","elephant","unique"
+head(gbi.distinct, 10)
+gbi.distinct <- gbi.distinct[,c(1:12,14,17,18)]
+
+names <- colnames(gbi.distinct) ; names[c(7,13:15)] <- c('encounter_id','total_id','perc_id','herd_type') ; colnames(gbi.distinct) <- names
+gbi.distinct$location <- paste(gbi.distinct$gps_s, gbi.distinct$gps_e, sep = '_')
+
+## convert to model data format
+md1 <- gbi.distinct[,c(1:9,16,12:15)]
+md1$dyad <- paste(md1$id_1, md1$id_2, sep = '_')
+md1$dyad_id <- as.integer(as.factor(md1$dyad))
+md1$location_id <- as.integer(as.factor(md1$location))
+
+md <- distinct(md1)
+# md_dyads <- md[md$social_event == 1,] # not sure whether this is necessary
+head(md)
+
+df_agg <- md %>%
+  group_by(id_1, id_2) %>%
+  summarise(event_count=sum(social_event), dyad_id=cur_group_id()) %>%
+  mutate(node_1_id=as.integer(as.factor(id_1)), node_2_id=as.integer(as.factor(id_2)))
+length(df_agg$id_1) == myTriangular(472) # correct number of dyads!
+head(df_agg)
+##   id_1  id_2  event_count dyad_id node_1_id node_2_id
+##   <chr> <chr>       <dbl>   <int>     <int>     <int>
+## 1 F1    F10             0       1         1         1
+## 2 F1    F100            0       2         1         2
+## 3 F1    F101            0       3         1         3
+## 4 F1    F102            0       4         1         4
+## 5 F1    F103            0       5         1         5
+## 6 F1    F104            0       6         1         6
+tail(df_agg)
+##  id_1  id_2  event_count dyad_id node_1_id node_2_id
+##   <chr> <chr>       <dbl>   <int>     <int>     <int>
+## 1 U67   U7              0  111151         1         1
+## 2 U67   U8              0  111152         1         2
+## 3 U67   U9              0  111153         1         3
+## 4 U7    U8              1  111154         1         1
+## 5 U7    U9              1  111155         1         2
+## 6 U8    U9              2  111156         1         1
+
+unique(df_agg$node_1_id)     # STILL GOT ALL ARE 1
+unique(df_agg$node_2_id)     # 1-471 BUT head() AND tail() SHOW THAT node_2_id STILL HAS VALUES 1-3 FOR U7-U9 AND F10,F100 AND F101
+
+length(unique(df_agg$dyad_id)) # 111156 -- correct
+df_agg$dyad <- paste(df_agg$id_1, df_agg$id_2, sep = '_')
+which(df_agg$dyad == 'F1_F10')        # 1
+which(md1$dyad == 'F1_F10')           # 546 ENTRIES
+df_agg$dyad_id[1] == md1$dyad_id[40181]
+df_agg$dyad_id[1] == md1$dyad_id[14930761]
+df_agg$dyad_id[1] == md1$dyad_id[39958855]
+which(df_agg$dyad == 'M1_M11')        # 60765
+which(md1$dyad == 'M1_M11')           # 500 ENTRIES
+df_agg$dyad_id[60765] == md1$dyad_id[331]
+df_agg$dyad_id[60765] == md1$dyad_id[15966960]
+df_agg$dyad_id[60765] == md1$dyad_id[40513969]
+which(df_agg$dyad == 'M15_M24')       # 76800
+which(md1$dyad == 'M15_M24')          # 481 ENTRIES
+df_agg$dyad_id[76800] == md1$dyad_id[24833]
+df_agg$dyad_id[76800] == md1$dyad_id[11469918]
+df_agg$dyad_id[76800] == md1$dyad_id[40194294]
+# yes, dyad_id is correct
+
+df_agg <- df_agg[,c(1:4)]
+## tested way to correct node_1 and node_2 not working due to exceeded vector memory
+#df_agg_corrected <- left_join(x = df_agg, y = md1, by = 'dyad_id')
+#df_agg_corrected <- df_agg_corrected[,c(1:4,7,8)]
+#colnames(df_agg_corrected) <- c('node_1','node_2','event_count','dyad_id','node_1_id','node_2_id')
+## alternative way
+df_agg$node_1 <- as.integer(as.factor(df_agg$id_1))
+df_agg$node_2 <- as.integer(as.factor(df_agg$id_2))+1 # add 1 so starts at 2 and F1 is "1"
+head(df_agg,10) ; tail(df_agg,10)
+## I THINK this is now correct!
+
+## add data about nodes
+colnames(nodes)
+node_data <- nodes[is.na(nodes$comments),c(1,3:5,9,11:13)]
+node_data$id_1 <- node_data$id
+node_data$id_2 <- node_data$id
+
+unique(gbi.distinct$id_1) # 155 females, 250 males, 65 unknowns
+unique(node_data$id_1)    # 151 females, 245 males, 66 unknowns
+
+colnames(node_data) ; colnames(df_agg)
+dyads <- left_join(x = df_agg, y = node_data, by = 'id_1')
+names <- colnames(dyads)
+names[c(2,7:15)] <- c('id_2','id_pad_1','name_1','age_class_1','age_category_1','sex_1','id1_deletecolumn','count_1','dem_class_1','deletecolumn1')
+colnames(dyads) <- names
+head(dyads)
+
+dyads <- left_join(x = dyads, y = node_data, by = 'id_2')
+names <- colnames(dyads)
+names[c(1,16:24)] <- c('id_1','id_pad_2','name_2','age_class_2','age_category_2','sex_2','id2_deletecolumn','count_2','dem_class_2','deletecolumn2')
+colnames(dyads) <- names
+
+str(dyads)
+dyads <- dyads[,c(4,1,2,5,6,3,7,16,8,17,9,18,10,19,11,20,13,22,14,23)]
+str(dyads)
+
+## create model data
+model_data <- list(
+  N = nrow(gbi.short),                    # Number of observations
+  M = nrow(df_agg),                       # Number of dyads
+  L = length(unique(gbi.short$location)), # Number of locations
+  dyad_ids = gbi.short$dyad_id,           # Vector of dyad IDs corresponding to each observation
+  location_ids = gbi.short$location_id,   # Vector of location IDs corresponding to each observation
+  event = gbi.short$event                 # Vector of binary values (0/1, presence/absence) corresponding to each observation
+)
 
 
