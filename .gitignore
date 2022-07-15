@@ -42,3 +42,6 @@ vignettes/*.pdf
 .csv
 .rds
 .xlsx
+
+# DS Store files for Mac Finder navigation
+.DS_Store
