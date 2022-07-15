@@ -408,95 +408,81 @@ counts_ls <- list(
 # females in 8 cliques -- edge weight 0.8, otherwise 0.2
 # unknowns attached to a single female -- edge weight 0.95
 
-cliques_F <- sample(1:8,50,replace=T)
+# assign females to family units
+cliques_F <- rep(NA,50)
+for(i in 1:50){
+  cliques_F[i] <- round(runif(1, min = 1, max = 8),0)
+}
 table(cliques_F)
 
+# create data frame of all individuals
 population <- data.frame(id = rep(NA,120),
                          num = c(1:50,1:50,1:20),
                          sex = c(rep('M',50), rep('F',50), rep('U',20)),
                          age = c(rep(c(3:7), each = 10), rep(c(3:7), each = 10), rep(c(1:2), each = 10)),
                          clique = c(rep(NA, 50), cliques_F, rep(NA, 20)))
-
 population$id <- paste(population$sex, population$num, sep = '')
 
+# randomly assign calves to females
 mothers <- data.frame(id = population$id[101:120],
                       family = sample(population$id[61:100], replace = F, size = 20))
 mothers
 population <- left_join(x = population, y = mothers, by = 'id')
 
-# need a clique for U elephants
-# need a family for F elephants
-head(mothers)
-tail(population,30)
-
+# need a clique for U elephants and a family for F elephants
 females <- population[population$sex == 'F', c(1,5,6)]
 unknown <- population[population$sex == 'U', c(1,5,6)]
-females$mother <- females$id
-unknown$mother <- unknown$family
-families <- left_join(x = unknown, y = females, by = 'mother')
+females$mother <- females$id ; unknown$mother <- unknown$family   # create variable to join by
+families <- left_join(x = unknown, y = females, by = 'mother')    # join to give unknowns a clique
 unknown <- families[,c(1,4,6)]
-colnames(unknown) <- c('id','mother','clique')
 
-families <- left_join(x = females, y = unknown, by = 'mother')
+families <- left_join(x = females, y = unknown, by = 'mother')    # join to give mothers their calf
 females <- families[,c(1,5,2)]
+
+colnames(unknown) <- c('id','mother','clique')
 colnames(females) <- c('id','mother','clique')
+families <- rbind(females, unknown)                               # put mother and calf data into a single data frame
 
-families <- rbind(females, unknown)
-
+# join to combine male and female/unknown data together
 population <- left_join(x = population, y = families, by = 'id')
 population <- population[,c(1,3,4,7,8)]
 colnames(population)[c(4,5)] <- c('family','clique')
 
-### Set edge weights
-# sample 1000 observations of dyads with probability = edge weight
-dyads <- data.frame(id_1 = rep(population$id, each = 120),
-                    id_2 = rep(population$id, 120))
-dyads$same <- ifelse(dyads$id_1 == dyads$id_2, 'yes', 'no')
-dyads <- dyads[dyads$same == 'no', c(1,2)]
-dyads$node_1 <- as.integer(as.factor(dyads$id_1))
-dyads$node_2 <- as.integer(as.factor(dyads$id_2))
-
-dyads$dyad <- ifelse(dyads$node_1 < dyads$node_2, 
+### Create dyadic data frame
+dyads <- data.frame(id_1 = rep(population$id, each = 120), id_2 = rep(population$id, 120))               # create new data frame of all dyads
+dyads$same <- ifelse(dyads$id_1 == dyads$id_2, 'yes', 'no') ; dyads <- dyads[dyads$same == 'no', c(1,2)] # remove self-dyads (e.g. M1-M1)
+dyads$node_1 <- as.integer(as.factor(dyads$id_1)) ; dyads$node_2 <- as.integer(as.factor(dyads$id_2))    # create factor of nodes
+dyads$dyad <- ifelse(dyads$node_1 < dyads$node_2,                   # create variable of dyads
                      paste(dyads$id_1, dyads$id_2, sep = '_'),
                      paste(dyads$id_2, dyads$id_1, sep = '_'))
 
-dyads <- data.frame(dyad = unique(dyads$dyad))
-dyads <- separate(dyads, col = dyad, into = c('id_1','id_2'), remove = FALSE)
-dyads$node_1 <- as.integer(as.factor(dyads$id_1))
-dyads$node_2 <- as.integer(as.factor(dyads$id_2))
-dyads$dyad_id <- as.integer(as.factor(dyads$dyad))
+dyads <- data.frame(dyad = unique(dyads$dyad))                                  # create new data frame of only unique dyads
+dyads <- separate(dyads, col = dyad, into = c('id_1','id_2'), remove = FALSE)   # nodes columns
+dyads$node_1 <- as.integer(as.factor(dyads$id_1))                               # nodes columns
+dyads$node_2 <- as.integer(as.factor(dyads$id_2))                               # nodes columns
+dyads$dyad_id <- as.integer(as.factor(dyads$dyad))                              # dyad index variable
 
-population$id_1 <- population$id ; population$id_2 <- population$id
-
-dyads <- left_join(x = dyads, y = population, by = 'id_1')
+population$id_1 <- population$id ; population$id_2 <- population$id  # variable to join information on each individual
+dyads <- left_join(x = dyads, y = population, by = 'id_1')           # add information about node 1
 dyads <- dyads[,c(1:6,8:11)]
 colnames(dyads)[c(3,7:10)] <- c('id_2','sex_1','age_1','family_1','clique_1')
 
-dyads <- left_join(x = dyads, y = population, by = 'id_2')
+dyads <- left_join(x = dyads, y = population, by = 'id_2')           # add information about node 2
 dyads <- dyads[,c(1:10,12:15)]
 colnames(dyads)[c(2,11:14)] <- c('id_1','sex_2','age_2','family_2','clique_2')
 
 dyads <- dyads[,c(1:7,11,8,12,9,13,10,14)]
 
+### Assign edge weight to dyad pairs
 for(i in 1:nrow(dyads)){
   if(is.na(dyads$clique_1[i]) | is.na(dyads$clique_2[i])) {
-    dyads$edge[i] <- 1
+    dyads$edge[i] <- abs(rnorm(1,0.2,0.1))                           # not in a family: edge weight around 0.2
   } else 
-    ifelse(dyads$family_1[i] == dyads$id_2[i],
-           dyads$edge[i] <- 2,
-           dyads$edge[i] <- 3)
-}
-unique(dyads$edge)
-
-length(dyads[dyads$edge == 2,]$dyad) # 20 -- correct
-
-for(i in 1:nrow(dyads)){
-  if(is.na(dyads$clique_1[i]) | is.na(dyads$clique_2[i])) {
-    dyads$edge[i] <- abs(rnorm(1,0.2,0.1))
-  } else 
-    ifelse(dyads$family_1[i] == dyads$id_2[i],
-           dyads$edge[i] <- 1 - abs(rnorm(1,0.05,0.05)),
-           dyads$edge[i] <- 1 - abs(rnorm(1,0.2,0.1)))
+    ifelse(dyads$clique_1[i] == dyads$clique_2[i],
+           ifelse(dyads$family_1[i] == dyads$id_2[i],
+                  dyads$edge[i] <- 1 - abs(rnorm(1,0.05,0.05)),      # mother-calf: edge weight around 0.95
+                  dyads$edge[i] <- 1 - abs(rnorm(1,0.2,0.1))),       # same family, not mother-calf: edge weight around 0.8
+           dyads$edge[i] <- abs(rnorm(1,0.2,0.1)))                   # different family: edge weight around 0.2
 }
 unique(dyads$edge)
 summary(dyads$edge)
@@ -504,33 +490,17 @@ summary(dyads$edge)
 rm(families, females, mothers, unknown, cliques_F)
 
 ### Sample observations
-colnames(dyads)
-rbinom(1, 6, 0.5) # Randomly draw six trials 1/0 with Pr(1)=0.5 and print number of successes. Only do this once.
-rbinom(5,10, 0.1) # Randomly draw ten trials 1/0 with Pr(1)=0.1 and print number of successes. Repeat five times.
-
-dyads$event_count <- rbinom(nrow(dyads), 20, prob = dyads$edge)
+for(i in 1:nrow(dyads)){
+  dyads$event_count[i] <- rbinom(1, 20, prob = dyads$edge[i])  # max 20 sightings of every dyad
+}
 
 ### add additional columns (dyadic sex, age and dem_class)
 head(dyads)
+# assign each node to age category (adult, pubescent, juvenile or calf) from age class
 dyads$age_cat_1 <- ifelse(dyads$age_1 == 1, 'C', ifelse(dyads$age_1 == 2, 'J', ifelse(dyads$age_1 < 5, 'P', 'A')))
 dyads$age_cat_2 <- ifelse(dyads$age_2 == 1, 'C', ifelse(dyads$age_2 == 2, 'J', ifelse(dyads$age_2 < 5, 'P', 'A')))
-dyads$dem_class_1 <- paste(dyads$age_cat_1, dyads$sex_1, sep = '')
-dyads$dem_class_2 <- paste(dyads$age_cat_2, dyads$sex_2, sep = '')
-dyads$demf_1 <- as.integer(as.factor(dyads$dem_class_1)) ; dyads$demf_2 <- as.integer(as.factor(dyads$dem_class_2))
-dyads$dem_dyad <- ifelse(dyads$demf_1 < dyads$demf_2,
-                         paste(dyads$dem_class_1, dyads$dem_class_2, sep = '_'),
-                         paste(dyads$dem_class_2, dyads$dem_class_1, sep = '_'))
-unique(dyads$dem_dyad) # AF_AF AF_AM AF_CU AF_JU AF_PF AF_PM AM_AM AM_CU AM_JU AM_PF AM_PM CU_CU CU_JU CU_PF CU_PM JU_JU JU_PF JU_PM PF_PF PF_PM PM_PM
-dyads$dem_dyad <- ifelse(dyads$dem_dyad == 'CU_JU', 'JU_CU',
-                         ifelse(dyads$dem_dyad == 'CU_PF', 'PF_CU',
-                                ifelse(dyads$dem_dyad == 'CU_PM','PM_CU',
-                                       ifelse(dyads$dem_dyad == 'JU_PF','PF_JU',
-                                              ifelse(dyads$dem_dyad == 'JU_PM','PM_JU',dyads$dem_dyad)))))
-dyads$dem_dyad_f <- as.integer(as.factor(dyads$dem_dyad))
-dyads$dem_diff <- ifelse(dyads$dem_class_1 == dyads$dem_class_2, 0, 1)
-dyads$sex_dyad <- paste(dyads$sex_1, dyads$sex_2, sep = '_')
-dyads$sex_diff <- ifelse(dyads$sex_1 == dyads$sex_2, 0, 1)
 
+# combine age categories into single variable for dyad
 dyads$age_dyad <- ifelse(dyads$age_cat_1 == 'A',
                          ifelse(dyads$age_cat_2 == 'A', 'A_A',
                                 ifelse(dyads$age_cat_2 == 'P', 'A_P',
@@ -549,27 +519,33 @@ dyads$age_dyad <- ifelse(dyads$age_cat_1 == 'A',
 unique(dyads$age_dyad) # "P_P" "P_A" "A_P" "P_C" "P_J" "A_A" "A_C" "A_J" "C_C" "C_J" "J_C" "J_J"
 dyads$age_diff <- abs(dyads$age_1 - dyads$age_2)
 
-dyads <- dyads[,c(1:20,23,25:29)]
+# create composite measure of demography per node (e.g. AM = adult male, CU = calf of unknown sex)
+dyads$dem_class_1 <- paste(dyads$age_cat_1, dyads$sex_1, sep = '')
+dyads$dem_class_2 <- paste(dyads$age_cat_2, dyads$sex_2, sep = '')
 
-eles <- cbind(dyads$id_1, dyads$id_2)
-eles <- sort(unique(eles))
-for(i in 1:nrow(dyads)){
-  for(j in 1:length(eles)){
-    k <- dyads[dyads$id_1 == eles[j],]
-    l <- dyads[dyads$id_2 == eles[j],]
-    dyads$count_1[i] <- ifelse(dyads$id_1[i] == eles[j], sum(k$event_count), dyads$count_1[i])
-    dyads$count_2[i] <- ifelse(dyads$id_2[i] == eles[j], sum(l$event_count), dyads$count_2[i])
-  }
-}
-summary(dyads$count_1) # all 273
+# combine demographies into single variable for dyad
+dyads$demf_1 <- as.integer(as.factor(dyads$dem_class_1)) ; dyads$demf_2 <- as.integer(as.factor(dyads$dem_class_2))
+dyads$dem_dyad <- ifelse(dyads$demf_1 < dyads$demf_2,
+                         paste(dyads$dem_class_1, dyads$dem_class_2, sep = '_'),
+                         paste(dyads$dem_class_2, dyads$dem_class_1, sep = '_'))
+dyads$dem_dyad <- ifelse(dyads$dem_dyad == 'CU_JU', 'JU_CU',        # standardise dem_dyad so always in same order
+                         ifelse(dyads$dem_dyad == 'CU_PF', 'PF_CU',
+                                ifelse(dyads$dem_dyad == 'CU_PM','PM_CU',
+                                       ifelse(dyads$dem_dyad == 'JU_PF','PF_JU',
+                                              ifelse(dyads$dem_dyad == 'JU_PM','PM_JU',dyads$dem_dyad)))))
+dyads$dem_dyad_f <- as.integer(as.factor(dyads$dem_dyad))           # make index variable
 
+dyads$dem_diff <- ifelse(dyads$dem_class_1 == dyads$dem_class_2, 0, 1) # binary: same or different
+dyads$sex_dyad <- paste(dyads$sex_1, dyads$sex_2, sep = '_')           # composite sex variable for dyad
+dyads$sex_diff <- ifelse(dyads$sex_1 == dyads$sex_2, 0, 1)             # binary: same or different
+dyads <- dyads[,c(1:22,25:29)] # remove demf variables -- not needed
 
 ### convert to data list
 colnames(dyads)
 simdat_ls <- list(
   M = nrow(dyads),               # Number of dyads
-  dyad_id  = dyads$dyad_id,      # Vector of dyad IDs corresponding to each observation
-  event    = dyads$event_count,  # Vector of binary values (0/1, presence/absence) corresponding to each observation
+  dyad_id  = dyads$dyad_id,      # Vector of dyad IDs
+  event    = dyads$event_count,  # Number of sightings of each dyad together
   dem_dyad = dyads$dem_dyad,     # Dyad demographic pairing
   dem_diff = dyads$dem_diff,     # Dyad difference in demography (same or different)
   age_dyad = dyads$age_dyad,     # Dyad age pairing
@@ -830,7 +806,7 @@ metropolis <- function(target, initial, iterations=10000, warmup=2000, thin=4, c
   df$event <- as.integer(df$event)
   list(df=df, p=p)
 }
-
+#####
 simulate_count <- function() {
   ## code to prepare `example.4.2` dataset goes here
   node_names <- c("Rey", "Leia", "Obi-Wan", "Luke", "C-3PO", "BB-8", "R2-D2", "D-O")
@@ -986,7 +962,7 @@ model {
 generated quantities {
   int event_pred[N] = poisson_rng(exp(log_pn));
 }')
-
+#####
 # Compiling the model may take a minute or two, but once this is done, the model can be fit using `sampling()`. The argument `cores` sets the number of CPU cores to be used for fitting the model, if your computer has 4 or more cores, it's worth setting this to 4.
 fit <- sampling(model, model_data, cores=4, iter=5000, refresh=500)
 
