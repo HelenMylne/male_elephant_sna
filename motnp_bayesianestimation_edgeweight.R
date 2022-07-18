@@ -1,17 +1,26 @@
-### Bayesian analysis of ALERT data
-### Set up ####
+#### Bayesian analysis of ALERT data ####
+# Script to process association data from Mosi-Oa-Tunya National Park, Zambia.
+# Data collected: 19th May 2016-21st December 2017
+# Collected by: Mr David Youldon, Mr Dabwiso Sakala, Miss Helen Mylne and other volunteers/interns/facilitated research students working with ALERT during this time
+# Data supplied by: ALERT and Mr David Youldon (11th August 2021) and via Volunteer Encounter (Bex Saunders, 19th October 2021)
+# Data input: raw data provided by ALERT processed using script 22.01.13_ALERT_bayesian.R
+
+#### Set up ####
 # load packages
 library(tidyverse)
 library(dplyr)
-#library(rstan)
-#library(rethinking)
-#library(igraph)
-#library(dagitty)
-#library(cmdstanr)
+library(rstan)
+library(rethinking)
+library(igraph)
+library(dagitty)
+library(cmdstanr)
 
 # information
+sessionInfo()
 R.Version()
 rstan::stan_version()
+#packageVersion('')
+#citation('')
 
 # set stan path
 set_cmdstan_path('/Users/helen/.cmdstanr/cmdstan-2.28.2')
@@ -51,7 +60,7 @@ rm(binom)
 dev.off()
 ################ 2) Create data lists ################
 ### import data for aggregated model (binomial)
-counts_df <- read_delim('motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',')
+counts_df <- read_delim('data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
 unique(counts_df$sex_1) # FALSE or NA
@@ -132,6 +141,20 @@ counts_df$dem_class_2 <- ifelse(counts_df$age_class_2 == 'Adult', paste('A',coun
                                        ifelse(counts_df$age_class_2 == 'Juvenile', paste('J',counts_df$sex_2, sep = ''),
                                               paste('C',counts_df$sex_2, sep = ''))))
 
+### correct dem_type with new dem_class
+counts_df$age_class_id_1 <- ifelse(counts_df$age_class_1 == 'Adult',4,
+                                   ifelse(counts_df$age_class_1 == 'Pubescent',3,
+                                          ifelse(counts_df$age_class_1 == 'Juvenile',2,1)))
+counts_df$age_class_id_2 <- ifelse(counts_df$age_class_2 == 'Adult',4,
+                                   ifelse(counts_df$age_class_2 == 'Pubescent',3,
+                                          ifelse(counts_df$age_class_2 == 'Juvenile',2,1)))
+counts_df$dem_type <- ifelse(counts_df$age_class_id_1 > counts_df$age_class_id_2,
+                             paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'),
+                             ifelse(counts_df$age_class_id_1 < counts_df$age_class_id_2,
+                                    paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_'),
+                                    paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_')))
+sort(unique(counts_df$dem_type))
+
 ### add column for age difference between dyad
 counts_df$age_diff <- abs(as.numeric(counts_df$age_cat_id_1) - as.numeric(counts_df$age_cat_id_2))
 
@@ -194,7 +217,7 @@ colnames(population)[c(4,5)] <- c('family','clique')
 ### Create dyadic data frame
 dyads <- data.frame(id_1 = rep(population$id, each = 120), id_2 = rep(population$id, 120))               # create new data frame of all dyads
 dyads$same <- ifelse(dyads$id_1 == dyads$id_2, 'yes', 'no') ; dyads <- dyads[dyads$same == 'no', c(1,2)] # remove self-dyads (e.g. M1-M1)
-dyads$node_1 <- as.integer(as.factor(dyads$id_1)) ; dyads$node_2 <- as.integer(as.factor(dyads$id_2))    # create factor of nodes
+dyads$node_1 <- as.integer(as.factor(dyads$id_1)) ; dyads$node_2 <- as.integer(as.factor(dyads$id_2))    # create factor of  <- 
 dyads$dyad <- ifelse(dyads$node_1 < dyads$node_2,                               # create variable of dyads
                      paste(dyads$id_1, dyads$id_2, sep = '_'),
                      paste(dyads$id_2, dyads$id_1, sep = '_'))
@@ -313,21 +336,10 @@ rm(population, i, N)
 # Binomial model using a beta distribution where shape 1 = times together and shape 2 = times apart
 
 ### Compile Stan model
-mod_2.2 <- cmdstan_model("models/simpleBetaNet_HKM_2.2_22.02.03.stan")
-mod_2.2
-### Code from Dan 2nd February 2022
-#data{
-#int n_dyads;
-#vector[n_dyads] apart;
-#vector[n_dyads] together;
-#}
-#parameters {
-#  vector<lower=0,upper=1>[n_dyads] weight; 
-#  model {
-#    weight ~ beta( 2 + together, 2 +  apart );
-#}
+mod_1.1 <- cmdstan_model("models/simpleBetaNet_DWF_22.01.23.stan")
+mod_1.1
 
-################ 5) Run model on simulated data: a = b = 2 ################
+################ 5) Run model on simulated data ################
 # create data list
 simdat_ls <- list(
   n_dyads  = nrow(dyads),        # Number of dyads
@@ -335,11 +347,8 @@ simdat_ls <- list(
   apart    = dyads$apart         # Number of sightings of each dyad apart
 )
 
-# Priors added are just values 2 and 2 -- pretty flat prior, but still more regularising than 1,1. Just enough to help push it away from extremes, but not enough that masses of data are required to drag the distributions toward the true values.
-# Having a weak prior might be fine here, given that it's not a hypothesis-connected parameter. However, what's important to look at here is what happens for well-sampled individuals, and what happens for poorly sampled ones. We don't want it to be too enthusiastic about the poorly-sampled individuals.
-
 ### Fit model
-edge_weight_2.2 <- mod_2.2$sample(
+edge_weight_1.1 <- mod_1.1$sample(
   data = simdat_ls, 
   seed = 12345, 
   chains = 4, 
@@ -347,98 +356,98 @@ edge_weight_2.2 <- mod_2.2$sample(
 )
 
 ### check model
-edge_weight_2.2$summary()
-#   variable        mean      median       sd     mad          q5        q95    rhat ess_bulk ess_tail
-#   <chr>          <dbl>       <dbl>    <dbl>   <dbl>       <dbl>      <dbl>   <dbl>    <dbl>    <dbl>
-# 1 lp__         -96302.     -96301.     60.4    60.8     -96401.     -96201.   1.00    1097.    1671.
-# 2 weight[1]      0.209       0.202   0.0811  0.0814      0.0886      0.358    1.00    9184.    2203.
-# 3 weight[2]      0.292       0.287   0.0917  0.0952       0.150      0.450    1.00   11174.    2581.
-# 4 weight[3]      0.292       0.287   0.0917  0.0941       0.155      0.452    1.00   10926.    2534.
-# 5 weight[4]      0.418       0.416   0.0984   0.101       0.258      0.580    1.00   10820.    2504.
-# 6 weight[5]     0.0835      0.0715   0.0565  0.0511      0.0152      0.194    1.00    8490.    1832.
-# 7 weight[6]      0.166       0.155   0.0780  0.0770      0.0585      0.311    1.00    9021.    1997.
-# 8 weight[7]      0.207       0.199   0.0794  0.0797      0.0915      0.348    1.00    9618.    2459.
-# 9 weight[8]      0.291       0.284   0.0929  0.0951       0.150      0.453    1.00    9875.    2330.
-#10 weight[9]     0.0832      0.0725   0.0548  0.0484      0.0159      0.190    1.00    7881.    2618.
+edge_weight_1.1$summary()
+#   variable        mean      median       sd     mad          q5        q95     rhat ess_bulk ess_tail
+#   <chr>          <dbl>       <dbl>    <dbl>   <dbl>       <dbl>      <dbl>    <dbl>    <dbl>    <dbl>
+# 1 lp__         -83508.      -83508     61.5    60.8      -83608.    -83407.    1.00     1347.    1966.
+# 2 weight[1]      0.183       0.173   0.0806  0.0791      0.0680       0.330    1.00     8950.    2451.
+# 3 weight[2]      0.272       0.267   0.0914  0.0896       0.134       0.434    1.00     9029.    2347.
+# 4 weight[3]      0.272       0.265   0.0928  0.0974       0.133       0.436    1.00     8872.    2522.
+# 5 weight[4]      0.408       0.406   0.0987   0.102       0.251       0.572   0.999    10311.    2992.
+# 6 weight[5]     0.0457      0.0322   0.0450  0.0325     0.00221       0.138    1.00     5098.    2204.
+# 7 weight[6]      0.137       0.125   0.0727  0.0689      0.0393       0.276    1.00     8291.    2548.
+# 8 weight[7]      0.179       0.169   0.0778  0.0760      0.0669       0.325    1.01     9580.    3062.
+# 9 weight[8]      0.272       0.266   0.0932  0.0934       0.132       0.437    1.00     8875.    2823.
+#10 weight[9]     0.0446      0.0314   0.0434  0.0326     0.00219       0.132    1.00     4795.    1798.
 # … with 7,131 more rows
-output1 <- read_cmdstan_csv(edge_weight_2.2$output_files()[1])
-output2 <- read_cmdstan_csv(edge_weight_2.2$output_files()[2])
-output3 <- read_cmdstan_csv(edge_weight_2.2$output_files()[3])
-output4 <- read_cmdstan_csv(edge_weight_2.2$output_files()[4])
+output1 <- read_cmdstan_csv(edge_weight_1.1$output_files()[1])
+output2 <- read_cmdstan_csv(edge_weight_1.1$output_files()[2])
+output3 <- read_cmdstan_csv(edge_weight_1.1$output_files()[3])
+output4 <- read_cmdstan_csv(edge_weight_1.1$output_files()[4])
 
-draws1_2.2 <- as.data.frame(output1$post_warmup_draws)
-draws2_2.2 <- as.data.frame(output2$post_warmup_draws)
-draws3_2.2 <- as.data.frame(output3$post_warmup_draws)
-draws4_2.2 <- as.data.frame(output4$post_warmup_draws)
-draws_simdat_2.2 <- rbind(draws1_2.2, draws2_2.2, draws3_2.2, draws4_2.2)
+draws1_1.1 <- as.data.frame(output1$post_warmup_draws)
+draws2_1.1 <- as.data.frame(output2$post_warmup_draws)
+draws3_1.1 <- as.data.frame(output3$post_warmup_draws)
+draws4_1.1 <- as.data.frame(output4$post_warmup_draws)
+draws_simdat_1.1 <- rbind(draws1_1.1, draws2_1.1, draws3_1.1, draws4_1.1)
 rm(output1, output2, output3, output4)
 
 # check chain mixing -- well mixed
-mean(draws1_2.2$`1.weight[1]`) ; mean(draws2_2.2$`1.weight[1]`) ; mean(draws3_2.2$`1.weight[1]`) ; mean(draws4_2.2$`1.weight[1]`)
-mean(draws1_2.2$`1.weight[2]`) ; mean(draws2_2.2$`1.weight[2]`) ; mean(draws3_2.2$`1.weight[2]`) ; mean(draws4_2.2$`1.weight[2]`)
-mean(draws1_2.2$`1.weight[3]`) ; mean(draws2_2.2$`1.weight[3]`) ; mean(draws3_2.2$`1.weight[3]`) ; mean(draws4_2.2$`1.weight[3]`)
+mean(draws1_1.1$`1.weight[1]`) ; mean(draws2_1.1$`1.weight[1]`) ; mean(draws3_1.1$`1.weight[1]`) ; mean(draws4_1.1$`1.weight[1]`)
+mean(draws1_1.1$`1.weight[2]`) ; mean(draws2_1.1$`1.weight[2]`) ; mean(draws3_1.1$`1.weight[2]`) ; mean(draws4_1.1$`1.weight[2]`)
+mean(draws1_1.1$`1.weight[3]`) ; mean(draws2_1.1$`1.weight[3]`) ; mean(draws3_1.1$`1.weight[3]`) ; mean(draws4_1.1$`1.weight[3]`)
 
 # plot each chain individually to check mixing -- all mixed well
-plot(draws1_2.2$`1.weight[1]`, col = 'purple', type = 'l',
+plot(draws1_1.1$`1.weight[1]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_2.2$`1.weight[1]`, col = 'green')
-lines(draws3_2.2$`1.weight[1]`, col = 'blue')
-lines(draws4_2.2$`1.weight[1]`, col = 'magenta')
-plot(draws1_2.2$`1.weight[2]`, col = 'purple', type = 'l',
+lines(draws2_1.1$`1.weight[1]`, col = 'green')
+lines(draws3_1.1$`1.weight[1]`, col = 'blue')
+lines(draws4_1.1$`1.weight[1]`, col = 'magenta')
+plot(draws1_1.1$`1.weight[2]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_2.2$`1.weight[2]`, col = 'green')
-lines(draws3_2.2$`1.weight[2]`, col = 'blue')
-lines(draws4_2.2$`1.weight[2]`, col = 'magenta')
-plot(draws1_2.2$`1.weight[3]`, col = 'purple', type = 'l',
+lines(draws2_1.1$`1.weight[2]`, col = 'green')
+lines(draws3_1.1$`1.weight[2]`, col = 'blue')
+lines(draws4_1.1$`1.weight[2]`, col = 'magenta')
+plot(draws1_1.1$`1.weight[3]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_2.2$`1.weight[3]`, col = 'green')
-lines(draws3_2.2$`1.weight[3]`, col = 'blue')
-lines(draws4_2.2$`1.weight[3]`, col = 'magenta')
+lines(draws2_1.1$`1.weight[3]`, col = 'green')
+lines(draws3_1.1$`1.weight[3]`, col = 'blue')
+lines(draws4_1.1$`1.weight[3]`, col = 'magenta')
 
-# build traceplots -- looks good, but some clique relationships substantially higher than family
-plot(draws1_2.2$`1.weight[1]`, type = 'l',
+# build traceplots -- highly variable, but generally fits the inputs
+plot(draws1_1.1$`1.weight[1]`, type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight')
-lines(draws1_2.2$`1.weight[2]`, col = 'tan')
-lines(draws1_2.2$`1.weight[3]`, col = 'orange')
-lines(draws1_2.2$`1.weight[4]`, col = 'green')
-lines(draws1_2.2$`1.weight[5]`, col = 'chocolate')
-lines(draws1_2.2$`1.weight[6]`, col = 'blue')
-lines(draws1_2.2$`1.weight[7]`, col = 'red')
-lines(draws1_2.2$`1.weight[8]`, col = 'seagreen')
-lines(draws1_2.2$`1.weight[9]`, col = 'purple')
-lines(draws1_2.2$`1.weight[10]`,col = 'magenta')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[1]+1], col = 'black')       # traceplot of mother-calf relationships
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[2]+1], col = 'tan')         # +1 because first column is not linked to a dyad
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[3]+1], col = 'orange')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[4]+1], col = 'green')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[5]+1], col = 'chocolate')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[6]+1], col = 'blue')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[7]+1], col = 'red')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[8]+1], col = 'seagreen')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[9]+1], col = 'purple')
-lines(draws1_2.2[which(dyads$family_1 == dyads$id_2)[10]+1], col = 'magenta')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[1]+1], col = 'black')      # traceplots of elephants in the same group but which are not mother-calf pairs
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[2]+1], col = 'tan')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[3]+1], col = 'orange')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[4]+1], col = 'green')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[5]+1], col = 'chocolate')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[6]+1], col = 'blue')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[7]+1], col = 'red')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[8]+1], col = 'seagreen')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[9]+1], col = 'purple')
-lines(draws1_2.2[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[10]+1], col = 'magenta')
+lines(draws1_1.1$`1.weight[2]`, col = 'tan')
+lines(draws1_1.1$`1.weight[3]`, col = 'orange')
+lines(draws1_1.1$`1.weight[4]`, col = 'green')
+lines(draws1_1.1$`1.weight[5]`, col = 'chocolate')
+lines(draws1_1.1$`1.weight[6]`, col = 'blue')
+lines(draws1_1.1$`1.weight[7]`, col = 'red')
+lines(draws1_1.1$`1.weight[8]`, col = 'seagreen')
+lines(draws1_1.1$`1.weight[9]`, col = 'purple')
+lines(draws1_1.1$`1.weight[10]`,col = 'magenta')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[1]+1], col = 'black')       # traceplot of mother-calf relationships
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[2]+1], col = 'tan')         # +1 because first column is not linked to a dyad
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[3]+1], col = 'orange')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[4]+1], col = 'green')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[5]+1], col = 'chocolate')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[6]+1], col = 'blue')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[7]+1], col = 'red')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[8]+1], col = 'seagreen')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[9]+1], col = 'purple')
+lines(draws1_1.1[which(dyads$family_1 == dyads$id_2)[10]+1], col = 'magenta')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[1]+1], col = 'black')      # traceplots of elephants in the same group but which are not mother-calf pairs
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[2]+1], col = 'tan')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[3]+1], col = 'orange')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[4]+1], col = 'green')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[5]+1], col = 'chocolate')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[6]+1], col = 'blue')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[7]+1], col = 'red')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[8]+1], col = 'seagreen')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[9]+1], col = 'purple')
+lines(draws1_1.1[which(dyads$clique_1 == dyads$clique_2 & dyads$family_1 != dyads$id_2)[10]+1], col = 'magenta')
 
 # mean and credible interval for each dyad weight
-means_2.2 <- data.frame(dyad = dyads$dyad,
-                        mean = apply(draws_simdat_2.2[2:7141], 2, mean), 
-                        median = apply(draws_simdat_2.2[2:7141], 2, median))
-draws_2.2_pi <- apply(draws_simdat_2.2[2:7141], 2, rethinking::PI)
-means_2.2$pi_lwr <- draws_2.2_pi[1,]
-means_2.2$pi_upr <- draws_2.2_pi[2,]
+means_1.1 <- data.frame(dyad = dyads$dyad,
+                        mean = apply(draws_simdat_1.1[2:7141], 2, mean), 
+                        median = apply(draws_simdat_1.1[2:7141], 2, median))
+draws_1.1_pi <- apply(draws_simdat_1.1[2:7141], 2, rethinking::PI)
+means_1.1$pi_lwr <- draws_1.1_pi[1,]
+means_1.1$pi_upr <- draws_1.1_pi[2,]
 
 # boxplot comparing types of dyads
-plot_data_2.2 <- left_join(x = means_2.2, y = dyads, by = 'dyad')
-ggplot(data = plot_data_2.2, aes(x = pair_type, y = mean, fill = pair_type))+
+plot_data_1.1 <- left_join(x = means_1.1, y = dyads, by = 'dyad')
+ggplot(data = plot_data_1.1, aes(x = pair_type, y = mean, fill = pair_type))+
   geom_boxplot()+
   geom_jitter(aes(x = pair_type, y = edge, fill = pair_type),
               pch = 4, colour = col.alpha('red', 0.2))+
@@ -446,21 +455,22 @@ ggplot(data = plot_data_2.2, aes(x = pair_type, y = mean, fill = pair_type))+
   theme_classic()
 
 # clear large objects from environment
-rm(draws1_2.2, draws1_2.2_pi, draws2_2.2, draws3_2.2, draws4_2.2, means_2.2, plot_data_2.2)
+rm(draws_1.1_pi, draws1_1.1, draws1_1.1_pi, draws2_1.1, draws3_1.1, draws4_1.1, means_1.1, plot_data_1.1, draws_simdat_1.1, dyads, simdat_ls)
 
-################ 6) Run model on real standardised data -- Binomial model to calculate SRI with uncertainty: a = b = 2 ################
+
+################ 6) Run model on real standardised data ################
 ### run model
-mod_2.2
+mod_1.1
 
-### Fit model (slow)
-weight_motnp_2.2 <- mod_2.2$sample(
+### Fit model (slow) - just over an hour (1:06:30)
+weight_motnp_1.1 <- mod_1.1$sample(
   data = counts_ls, 
   seed = 12345, 
   chains = 4, 
   parallel_chains = 4)
 
 ### check model
-weight_motnp_2.2
+weight_motnp_1.1
 # variable       mean     median     sd    mad         q5        q95 rhat ess_bulk ess_tail
 #lp__      -819804.08 -819806.00 248.32 249.82 -820201.05 -819385.90 1.00     1300     2048
 #weight[1]       0.05       0.04   0.03   0.03       0.01       0.12 1.00     6812     2442
@@ -473,106 +483,108 @@ weight_motnp_2.2
 #weight[8]       0.05       0.04   0.03   0.03       0.01       0.11 1.00     7885     1953
 #weight[9]       0.06       0.05   0.04   0.03       0.01       0.13 1.00     6779     2644
 # showing 10 of 106954 rows (change via 'max_rows' argument or 'cmdstanr_max_rows' option)
-#weight_motnp_2.2$summary()  # exceeds vector memory on my laptop
-output1 <- read_cmdstan_csv(weight_motnp_2.2$output_files()[1])
-output2 <- read_cmdstan_csv(weight_motnp_2.2$output_files()[2])
-output3 <- read_cmdstan_csv(weight_motnp_2.2$output_files()[3])
-output4 <- read_cmdstan_csv(weight_motnp_2.2$output_files()[4])
+#weight_motnp_1.1$summary()  # exceeds vector memory on my laptop
+output1 <- read_cmdstan_csv(weight_motnp_1.1$output_files()[1])
+output2 <- read_cmdstan_csv(weight_motnp_1.1$output_files()[2])
+output3 <- read_cmdstan_csv(weight_motnp_1.1$output_files()[3])
+output4 <- read_cmdstan_csv(weight_motnp_1.1$output_files()[4])
 
-draws1_motnp2.2 <- as.data.frame(output1$post_warmup_draws)
-draws2_motnp2.2 <- as.data.frame(output2$post_warmup_draws)
-draws3_motnp2.2 <- as.data.frame(output3$post_warmup_draws)
-draws4_motnp2.2 <- as.data.frame(output4$post_warmup_draws)
-draws_motnp2.2 <- rbind(draws1_motnp2.2, draws2_motnp2.2, draws3_motnp2.2, draws4_motnp2.2)
+draws1_motnp1.1 <- as.data.frame(output1$post_warmup_draws)
+draws2_motnp1.1 <- as.data.frame(output2$post_warmup_draws)
+draws3_motnp1.1 <- as.data.frame(output3$post_warmup_draws)
+draws4_motnp1.1 <- as.data.frame(output4$post_warmup_draws)
+draws_motnp1.1 <- rbind(draws1_motnp1.1, draws2_motnp1.1, draws3_motnp1.1, draws4_motnp1.1)
 rm(output1, output2, output3, output4)
 
-colnames(draws_motnp2.2)[2:106954] <- counts_df$dyad
+colnames(draws_motnp1.1)[2:106954] <- counts_df$dyad
 
 # Assign random set of columns to check
 plot_cols <- sample(x = 2:106954, size = 30, replace = F)
 
 # tidy data -- vector memory usually exhausted and won't run
-tidy_draws_2.2 <- pivot_longer(draws_motnp2.2[,2:106954], cols = everything(), names_to = 'dyad', values_to = 'draw')
-tidy_draws_2.2$chain <- rep(1:4, each = 106953000)
-tidy_draws_2.2$index <- rep(rep(1:1000, each = 106953),4)
-head(tidy_draws_2.2, 10)
-tail(tidy_draws_2.2, 10)
+tidy_draws_1.1 <- pivot_longer(draws_motnp1.1[,2:106954], cols = everything(), names_to = 'dyad', values_to = 'draw')
+tidy_draws_1.1$chain <- rep(1:4, each = 106953000)
+tidy_draws_1.1$index <- rep(rep(1:1000, each = 106953),4)
+head(tidy_draws_1.1, 10)
+tail(tidy_draws_1.1, 10)
 
 # subset for Sierra (F52) -- family = U17, F60, U21 and F98
-tidy_sierra <- tidy_draws[tidy_draws$dyad == 'F52_M40' | tidy_draws$dyad == 'F52_M26' | tidy_draws$dyad == 'F52_F8' | 
-                            tidy_draws$dyad == 'F52_M15' | tidy_draws$dyad == 'F52_F98' | tidy_draws$dyad == 'F52_U17' | 
-                            tidy_draws$dyad == 'F52_U21' | tidy_draws$dyad == 'F52_F60',]
+tidy_sierra <- draws_motnp1.1[,c('F52_M40','F52_M26','F52_F8','F52_M15','F52_F98','F52_U17','F52_U21','F52_F60')]
+tidy_sierra <- pivot_longer(tidy_sierra, cols = everything(), names_to = 'dyad', values_to = 'draw')
 tidy_sierra <- separate(tidy_sierra, dyad, sep = '_', remove = F, into = c('F52','id'))
-tidy_sierra$ID <- ifelse(tidy_sierra$id == 'U17', 'U17 (calf)',
+tidy_sierra$label <- ifelse(tidy_sierra$id == 'U17', 'U17 (calf)',
                          ifelse(tidy_sierra$id == 'U21', 'U21 (relative)',
                                 ifelse(tidy_sierra$id == 'F60', 'F60 (relative)',
                                        ifelse(tidy_sierra$id == 'F98', 'F98 (relative)', 
                                               ifelse(tidy_sierra$id == 'F8', 'F8 (unrelated female)',
                                                      ifelse(tidy_sierra$id == 'M26', 'M26 (adult male)',
                                                             ifelse(tidy_sierra$id == 'M15', 'M15 (unrelated pubescent male)', 'M40 (adult male)')))))))
-tidy_sierra$ID <- factor(tidy_sierra$ID, levels = c('U17 (calf)', 'F60 (relative)', 'U21 (relative)', 'F98 (relative)', 'M40 (adult male)','M26 (adult male)', 'F8 (unrelated female)','M15 (unrelated pubescent male)'))
+tidy_sierra$label <- factor(tidy_sierra$label, levels = c('U17 (calf)', 'F60 (relative)', 'U21 (relative)', 'F98 (relative)', 'M40 (adult male)','M26 (adult male)', 'F8 (unrelated female)','M15 (unrelated pubescent male)'))
+tidy_sierra$chain <- rep(1:4, each = length(tidy_sierra$dyad)/4)
+tidy_sierra$index <- rep(rep(1:1000, each = length(unique(tidy_sierra$dyad))),4)
 
-### save data ####
-write_csv(draws_motnp2.2, 'data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.csv')
-write_csv(tidy_draws, 'data_processed/motnp_bayesian_edgedistributions_tidy_22.02.03.csv')
+### save data 
+write_csv(draws_motnp1.1, 'data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv')
+#write_csv(tidy_draws, 'data_processed/motnp_bayesian_edgedistributions_tidy_22.03.03.csv')
 
-################ 7) Summarise and plot edge weights --  a = b = 2 ################
-# draws_motnp2.2 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.csv')
+################ 7) Summarise and plot edge weights ################
+# draws_motnp1.1 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv')
 ### build traceplots ####
 # random dyads -- many are very wide, high uncertainty
-plot(draws_motnp2.2[,plot_cols[1]], type = 'l',
+plot(draws_motnp1.1[,plot_cols[1]], type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight')
-lines(draws_motnp2.2[,plot_cols[2]], col = 'tan')
-lines(draws_motnp2.2[,plot_cols[3]], col = 'orange')
-lines(draws_motnp2.2[,plot_cols[4]], col = 'green')
-lines(draws_motnp2.2[,plot_cols[5]], col = 'chocolate')
-lines(draws_motnp2.2[,plot_cols[6]], col = 'blue')
-lines(draws_motnp2.2[,plot_cols[7]], col = 'red')
-lines(draws_motnp2.2[,plot_cols[8]], col = 'seagreen')
-lines(draws_motnp2.2[,plot_cols[9]], col = 'purple')
-lines(draws_motnp2.2[,plot_cols[10]],col = 'magenta')
-lines(draws_motnp2.2[,plot_cols[11]],col = 'black')
-lines(draws_motnp2.2[,plot_cols[12]],col = 'tan')
-lines(draws_motnp2.2[,plot_cols[13]],col = 'orange')
-lines(draws_motnp2.2[,plot_cols[14]],col = 'green')
-lines(draws_motnp2.2[,plot_cols[15]],col = 'chocolate')
-lines(draws_motnp2.2[,plot_cols[16]],col = 'blue')
-lines(draws_motnp2.2[,plot_cols[17]],col = 'red')
-lines(draws_motnp2.2[,plot_cols[18]],col = 'seagreen')
-lines(draws_motnp2.2[,plot_cols[19]],col = 'purple')
-lines(draws_motnp2.2[,plot_cols[20]],col = 'magenta')
-lines(draws_motnp2.2[,plot_cols[21]],col = 'black')
-lines(draws_motnp2.2[,plot_cols[22]],col = 'tan')
-lines(draws_motnp2.2[,plot_cols[23]],col = 'orange')
-lines(draws_motnp2.2[,plot_cols[24]],col = 'green')
-lines(draws_motnp2.2[,plot_cols[25]],col = 'chocolate')
-lines(draws_motnp2.2[,plot_cols[26]],col = 'blue')
-lines(draws_motnp2.2[,plot_cols[27]],col = 'red')
-lines(draws_motnp2.2[,plot_cols[28]],col = 'seagreen')
-lines(draws_motnp2.2[,plot_cols[29]],col = 'purple')
-lines(draws_motnp2.2[,plot_cols[30]],col = 'magenta')
+lines(draws_motnp1.1[,plot_cols[2]], col = 'tan')
+lines(draws_motnp1.1[,plot_cols[3]], col = 'orange')
+lines(draws_motnp1.1[,plot_cols[4]], col = 'green')
+lines(draws_motnp1.1[,plot_cols[5]], col = 'chocolate')
+lines(draws_motnp1.1[,plot_cols[6]], col = 'blue')
+lines(draws_motnp1.1[,plot_cols[7]], col = 'red')
+lines(draws_motnp1.1[,plot_cols[8]], col = 'seagreen')
+lines(draws_motnp1.1[,plot_cols[9]], col = 'purple')
+lines(draws_motnp1.1[,plot_cols[10]],col = 'magenta')
+lines(draws_motnp1.1[,plot_cols[11]],col = 'black')
+lines(draws_motnp1.1[,plot_cols[12]], col = 'tan')
+lines(draws_motnp1.1[,plot_cols[13]], col = 'orange')
+lines(draws_motnp1.1[,plot_cols[14]], col = 'green')
+lines(draws_motnp1.1[,plot_cols[15]], col = 'chocolate')
+lines(draws_motnp1.1[,plot_cols[16]], col = 'blue')
+lines(draws_motnp1.1[,plot_cols[17]], col = 'red')
+lines(draws_motnp1.1[,plot_cols[18]], col = 'seagreen')
+lines(draws_motnp1.1[,plot_cols[19]], col = 'purple')
+lines(draws_motnp1.1[,plot_cols[20]],col = 'magenta')
+lines(draws_motnp1.1[,plot_cols[21]],col = 'black')
+lines(draws_motnp1.1[,plot_cols[22]], col = 'tan')
+lines(draws_motnp1.1[,plot_cols[23]], col = 'orange')
+lines(draws_motnp1.1[,plot_cols[24]], col = 'green')
+lines(draws_motnp1.1[,plot_cols[25]], col = 'chocolate')
+lines(draws_motnp1.1[,plot_cols[26]], col = 'blue')
+lines(draws_motnp1.1[,plot_cols[27]], col = 'red')
+lines(draws_motnp1.1[,plot_cols[28]], col = 'seagreen')
+lines(draws_motnp1.1[,plot_cols[29]], col = 'purple')
+lines(draws_motnp1.1[,plot_cols[30]],col = 'magenta')
 
 # Sierra = F52, herd members = F60+U21+F98, calf = U17. This looks really good, and not too wide (all seen a good number of times).
 plot(NULL, ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,4000))
-lines(draws_motnp2.2$F52_M40, col = 'black')      # non-herd member, adult male
-lines(draws_motnp2.2$F52_M15, col = 'tan')        # non-herd member, pubescent male
-lines(draws_motnp2.2$F52_M203,col = 'orange')     # non-herd member, adult male
-lines(draws_motnp2.2$F52_M26, col = 'green')      # non-herd member, calf
-lines(draws_motnp2.2$F52_F8,  col = 'chocolate')  # non-herd member, adult female
-lines(draws_motnp2.2$F52_U9,  col = 'blue')       # non-herd member, calf
-lines(draws_motnp2.2$F52_F98, col = 'red')        # herd member most frequently absent from sightings
-lines(draws_motnp2.2$F52_U17, col = 'purple')     # calf
-lines(draws_motnp2.2$F52_U21, col = 'seagreen')   # sister
-lines(draws_motnp2.2$F52_F60, col = 'magenta')    # sister's calf
+lines(draws_motnp1.1$F52_M40, col = 'black')      # non-herd member, adult male
+lines(draws_motnp1.1$F52_M15, col = 'tan')        # non-herd member, pubescent male
+lines(draws_motnp1.1$F52_M203,col = 'orange')     # non-herd member, adult male
+lines(draws_motnp1.1$F52_M26, col = 'green')      # non-herd member, calf
+lines(draws_motnp1.1$F52_F8,  col = 'chocolate')  # non-herd member, adult female
+lines(draws_motnp1.1$F52_U9,  col = 'blue')       # non-herd member, calf
+lines(draws_motnp1.1$F52_F98, col = 'red')        # herd member most frequently absent from sightings
+lines(draws_motnp1.1$F52_U17, col = 'purple')     # calf
+lines(draws_motnp1.1$F52_U21, col = 'seagreen')   # sister
+lines(draws_motnp1.1$F52_F60, col = 'magenta')    # sister's calf
 
 # ggplot version if tidying worked: plot for Sierra (F52)
-(traceplot_sierra <- ggplot(tidy_sierra[tidy_sierra$chain == 1,], aes(x = index, y = draw, colour = ID))+
+(traceplot_sierra <- ggplot(tidy_sierra[tidy_sierra$chain == 1,], aes(x = index, y = draw, colour = label))+
     geom_line()+
     scale_color_viridis_d()+
     theme_classic()+
     scale_x_continuous('MCMC chain position',  expand = c(0,0))+
-    scale_y_continuous('edge weight estimate', expand = c(0.02,0)))
-ggsave(path = 'outputs/motnp_22.01.31/', filename = 'motnp_sierra_traceplot.pdf',
+    scale_y_continuous('edge weight estimate', expand = c(0.02,0))+
+    labs(colour = 'Partner (relationship)'))
+ggsave(path = 'outputs/motnp_22.03.03/', filename = 'motnp_sierra_traceplot.pdf',
        plot = traceplot_sierra,
        width = 30, height = 24, units = 'cm')
 
@@ -580,7 +592,7 @@ ggsave(path = 'outputs/motnp_22.01.31/', filename = 'motnp_sierra_traceplot.pdf'
     geom_line()+
     scale_color_viridis_d()+
     theme_light()+
-    facet_wrap(.~ID)+
+    facet_wrap(.~label)+
     scale_x_continuous('MCMC chain position',  expand = c(0,0))+
     scale_y_continuous('edge weight estimate', expand = c(0.02,0))+
     theme(legend.position = c(0.85, 0.15), legend.text = element_text(size = 12),
@@ -591,82 +603,82 @@ ggsave(path = 'outputs/motnp_22.02.01/', filename = 'motnp_sierra_traceplot.pdf'
        width = 30, height = 24, units = 'cm')
 
 # check chain mixing
-plot(draws1_motnp2.2$`1.weight[1]`, col = 'purple', type = 'l',
+plot(draws1_motnp1.1$`1.weight[1]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_motnp2.2$`1.weight[1]`, col = 'green')
-lines(draws3_motnp2.2$`1.weight[1]`, col = 'blue')
-lines(draws4_motnp2.2$`1.weight[1]`, col = 'magenta')
-plot(draws1_motnp2.2$`1.weight[2]`, col = 'purple', type = 'l',
+lines(draws2_motnp1.1$`1.weight[1]`, col = 'green')
+lines(draws3_motnp1.1$`1.weight[1]`, col = 'blue')
+lines(draws4_motnp1.1$`1.weight[1]`, col = 'magenta')
+plot(draws1_motnp1.1$`1.weight[2]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_motnp2.2$`1.weight[2]`, col = 'green')
-lines(draws3_motnp2.2$`1.weight[2]`, col = 'blue')
-lines(draws4_motnp2.2$`1.weight[2]`, col = 'magenta')
-plot(draws1_motnp2.2$`1.weight[3]`, col = 'purple', type = 'l',
+lines(draws2_motnp1.1$`1.weight[2]`, col = 'green')
+lines(draws3_motnp1.1$`1.weight[2]`, col = 'blue')
+lines(draws4_motnp1.1$`1.weight[2]`, col = 'magenta')
+plot(draws1_motnp1.1$`1.weight[3]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_motnp2.2$`1.weight[3]`, col = 'green')
-lines(draws3_motnp2.2$`1.weight[3]`, col = 'blue')
-lines(draws4_motnp2.2$`1.weight[3]`, col = 'magenta')
+lines(draws2_motnp1.1$`1.weight[3]`, col = 'green')
+lines(draws3_motnp1.1$`1.weight[3]`, col = 'blue')
+lines(draws4_motnp1.1$`1.weight[3]`, col = 'magenta')
 which(counts_df$dyad == 'F52_U17') # 41192
-plot(draws1_motnp2.2$`1.weight[41192]`, col = 'purple', type = 'l',
+plot(draws1_motnp1.1$`1.weight[41192]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_motnp2.2$`1.weight[41192]`, col = 'green')
-lines(draws3_motnp2.2$`1.weight[41192]`, col = 'blue')
-lines(draws4_motnp2.2$`1.weight[41192]`, col = 'magenta')
+lines(draws2_motnp1.1$`1.weight[41192]`, col = 'green')
+lines(draws3_motnp1.1$`1.weight[41192]`, col = 'blue')
+lines(draws4_motnp1.1$`1.weight[41192]`, col = 'magenta')
 which(counts_df$dyad == 'F52_F60') # 40896
-plot(draws1_motnp2.2$`1.weight[40896]`, col = 'purple', type = 'l',
+plot(draws1_motnp1.1$`1.weight[40896]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_motnp2.2$`1.weight[40896]`, col = 'green')
-lines(draws3_motnp2.2$`1.weight[40896]`, col = 'blue')
-lines(draws4_motnp2.2$`1.weight[40896]`, col = 'magenta')
+lines(draws2_motnp1.1$`1.weight[40896]`, col = 'green')
+lines(draws3_motnp1.1$`1.weight[40896]`, col = 'blue')
+lines(draws4_motnp1.1$`1.weight[40896]`, col = 'magenta')
 which(counts_df$dyad == 'F52_U21') # 41197
-plot(draws1_motnp2.2$`1.weight[41197]`, col = 'purple', type = 'l',
+plot(draws1_motnp1.1$`1.weight[41197]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_motnp2.2$`1.weight[41197]`, col = 'green')
-lines(draws3_motnp2.2$`1.weight[41197]`, col = 'blue')
-lines(draws4_motnp2.2$`1.weight[41197]`, col = 'magenta')
+lines(draws2_motnp1.1$`1.weight[41197]`, col = 'green')
+lines(draws3_motnp1.1$`1.weight[41197]`, col = 'blue')
+lines(draws4_motnp1.1$`1.weight[41197]`, col = 'magenta')
 which(counts_df$dyad == 'F52_F98') # 40937
-plot(draws1_motnp2.2$`1.weight[40937]`, col = 'purple', type = 'l',
+plot(draws1_motnp1.1$`1.weight[40937]`, col = 'purple', type = 'l',
      ylim = c(0,1), las = 1, ylab = 'edge weight', xlim = c(0,1000))
-lines(draws2_motnp2.2$`1.weight[40937]`, col = 'green')
-lines(draws3_motnp2.2$`1.weight[40937]`, col = 'blue')
-lines(draws4_motnp2.2$`1.weight[40937]`, col = 'magenta')
+lines(draws2_motnp1.1$`1.weight[40937]`, col = 'green')
+lines(draws3_motnp1.1$`1.weight[40937]`, col = 'blue')
+lines(draws4_motnp1.1$`1.weight[40937]`, col = 'magenta')
 
 ### density plots ####
 # random columns
-dens(draws_motnp2.2[,plot_cols[1]], ylim = c(0,50), xlim = c(0,1), las = 1)
-dens(add = T, draws_motnp2.2[,plot_cols[2]], col = 'tan')
-dens(add = T, draws_motnp2.2[,plot_cols[3]], col = 'orange')
-dens(add = T, draws_motnp2.2[,plot_cols[4]], col = 'green')
-dens(add = T, draws_motnp2.2[,plot_cols[5]], col = 'chocolate')
-dens(add = T, draws_motnp2.2[,plot_cols[6]], col = 'blue')
-dens(add = T, draws_motnp2.2[,plot_cols[7]], col = 'red')
-dens(add = T, draws_motnp2.2[,plot_cols[8]], col = 'seagreen')
-dens(add = T, draws_motnp2.2[,plot_cols[9]], col = 'purple')
-dens(add = T, draws_motnp2.2[,plot_cols[10]],col = 'magenta')
-dens(add = T, draws_motnp2.2[,plot_cols[11]],col = 'black')
-dens(add = T, draws_motnp2.2[,plot_cols[12]],col = 'tan')
-dens(add = T, draws_motnp2.2[,plot_cols[13]],col = 'orange')
-dens(add = T, draws_motnp2.2[,plot_cols[14]],col = 'green')
-dens(add = T, draws_motnp2.2[,plot_cols[15]],col = 'chocolate')
-dens(add = T, draws_motnp2.2[,plot_cols[16]],col = 'blue')
-dens(add = T, draws_motnp2.2[,plot_cols[17]],col = 'red')
-dens(add = T, draws_motnp2.2[,plot_cols[18]],col = 'seagreen')
-dens(add = T, draws_motnp2.2[,plot_cols[19]],col = 'purple')
-dens(add = T, draws_motnp2.2[,plot_cols[20]],col = 'magenta')
-dens(add = T, draws_motnp2.2[,plot_cols[21]],col = 'black')
-dens(add = T, draws_motnp2.2[,plot_cols[22]],col = 'tan')
-dens(add = T, draws_motnp2.2[,plot_cols[23]],col = 'orange')
-dens(add = T, draws_motnp2.2[,plot_cols[24]],col = 'green')
-dens(add = T, draws_motnp2.2[,plot_cols[25]],col = 'chocolate')
-dens(add = T, draws_motnp2.2[,plot_cols[26]],col = 'blue')
-dens(add = T, draws_motnp2.2[,plot_cols[27]],col = 'red')
-dens(add = T, draws_motnp2.2[,plot_cols[28]],col = 'seagreen')
-dens(add = T, draws_motnp2.2[,plot_cols[29]],col = 'purple')
-dens(add = T, draws_motnp2.2[,plot_cols[30]],col = 'magenta')
-dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_U17')+1],col = 'magenta')
-dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_F60')+1],col = 'purple')
-dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_U21')+1],col = 'blue')
-dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_F98')+1],col = 'red')
+dens(draws_motnp1.1[,plot_cols[1]], ylim = c(0,50), xlim = c(0,1), las = 1)
+dens(add = T, draws_motnp1.1[,plot_cols[2]], col = 'tan')
+dens(add = T, draws_motnp1.1[,plot_cols[3]], col = 'orange')
+dens(add = T, draws_motnp1.1[,plot_cols[4]], col = 'green')
+dens(add = T, draws_motnp1.1[,plot_cols[5]], col = 'chocolate')
+dens(add = T, draws_motnp1.1[,plot_cols[6]], col = 'blue')
+dens(add = T, draws_motnp1.1[,plot_cols[7]], col = 'red')
+dens(add = T, draws_motnp1.1[,plot_cols[8]], col = 'seagreen')
+dens(add = T, draws_motnp1.1[,plot_cols[9]], col = 'purple')
+dens(add = T, draws_motnp1.1[,plot_cols[10]],col = 'magenta')
+dens(add = T, draws_motnp1.1[,plot_cols[11]],col = 'black')
+dens(add = T, draws_motnp1.1[,plot_cols[12]],col = 'tan')
+dens(add = T, draws_motnp1.1[,plot_cols[13]],col = 'orange')
+dens(add = T, draws_motnp1.1[,plot_cols[14]],col = 'green')
+dens(add = T, draws_motnp1.1[,plot_cols[15]],col = 'chocolate')
+dens(add = T, draws_motnp1.1[,plot_cols[16]],col = 'blue')
+dens(add = T, draws_motnp1.1[,plot_cols[17]],col = 'red')
+dens(add = T, draws_motnp1.1[,plot_cols[18]],col = 'seagreen')
+dens(add = T, draws_motnp1.1[,plot_cols[19]],col = 'purple')
+dens(add = T, draws_motnp1.1[,plot_cols[20]],col = 'magenta')
+dens(add = T, draws_motnp1.1[,plot_cols[21]],col = 'black')
+dens(add = T, draws_motnp1.1[,plot_cols[22]],col = 'tan')
+dens(add = T, draws_motnp1.1[,plot_cols[23]],col = 'orange')
+dens(add = T, draws_motnp1.1[,plot_cols[24]],col = 'green')
+dens(add = T, draws_motnp1.1[,plot_cols[25]],col = 'chocolate')
+dens(add = T, draws_motnp1.1[,plot_cols[26]],col = 'blue')
+dens(add = T, draws_motnp1.1[,plot_cols[27]],col = 'red')
+dens(add = T, draws_motnp1.1[,plot_cols[28]],col = 'seagreen')
+dens(add = T, draws_motnp1.1[,plot_cols[29]],col = 'purple')
+dens(add = T, draws_motnp1.1[,plot_cols[30]],col = 'magenta')
+dens(add = T, draws_motnp1.1[,which(counts_df$dyad == 'F52_U17')+1],col = 'magenta')
+dens(add = T, draws_motnp1.1[,which(counts_df$dyad == 'F52_F60')+1],col = 'purple')
+dens(add = T, draws_motnp1.1[,which(counts_df$dyad == 'F52_U21')+1],col = 'blue')
+dens(add = T, draws_motnp1.1[,which(counts_df$dyad == 'F52_F98')+1],col = 'red')
 
 # density plots -- only run if tidying data worked
 dens(tidy_sierra[tidy_sierra$id == 'M40',]$draw, xlab = 'edge weight estimation',       # all chains, plotted together
@@ -715,83 +727,49 @@ ggsave(path = 'outputs/motnp_22.02.01/', filename = 'motnp_sierra_density.pdf',
 
 ### summarise data ####
 # summarise -- look for any anomalies in draw values or chain variation
-summaries <- data.frame(dyad = colnames(draws_motnp2.2[2:106954]),
-                        min = rep(NA, ncol(draws_motnp2.2)-1),
-                        max = rep(NA, ncol(draws_motnp2.2)-1),
-                        mean = rep(NA, ncol(draws_motnp2.2)-1),
-                        median = rep(NA, ncol(draws_motnp2.2)-1),
-                        sd = rep(NA, ncol(draws_motnp2.2)-1))
-for(i in 1:nrow(summaries)){
-  summaries$min[i]    <- min(draws_motnp2.2[,i+1])
-  summaries$max[i]    <- max(draws_motnp2.2[,i+1])
-  summaries$mean[i]   <- mean(draws_motnp2.2[,i+1])
-  summaries$median[i] <- median(draws_motnp2.2[,i+1])
-  summaries$sd[i]     <- sd(draws_motnp2.2[,i+1])
+summaries <- data.frame(dyad = colnames(draws_motnp1.1[2:106954]),
+                        min = rep(NA, ncol(draws_motnp1.1)-1),
+                        max = rep(NA, ncol(draws_motnp1.1)-1),
+                        mean = rep(NA, ncol(draws_motnp1.1)-1),
+                        median = rep(NA, ncol(draws_motnp1.1)-1),
+                        sd = rep(NA, ncol(draws_motnp1.1)-1))
+for(i in 72137:nrow(summaries)){
+  summaries$min[i]    <- min(draws_motnp1.1[,i+1])
+  summaries$max[i]    <- max(draws_motnp1.1[,i+1])
+  summaries$mean[i]   <- mean(draws_motnp1.1[,i+1])
+  summaries$median[i] <- median(draws_motnp1.1[,i+1])
+  summaries$sd[i]     <- sd(draws_motnp1.1[,i+1])
 }
 
 summary(summaries)
-summaries$dyad[which(summaries$min == min(summaries$min))] # F22_M5
-summaries$dyad[which(summaries$min == max(summaries$min))] # F17_U1
-summaries$dyad[which(summaries$max == min(summaries$max))] # M14_M56
-summaries$dyad[which(summaries$max == max(summaries$max))] # M6_U5 -- both calves in B2
-summaries$dyad[which(summaries$sd == min(summaries$sd))] # M14_M56
-summaries$dyad[which(summaries$sd == max(summaries$sd))] # F82_U10
+summaries$dyad[which(summaries$min == min(summaries$min))] # F145_M68 = lowest value drawn
+summaries$dyad[which(summaries$min == max(summaries$min))] # F17_U1 = highest lowest value drawn
+summaries$dyad[which(summaries$max == min(summaries$max))] # M14_M56 = lowest highest value drawn
+summaries$dyad[which(summaries$max == max(summaries$max))] # F44_U15 M131_M178 = highest value drawn (1)
+summaries$dyad[which(summaries$sd == min(summaries$sd))]   # M14_M56
+summaries$dyad[which(summaries$sd == max(summaries$sd))]   # F113_F117
 
-plot(draws_motnp2.2$F22_M5, type = 'l',
-     ylim = c(0,1), las = 1, ylab = 'edge weight')  # still shows a fair amount of variation
-lines(draws_motnp2.2$F17_U1, col = 'red')           # still shows a fair amount of variation
-lines(draws_motnp2.2$M14_M56, col = 'blue')         # very low variation, but enough to trust the chain
-lines(draws_motnp2.2$M6_U5, col = 'green')          # still shows a fair amount of variation
-lines(draws_motnp2.2$F82_U10, col = 'purple')       # OK this one DOES look a bit crazy...
-
-summaries$min[which(summaries$sd == max(summaries$sd))]     # 0.048
-summaries$max[which(summaries$sd == max(summaries$sd))]     # 0.996
-summaries$mean[which(summaries$sd == max(summaries$sd))]    # 0.597
-summaries$median[which(summaries$sd == max(summaries$sd))]  # 0.614
-counts_df$all_events[which(counts_df$dyad == 'F82_U10')]    # mother calf pair but only seen once
-
-
-
-means_motnp2.2 <- data.frame(dyad = counts_df$dyad,
-                             min = apply(draws_motnp2.2[,2:106954], 2, min),
-                             max = apply(draws_motnp2.2[,2:106954], 2, max),
-                             mean = apply(draws_motnp2.2[,2:106954], 2, mean),
-                             median = apply(draws_motnp2.2[,2:106954], 2, median),
-                             sd = apply(draws_motnp2.2[,2:106954], 2, sd))
-draws_pi_motnp2.2 <- apply(draws_motnp2.2[2:106954], 2, rethinking::PI)
-means_motnp2.2$pi_lwr <- draws_pi_motnp2.2[1,] ; means_motnp2.2$pi_upr <- draws_pi_motnp2.2[2,]
-
-summary(means_motnp2.2)
-means_motnp2.2$dyad[which(means_motnp2.2$min == min(means_motnp2.2$min))] # F22_M5
-means_motnp2.2$dyad[which(means_motnp2.2$min == max(means_motnp2.2$min))] # F17_U1
-means_motnp2.2$dyad[which(means_motnp2.2$max == min(means_motnp2.2$max))] # M14_M56
-means_motnp2.2$dyad[which(means_motnp2.2$max == max(means_motnp2.2$max))] # M6_U5 -- both calves in B2
-means_motnp2.2$dyad[which(means_motnp2.2$sd == min(means_motnp2.2$sd))] # M14_M56
-means_motnp2.2$dyad[which(means_motnp2.2$sd == max(means_motnp2.2$sd))] # F82_U10
-
-plot(draws_motnp2.2$F22_M5, type = 'l',
-     ylim = c(0,1), las = 1, ylab = 'edge weight')  # still shows a fair amount of variation
-lines(draws_motnp2.2$F17_U1, col = 'red')           # still shows a fair amount of variation
-lines(draws_motnp2.2$M14_M56, col = 'blue')         # very low variation, but enough to trust the chain
-lines(draws_motnp2.2$M6_U5, col = 'green')          # still shows a fair amount of variation
-lines(draws_motnp2.2$F82_U10, col = 'purple')       # OK this one DOES look a bit crazy...
-
-means_motnp2.2$min[which(means_motnp2.2$sd == max(means_motnp2.2$sd))]     # 0.048
-means_motnp2.2$max[which(means_motnp2.2$sd == max(means_motnp2.2$sd))]     # 0.996
-means_motnp2.2$mean[which(means_motnp2.2$sd == max(means_motnp2.2$sd))]    # 0.597
-means_motnp2.2$median[which(means_motnp2.2$sd == max(means_motnp2.2$sd))]  # 0.614
-counts_df$all_events[which(counts_df$dyad == 'F82_U10')]    # mother calf pair but only seen once
+plot(draws_motnp1.1$F145_M68, type = 'l',
+     ylim = c(0,1), las = 1, ylab = 'edge weight')       # still shows a fair amount of variation
+lines(draws_motnp1.1$F17_U1, col = 'red')                # still shows a fair amount of variation
+lines(draws_motnp1.1$M14_M56, col = 'blue')              # very low variation, but enough to trust the chain
+lines(draws_motnp1.1$F44_U15, col = 'green')             # still shows a fair amount of variation
+lines(draws_motnp1.1$M131_M178, col = 'orange')          # looks pretty crazy! -- 2 young males, each only seen once
+summaries$min[which(summaries$dyad == 'M131_M178')]
+summaries$sd[which(summaries$dyad == 'M131_M178')]
+summaries$mean[which(summaries$dyad == 'M131_M178')]
+lines(draws_motnp1.1$F113_F117, col = 'purple')          # OK this one DOES look a bit crazy...
 
 # organise dem_class
-plot_data_motnp2.2 <- left_join(x = means_motnp2.2, y = counts_df, by = 'dyad')
-head(plot_data_motnp2.2)
-plot_data_motnp2.2$dem_class_1_cat <- as.integer(as.factor(plot_data_motnp2.2$dem_class_1))
-plot_data_motnp2.2$dem_class_2_cat <- as.integer(as.factor(plot_data_motnp2.2$dem_class_2))
-plot_data_motnp2.2$dem_type_short <- ifelse(plot_data_motnp2.2$dem_class_1_cat <= plot_data_motnp2.2$dem_class_2_cat,
-                                            paste(plot_data_motnp2.2$dem_class_1, plot_data_motnp2.2$dem_class_2, sep = '_'),
-                                            paste(plot_data_motnp2.2$dem_class_2, plot_data_motnp2.2$dem_class_1, sep = '_'))
-sort(unique(plot_data_motnp2.2$dem_type_short))
-types <- data.frame(all = sort(unique(plot_data_motnp2.2$dem_type_short)), type1 = NA, type2 = NA)
+plot_data_motnp1.1 <- left_join(x = summaries, y = counts_df, by = 'dyad')
+head(plot_data_motnp1.1)
+plot_data_motnp1.1$dem_class_1_cat <- as.integer(as.factor(plot_data_motnp1.1$dem_class_1))
+plot_data_motnp1.1$dem_class_2_cat <- as.integer(as.factor(plot_data_motnp1.1$dem_class_2))
+plot_data_motnp1.1$dem_type_short <- ifelse(plot_data_motnp1.1$dem_class_1_cat <= plot_data_motnp1.1$dem_class_2_cat,
+                                            paste(plot_data_motnp1.1$dem_class_1, plot_data_motnp1.1$dem_class_2, sep = '_'),
+                                            paste(plot_data_motnp1.1$dem_class_2, plot_data_motnp1.1$dem_class_1, sep = '_'))
+sort(unique(plot_data_motnp1.1$dem_type_short))
+types <- data.frame(all = sort(unique(plot_data_motnp1.1$dem_type_short)), type1 = NA, type2 = NA)
 types <- separate(types, col = all, into = c('type1', 'type2'), remove = F)
 types <- separate(types, type1, into = c('class1','sex1'), sep = 1, remove = F)
 types <- separate(types, type2, into = c('class2','sex2'), sep = 1, remove = F)
@@ -813,51 +791,45 @@ types$join <- case_when(types$class1 == 'C' & types$class2 == 'C' ~ 'CC',
 unique(types$join)
 types <- types[,c(1,8)]
 colnames(types)[1] <- 'dem_type_short'
-plot_data_motnp2.2 <- left_join(plot_data_motnp2.2, types, by = 'dem_type_short')
-plot_data_motnp2.2$join <- paste(plot_data_motnp2.2$join, ' ', sep = ' ')
-which(is.na(plot_data_motnp2.2$join))
+plot_data_motnp1.1 <- left_join(plot_data_motnp1.1, types, by = 'dem_type_short')
+plot_data_motnp1.1$join <- paste(plot_data_motnp1.1$join, ' ', sep = ' ')
+which(is.na(plot_data_motnp1.1$join))
 
 # boxplot edge weights by demographic type of dyad -- all types
 colours <- c('magenta','purple','grey','grey','magenta','purple','grey','blue','purple','purple','purple','blue','purple','grey','grey','grey','grey','grey','magenta','purple','grey','purple','purple','blue','purple','grey','grey')
 (edge_vs_demtype_all <- 
-    ggplot(data = plot_data_motnp2.2, aes(y = mean, x = join))+
+    ggplot(data = plot_data_motnp1.1, aes(y = mean, x = join))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  fill = colours)+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown',
          y = 'mean edge weight')+
     coord_flip())
-ggsave(path = 'outputs/motnp_22.01.31/', filename = 'motnp_all_edge_vs_demtype.pdf',
-       plot = edge_vs_demtype_all,
-       width = 20, height = 24, units = 'cm')  
-ggsave(path = 'outputs/motnp_22.02.01/', filename = 'motnp_all_edge_vs_demtype.pdf',
+ggsave(path = 'outputs/motnp_22.03.03/', filename = 'motnp_all_edge_vs_demtype.pdf',
        plot = edge_vs_demtype_all,
        width = 20, height = 24, units = 'cm')  
 
 # boxplot edge weights by demographic type of dyad -- only adults/pubescents
-adults_motnp2.2 <- plot_data_motnp2.2[plot_data_motnp2.2$age_cat_id_1 > 2 & plot_data_motnp2.2$age_cat_id_2 > 2,]
-adults_motnp2.2 <- adults_motnp2.2[!is.na(adults_motnp2.2$dyad),]
+adults_motnp1.1 <- plot_data_motnp1.1[plot_data_motnp1.1$age_cat_id_1 > 2 & plot_data_motnp1.1$age_cat_id_2 > 2,]
+adults_motnp1.1 <- adults_motnp1.1[!is.na(adults_motnp1.1$dyad),]
 colours <- c('magenta','purple','magenta','purple','grey','blue','purple','blue','purple','magenta','purple','grey','blue','purple')
 (edge_vs_demtype <- 
-    ggplot(data = adults_motnp2.2, aes(y = mean, x = join))+
+    ggplot(data = adults_motnp1.1, aes(y = mean, x = join))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  fill = colours)+
     theme_classic()+
     labs(x = 'dyad demography (A/P = adult/pubescent, M/F/U = male/female/unknown',
          y = 'mean edge weight')+
     coord_flip())
-ggsave(path = 'outputs/motnp_22.01.31/', filename = 'motnp_adults_edge_vs_demtype.pdf',
+ggsave(path = 'outputs/motnp_22.03.03/', filename = 'motnp_adults_edge_vs_demtype.pdf',
        plot = edge_vs_demtype,
        width = 20, height = 24, units = 'cm')  
-ggsave(path = 'outputs/motnp_22.02.01/', filename = 'motnp_adults_edge_vs_demtype.pdf',
-       plot = edge_vs_demtype,
-       width = 20, height = 24, units = 'cm')
 
 # scatter plot of all adult edges by age difference
-adults_motnp2.2$sex_type_names <- ifelse(adults_motnp2.2$sex_type == 'F_F', 'female-female',
-                                         ifelse(adults_motnp2.2$sex_type == 'F_M', 'male-female', 'male-male'))
+adults_motnp1.1$sex_type_names <- ifelse(adults_motnp1.1$sex_type == 'F_F', 'female-female',
+                                         ifelse(adults_motnp1.1$sex_type == 'F_M', 'male-female', 'male-male'))
 (edge_vs_agediff <- 
-    ggplot(adults_motnp2.2[adults_motnp2.2$sex_1 != 'U' & adults_motnp2.2$sex_2 != 'U',],
+    ggplot(adults_motnp1.1[adults_motnp1.1$sex_1 != 'U' & adults_motnp1.1$sex_2 != 'U',],
            aes(x = age_diff, y = mean, fill = sex_type))+
     geom_jitter(alpha = 0.2)+
     theme_classic()+
@@ -869,16 +841,16 @@ adults_motnp2.2$sex_type_names <- ifelse(adults_motnp2.2$sex_type == 'F_F', 'fem
     scale_y_continuous('mean edge weight',
                        expand = c(0.02,0),
                        limits = c(0,1)))
-ggsave(path = 'outputs/motnp_22.01.31/', filename = 'motnp_adults_edge_vs_agediff.pdf',
-       plot = edge_vs_agediff,
-       width = 30, height = 24, units = 'cm')
-ggsave(path = 'outputs/motnp_22.02.01/', filename = 'motnp_adults_edge_vs_agediff.pdf',
+ggsave(path = 'outputs/motnp_22.03.03/', filename = 'motnp_adults_edge_vs_agediff.pdf',
        plot = edge_vs_agediff,
        width = 30, height = 24, units = 'cm')
 
+rm(draws1_motnp1.1, draws2_motnp1.1, draws3_motnp1.1, draws4_motnp1.1)
+rm(edge_vs_agediff, edge_vs_demtype, edge_vs_demtype_all, plot_data_motnp1.1, types, colours, adults_motnp1.1)
+
 ################ 8) Create network plots ################
-head(means_motnp2.2)
-length(unique(plot_data_motnp2.2$id_1))+1 # number of individuals
+head(summaries)
+length(unique(plot_data_motnp1.1$id_1))+1 # number of individuals = 463
 
 ### Plot for Sierra and co. ####
 counts_df_test <- counts_df[counts_df$id_1 == 'F52' | counts_df$id_1 == 'F60' | counts_df$id_1 == 'F98' | 
@@ -890,17 +862,8 @@ counts_df_test <- counts_df_test[counts_df_test$id_2 == 'F52' | counts_df_test$i
                                    counts_df_test$id_2 == 'M40' | counts_df_test$id_2 == 'M26' | 
                                    counts_df_test$id_2 == 'M15' | counts_df_test$id_2 == 'F8',]
 sierra_dyads <- counts_df_test$dyad
-all_dyads <- colnames(draws_motnp2.2)
-#which(all_dyads == "F52_F60" | all_dyads == "F52_F8" | all_dyads == "F52_F98" | all_dyads == "F52_M15" | all_dyads == "F52_M26" | all_dyads == "F52_M40" |
-#        all_dyads == "F52_U17" | all_dyads == "F52_U21" | all_dyads == "F60_F8"  | all_dyads == "F60_F98" | all_dyads == "F60_M15" | all_dyads == "F60_M26" |
-#        all_dyads == "F60_M40" | all_dyads == "F60_U17" | all_dyads == "F60_U21" | all_dyads == "F8_F98"  | all_dyads == "F8_M15"  | all_dyads == "F8_M26"  |
-#        all_dyads == "F8_M40"  | all_dyads == "F8_U17"  | all_dyads == "F8_U21"  | all_dyads == "F98_M15" | all_dyads == "F98_M26" | all_dyads == "F98_M40" | 
-#        all_dyads == "F98_U17" | all_dyads == "F98_U21" | all_dyads == "M15_M26" | all_dyads == "M15_M40" | all_dyads == "M15_U17" | all_dyads == "M15_U21" |
-#        all_dyads == "M26_M40" | all_dyads == "M26_U17" | all_dyads == "M26_U21" | all_dyads == "M40_U17" | all_dyads == "M40_U21" | all_dyads == "U17_U21")
-#draws_test <- draws[,c(40897,40918,40938,40992,41104,41120,41193,41198,44140,44160,44214,44326,44342,44415,44420,51363,51417,51529,
-#                       51545,51618,51623,57867,57979,57995,58068,58073,73396,73412,73485,73490,96092,96165,96170,98381,98386,105248)]
-
-draws_test <- draws_motnp2.2[,which(all_dyads == "F52_F60" | all_dyads == "F52_F8" | all_dyads == "F52_F98" | all_dyads == "F52_M15" |
+all_dyads <- colnames(draws_motnp1.1)
+draws_test <- draws_motnp1.1[,which(all_dyads == "F52_F60" | all_dyads == "F52_F8" | all_dyads == "F52_F98" | all_dyads == "F52_M15" |
                                       all_dyads == "F52_M26" | all_dyads == "F52_M40" | all_dyads == "F52_U17" | all_dyads == "F52_U21" |
                                       all_dyads == "F60_F8"  | all_dyads == "F60_F98" | all_dyads == "F60_M15" | all_dyads == "F60_M26" |
                                       all_dyads == "F60_M40" | all_dyads == "F60_U17" | all_dyads == "F60_U21" | all_dyads == "F8_F98"  |
@@ -921,8 +884,6 @@ for(dyad_id in 1:nrow(counts_df_test)) {                                    # as
   adj_tensor_test[dyad_row$node_1_2, dyad_row$node_2_2, ] <- draws_test[, dyad_id]
 }
 adj_tensor_test[, , 1] # Print the first sample of the posterior distribution over adjacency matrices
-adj_tensor_test[, 1, ] # Print the first sample of the posterior distribution over adjacency matrices
-adj_tensor_test[1, , ] # Print the first sample of the posterior distribution over adjacency matrices
 
 # Calculate lower, median, and upper quantiles of edge weights. Lower and upper give credible intervals.
 adj_quantiles_test <- apply(adj_tensor_test, c(1, 2), function(x) quantile(x, probs=c(0.025, 0.5, 0.975))) # identify median and 95% CI
@@ -945,18 +906,13 @@ plot(g_mid_test, edge.width = 3*E(g_rng_test)$weight, edge.color = rgb(0, 0, 0, 
      vertex.label = c(sort(unique(counts_df_test$id_1)),'U21'),
      vertex.label.dist = 0, vertex.label.color = "black", layout = coords_test, add = TRUE)
 
-# work out how to filter data for plotting
-apply(draws_test, 2, median)
-# F52_F60 = 0.863223000 ; 52_F8 = 0.033248300 ; F52_F98 = 0.623663500 ; F52_M15 = 0.009397185 ; F52_M26 = 0.034015850 ; F52_M40 = 0.054451600 ; F52_U17 = 0.935521500 ; F52_U21 = 0.837885000 ; F60_F8 = 0.035207550 
-adj_mid
-#      [,1]     [,2]       [,3]      [,4]        [,5]       [,6]       [,7]        [,8]       [,9]
-# [1,]    0 0.863223 0.03324830 0.6236635 0.009397185 0.03401585 0.05445160 0.935521500 0.83788500
-# [2,]    0 0.000000 0.03520755 0.5926630 0.009502835 0.03659575 0.05712505 0.820356000 0.95435200
-## 1 = F52, 2 = F60, 3 = F8, 4 = F98, 5 = M15, 6 = M26, 7 = M40, 8 = U17, 9 = U21 --> They go in alphanumeric order
+# clear environment
+rm(adj_lower_test, adj_mid_test, adj_range_test, adj_upper_test, coords_test, counts_df_test, draws_test, dyad_row, g_mid_test, g_rng_test, adj_quantiles_test, adj_tensor_test, dyad_id, i, plot_cols, all_dyads, sierra_dyads)
 
 ### Create igraph object for all elephants and then just plot certain individuals ####
 # read in draws data -- very slow!
-draws_motnp2.2 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.csv')
+#draws_motnp1.1 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv')
+#draws <- data.matrix(draws_motnp1.1)
 
 # reassign dyad numbers to remove gaps
 counts_df$node_1_nogaps <- as.integer(as.factor(counts_df$node_1))
@@ -965,14 +921,21 @@ counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
 # create array of draws per dyad (distributions)
 adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
                          NROW(unique(counts_df$id_2))+1,
-                         NROW(draws_motnp2.2)),
+                         NROW(draws)),
                     dimnames = list(c(unique(counts_df$id_1),'U9'),
                                     c('F1',unique(counts_df$id_2)),
                                     NULL))
-for (i in 1:nrow(counts_df)) {
+N <- nrow(counts_df)
+
+for (i in 1:54000) {            # can cope with jumps of 50000 dyads at a time
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp2.2[, i+1]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws[, i+1]
 }
+for (i in 54001:N) {
+  dyad_row <- counts_df[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws[, i+1]
+}
+adj_tensor[,,1]
 
 # convert to array of medians and 95% credible intervals
 adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
@@ -985,7 +948,54 @@ adj_range <- ((adj_upper - adj_lower)/adj_mid) ; adj_range[is.nan(adj_range)] <-
 g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
 g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
 
-# Plot all
+# Generate nodes data for plotting characteristics
+ele_nodes <- read_csv('data_processed/motnp_elenodes_22.01.13.csv')
+nodes <- data.frame(id = sort(unique(ele_nodes$id)))
+nodes <- left_join(nodes, ele_nodes, by = 'id')
+nodes$sex       <- as.factor(nodes$sex)
+nodes$age_class <- as.factor(nodes$age_class)
+nodes$dem_class <- as.factor(nodes$dem_class)
+str(nodes)
+
+# correct age and demographic classes for nodes
+unique(nodes$age_category) # "50+"   "10-15" "35-50" "20-35" "15-19" "8-9"   "9-10"  "4-5"   "5-6"   "6-7"   "0-3"   "7-8"   "20-25" "25-40" "40+"   "3-4" "1-2"   NA
+nodes$age_category <- ifelse(nodes$age_category == '1-2','0-3',nodes$age_category)
+nodes$age_cat_id <- ifelse(nodes$age_category == '0-3', 1,
+                           ifelse(nodes$age_category == '3-4', 1,
+                                  ifelse(nodes$age_category == '4-5', 1,
+                                         ifelse(nodes$age_category == '5-6', 2,
+                                                ifelse(nodes$age_category == '6-7', 2,
+                                                       ifelse(nodes$age_category == '7-8', 2,
+                                                              ifelse(nodes$age_category == '8-9', 2,
+                                                                     ifelse(nodes$age_category == '9-10', 2,
+                                                                            ifelse(nodes$age_category == '10-15', 3,
+                                                                                   ifelse(nodes$age_category == '15-19', 4,
+                                                                                          ifelse(nodes$age_category == '20-25', 5,
+                                                                                                 ifelse(nodes$age_category == '20-35', 5,
+                                                                                                        ifelse(nodes$age_category == '25-40', 6,
+                                                                                                               ifelse(nodes$age_category == '35-50', 6,
+                                                                                                                      ifelse(nodes$age_category == '40+', 7,
+                                                                                                                             ifelse(nodes$age_category == '50+', 7, nodes$age_category))))))))))))))))
+nodes[is.na(nodes$age_category),]   # U8 doesn't have an age but not a problem -- won't be part of the main analysis. Is a calf so age_cat_id = 1
+nodes$age_cat_id[which(is.na(nodes$age_cat_id))] <- 1
+
+unique(nodes$age_category[nodes$age_class == 'Calf'])      # shouldn't include any ages over 4-5
+unique(nodes$age_category[nodes$age_class == 'Juvenile'])  # shouldn't include any ages under 5-6
+unique(nodes$age_category[nodes$age_class == 'Pubescent']) # shouldn't include any ages under 9-10 or over 15-19
+unique(nodes$age_category[nodes$age_class == 'Adult'])     # shouldn't include any ages under 20-25
+
+nodes$age_class <- ifelse(nodes$age_cat_id == 1, 'Calf',
+                          ifelse(nodes$age_cat_id == 2, 'Juvenile',
+                                 ifelse(nodes$age_cat_id > 4, 'Adult','Pubescent')))
+
+nodes$dem_class <- ifelse(nodes$age_class == 'Adult', paste('A',nodes$sex, sep = ''),
+                          ifelse(nodes$age_class == 'Pubescent', paste('P',nodes$sex, sep = ''),
+                                 ifelse(nodes$age_class == 'Juvenile', paste('J',nodes$sex, sep = ''),
+                                        paste('C',nodes$sex, sep = ''))))
+
+rm(ele_nodes)
+
+# Plot whole network
 coords <- igraph::layout_nicely(g_mid)
 plot(g_mid,
      edge.width = E(g_mid)$weight,
@@ -1002,142 +1012,114 @@ plot(g_mid,
      vertex.label.color = 'black',
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
-     vertex.color= ifelse(ele_nodes$age_class == 'Adult','seagreen1',
-                          ifelse(ele_nodes$age_class == 'Pubescent','skyblue',
-                                 ifelse(ele_nodes$age_class == 'Juvenile', 'yellow','magenta'))),
+     vertex.color= ifelse(nodes$age_class == 'Adult','seagreen1',
+                          ifelse(nodes$age_class == 'Pubescent','skyblue',
+                                 ifelse(nodes$age_class == 'Juvenile', 'yellow','magenta'))),
      layout = coords, add = TRUE)
 
+
 plot(g_mid,
-     edge.width = E(g_mid)$weight,
+     edge.width = E(g_mid)$weight*3,
      vertex.label = NA,
      vertex.size = 5,
-     edge.color = ifelse(mid_links$mid < 0.5,'transparent','black'),
+     edge.color = ifelse(adj_mid < 0.5,'transparent','black'),
      layout = coords)
 plot(g_mid,
-     edge.width = E(g_rng)$weight,
-     edge.color = ifelse(mid_links$mid < 0.5,'transparent',rgb(0,0,0,0.25)),
+     edge.width = E(g_rng)$weight*3,
+     edge.color = ifelse(adj_mid < 0.5,'transparent',rgb(0,0,0,0.25)),
      vertex.size = 5,
      vertex.label = c(sort(unique(counts_df$id_1)),'U9'),
      vertex.label.dist = 0,
      vertex.label.color = 'black',
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
-     vertex.color= ifelse(ele_nodes$age_class == 'Adult','seagreen1',
-                          ifelse(ele_nodes$age_class == 'Pubescent','skyblue',
-                                 ifelse(ele_nodes$age_class == 'Juvenile', 'yellow','magenta'))),
+     vertex.color= ifelse(nodes$age_class == 'Adult','seagreen1',
+                          ifelse(nodes$age_class == 'Pubescent','skyblue',
+                                 ifelse(nodes$age_class == 'Juvenile', 'yellow','magenta'))),
      layout = coords, add = TRUE)
 
-# read in nodes data for subsetting
-ele_nodes <- read_csv('data_processed/motnp_elenodes_22.01.13.csv')
-ele_nodes$sex       <- as.factor(ele_nodes$sex)
-ele_nodes$age_class <- as.factor(ele_nodes$age_class)
-ele_nodes$dem_class <- as.factor(ele_nodes$dem_class)
-ele_nodes <- ele_nodes[,c(12,2:4,5,6,8,9,10,13)]
-str(ele_nodes)
-
 # create variables for different degrees of node connectedness
-ele_nodes$degree_0.1 <- NA
-ele_nodes$degree_0.2 <- NA
-ele_nodes$degree_0.3 <- NA
-ele_nodes$degree_0.4 <- NA
-ele_nodes$degree_0.5 <- NA
-for(i in 1:NROW(ele_nodes)){
-  ele_rows <- links[links$id_1 == ele_nodes$id[i] | links$id_2 == ele_nodes$id[i],]
-  ele_nodes$degree_0.1[i] <- length(which(ele_rows$mid > 0.1))
-  ele_nodes$degree_0.2[i] <- length(which(ele_rows$mid > 0.2))
-  ele_nodes$degree_0.3[i] <- length(which(ele_rows$mid > 0.3))
-  ele_nodes$degree_0.4[i] <- length(which(ele_rows$mid > 0.4))
-  ele_nodes$degree_0.5[i] <- length(which(ele_rows$mid > 0.5))
+nodes$degree_0.1 <- NA
+nodes$degree_0.2 <- NA
+nodes$degree_0.3 <- NA
+nodes$degree_0.4 <- NA
+nodes$degree_0.5 <- NA
+
+summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
+for(i in 1:NROW(nodes)){
+  rows <- summaries[summaries$id_1 == nodes$id[i] | summaries$id_2 == nodes$id[i],]
+  nodes$degree_0.1[i] <- length(which(rows$median > 0.1))
+  nodes$degree_0.2[i] <- length(which(rows$median > 0.2))
+  nodes$degree_0.3[i] <- length(which(rows$median > 0.3))
+  nodes$degree_0.4[i] <- length(which(rows$median > 0.4))
+  nodes$degree_0.5[i] <- length(which(rows$median > 0.5))
 }
-nodes <- data.frame(id = sort(ele_nodes$id))      # reorder so that in same order
-nodes <- left_join(nodes, ele_nodes, by = 'id')
+
+which(nodes$degree_0.1 < nodes$degree_0.2)
+which(nodes$degree_0.2 < nodes$degree_0.3)
+which(nodes$degree_0.3 < nodes$degree_0.4)
+which(nodes$degree_0.4 < nodes$degree_0.5)
 
 # plot network with reduced nodes -- only those with degree values > 0.5
-g_mid_0.5 <- delete.vertices(graph = g_mid, v = ele_nodes$id[which(ele_nodes$degree_0.5 == 0)])
-plot(g_mid_0.5)
-g_rng_0.5 <- delete.vertices(graph = g_rng, v = ele_nodes$id[which(ele_nodes$degree_0.5 == 0)])
-plot(g_rng_0.5)
+g_mid_0.5 <- delete.vertices(graph = g_mid, v = nodes$id[which(nodes$degree_0.5 == 0)])
+g_rng_0.5 <- delete.vertices(graph = g_rng, v = nodes$id[which(nodes$degree_0.5 == 0)])
 
 coords_0.5 <- layout_nicely(g_mid_0.5)
 plot(g_mid_0.5,
-     edge.width = ifelse(E(g_mid_0.5)$weight > 0.5, E(g_mid_0.5)$weight, 0),
-     edge.color = 'black',
-     vertex.size = 5,
+     edge.width = ifelse(E(g_mid_0.5)$weight > 0.5, E(g_rng_0.5)$weight, 0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 6,
      vertex.label = NA,
      layout = coords_0.5)
 plot(g_mid_0.5,
-     edge.color = rgb(0,0,0,0.25),
-     edge.width = ifelse(E(g_mid_0.5)$weight > 0.5, E(g_rng_0.5)$weight, 0),
-     vertex.size = 5,
+     edge.width = ifelse(E(g_mid_0.5)$weight > 0.5, E(g_mid_0.5)$weight, 0),
+     edge.color = 'black',
+     vertex.size = 6,
      vertex.label.color = 'black',
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = ifelse(ele_nodes[which(ele_nodes$degree_0.5 != 0),]$age_class == 'Adult', 'seagreen1',
-                           ifelse(ele_nodes[which(ele_nodes$degree_0.5 != 0),]$age_class == 'Pubescent','skyblue',
-                                  ifelse(ele_nodes[which(ele_nodes$degree_0.5 != 0),]$age_class == 'Juvenile', 'yellow','magenta'))),
-     layout = coords_0.5, add = TRUE)
+     vertex.color = ifelse(nodes[which(nodes$degree_0.5 != 0),]$age_class == 'Adult', 'seagreen1',
+                           ifelse(nodes[which(nodes$degree_0.5 != 0),]$age_class == 'Pubescent','skyblue',
+                                  ifelse(nodes[which(nodes$degree_0.5 != 0),]$age_class == 'Juvenile', 'yellow','magenta'))),
+     layout = coords_0.5,
+     add = TRUE)
 
 #  plot network with reduced nodes -- only those with degree values > 0.3
-g_mid_0.3 <- delete.vertices(graph = g_mid,
-                             v = ele_nodes$id[which(ele_nodes$degree_0.3 == 0)])
-g_rng_0.3 <- delete.vertices(graph = g_rng,
-                             v = ele_nodes$id[which(ele_nodes$degree_0.3 == 0)])
+g_mid_0.3 <- delete.vertices(graph = g_mid, v = nodes$id[which(nodes$degree_0.3 == 0)])
+g_rng_0.3 <- delete.vertices(graph = g_rng, v = nodes$id[which(nodes$degree_0.3 == 0)])
 
 coords_0.3 <- layout_nicely(g_mid_0.3)
 plot(g_mid_0.3,
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.5, E(g_mid_0.3)$weight, 0),
-     edge.color = 'black',
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
      vertex.size = 7,
      vertex.label = NA,
      layout = coords_0.3)
 plot(g_mid_0.3,
-     edge.color = rgb(0,0,0,0.25),
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.5, E(g_rng_0.3)$weight, 0),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
+     edge.color = 'black',
      vertex.size = 7,
      vertex.label.color = 'black',
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = ifelse(ele_nodes[which(ele_nodes$degree_0.3 != 0),]$age_class == 'Adult',
+     vertex.color = ifelse(nodes[which(nodes$degree_0.3 != 0),]$age_class == 'Adult',
                            'seagreen1',
-                           ifelse(ele_nodes[which(ele_nodes$degree_0.3 != 0),]$age_class == 'Pubescent',
+                           ifelse(nodes[which(nodes$degree_0.3 != 0),]$age_class == 'Pubescent',
                                   'skyblue',
-                                  ifelse(ele_nodes[which(ele_nodes$degree_0.3 != 0),]$age_class == 'Juvenile',
+                                  ifelse(nodes[which(nodes$degree_0.3 != 0),]$age_class == 'Juvenile',
                                          'yellow','magenta'))),
      layout = coords_0.3, add = TRUE)
 
-# layout in circle and only plot the weakest, just to be certain that the uncertainties are actually plotting
-coords <- layout_in_circle(g_mid)
-plot(g_mid,
-     edge.width = ifelse(E(g_mid)$weight < 0.05, E(g_mid)$weight, 0),
-     edge.color = 'black',
-     vertex.size = 3,
-     vertex.label = NA,
-     layout = coords)
-plot(g_mid,
-     edge.color = rgb(0,0,0,0.05),
-     edge.width = ifelse(E(g_mid)$weight < 0.05, E(g_rng)$weight, 0),
-     vertex.size = 7,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.label.dist = 0,
-     vertex.color = ifelse(ele_nodes[which(ele_nodes$degree_0.3 != 0),]$age_class == 'Adult',
-                           'seagreen1',
-                           ifelse(ele_nodes[which(ele_nodes$degree_0.3 != 0),]$age_class == 'Pubescent',
-                                  'skyblue',
-                                  ifelse(ele_nodes[which(ele_nodes$degree_0.3 != 0),]$age_class == 'Juvenile',
-                                         'yellow','magenta'))),
-     layout = coords, add = TRUE)
-
 #plot males
 g_mid_m <- delete.vertices(graph = g_mid,
-                           v = ele_nodes$id[which(ele_nodes$dem_class != 'AM' &
-                                                    ele_nodes$dem_class != 'PM')])
+                           v = nodes$id[which(nodes$dem_class != 'AM' &
+                                                    nodes$dem_class != 'PM')])
 g_rng_m <- delete.vertices(graph = g_rng,
-                           v = ele_nodes$id[which(ele_nodes$dem_class != 'AM' &
-                                                    ele_nodes$dem_class != 'PM')])
+                           v = nodes$id[which(nodes$dem_class != 'AM' &
+                                                    nodes$dem_class != 'PM')])
+males <- nodes[nodes$dem_class == 'AM' | nodes$dem_class == 'PM',]
 coords_m <- layout_nicely(g_mid_m)
 plot(g_mid_m,
      edge.width = E(g_mid_m)$weight,
@@ -1153,44 +1135,185 @@ plot(g_mid_m,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = ifelse(ele_nodes[which(ele_nodes$dem_class == 'AM' | 
-                                             ele_nodes$dem_class == 'PM'),]$age_class == 'Adult',
-                           'seagreen1', 'skyblue'),
+     vertex.color = ifelse(males$age_class == 'Adult','seagreen1', 'skyblue'),
      layout = coords_m, add = TRUE)
 
-# plot males >0.3 -- I THINK this is working, but it keeps only showing a handful of the labels. If I then change the size of the plot window, they normally appear so I think it's just that my laptop is struggling, but there might be a problem with these plots still.
-g_mid_m <- delete.vertices(graph = g_mid,
-                           v = ele_nodes$id[which(ele_nodes$dem_class != 'AM' &
-                                                    ele_nodes$dem_class != 'PM' |
-                                                    ele_nodes$degree_0.3 == 0)])
-g_rng_m <- delete.vertices(graph = g_rng,
-                           v = ele_nodes$id[which(ele_nodes$dem_class != 'AM' &
-                                                    ele_nodes$dem_class != 'PM' |
-                                                    ele_nodes$degree_0.3 == 0)])
-coords_m <- layout_nicely(g_mid_m)
-plot(g_mid_m,
-     edge.width = E(g_mid_m)$weight,
-     edge.color = 'black',
+# plot males >0.3
+g_mid_m0.3 <- delete.vertices(graph = g_mid,
+                           v = nodes$id[which(nodes$dem_class != 'AM' &
+                                                    nodes$dem_class != 'PM' |
+                                                    nodes$degree_0.3 == 0)])
+g_rng_m0.3 <- delete.vertices(graph = g_rng,
+                           v = nodes$id[which(nodes$dem_class != 'AM' &
+                                                    nodes$dem_class != 'PM' |
+                                                    nodes$degree_0.3 == 0)])
+males0.3 <- males[males$degree_0.3 > 0,]
+coords_m0.3 <- layout_nicely(g_mid_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_rng_m0.3)$weight*3, 0),
+     edge.color = rgb(0,0,0,0.25),
      vertex.size = 7,
      vertex.label = NA,
-     layout = coords_m)
-plot(g_mid_m,
-     edge.color = rgb(0,0,0,0.25),
-     edge.width = E(g_rng_m)$weight,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*3, 0),
+     edge.color = 'black',
      vertex.size = 7,
      vertex.label.color = 'black',
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = ifelse(ele_nodes[which(ele_nodes$dem_class == 'AM' | 
-                                             ele_nodes$dem_class == 'PM'),]$age_class == 'Adult',
-                           'seagreen1', 'skyblue'),
-     layout = coords_m, add = TRUE)
+     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     layout = coords_m0.3, add = TRUE)
+
+m38 <- summaries[summaries$id_1 == 'M38' | summaries$id_2 == 'M38',]
+m38 <- m38[m38$median > 0.3,] # leaves on elephants which are >0.3 connected to females/calves
+m87 <- summaries[summaries$id_1 == 'M87' | summaries$id_2 == 'M87',]
+m87 <- m87[m87$median > 0.3,] # leaves on elephants which are >0.3 connected to females/calves
+
+g_mid_m0.3 <- delete_vertices(graph = g_mid_m0.3, v = c('M240','M71','M99','M233',
+                                                        'M158','M148','M87','M38',
+                                                        'M128','M10','M111','M95',
+                                                        'M7','M70','M17','M117',
+                                                        'M221','M156','M196','M80',
+                                                        'M114','M177'))
+g_rng_m0.3 <- delete_vertices(graph = g_rng_m0.3, v = c('M240','M71','M99','M233',
+                                                        'M158','M148','M87','M38',
+                                                        'M128','M10','M111','M95',
+                                                        'M7','M70','M17','M117',
+                                                        'M221','M156','M196','M80',
+                                                        'M114','M177'))
+males0.3 <- males0.3[males0.3$id != 'M240' & males0.3$id != 'M71' & males0.3$id != 'M99' & males0.3$id != 'M233' & males0.3$id != 'M158' & males0.3$id != 'M148' & males0.3$id != 'M87' & males0.3$id != 'M38' & males0.3$id != 'M128' & males0.3$id != 'M10' & males0.3$id != 'M111' & males0.3$id != 'M95' & males0.3$id != 'M7' & males0.3$id != 'M70' & males0.3$id != 'M17' & males0.3$id != 'M117' & males0.3$id != 'M221' & males0.3$id != 'M156' & males0.3$id != 'M196' & males0.3$id != 'M80' & males0.3$id != 'M114' & males0.3$id != 'M177',]
+
+coords_m0.3 <- layout_nicely(g_mid_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_rng_m0.3)$weight*3, 0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 7,
+     vertex.label = NA,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = 7,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     layout = coords_m0.3, add = TRUE)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_rng_m0.3)$weight*3, 0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = males0.3$count,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     layout = coords_m0.3, add = TRUE)
+
+summary(males0.3$count)
+table(males0.3$count)
+males0.3$count[which(males0.3$id == 'M157')]
+males0.3$count[which(males0.3$id == 'M162')]
+summaries$sd[which(summaries$dyad == 'M157_M162')] # 0.2355704
+summaries$sd[which(summaries$dyad == 'M101_M16')]  # 0.2371941
+summaries$sd[which(summaries$dyad == 'M200_M205')] # 0.1335143
+max(summaries$sd)
+plot(draws[,which(colnames(draws) == 'M157_M162')], type = 'l')
+plot(draws[,which(colnames(draws) == 'M101_M16')],  type = 'l')
+plot(draws[,which(colnames(draws) == 'M200_M205')], type = 'l')
+g_rng_m0.3[1] # M157 = 20, M162 = 24
+g_rng_m0.3[20] # M162 = 1.147962
+g_rng_m0.3[24] # M157 = 1.147962
+g_rng_m0.3[1]  ; g_rng_m0.3[22] # M101_M16  = 1.166944
+g_rng_m0.3[47] ; g_rng_m0.3[48] # M200_M205 = 1.579656
+g_mid_m0.3[20] ; g_mid_m0.3[24] # M157_M162 = 0.71228400
+g_mid_m0.3[1]  ; g_mid_m0.3[22] # M101_M16  = 0.71306150
+g_mid_m0.3[47] ; g_mid_m0.3[48] # M200_M205 = 0.32397950
+# is plotting igraph object correctly, igraph is underestimating the uncertainty
+
+adj_range['M157','M162']  # 1.147962
+adj_range['M101','M16']   # 1.166944
+adj_range['M200','M205']  # 1.579656
+# igraph is not making the error, adj_range is
+adj_quantiles[1,'M157','M162']  # 0.1706227
+adj_quantiles[2,'M157','M162']  # 0.712284
+adj_quantiles[3,'M157','M162']  # 0.9882974
+adj_quantiles[1,'M101','M16']   # 0.1569084
+adj_quantiles[2,'M101','M16']   # 0.7130615
+adj_quantiles[3,'M101','M16']   # 0.989011
+adj_quantiles[1,'M200','M205']  # 0.1040737
+adj_quantiles[2,'M200','M205']  # 0.3239795
+adj_quantiles[3,'M200','M205']  # 0.6158498
+
+
+adj_range2 <- adj_upper - adj_lower ; adj_range2[is.nan(adj_range2)] <- 0
+g_rng2 <- graph_from_adjacency_matrix(adj_range2, mode="undirected", weighted=TRUE)
+g_rng2_m0.3 <- delete.vertices(graph = g_rng2,
+                               v = nodes$id[which(nodes$dem_class != 'AM' &
+                                                   nodes$dem_class != 'PM' |
+                                                   nodes$degree_0.3 == 0)])
+
+g_rng2_m0.3 <- delete_vertices(graph = g_rng2_m0.3, v = c('M240','M71','M99','M233',
+                                                        'M158','M148','M87','M38',
+                                                        'M128','M10','M111','M95',
+                                                        'M7','M70','M17','M117',
+                                                        'M221','M156','M196','M80',
+                                                        'M114','M177'))
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, (E(g_rng2_m0.3)$weight*5), 0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*5, 0),
+     edge.color = 'black',
+     vertex.size = males0.3$count,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     layout = coords_m0.3, add = TRUE)
+g_mid_m0.3[1]
+g_rng_m0.3[1]
+
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, (E(g_rng2_m0.3)$weight*10), 0),
+     edge.color = 'blue',
+     vertex.size = 7,
+     vertex.label = NA,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*10, 0),
+     edge.color = 'black',
+     vertex.size = 7,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     layout = coords_m0.3, add = TRUE)
+
+
+### clear environment
+rm(coords, coords_0.3, coords_0.5, coords_m, coords_m0.3, dyad_row, edges, ele, ele_nodes, elephants, g_mid, g_mid_0.3, g_mid_0.5, g_mid_m, g_mid_m0.3, g_rng, g_rng_0.3, g_rng_0.5, g_rng_m, g_rng_m0.3, m38, m87, males, males0.3, rows, traceplot_sierra, traceplot_sierra2, i)
 
 ################ 9) Just playing with gregariousness ideas a little ################
-head(means_motnp2.2)
-length(means_motnp2.2$dyad) # this is all of the dyads
-edges <- left_join(x = means_motnp2.2, y = counts_df, by = 'dyad')
+head(summaries)
+length(summaries$dyad) # this is all of the dyads
+edges <- left_join(x = summaries, y = counts_df, by = 'dyad')
+edges <- edges[,c(1:9,12:41)]
+colnames(edges)[2:3] <- c('id_1','id_2')
 elephants <- data.frame(id = c(edges$id_1, 'U9'),
                         sex = c(edges$sex_1, 'U'),
                         age_class = c(edges$age_class_1, 'Calf'),
@@ -1245,7 +1368,7 @@ ggplot(elephants, aes(x = age_cat_id, y = mean_edge_apm, colour = sex))+
   ylab('median edge weight')+
   theme_light()
 
-ggplot(elephants, aes(x = age_cat_id, y = mean_edge_apf, colour = sex))+
+ggplot(elephants, aes(x = age_cat_id, y = mean_edge_apm, colour = sex))+
   #geom_point(alpha = 0.7)+
   geom_jitter(width = 0.2)+
   xlab('age category')+
@@ -1257,41 +1380,327 @@ ggplot(elephants, aes(x = age_cat_id, y = max_edge, pch = sex, colour = max_edge
   geom_jitter(width = 0.2)+
   labs(colour = 'demography of\nclosest associate',
        x = 'age category',
-       y = 'median edge weight')+
+       y = 'maximum edge weight')+
   theme_light()
 
-################ 10) Extract centrality metrics for each individual ################
-N <- length(unique(counts_df$id_1))+1
-num_iterations <- length(draws_motnp2.2$F1_F10)
-centrality_matrix <- matrix(0, nrow = num_iterations, ncol = N)
-for (i in 1:num_iterations) {
+
+################ 10) Nodal regression ################
+# The final common type of network analysis we will cover here is nodal regression, where a regression is performed to analyse the relationship between a nodal network metric(such as centrality) and nodal traits (such as age and sex).  These analyses are usually used to assess how network position depends on various biological factors, but can also be used where network position is a predictor.  Since node metrics are derivative measures of the network, uncertainty in edge weights should ideally propagate through to node metrics, and on to coefficients in regression analyses, giving an accurate estimate of the total uncertainty in inferred parameters.  The core of the nodal regression is similar to dyadic regression, taking the form:
+#X(n)i j∼Poisson(λ(n)i jD(n)i j)
+#logÄλ(n)i jä=ωi j+L(n)i j
+#Mi(ω)∼Normal(β0+β1xi,σ2)
+# where β0 is the intercept parameter, β1 is the slope parameter, and σ is the standard deviation of the residuals. Mi(ω) denotes the node metric estimates when applied to the edge weights estimated in the top part of the model. Calculating node metrics within the model may present a practical challenge when using standard model fitting software, as many node metrics can not be described purely in terms of closed-form equations (Freeman, 1978).  In this case, splitting up the model along the dashed line becomes an important step, as it allows the edge weights to be estimated using a standard piece of software, and leaves the regression part of the model to be fit using a sampler that supports numeric estimates of network centralities. As part of the code we have made available, we have written a custom Metropolis-Hastings sampler that allows numeric estimates of node metrics to be used when fitting the model. Importantly, our sampler samples from the joint distribution of edge weights, rather than sampling edge weights independently. This ensures that the effect of any structure in the observation data (such as location effects) is maintained and propagated through to the node metric estimates, and subsequently to regression coefficient estimates.
+
+### create array of draws per dyad (distributions) -- same as above
+adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
+                         NROW(unique(counts_df$id_2))+1,
+                         NROW(draws_motnp1.1)),
+                    dimnames = list(c(unique(counts_df$id_1),'U9'),
+                                    c('F1',unique(counts_df$id_2)),
+                                    NULL))
+N <- nrow(counts_df)
+
+for (i in 1:54000) {            # can cope with jumps of 50000 dyads at a time
+  dyad_row <- counts_df[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp1.1[, i+1]
+}
+for (i in 54001:N) {
+  dyad_row <- counts_df[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp1.1[, i+1]
+}
+adj_tensor[,,1]
+
+### create centrality matrix
+centrality_matrix <- matrix(0, nrow = NROW(draws_motnp1.1), ncol = length(unique(counts_df$id_1))+1)
+for (i in 1:NROW(draws_motnp1.1)) {
   g <- graph_from_adjacency_matrix(adj_tensor[, , i], mode="undirected", weighted=TRUE)
   centrality_matrix[i, ] <- strength(g)
 }
 
-colnames(centrality_matrix) <- c("Rey", "Leia", "Obi-Wan", "Luke", "C-3PO", "BB-8", "R2-D2", "D-O")
+colnames(centrality_matrix) <- c(sort(unique(counts_df$id_1)),unique(counts_df$id_2)[462])
 head(centrality_matrix)
+write_csv(as.data.frame(centrality_matrix), 'data_processed/motnp_bayesian_nodalregression_centralitymatrix_22.03.04.csv')
 
 centrality_quantiles <- t(apply(centrality_matrix, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
 centrality_quantiles
 
+cq <- data.frame(id = rownames(centrality_quantiles),
+                 strength_lwr = centrality_quantiles[,1],
+                 strength_mid = centrality_quantiles[,2],
+                 strength_upr = centrality_quantiles[,3])
+cq$id[which(cq$strength_mid == max(cq$strength_mid))]
+nodes <- left_join(nodes, cq, by = 'id')
+head(nodes)
+
+boxplot(nodes$strength_mid ~ nodes$sex, notch = T)
+boxplot(nodes$strength_mid ~ nodes$age_class, notch = T)
+boxplot(nodes$strength_mid ~ nodes$age_category, notch = T, horizontal = T, las = 1, ylab = '')
+
+nodes$age <- ifelse(nodes$age_category == '0-3', 1,
+             ifelse(nodes$age_category == '1-2', 1,
+             ifelse(nodes$age_category == '3-4', 1,
+             ifelse(nodes$age_category == '4-5', 1,
+             ifelse(nodes$age_category == '5-6', 2,
+             ifelse(nodes$age_category == '6-7', 2,
+             ifelse(nodes$age_category == '7-8', 2,
+             ifelse(nodes$age_category == '8-9', 2,
+             ifelse(nodes$age_category == '9-10', 3,
+             ifelse(nodes$age_category == '10-15', 3,
+             ifelse(nodes$age_category == '15-19', 4,
+             ifelse(nodes$age_category == '20-25', 5,
+             ifelse(nodes$age_category == '20-35', 5,
+             ifelse(nodes$age_category == '25-40', 6,
+             ifelse(nodes$age_category == '35-50', 6,
+             ifelse(nodes$age_category == '40+', 7,
+             ifelse(nodes$age_category == '50+', 7, 'error')))))))))))))))))
+nodes$age <- ifelse(nodes$id == 'U8', 1, nodes$age)
+boxplot(nodes$strength_mid ~ nodes$age, notch = T, horizontal = T, las = 1, ylab = '')
+
+nodes_tidy <- pivot_longer(data = nodes, cols = 14:21,
+                           names_to = 'centrality_type', values_to = 'centrality')
+nodes_tidy$centrality_type <- factor(nodes_tidy$centrality_type,
+                                     levels = c('strength_lwr', 'strength_mid', 'strength_upr',
+                                                'degree_0.1','degree_0.2','degree_0.3',
+                                                'degree_0.4','degree_0.5'))
+ggplot(nodes_tidy, aes(y = centrality, x = age, fill = centrality_type))+
+  geom_boxplot()+
+  facet_wrap(.~centrality_type, scales = 'free')+ # lwr, mid and upr = very similar patterns. degree = very variable depending on level
+  theme_light()+
+  theme(legend.position = 'none',
+        strip.text = element_text(colour = 'black'))
+
+ggplot(nodes_tidy[nodes_tidy$centrality_type == 'degree_0.2' |
+                    nodes_tidy$centrality_type == 'strength_mid',],
+       aes(y = centrality, x = age))+
+  geom_boxplot()+
+  facet_wrap( . ~ centrality_type )
+
+### write nodes data frame to file
+write_csv(nodes, 'data_processed/motnp_elenodes_centrality_22.03.03.csv')
+
+# The key challenge to quantifying uncertainty in network analysis is to incorporate uncertainty due to sampling into downstream analyses, commonly regression. This can be achieved by modifying the likelihood function of a regression model to treat the network centralities with uncertainty. We have written a custom MCMC sampler function that samples from the joint distribution of network centralities calculated earlier and treats those samples as the data in the likelihood function. Likelihood functions for the sampler use the index variable to keep track of which data points are being compared internally in the sampler, to ensure that candidate steps in the MCMC are not accepted or rejected because they are being compared to different data points, rather than because of the parameter space. Custom likelihood functions take a similar form to the target += syntax in Stan, but for more specific resources the following document is a good start: https://www.ime.unicamp.br/~cnaber/optim_1.pdf.
+
+loglik <- function(params, Y, X, index) {
+  # Define parameters
+  intercept <- params[1]
+  beta_age <- params[2]
+  beta_females <- params[3]
+  beta_males <- params[4]
+  beta_unks <- params[5]
+  sigma <- exp(params[6]) # Exponential keeps underlying value unconstrained, which is much easier for the sampler.
+  
+  # Sample data according to index
+  y <- Y[index %% dim(Y)[1] + 1, ]
+  
+  # Define model
+  target <- 0
+  target <- target + sum(dnorm(y, mean = intercept + beta_age*X[,1] + beta_females*X[,2] + beta_males*X[,3] + beta_unks*X[,4],
+                               sd = sigma, log = TRUE))                   # Main model
+  target <- target + dnorm(intercept,    mean = 0, sd = 2.5, log = TRUE)  # Prior on intercept
+  target <- target + dnorm(beta_age,     mean = 0, sd = 2.5, log = TRUE)  # Prior on age coefficient
+  target <- target + dnorm(beta_females, mean = 0, sd = 2.5, log = TRUE)  # Prior on female coefficient
+  target <- target + dnorm(beta_males,   mean = 0, sd = 2.5, log = TRUE)  # Prior on male coefficient
+  target <- target + dnorm(beta_unks,    mean = 0, sd = 2.5, log = TRUE)  # Prior on unknown coefficient
+  target <- target + dexp(sigma, 1, log = TRUE)                           # Prior on sigma
+  
+  return(target)
+}
+
+# Now we will prepare data for fitting the model. The predictor matrix is simply a matrix with 3 columns and 463 rows, corresponding to whether each of the 8 nodes is a female (column 1), a male (column 2), or an unknown (column 3).
+predictor_matrix <- matrix(0, nrow = length(nodes$id), ncol = 4)
+colnames(predictor_matrix) <- c('age','female', 'male','unknown')
+predictor_matrix[, 1] <- as.numeric(nodes$age)
+predictor_matrix[which(nodes$sex == 'F'), 2] <- 1
+predictor_matrix[which(nodes$sex == 'M'), 3] <- 1
+predictor_matrix[which(nodes$sex == 'U'), 4] <- 1
+predictor_matrix
+
+write_csv(as.data.frame(predictor_matrix), 'data_processed/motnp_bayesian_nodalregression_predictormatrix_22.03.04.csv')
+
+# Since network strength is strictly positive, a Gaussian error is not a reasonable model for the data. The Gaussian family model is much easier to implement as well as interpret than many other models, so we will standardise the centralities by taking z-scores.
+centrality_matrix_std <- (centrality_matrix - apply(centrality_matrix, 1, mean))/apply(centrality_matrix, 1, sd)
+
+# Now we’re in a position to fit the model. To do this, we define the target function, which is simply a function that maps candidate parameters and a network centrality index to the log-likelihood of that function for the given sample of the centrality posterior. This means the target function can be written as a function of the data centrality_matrix_std and predictor_matrix.
+target <- function(params, index) loglik(params, centrality_matrix_std, predictor_matrix, index)
+
+# define metropolis sampler function
+metropolis <- function(target, initial, iterations=10000, warmup=2000, thin=4, chain_id=1, refresh=2000) {
+  k <- length(initial)
+  chain <- matrix(0, iterations + warmup, k)
+  ll_obs <- NULL
+  pred <- NULL
+  chain[1, ] <- initial
+  acceptances <- c(1)
+  prop_dispersion <- 2.38
+  for (i in 2:(iterations + warmup)) {
+    current <- chain[i - 1, ]
+    # Single Component Adaptive Metropolis (SCAM)
+    if (i <= 100) {
+      candidate <- rnorm(k, mean=current, sd=5)
+    } else {
+      prop_var <- prop_dispersion * (current_var + 0.05)
+      candidate <- rnorm(k, mean=current, sd=sqrt(prop_var))
+    }
+    current_lk <- target(current, i)
+    candidate_lk <- target(candidate, i)
+    A <- exp(candidate_lk - current_lk)
+    if (runif(1) < A) { # Accept
+      chain[i, ] <- candidate
+      acceptances[length(acceptances) + 1] <- 1
+    } else {
+      acceptances[length(acceptances) + 1] <- 0
+      chain[i, ] <- current
+    }
+    # Update current mean and current var for next iteration.
+    if (i == 100) {
+      current_mean <- colMeans(chain[1:i, ])
+      current_var <- apply(chain[1:i, ], 2, var)
+    } else if (i >= 100) {
+      prev_mean <- current_mean
+      prev_var <- current_var
+      current_mean <- (i - 1)/i * prev_mean + (1/i) * chain[i, ]
+      current_var <- (i - 2)/(i - 1) * prev_var + prev_mean^2 + 1/(i - 1) * (chain[i, ])^2 - i/(i - 1) * current_mean^2
+    }
+    # Adjust acceptance rate for batch.
+    if (i %% 100 == 0) {
+      acc_batch <- mean(acceptances[(i - 99):i])
+      if (acc_batch < 0.23) {
+        prop_dispersion <- prop_dispersion/exp(sqrt(1/(i/100)))
+      } else {
+        prop_dispersion <- prop_dispersion * exp(sqrt(1/(i/100)))
+      }
+    }
+    # Print out progress
+    if (refresh != 0 && i %% refresh == 0) {
+      if (i < warmup) {
+        cat(paste0("Chain: ", chain_id, " | Iteration: ", i, "/", warmup + iterations, " (Warmup)\n"))
+      } else {
+        cat(paste0("Chain: ", chain_id, " | Iteration: ", i, "/", warmup + iterations, " (Sampling)\n"))
+      }
+    }
+  }
+  # close(pb)
+  cat(paste0("Acceptance Rate: ", mean(acceptances), "\n"))
+  return(chain[seq(warmup, iterations + warmup - 1, thin), ])
+}
+
+# The function metropolis from sampler.R can now be used to fit the model using the provided target function, an initial set of parameters, and some additional MCMC options.
+chain <- metropolis(target, c(0, 0, 0, 0), iterations=100000, thin=100, refresh=10000)
+
+colnames(chain) <- c("intercept", "beta_lifeform", "beta_droid", "sigma")
+head(chain)
+
+par(mfrow=c(2, 2))
+for (i in 1:4) {
+  plot(chain[, i], type="l")
+}
+
+plot(density(centrality_matrix_std[1, ]), ylim=c(0, 0.7), main="", xlab="Standardised network strength")
+sample_ids <- sample(1:1000, size=200)
+for (i in sample_ids) {
+  pred <- rnorm(8, mean=chain[i, "intercept"] + chain[i, "beta_lifeform"] * predictor_matrix[, 1] + chain[i, "beta_droid"] * predictor_matrix[, 2], sd=exp(chain[i, "sigma"]))
+  lines(density(centrality_matrix_std[i, ]), col=rgb(0, 0, 0, 0.25))
+  lines(density(pred), col=rgb(0, 0, 1, 0.25))
+}
+
+coefficient_quantiles <- t(apply(chain, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
+coefficient_quantiles
+
+beta_difference <- chain[, "beta_lifeform"] - chain[, "beta_droid"]
+quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
 
 
 
 
 
 
+#
+################ 11) Dyadic regression ################
+# A common type of analysis in studies of social networks is to consider factors that affectedge weights.  This type of analysis is often called dyadic regression, where explanatoryfactors such as sex or age difference are regressed against edge weight. The edge weightsin dyadic regression are non-independent, as variables such as age difference or sex dif-ference are inherently linked to individual-level attributes.  This means that effects dueto age or sex in individualiaffect all dyads that connecti.  This non-independence canbe controlled for by including node-level effects in the regression (Tranmer et al., 2014).Using the count data example discussed earlier, we propose to conduct dyadic regres-sion using a standard regression model of the form:
+#         X_ij ∼ Poisson(lambda_ij)
+#         log(lambda_ij) = weight_ij + Location_ij
+#         weight_ij ∼ Normal(beta_0 + beta_1*x_ij + u_i + u_j, sigma_sq)
+# where beta_0 is the intercept parameter, beta_1 is the slope parameter, ui and uj are parameters accounting for the effect of node membership on edge weight, and sigma is the standard deviation of the residuals.  The dashed line indicates that the model can be fit in two separate parts:the first part being the core edge weight model, and the second part being the dyadic regression model.  It is not strictly necessary to separate out the model like this, but do-ing so makes it possible to fit the edge weight model once and conduct multiple types of analysis on it afterwards without fitting the entire model again.Theβ0andβ1parameters can be interpreted in the same way as usual regression coefficients, and will be accompanied with credible intervals describing the probability distribution of coefficient values.  There are several ways to gain inference from these values.  The overlap of the credible interval with zero is often used to indicate the presence of a ‘significant effect’, though this approach has been criticised for several reasons(Gelman et al., 2012; Ogle et al., 2019).  An alternative option is to use Bayes factorsto quantify support for or against the hypothesis H1:β16=0 (Kass and Raftery, 1995;Jeffreys, 1998). In regression settings, the Bayes factor for a point null hypothesis can be calculated quickly using the Savage-Dickey method (Wagenmakers et al., 2010).The model shown here is intended as a minimal example of a simple linear regression with node-level effects to account for the non-independence of edges. The regression can be extended to support different family distributions, hierarchical effects, non-linearities,and more. We have included examples of diagnostics and some extensions in the example code.
 
+#### simulated data ####
+### create data list
+simdat_ls <- list(
+  n_dyads  = nrow(dyads),       # total number of times one or other of the dyad was observed
+  together = dyads$event_count, # count number of sightings seen together
+  apart    = dyads$apart,       # count number of sightings seen apart
+  age_diff = dyads$age_diff)    # age difference between individuals
+  #dem_dyad = dyads$dem_dyad_f)  # demographic pair of dyad
 
+simdat_ls$together <- simdat_ls$together+1
+simdat_ls$apart <- simdat_ls$apart+1
 
+#test <- ulam(alist(events ~ dbeta(together, apart)),  data = simdat_ls, chains = 1, cores = 4)
+test <- ulam(alist(
+  events ~ dbeta(together, apart),
+  weight ~ dnorm(mu, sigma),
+  mu <- events + b1 * age_diff, # + u_i[id_1] + u_j[id_2], -- should include individual effects but no idea how to do this so that unaffected by which is id_1 and which is id_2
+  b1 ~ dnorm(-0.5,2),
+  sigma ~ dexp(1)),
+  data = simdat_ls, chains = 1, cores = 4)
+stancode(test)
+precis(test)
+traceplot(test)
 
+d_reg_test <- cmdstan_model("models/dyadic_regression_hkm_22.03.03.stan")
+d_reg_test
 
+### Fit model
+test2 <- d_reg_test$sample(
+  data = simdat_ls, 
+  seed = 12345, 
+  chains = 4, 
+  parallel_chains = 4
+)
 
+### check model
+test2$summary()
 
+#### real data ###
+nodes$age_sex <- paste(nodes$age_cat_id ,nodes$sex, sep = '')
+nodes$family[which(nodes$family == "M26 M87 Dead 1 Jul 17 Poached")] <- 'M26 M87'
+nodes$family[which(nodes$family == 'n/a')] <- NA
+nodes <- separate(nodes, family, into = c('family.1','family.2','family.3'), sep = ' ')
 
+age_sex_family <- nodes[,c('id','age_sex','family.1','family.2','family.3')]
+colnames(age_sex_family) <- c('id_1','age_sex_1','family_1.1','family_1.2','family_1.3')
+counts_df <- left_join(x = counts_df, y = age_sex_family, by = 'id_1')
+colnames(age_sex_family) <- c('id_2','age_sex_2','family_2.1','family_2.2','family_2.3')
+counts_df <- left_join(x = counts_df, y = age_sex_family, by = 'id_2')
+rm(age_sex_family)
+counts_df$dem_dyad <- paste(counts_df$age_sex_1, counts_df$age_sex_2, sep = '_')
+barplot(table(counts_df$dem_dyad), las = 1, horiz = T) # some have only a very few pairs
 
+for(i in 1:nrow(counts_df)){
+  counts_df$family_1.1[i] <- ifelse(is.na(counts_df$family_1.1[i]) == TRUE, 'NA', counts_df$family_1.1[i])
+  counts_df$family_1.2[i] <- ifelse(is.na(counts_df$family_1.2[i]) == TRUE, 'NA', counts_df$family_1.2[i])
+  counts_df$family_1.3[i] <- ifelse(is.na(counts_df$family_1.3[i]) == TRUE, 'NA', counts_df$family_1.3[i])
+  counts_df$family_2.1[i] <- ifelse(is.na(counts_df$family_2.1[i]) == TRUE, 'NA', counts_df$family_2.1[i])
+  counts_df$family_2.2[i] <- ifelse(is.na(counts_df$family_2.2[i]) == TRUE, 'NA', counts_df$family_2.2[i])
+  counts_df$family_2.3[i] <- ifelse(is.na(counts_df$family_2.3[i]) == TRUE, 'NA', counts_df$family_2.2[i])
+}
 
+counts_df$family1 <- ifelse(counts_df$family_1.1 == counts_df$id_2, 'family', 
+                            ifelse(counts_df$family_2.1 == counts_df$id_1, 'family', 'not_family'))
+counts_df$family2 <- ifelse(counts_df$family_1.2 == counts_df$id_2, 'family',  
+                            ifelse(counts_df$family_2.2 == counts_df$id_1, 'family', 'not_family'))
+counts_df$family3 <- ifelse(counts_df$family_1.3 == counts_df$id_2, 'family', 
+                            ifelse(counts_df$family_2.3 == counts_df$id_1, 'family', 'not_family'))
 
+counts_df$family <- ifelse(counts_df$family1 == 'family' | counts_df$family2 == 'family' | counts_df$family3 == 'family',
+                           'family','not_family')
+table(counts_df$family)
+
+family <- counts_df[counts_df$family == 'family',]
+unique(family$dem_type)
+
+counts_df$family <- ifelse(counts_df$family == 'family','mother_calf',counts_df$family)
+counts_df$family <- ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_PF',
+                           'family',)
 
 
 
