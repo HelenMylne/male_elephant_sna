@@ -8,8 +8,6 @@
 # load packages
 library(tidyverse)
 library(dplyr)
-library(rstan)
-library(rethinking)
 library(igraph)
 library(dagitty)
 library(cmdstanr)
@@ -18,7 +16,6 @@ library(lubridate)
 # information
 sessionInfo()
 R.Version()
-rstan::stan_version()
 #packageVersion('')
 #citation('')
 
@@ -178,6 +175,7 @@ colnames(efa_gps)[4] <- c('date')
 efa_gps$location <- paste(efa_gps$latitude, efa_gps$longitude, sep = '_')
 
 write_delim(efa_gps, 'data_processed/mpnp_eles_long_22.03.08.csv', delim = ',')
+# efa_gps <- read_csv('data_processed/mpnp_eles_long_22.03.08.csv')
 
 #### Nodes data frame ####
 ele_nodes <- data.frame(id_no = sort(unique(efa$elephant_id)),
@@ -232,6 +230,7 @@ ele_nodes$dem_class <- paste(ele_nodes$age, ele_nodes$sex, sep = '')
 ele_nodes <- ele_nodes[c(1:6)]
 
 write_delim(ele_nodes, 'data_processed/mpnp_elenodes_22.03.08.csv')
+# ele_nodes <- read_csv('data_processed/mpnp_elenodes_22.03.08.csv')
 
 ### clean environment
 rm(efa, efa_age, efa_id, efa_long, test, check, i)
@@ -247,8 +246,6 @@ plot(efa_gps$longitude ~ efa_gps$latitude, ylim = c(24.2,24.9), xlim = c(-20.8,-
 
 #### create dyadic data frame ####
 ## create gbi_matrix ####
-colnames(efa_gps)
-
 ### create group-by-individual matrix
 eles_asnipe <- efa_gps[,c(4,5,3,14)]  # date, time, elephant, location
 eles_asnipe$Date <- as.integer(eles_asnipe$date)
@@ -271,7 +268,7 @@ gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID')
 
 ## convert gbi_matrix to series of dyadic data frames ####
 ### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md) -- NOTE: this step takes a long time to run, and the for loops get exponentially slower with more and more observations. Running it in chunks rather than all at once reduces how much it slows down.
-nrow(gbi_matrix) # 3765 -- run in 14 blocks of 250 sightings + 1 block of 265
+nrow(gbi_matrix) # 3765 -- run in 74 blocks of 50 sightings + 1 block of 65
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1:250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -296,10 +293,36 @@ for (obs_id in 1:250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1.250_22.03.08.csv', delim = ',')
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1.250_22.03.10.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 251:500) {
+for (obs_id in 251:387) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 10 == 0) {print(obs_id)}
+  if(obs_id %% 10 == 0) {print(Sys.time())}
+}
+head(gbi_df)
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings251.387_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 388:400) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
@@ -322,10 +345,10 @@ for (obs_id in 251:500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings251.500_22.03.08.csv', delim = ',')
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings388.400_22.03.08.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 501:750) {
+for (obs_id in 401:450) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
@@ -348,10 +371,11 @@ for (obs_id in 501:750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings501.750_22.03.08.csv', delim = ',')
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings401.450_22.03.08.csv', delim = ',')
+
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 751:1000) {
+for (obs_id in 451:500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
@@ -374,10 +398,10 @@ for (obs_id in 751:1000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings751.1000_22.03.08.csv', delim = ',')
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings451.500_22.03.08.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1001:1250) {
+for (obs_id in 501:550) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
@@ -400,10 +424,1720 @@ for (obs_id in 1001:1250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1001.1250_22.03.08.csv', delim = ',')
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings501.550_22.03.08.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1251:1500) {
+for (obs_id in 551:600) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings551.600_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 601:650) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings601.650_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 651:700) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings651.700_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 701:750) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings701.750_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 751:800) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings751.800_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 801:850) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings801.850_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 851:900) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings851.900_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 901:950) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings901.950_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 951:1000) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings951.1000_22.03.08.csv', delim = ',')
+
+
+
+
+
+
+
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1001:1050) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1001.1050_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1051:1100) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1051.1100_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1101:1150) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1101.1150_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1151:1200) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1151.1200_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1201:1250) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1201.1250_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1251:1300) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1251.1300_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1301:1350) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1301.1350_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1351:1400) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1351.1400_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1401:1450) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1401.1450_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1451:1500) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1451.1500_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1501:1550) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1501.1550_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1551:1600) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1551.1600_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1601:1650) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1601.1650_22.03.08.csv', delim = ',')
+
+
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1651:1700) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1651.1700_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1701:1750) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1701.1750_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1751:1800) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1751.1800_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1801:1850) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1801.1850_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1851:1900) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1851.1900_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1901:1950) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1901.1950_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 1951:2000) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1951.2000_22.03.08.csv', delim = ',')
+
+
+
+
+
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2001:2050) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2001.2050_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2051:2100) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2051.2100_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2101:2150) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2101.2150_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2151:2200) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2151.2200_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2201:2250) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2201.2250_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2251:2300) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2251.2300_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2301:2350) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2301.2350_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2351:2400) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2351.2400_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2401:2450) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2401.2450_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2451:2500) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2451.2500_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2501:2550) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2501.2550_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2551:2600) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2551.2600_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2601:2650) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2601.2650_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2651:2700) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2651.2700_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2701:2750) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2701.2750_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2751:2800) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2751.2800_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2801:2850) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2801.2850_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2851:2900) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2851.2900_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2901:2950) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2901.2950_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 2951:3000) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2951.3000_22.03.08.csv', delim = ',')
+
+
+
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3001:3050) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3001.3050_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3051:3100) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3051.3100_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3101:3150) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3101.3150_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3151:3200) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3151.3200_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3201:3250) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3201.3250_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3251:3300) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3251.3300_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3301:3350) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3301.3350_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3351:3400) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3351.3400_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3401:3450) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3401.3450_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3451:3500) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3451.3500_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3501:3550) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3501.3550_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3551:3600) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3551.3600_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3601:3650) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3601.3650_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3651:3700) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3651.3700_22.03.08.csv', delim = ',')
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3701:3750) {
+  for (i in which(gbi_matrix[obs_id, ] == 1)) {
+    for (j in 1:ncol(gbi_matrix)) {
+      if (i != j) {
+        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
+                                           node_2 = node_2,
+                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
+                                           obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 5 == 0) {print(obs_id)}
+  if(obs_id %% 5 == 0) {print(Sys.time())}
+}
+gbi_df
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3701.3750_22.03.08.csv', delim = ',')
+
+
+gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
+for (obs_id in 3751:3765) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
@@ -426,241 +2160,7 @@ for (obs_id in 1251:1500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1251.1500_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1501:1750) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1501.1750_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1751:2000) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings1751.2000_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2001:2250) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2001.2250_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2251:2500) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2251.2500_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2501:2750) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2501.2750_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2751:3000) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings2751.3000_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3001:3250) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3001.3250_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3251:3500) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3251.3500_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3501:3765) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3501.3765_22.03.08.csv', delim = ',')
+write_delim(gbi_df, 'data_processed/mpnp_bayesian_allpairwiseevents_sightings3751.3765_22.03.08.csv', delim = ',')
 
 ## merge dyadic data frames, create aggregated count data frame ####
 ### read in all files
