@@ -203,10 +203,57 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")
 
+<<<<<<< HEAD
 ### estimate Weibull distribution ####
 colnames(age_cens)[1] <- 'age'
 age_cens$age_non0 <- age_cens$age+0.01 # wouldn't run when I allowed age = 0, so increased all values by 0.01 to make it run
 
+=======
+### estimate Weibull distribution -- DWF 28th March 2022 ####
+colnames(age_cens)[1] <- 'age'
+age_cens$age_non0 <- age_cens$age+0.01 # wouldn't run when I allowed age = 0, so increased all values by 0.01 to make it run
+
+age_cens$censor <- as.integer(as.logical(age_cens$censor))  # 1647 elephants LIVING = 1647 elephants need to be censor=1
+
+# Examine default brms priors
+# prior_summary(bfit_m)
+
+# run model for male elephants with slightly better priors
+bfit_m <- age_cens %>% filter(sex == 'Male') %>%
+  brm(age_non0 | cens(censor) ~ 1,
+      prior = c(
+        prior(student_t(3, 5, 5), class = Intercept),
+        prior(exponential(0.5), class = shape)
+      ),
+      data = ., family = "weibull", 
+      chains = 4, cores = 4)
+
+plot(bfit_m)
+
+# extract scale and shape from posterior draws
+# to convert to scale we need to both undo the link function by taking the exponent
+# and then refer to the brms documentation to understand how the mean relates to the scale
+bfit_m_draws <- as_draws_df(bfit_m) %>%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape)))
+
+est_shape <- mean(bfit_m_draws$shape)
+est_scale <- mean(bfit_m_draws$scale)
+
+# Let's do a posterior predictive plot based on the mean
+probs <- dweibull(1:100, shape = est_shape, scale = est_scale)
+probs <- probs / sum(probs)
+plot(probs) 
+
+# Lets simulate ages for 3k elephants
+hist(rweibull(3000,est_shape,est_scale))
+
+# Shape = 1.29, scale = 29.5 (so we will use shape = 1.3 and scale = 30)
+
+### estimate Weibull distribution -- HKM 29th March 2022 ####
+colnames(age_cens)[1] <- 'age'
+age_cens$age_non0 <- ifelse(age_cens$age == 0, 0.001, age_cens$age) # wouldn't run when I allowed age = 0, so increased all values by 0.01 to make it run
+
+>>>>>>> c4afac5524eb88af6299a1af594055a24ffd23e6
 age_cens$censor <- as.integer(!as.logical(age_cens$censor)) # 1 = FALSE = DEAD
 
 # Examine default brms priors
