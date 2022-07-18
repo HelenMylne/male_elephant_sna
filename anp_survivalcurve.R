@@ -204,6 +204,7 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   xlab("Assigned age") + ylab("Modelled age")
 
 ### test on same population ####
+# read in male elephant data
 males <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx', sheet = 1) %>% janitor::clean_names()
 males$age_2020 <- ifelse(males$dyr < 20, 2020 - males$byr, NA)
 males$age_2020_cat <- ifelse(males$age_2020 < 15, 3,
@@ -211,6 +212,8 @@ males$age_2020_cat <- ifelse(males$age_2020 < 15, 3,
                                     ifelse(males$age_2020 > 19 & males$age_2020 < 25, 5,
                                            ifelse(males$age_2020 > 24 & males$age_2020 < 40, 6,7))))
 model_data <- males[!is.na(males$age_2020_cat),]
+
+# create data list
 N <- length(unique(model_data$casename))   # Number of individuals
 K <- 7                                     # Number of age bin categories
 elephants_ls <- list(
@@ -271,7 +274,6 @@ summary(df$value[which(df$true_age == 7)])
 quantile(df$value[which(df$true_age == 7)], seq(0,1,0.01))
 
 
-
 ### estimate Weibull distribution -- DWF 28th March 2022 ####
 colnames(age_cens)[1] <- 'age'
 age_cens$age_non0 <- age_cens$age+0.01 # wouldn't run when I allowed age = 0, so increased all values by 0.01 to make it run
@@ -311,3 +313,72 @@ plot(probs)
 hist(rweibull(3000,est_shape,est_scale))
 
 # Shape = 1.29, scale = 29.5 (so we will use shape = 1.3 and scale = 30)
+
+### estimate Weibull distribution -- HKM 28th March 2022 ####
+colnames(age_cens)[1] <- 'age'
+age_cens$age_non0 <- age_cens$age+0.01 # wouldn't run when I allowed age = 0, so increased all values by 0.01 to make it run
+
+age_cens %>%
+  mutate(censor = if_else(censor == 0, 1, 0)) %>%
+  brm(age_non0 | cens(censor) ~ 1, data = ., family = "weibull", 
+      refresh = 2e3, cores = 4) -> bfit_all   # run model for all elephants
+
+
+
+
+
+
+
+print(bfit_all)
+as_sample_tibble(bfit_all) %>%                # not entirely sure what these plots are showing?
+  mutate_at(vars(b_Intercept), exp) %>%
+  ggplot(aes(x = b_Intercept, y = shape)) +
+  geom_density_2d(colour = "red", size = 1) +
+  geom_point(alpha = 0.1) +
+  geom_hline(yintercept = 0.89, colour = "blue") +
+  geom_vline(xintercept = 16.2, colour = "blue") +
+  xlab("Scale") +
+  ylab("Shape") +
+  ggtitle("Right-censored weibull all elephants (shape, scale)") +
+  theme_fivethirtyeight()
+
+age_cens[age_cens$sex == 'Male',] %>%
+  mutate(censor = if_else(censor == 0, 1, 0)) %>%
+  brm(age_non0 | cens(censor) ~ 1, data = ., family = "weibull", 
+      refresh = 2e3, cores = 4) -> bfit_m    # run model for male elephants
+print(bfit_m)
+as_sample_tibble(bfit_m) %>%
+  mutate_at(vars(b_Intercept), exp) %>%
+  ggplot(aes(x = b_Intercept, y = shape)) +
+  geom_density_2d(colour = "red", size = 1) +
+  geom_point(alpha = 0.1) +
+  geom_hline(yintercept = 0.87, colour = "blue") +
+  geom_vline(xintercept = 14.7, colour = "blue") +
+  xlab("Scale") +
+  ylab("Shape") +
+  ggtitle("Right-censored weibull males (shape, scale)") +
+  theme_fivethirtyeight()
+
+age_cens[age_cens$sex == 'Female',] %>%
+  mutate(censor = if_else(censor == 0, 1, 0)) %>%
+  brm(age_non0 | cens(censor) ~ 1, data = ., family = "weibull", 
+      refresh = 2e3, cores = 4) -> bfit_f    # run model for female elephants
+print(bfit_f)
+as_sample_tibble(bfit_f) %>%
+  mutate_at(vars(b_Intercept), exp) %>%
+  ggplot(aes(x = b_Intercept, y = shape)) +
+  geom_density_2d(colour = "red", size = 1) +
+  geom_point(alpha = 0.1) +
+  geom_hline(yintercept = 0.96, colour = "blue") +
+  geom_vline(xintercept = 18, colour = "blue") +
+  xlab("Scale") +
+  ylab("Shape") +
+  ggtitle("Right-censored weibull females (shape, scale)") +
+  theme_fivethirtyeight()
+
+# extract estimates for priors
+bfit_all$fit  # shape = 0.89 ± 0.01. lwr = 0.87, upr = 0.92. Scale from graph = 16.2 (15.7 - 16.7)
+bfit_m$fit    # shape = 0.87 ± 0.02. lwr = 0.84, upr = 0.91. Scale from graph = 14.7 (13.9 - 15.4)
+bfit_f$fit    # shape = 0.96 ± 0.02. lwr = 0.92, upr = 1.    Scale from graph = 18.0 (17.1 - 18.9)
+
+
