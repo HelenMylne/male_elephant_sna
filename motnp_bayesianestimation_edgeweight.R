@@ -513,12 +513,12 @@ tidy_sierra <- draws_motnp1.1[,c('F52_M40','F52_M26','F52_F8','F52_M15','F52_F98
 tidy_sierra <- pivot_longer(tidy_sierra, cols = everything(), names_to = 'dyad', values_to = 'draw')
 tidy_sierra <- separate(tidy_sierra, dyad, sep = '_', remove = F, into = c('F52','id'))
 tidy_sierra$label <- ifelse(tidy_sierra$id == 'U17', 'U17 (calf)',
-                         ifelse(tidy_sierra$id == 'U21', 'U21 (relative)',
-                                ifelse(tidy_sierra$id == 'F60', 'F60 (relative)',
-                                       ifelse(tidy_sierra$id == 'F98', 'F98 (relative)', 
-                                              ifelse(tidy_sierra$id == 'F8', 'F8 (unrelated female)',
-                                                     ifelse(tidy_sierra$id == 'M26', 'M26 (adult male)',
-                                                            ifelse(tidy_sierra$id == 'M15', 'M15 (unrelated pubescent male)', 'M40 (adult male)')))))))
+                            ifelse(tidy_sierra$id == 'U21', 'U21 (relative)',
+                                   ifelse(tidy_sierra$id == 'F60', 'F60 (relative)',
+                                          ifelse(tidy_sierra$id == 'F98', 'F98 (relative)', 
+                                                 ifelse(tidy_sierra$id == 'F8', 'F8 (unrelated female)',
+                                                        ifelse(tidy_sierra$id == 'M26', 'M26 (adult male)',
+                                                               ifelse(tidy_sierra$id == 'M15', 'M15 (unrelated pubescent male)', 'M40 (adult male)')))))))
 tidy_sierra$label <- factor(tidy_sierra$label, levels = c('U17 (calf)', 'F60 (relative)', 'U21 (relative)', 'F98 (relative)', 'M40 (adult male)','M26 (adult male)', 'F8 (unrelated female)','M15 (unrelated pubescent male)'))
 tidy_sierra$chain <- rep(1:4, each = length(tidy_sierra$dyad)/4)
 tidy_sierra$index <- rep(rep(1:1000, each = length(unique(tidy_sierra$dyad))),4)
@@ -727,13 +727,13 @@ ggsave(path = 'outputs/motnp_22.02.01/', filename = 'motnp_sierra_density.pdf',
 
 ### summarise data ####
 # summarise -- look for any anomalies in draw values or chain variation
-summaries <- data.frame(dyad = colnames(draws_motnp1.1[2:106954]),
+summaries <- data.frame(dyad = colnames(draws_motnp1.1[,2:106954]),
                         min = rep(NA, ncol(draws_motnp1.1)-1),
                         max = rep(NA, ncol(draws_motnp1.1)-1),
                         mean = rep(NA, ncol(draws_motnp1.1)-1),
                         median = rep(NA, ncol(draws_motnp1.1)-1),
                         sd = rep(NA, ncol(draws_motnp1.1)-1))
-for(i in 72137:nrow(summaries)){
+for(i in 1:nrow(summaries)){
   summaries$min[i]    <- min(draws_motnp1.1[,i+1])
   summaries$max[i]    <- max(draws_motnp1.1[,i+1])
   summaries$mean[i]   <- mean(draws_motnp1.1[,i+1])
@@ -910,9 +910,8 @@ plot(g_mid_test, edge.width = 3*E(g_rng_test)$weight, edge.color = rgb(0, 0, 0, 
 rm(adj_lower_test, adj_mid_test, adj_range_test, adj_upper_test, coords_test, counts_df_test, draws_test, dyad_row, g_mid_test, g_rng_test, adj_quantiles_test, adj_tensor_test, dyad_id, i, plot_cols, all_dyads, sierra_dyads)
 
 ### Create igraph object for all elephants and then just plot certain individuals ####
-# read in draws data -- very slow!
-#draws_motnp1.1 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv')
-#draws <- data.matrix(draws_motnp1.1)
+#draws_motnp1.1 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv') %>% 
+# data.matrix() # convert to matrix or array fails
 
 # reassign dyad numbers to remove gaps
 counts_df$node_1_nogaps <- as.integer(as.factor(counts_df$node_1))
@@ -921,7 +920,7 @@ counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
 # create array of draws per dyad (distributions)
 adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
                          NROW(unique(counts_df$id_2))+1,
-                         NROW(draws)),
+                         NROW(draws_motnp1.1)),
                     dimnames = list(c(unique(counts_df$id_1),'U9'),
                                     c('F1',unique(counts_df$id_2)),
                                     NULL))
@@ -929,20 +928,23 @@ N <- nrow(counts_df)
 
 for (i in 1:54000) {            # can cope with jumps of 50000 dyads at a time
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws[, i+1]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp1.1[, i+1]
 }
+#draws_half <- draws_motnp1.1[,54001:N+1]
+#rm(draws_motnp1.1)
 for (i in 54001:N) {
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws[, i+1]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_half[, i-54000]
 }
 adj_tensor[,,1]
+#rm(draws_half)
 
 # convert to array of medians and 95% credible intervals
 adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
 (adj_lower <- adj_quantiles[1, , ])
 (adj_mid   <- adj_quantiles[2, , ])
 (adj_upper <- adj_quantiles[3, , ])
-adj_range <- ((adj_upper - adj_lower)/adj_mid) ; adj_range[is.nan(adj_range)] <- 0
+adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
 
 # Generate two igraph objects, one from the median and one from the standardised width.
 g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
@@ -995,49 +997,6 @@ nodes$dem_class <- ifelse(nodes$age_class == 'Adult', paste('A',nodes$sex, sep =
 
 rm(ele_nodes)
 
-# Plot whole network
-coords <- igraph::layout_nicely(g_mid)
-plot(g_mid,
-     edge.width = E(g_mid)$weight,
-     vertex.label = NA,
-     vertex.size = 5,
-     edge.color = 'black',
-     layout = coords)
-plot(g_mid,
-     edge.width = E(g_rng)$weight,
-     edge.color = rgb(0, 0, 0, 0.25), 
-     vertex.size = 8,
-     vertex.label = c(sort(unique(counts_df$id_1)),'U9'),
-     vertex.label.dist = 0,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.color= ifelse(nodes$age_class == 'Adult','seagreen1',
-                          ifelse(nodes$age_class == 'Pubescent','skyblue',
-                                 ifelse(nodes$age_class == 'Juvenile', 'yellow','magenta'))),
-     layout = coords, add = TRUE)
-
-
-plot(g_mid,
-     edge.width = E(g_mid)$weight*3,
-     vertex.label = NA,
-     vertex.size = 5,
-     edge.color = ifelse(adj_mid < 0.5,'transparent','black'),
-     layout = coords)
-plot(g_mid,
-     edge.width = E(g_rng)$weight*3,
-     edge.color = ifelse(adj_mid < 0.5,'transparent',rgb(0,0,0,0.25)),
-     vertex.size = 5,
-     vertex.label = c(sort(unique(counts_df$id_1)),'U9'),
-     vertex.label.dist = 0,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.color= ifelse(nodes$age_class == 'Adult','seagreen1',
-                          ifelse(nodes$age_class == 'Pubescent','skyblue',
-                                 ifelse(nodes$age_class == 'Juvenile', 'yellow','magenta'))),
-     layout = coords, add = TRUE)
-
 # create variables for different degrees of node connectedness
 nodes$degree_0.1 <- NA
 nodes$degree_0.2 <- NA
@@ -1060,6 +1019,49 @@ which(nodes$degree_0.2 < nodes$degree_0.3)
 which(nodes$degree_0.3 < nodes$degree_0.4)
 which(nodes$degree_0.4 < nodes$degree_0.5)
 
+# Plot whole network
+par(mai = c(0.1,0.1,0.1,0.1))
+coords <- igraph::layout_nicely(g_mid)
+plot(g_mid,
+     edge.width = E(g_mid)$weight,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = 'black',
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_rng)$weight,
+     edge.color = rgb(0, 0, 0, 0.25), 
+     vertex.size = 8,
+     vertex.label = c(sort(unique(counts_df$id_1)),'U9'),
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(nodes$age_class == 'Adult','seagreen1',
+                          ifelse(nodes$age_class == 'Pubescent','skyblue',
+                                 ifelse(nodes$age_class == 'Juvenile', 'yellow','magenta'))),
+     layout = coords, add = TRUE)
+
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = ifelse(adj_mid < 0.5,'transparent','black'),
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = ifelse(adj_mid < 0.5,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 5,
+     vertex.label = c(sort(unique(counts_df$id_1)),'U9'),
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(nodes$age_class == 'Adult','seagreen1',
+                          ifelse(nodes$age_class == 'Pubescent','skyblue',
+                                 ifelse(nodes$age_class == 'Juvenile', 'yellow','magenta'))),
+     layout = coords, add = TRUE)
+
 # plot network with reduced nodes -- only those with degree values > 0.5
 g_mid_0.5 <- delete.vertices(graph = g_mid, v = nodes$id[which(nodes$degree_0.5 == 0)])
 g_rng_0.5 <- delete.vertices(graph = g_rng, v = nodes$id[which(nodes$degree_0.5 == 0)])
@@ -1067,7 +1069,7 @@ g_rng_0.5 <- delete.vertices(graph = g_rng, v = nodes$id[which(nodes$degree_0.5 
 coords_0.5 <- layout_nicely(g_mid_0.5)
 plot(g_mid_0.5,
      edge.width = ifelse(E(g_mid_0.5)$weight > 0.5, E(g_rng_0.5)$weight, 0),
-     edge.color = rgb(0,0,0,0.25),
+     edge.color = rgb(0,0,0,0.5),
      vertex.size = 6,
      vertex.label = NA,
      layout = coords_0.5)
@@ -1075,6 +1077,28 @@ plot(g_mid_0.5,
      edge.width = ifelse(E(g_mid_0.5)$weight > 0.5, E(g_mid_0.5)$weight, 0),
      edge.color = 'black',
      vertex.size = 6,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(nodes[which(nodes$degree_0.5 != 0),]$age_class == 'Adult', 'seagreen1',
+                           ifelse(nodes[which(nodes$degree_0.5 != 0),]$age_class == 'Pubescent','skyblue',
+                                  ifelse(nodes[which(nodes$degree_0.5 != 0),]$age_class == 'Juvenile', 'yellow','magenta'))),
+     layout = coords_0.5,
+     add = TRUE)
+
+plot(g_mid_0.5,
+     edge.width = ifelse(E(g_mid_0.5)$weight > 0.5,
+                         E(g_rng_0.5)$weight*2 + E(g_mid_0.5)$weight*2,
+                         0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 7,
+     vertex.label = NA,
+     layout = coords_0.5)
+plot(g_mid_0.5,
+     edge.width = ifelse(E(g_mid_0.5)$weight > 0.5, E(g_mid_0.5)$weight*2, 0),
+     edge.color = 'black',
+     vertex.size = 7,
      vertex.label.color = 'black',
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
@@ -1112,13 +1136,13 @@ plot(g_mid_0.3,
                                          'yellow','magenta'))),
      layout = coords_0.3, add = TRUE)
 
-#plot males
+# plot males
 g_mid_m <- delete.vertices(graph = g_mid,
                            v = nodes$id[which(nodes$dem_class != 'AM' &
-                                                    nodes$dem_class != 'PM')])
+                                                nodes$dem_class != 'PM')])
 g_rng_m <- delete.vertices(graph = g_rng,
                            v = nodes$id[which(nodes$dem_class != 'AM' &
-                                                    nodes$dem_class != 'PM')])
+                                                nodes$dem_class != 'PM')])
 males <- nodes[nodes$dem_class == 'AM' | nodes$dem_class == 'PM',]
 coords_m <- layout_nicely(g_mid_m)
 plot(g_mid_m,
@@ -1140,13 +1164,13 @@ plot(g_mid_m,
 
 # plot males >0.3
 g_mid_m0.3 <- delete.vertices(graph = g_mid,
-                           v = nodes$id[which(nodes$dem_class != 'AM' &
-                                                    nodes$dem_class != 'PM' |
-                                                    nodes$degree_0.3 == 0)])
+                              v = nodes$id[which(nodes$dem_class != 'AM' &
+                                                   nodes$dem_class != 'PM' |
+                                                   nodes$degree_0.3 == 0)])
 g_rng_m0.3 <- delete.vertices(graph = g_rng,
-                           v = nodes$id[which(nodes$dem_class != 'AM' &
-                                                    nodes$dem_class != 'PM' |
-                                                    nodes$degree_0.3 == 0)])
+                              v = nodes$id[which(nodes$dem_class != 'AM' &
+                                                   nodes$dem_class != 'PM' |
+                                                   nodes$degree_0.3 == 0)])
 males0.3 <- males[males$degree_0.3 > 0,]
 coords_m0.3 <- layout_nicely(g_mid_m0.3)
 plot(g_mid_m0.3,
@@ -1166,28 +1190,26 @@ plot(g_mid_m0.3,
      vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
      layout = coords_m0.3, add = TRUE)
 
-m38 <- summaries[summaries$id_1 == 'M38' | summaries$id_2 == 'M38',]
-m38 <- m38[m38$median > 0.3,] # leaves on elephants which are >0.3 connected to females/calves
-m87 <- summaries[summaries$id_1 == 'M87' | summaries$id_2 == 'M87',]
-m87 <- m87[m87$median > 0.3,] # leaves on elephants which are >0.3 connected to females/calves
-
+# remove elephants from males 0.3 graph that are only >0.3-connected to females so float unattached
 g_mid_m0.3 <- delete_vertices(graph = g_mid_m0.3, v = c('M240','M71','M99','M233',
                                                         'M158','M148','M87','M38',
                                                         'M128','M10','M111','M95',
                                                         'M7','M70','M17','M117',
                                                         'M221','M156','M196','M80',
-                                                        'M114','M177'))
+                                                        'M114','M177','M218'))
 g_rng_m0.3 <- delete_vertices(graph = g_rng_m0.3, v = c('M240','M71','M99','M233',
                                                         'M158','M148','M87','M38',
                                                         'M128','M10','M111','M95',
                                                         'M7','M70','M17','M117',
                                                         'M221','M156','M196','M80',
-                                                        'M114','M177'))
-males0.3 <- males0.3[males0.3$id != 'M240' & males0.3$id != 'M71' & males0.3$id != 'M99' & males0.3$id != 'M233' & males0.3$id != 'M158' & males0.3$id != 'M148' & males0.3$id != 'M87' & males0.3$id != 'M38' & males0.3$id != 'M128' & males0.3$id != 'M10' & males0.3$id != 'M111' & males0.3$id != 'M95' & males0.3$id != 'M7' & males0.3$id != 'M70' & males0.3$id != 'M17' & males0.3$id != 'M117' & males0.3$id != 'M221' & males0.3$id != 'M156' & males0.3$id != 'M196' & males0.3$id != 'M80' & males0.3$id != 'M114' & males0.3$id != 'M177',]
+                                                        'M114','M177','M218'))
+males0.3 <- males0.3[males0.3$id != 'M240' & males0.3$id != 'M71' & males0.3$id != 'M99' & males0.3$id != 'M233' & males0.3$id != 'M158' & males0.3$id != 'M148' & males0.3$id != 'M87' & males0.3$id != 'M38' & males0.3$id != 'M128' & males0.3$id != 'M10' & males0.3$id != 'M111' & males0.3$id != 'M95' & males0.3$id != 'M7' & males0.3$id != 'M70' & males0.3$id != 'M17' & males0.3$id != 'M117' & males0.3$id != 'M221' & males0.3$id != 'M156' & males0.3$id != 'M196' & males0.3$id != 'M80' & males0.3$id != 'M114' & males0.3$id != 'M177' & males0.3$id != 'M218',]
 
 coords_m0.3 <- layout_nicely(g_mid_m0.3)
 plot(g_mid_m0.3,
-     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_rng_m0.3)$weight*3, 0),
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
+                         E(g_rng_m0.3)$weight*3 + E(g_mid_m0.3)$weight*3,
+                         0),
      edge.color = rgb(0,0,0,0.25),
      vertex.size = 7,
      vertex.label = NA,
@@ -1203,7 +1225,25 @@ plot(g_mid_m0.3,
      vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
      layout = coords_m0.3, add = TRUE)
 plot(g_mid_m0.3,
-     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_rng_m0.3)$weight*3, 0),
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
+                         E(g_rng_m0.3)$weight*3 + E(g_mid_m0.3)$weight*3,
+                         0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = males0.3$count,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     layout = coords_m0.3, add = TRUE)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_rng_m0.3)$weight*10, 0),
      edge.color = rgb(0,0,0,0.25),
      vertex.size = 1,
      vertex.label = NA,
@@ -1219,91 +1259,30 @@ plot(g_mid_m0.3,
      vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
      layout = coords_m0.3, add = TRUE)
 
-summary(males0.3$count)
+g_mid_m0.3[20]
+
+plot(draws[1:1000,which(colnames(draws) == 'M157_M162')],
+     type = 'l', col = 'blue', las = 1, xlim = c(0,1000), ylim = c(0,1),
+     xlab = 'position in MCMC chain', ylab = 'draw')
+lines(draws[1001:2000,which(colnames(draws) == 'M157_M162')], col = 'red')
+lines(draws[2001:3000,which(colnames(draws) == 'M157_M162')], col = 'darkgreen')
+lines(draws[3001:4000,which(colnames(draws) == 'M157_M162')], col = 'purple')
+abline(h = median(draws[,which(colnames(draws) == 'M157_M162')]), col = 'black', lty = 2)
+median(draws[,which(colnames(draws) == 'M157_M162')])
+sd(draws[,which(colnames(draws) == 'M157_M162')])
+
+plot(draws[1:1000,which(colnames(draws) == 'M151_M19')],
+     type = 'l', col = 'blue', las = 1, xlim = c(0,1000), ylim = c(0,1),
+     xlab = 'position in MCMC chain', ylab = 'draw')
+lines(draws[1001:2000,which(colnames(draws) == 'M151_M19')], col = 'red')
+lines(draws[2001:3000,which(colnames(draws) == 'M151_M19')], col = 'darkgreen')
+lines(draws[3001:4000,which(colnames(draws) == 'M151_M19')], col = 'purple')
+abline(h = median(draws[,which(colnames(draws) == 'M151_M19')]), col = 'black', lty = 2)
+median(draws[,which(colnames(draws) == 'M151_M19')])
+sd(draws[,which(colnames(draws) == 'M151_M19')])
+
 table(males0.3$count)
-males0.3$count[which(males0.3$id == 'M157')]
-males0.3$count[which(males0.3$id == 'M162')]
-summaries$sd[which(summaries$dyad == 'M157_M162')] # 0.2355704
-summaries$sd[which(summaries$dyad == 'M101_M16')]  # 0.2371941
-summaries$sd[which(summaries$dyad == 'M200_M205')] # 0.1335143
-max(summaries$sd)
-plot(draws[,which(colnames(draws) == 'M157_M162')], type = 'l')
-plot(draws[,which(colnames(draws) == 'M101_M16')],  type = 'l')
-plot(draws[,which(colnames(draws) == 'M200_M205')], type = 'l')
-g_rng_m0.3[1] # M157 = 20, M162 = 24
-g_rng_m0.3[20] # M162 = 1.147962
-g_rng_m0.3[24] # M157 = 1.147962
-g_rng_m0.3[1]  ; g_rng_m0.3[22] # M101_M16  = 1.166944
-g_rng_m0.3[47] ; g_rng_m0.3[48] # M200_M205 = 1.579656
-g_mid_m0.3[20] ; g_mid_m0.3[24] # M157_M162 = 0.71228400
-g_mid_m0.3[1]  ; g_mid_m0.3[22] # M101_M16  = 0.71306150
-g_mid_m0.3[47] ; g_mid_m0.3[48] # M200_M205 = 0.32397950
-# is plotting igraph object correctly, igraph is underestimating the uncertainty
-
-adj_range['M157','M162']  # 1.147962
-adj_range['M101','M16']   # 1.166944
-adj_range['M200','M205']  # 1.579656
-# igraph is not making the error, adj_range is
-adj_quantiles[1,'M157','M162']  # 0.1706227
-adj_quantiles[2,'M157','M162']  # 0.712284
-adj_quantiles[3,'M157','M162']  # 0.9882974
-adj_quantiles[1,'M101','M16']   # 0.1569084
-adj_quantiles[2,'M101','M16']   # 0.7130615
-adj_quantiles[3,'M101','M16']   # 0.989011
-adj_quantiles[1,'M200','M205']  # 0.1040737
-adj_quantiles[2,'M200','M205']  # 0.3239795
-adj_quantiles[3,'M200','M205']  # 0.6158498
-
-
-adj_range2 <- adj_upper - adj_lower ; adj_range2[is.nan(adj_range2)] <- 0
-g_rng2 <- graph_from_adjacency_matrix(adj_range2, mode="undirected", weighted=TRUE)
-g_rng2_m0.3 <- delete.vertices(graph = g_rng2,
-                               v = nodes$id[which(nodes$dem_class != 'AM' &
-                                                   nodes$dem_class != 'PM' |
-                                                   nodes$degree_0.3 == 0)])
-
-g_rng2_m0.3 <- delete_vertices(graph = g_rng2_m0.3, v = c('M240','M71','M99','M233',
-                                                        'M158','M148','M87','M38',
-                                                        'M128','M10','M111','M95',
-                                                        'M7','M70','M17','M117',
-                                                        'M221','M156','M196','M80',
-                                                        'M114','M177'))
-plot(g_mid_m0.3,
-     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, (E(g_rng2_m0.3)$weight*5), 0),
-     edge.color = rgb(0,0,0,0.25),
-     vertex.size = 1,
-     vertex.label = NA,
-     layout = coords_m0.3)
-plot(g_mid_m0.3,
-     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*5, 0),
-     edge.color = 'black',
-     vertex.size = males0.3$count,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.label.dist = 0,
-     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
-     layout = coords_m0.3, add = TRUE)
-g_mid_m0.3[1]
-g_rng_m0.3[1]
-
-plot(g_mid_m0.3,
-     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, (E(g_rng2_m0.3)$weight*10), 0),
-     edge.color = 'blue',
-     vertex.size = 7,
-     vertex.label = NA,
-     layout = coords_m0.3)
-plot(g_mid_m0.3,
-     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight*10, 0),
-     edge.color = 'black',
-     vertex.size = 7,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.label.dist = 0,
-     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
-     layout = coords_m0.3, add = TRUE)
-
+sum(table(males0.3$count)[1:4])
 
 ### clear environment
 rm(coords, coords_0.3, coords_0.5, coords_m, coords_m0.3, dyad_row, edges, ele, ele_nodes, elephants, g_mid, g_mid_0.3, g_mid_0.5, g_mid_m, g_mid_m0.3, g_rng, g_rng_0.3, g_rng_0.5, g_rng_m, g_rng_m0.3, m38, m87, males, males0.3, rows, traceplot_sierra, traceplot_sierra2, i)
@@ -1391,10 +1370,14 @@ ggplot(elephants, aes(x = age_cat_id, y = max_edge, pch = sex, colour = max_edge
 #Mi(ω)∼Normal(β0+β1xi,σ2)
 # where β0 is the intercept parameter, β1 is the slope parameter, and σ is the standard deviation of the residuals. Mi(ω) denotes the node metric estimates when applied to the edge weights estimated in the top part of the model. Calculating node metrics within the model may present a practical challenge when using standard model fitting software, as many node metrics can not be described purely in terms of closed-form equations (Freeman, 1978).  In this case, splitting up the model along the dashed line becomes an important step, as it allows the edge weights to be estimated using a standard piece of software, and leaves the regression part of the model to be fit using a sampler that supports numeric estimates of network centralities. As part of the code we have made available, we have written a custom Metropolis-Hastings sampler that allows numeric estimates of node metrics to be used when fitting the model. Importantly, our sampler samples from the joint distribution of edge weights, rather than sampling edge weights independently. This ensures that the effect of any structure in the observation data (such as location effects) is maintained and propagated through to the node metric estimates, and subsequently to regression coefficient estimates.
 
+#draws_motnp1.1 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv')
+#draws <- data.matrix(draws_motnp1.1) # convert to matrix or array fails
+#rm(draws_motnp1.1)
+
 ### create array of draws per dyad (distributions) -- same as above
 adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
                          NROW(unique(counts_df$id_2))+1,
-                         NROW(draws_motnp1.1)),
+                         NROW(draws)),
                     dimnames = list(c(unique(counts_df$id_1),'U9'),
                                     c('F1',unique(counts_df$id_2)),
                                     NULL))
@@ -1402,24 +1385,24 @@ N <- nrow(counts_df)
 
 for (i in 1:54000) {            # can cope with jumps of 50000 dyads at a time
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp1.1[, i+1]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws[, i+1]
 }
 for (i in 54001:N) {
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp1.1[, i+1]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws[, i+1]
 }
 adj_tensor[,,1]
 
 ### create centrality matrix
-centrality_matrix <- matrix(0, nrow = NROW(draws_motnp1.1), ncol = length(unique(counts_df$id_1))+1)
-for (i in 1:NROW(draws_motnp1.1)) {
+centrality_matrix <- matrix(0, nrow = NROW(draws), ncol = length(unique(counts_df$id_1))+1)
+for (i in 1:NROW(draws)) {
   g <- graph_from_adjacency_matrix(adj_tensor[, , i], mode="undirected", weighted=TRUE)
   centrality_matrix[i, ] <- strength(g)
 }
 
 colnames(centrality_matrix) <- c(sort(unique(counts_df$id_1)),unique(counts_df$id_2)[462])
 head(centrality_matrix)
-write_csv(as.data.frame(centrality_matrix), 'data_processed/motnp_bayesian_nodalregression_centralitymatrix_22.03.04.csv')
+write_csv(as.data.frame(centrality_matrix), 'data_processed/motnp_bayesian_nodalregression_centralitymatrix_22.03.14.csv')
 
 centrality_quantiles <- t(apply(centrality_matrix, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
 centrality_quantiles
@@ -1429,40 +1412,41 @@ cq <- data.frame(id = rownames(centrality_quantiles),
                  strength_mid = centrality_quantiles[,2],
                  strength_upr = centrality_quantiles[,3])
 cq$id[which(cq$strength_mid == max(cq$strength_mid))]
+
 nodes <- left_join(nodes, cq, by = 'id')
 head(nodes)
 
 boxplot(nodes$strength_mid ~ nodes$sex, notch = T)
 boxplot(nodes$strength_mid ~ nodes$age_class, notch = T)
 boxplot(nodes$strength_mid ~ nodes$age_category, notch = T, horizontal = T, las = 1, ylab = '')
+boxplot(nodes$strength_mid ~ nodes$age_cat_id, notch = T, horizontal = T, las = 1, ylab = '')
 
-nodes$age <- ifelse(nodes$age_category == '0-3', 1,
-             ifelse(nodes$age_category == '1-2', 1,
-             ifelse(nodes$age_category == '3-4', 1,
-             ifelse(nodes$age_category == '4-5', 1,
-             ifelse(nodes$age_category == '5-6', 2,
-             ifelse(nodes$age_category == '6-7', 2,
-             ifelse(nodes$age_category == '7-8', 2,
-             ifelse(nodes$age_category == '8-9', 2,
-             ifelse(nodes$age_category == '9-10', 3,
-             ifelse(nodes$age_category == '10-15', 3,
-             ifelse(nodes$age_category == '15-19', 4,
-             ifelse(nodes$age_category == '20-25', 5,
-             ifelse(nodes$age_category == '20-35', 5,
-             ifelse(nodes$age_category == '25-40', 6,
-             ifelse(nodes$age_category == '35-50', 6,
-             ifelse(nodes$age_category == '40+', 7,
-             ifelse(nodes$age_category == '50+', 7, 'error')))))))))))))))))
-nodes$age <- ifelse(nodes$id == 'U8', 1, nodes$age)
-boxplot(nodes$strength_mid ~ nodes$age, notch = T, horizontal = T, las = 1, ylab = '')
+ggplot(nodes, aes(y = strength_mid, x = age_cat_id))+
+  geom_jitter()+
+  theme_light()
 
-nodes_tidy <- pivot_longer(data = nodes, cols = 14:21,
+nodes$age <- jitter(as.numeric(nodes$age_cat_id),1.5)
+plot(nodes$strength_mid ~ nodes$age, las =  1, pch = 21, col = 'black', ylim = c(10, 75),
+     bg = ifelse(nodes$sex == 'F', 'magenta',
+                 ifelse(nodes$sex == 'M', 'blue', 'yellow')),
+     xlab = 'age category (jittered)', ylab = 'network centrality')
+for(i in 1:nrow(nodes)){
+  lines(c(nodes$age[i], nodes$age[i]),
+        c(nodes$strength_lwr[i], nodes$strength_upr[i]),
+        col = ifelse(nodes$sex[i] == 'F', 'magenta',
+                     ifelse(nodes$sex[i] == 'M', 'blue', 'yellow')),
+        lwd = 1, lty = 1)
+}
+legend(x = 1.5, y = 22, legend = c('male','female','unknown sex'),
+       pt.bg = c('blue','magenta','yellow'), pch = 21)
+
+nodes_tidy <- pivot_longer(data = nodes, cols = 15:22,
                            names_to = 'centrality_type', values_to = 'centrality')
 nodes_tidy$centrality_type <- factor(nodes_tidy$centrality_type,
                                      levels = c('strength_lwr', 'strength_mid', 'strength_upr',
                                                 'degree_0.1','degree_0.2','degree_0.3',
                                                 'degree_0.4','degree_0.5'))
-ggplot(nodes_tidy, aes(y = centrality, x = age, fill = centrality_type))+
+ggplot(nodes_tidy, aes(y = centrality, x = age_cat_id, fill = centrality_type))+
   geom_boxplot()+
   facet_wrap(.~centrality_type, scales = 'free')+ # lwr, mid and upr = very similar patterns. degree = very variable depending on level
   theme_light()+
@@ -1476,7 +1460,19 @@ ggplot(nodes_tidy[nodes_tidy$centrality_type == 'degree_0.2' |
   facet_wrap( . ~ centrality_type )
 
 ### write nodes data frame to file
-write_csv(nodes, 'data_processed/motnp_elenodes_centrality_22.03.03.csv')
+write_csv(nodes, 'data_processed/motnp_elenodes_centrality_22.03.14.csv')
+
+nodes_tidy$centrality_type <- factor(nodes_tidy$centrality_type,
+                                     levels = c('strength_lwr', 'strength_mid', 'strength_upr',
+                                                'degree_0.1','degree_0.3','degree_0.5',
+                                                'degree_0.2','degree_0.4'))
+ggplot(nodes_tidy, aes(y = centrality, x = age_cat_id, fill = centrality_type))+
+  geom_boxplot()+
+  facet_wrap(.~centrality_type, scales = 'free')+ # lwr, mid and upr = very similar patterns. degree = very variable depending on level
+  theme_light()+
+  theme(legend.position = 'none',
+        strip.text = element_text(colour = 'black'))
+
 
 # The key challenge to quantifying uncertainty in network analysis is to incorporate uncertainty due to sampling into downstream analyses, commonly regression. This can be achieved by modifying the likelihood function of a regression model to treat the network centralities with uncertainty. We have written a custom MCMC sampler function that samples from the joint distribution of network centralities calculated earlier and treats those samples as the data in the likelihood function. Likelihood functions for the sampler use the index variable to keep track of which data points are being compared internally in the sampler, to ensure that candidate steps in the MCMC are not accepted or rejected because they are being compared to different data points, rather than because of the parameter space. Custom likelihood functions take a similar form to the target += syntax in Stan, but for more specific resources the following document is a good start: https://www.ime.unicamp.br/~cnaber/optim_1.pdf.
 
@@ -1496,11 +1492,11 @@ loglik <- function(params, Y, X, index) {
   target <- 0
   target <- target + sum(dnorm(y, mean = intercept + beta_age*X[,1] + beta_females*X[,2] + beta_males*X[,3] + beta_unks*X[,4],
                                sd = sigma, log = TRUE))                   # Main model
-  target <- target + dnorm(intercept,    mean = 0, sd = 2.5, log = TRUE)  # Prior on intercept
-  target <- target + dnorm(beta_age,     mean = 0, sd = 2.5, log = TRUE)  # Prior on age coefficient
-  target <- target + dnorm(beta_females, mean = 0, sd = 2.5, log = TRUE)  # Prior on female coefficient
-  target <- target + dnorm(beta_males,   mean = 0, sd = 2.5, log = TRUE)  # Prior on male coefficient
-  target <- target + dnorm(beta_unks,    mean = 0, sd = 2.5, log = TRUE)  # Prior on unknown coefficient
+  target <- target + dnorm(intercept,    mean = 0, sd = 0.5, log = TRUE)  # Prior on intercept
+  target <- target + dnorm(beta_age,     mean = 0, sd = 0.5, log = TRUE)  # Prior on age coefficient
+  target <- target + dnorm(beta_females, mean = 0, sd = 0.5, log = TRUE)  # Prior on female coefficient
+  target <- target + dnorm(beta_males,   mean = 0, sd = 0.5, log = TRUE)  # Prior on male coefficient
+  target <- target + dnorm(beta_unks,    mean = 0, sd = 0.5, log = TRUE)  # Prior on unknown coefficient
   target <- target + dexp(sigma, 1, log = TRUE)                           # Prior on sigma
   
   return(target)
@@ -1509,13 +1505,11 @@ loglik <- function(params, Y, X, index) {
 # Now we will prepare data for fitting the model. The predictor matrix is simply a matrix with 3 columns and 463 rows, corresponding to whether each of the 8 nodes is a female (column 1), a male (column 2), or an unknown (column 3).
 predictor_matrix <- matrix(0, nrow = length(nodes$id), ncol = 4)
 colnames(predictor_matrix) <- c('age','female', 'male','unknown')
-predictor_matrix[, 1] <- as.numeric(nodes$age)
+predictor_matrix[, 1] <- as.numeric(nodes$age_cat_id)
 predictor_matrix[which(nodes$sex == 'F'), 2] <- 1
 predictor_matrix[which(nodes$sex == 'M'), 3] <- 1
 predictor_matrix[which(nodes$sex == 'U'), 4] <- 1
 predictor_matrix
-
-write_csv(as.data.frame(predictor_matrix), 'data_processed/motnp_bayesian_nodalregression_predictormatrix_22.03.04.csv')
 
 # Since network strength is strictly positive, a Gaussian error is not a reasonable model for the data. The Gaussian family model is much easier to implement as well as interpret than many other models, so we will standardise the centralities by taking z-scores.
 centrality_matrix_std <- (centrality_matrix - apply(centrality_matrix, 1, mean))/apply(centrality_matrix, 1, sd)
@@ -1585,20 +1579,22 @@ metropolis <- function(target, initial, iterations=10000, warmup=2000, thin=4, c
 }
 
 # The function metropolis from sampler.R can now be used to fit the model using the provided target function, an initial set of parameters, and some additional MCMC options.
-chain <- metropolis(target, c(0, 0, 0, 0), iterations=100000, thin=100, refresh=10000)
+chain <- metropolis(target, initial = c(0, 0, 0, 0, 0, 0), iterations=100000, thin=100, refresh=10000)
 
-colnames(chain) <- c("intercept", "beta_lifeform", "beta_droid", "sigma")
+colnames(chain) <- c("intercept", "beta_age", "beta_females", "beta_males", "beta_unks", "sigma")
 head(chain)
 
-par(mfrow=c(2, 2))
-for (i in 1:4) {
-  plot(chain[, i], type="l")
+par(mfrow=c(3,2))
+for (i in 1:6) {
+  plot(chain[, i], type="l", las  = 1,
+       ylab = colnames(chain)[i])
 }
 
-plot(density(centrality_matrix_std[1, ]), ylim=c(0, 0.7), main="", xlab="Standardised network strength")
+par(mfrow = c(1,1))
+plot(density(centrality_matrix_std[1, ]), ylim=c(0, 1.5), main="", xlab="Standardised network strength")
 sample_ids <- sample(1:1000, size=200)
 for (i in sample_ids) {
-  pred <- rnorm(8, mean=chain[i, "intercept"] + chain[i, "beta_lifeform"] * predictor_matrix[, 1] + chain[i, "beta_droid"] * predictor_matrix[, 2], sd=exp(chain[i, "sigma"]))
+  pred <- rnorm(8, mean=chain[i, "intercept"] + chain[i,"beta_age"]*predictor_matrix[,1] + chain[i,"beta_females"]*predictor_matrix[,2] + chain[i,"beta_males"]*predictor_matrix[,3] + chain[i,'beta_unks']*predictor_matrix[,4], sd=exp(chain[i, "sigma"]))
   lines(density(centrality_matrix_std[i, ]), col=rgb(0, 0, 0, 0.25))
   lines(density(pred), col=rgb(0, 0, 1, 0.25))
 }
@@ -1606,15 +1602,106 @@ for (i in sample_ids) {
 coefficient_quantiles <- t(apply(chain, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
 coefficient_quantiles
 
-beta_difference <- chain[, "beta_lifeform"] - chain[, "beta_droid"]
+beta_difference <- chain[, "beta_females"] - chain[, "beta_males"]
 quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
 
+beta_difference <- chain[, "beta_females"] - chain[, "beta_unks"]
+quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
 
+beta_difference <- chain[, "beta_males"] - chain[, "beta_unks"]
+quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
 
+## adjust loglik function for alternative node age categories
+loglik <- function(params, Y, X, index) {
+  # Define parameters
+  intercept <- params[1]
+  beta_age <- params[2]
+  beta_females <- params[3]
+  beta_males <- params[4]
+  beta_unks <- params[5]
+  sigma <- exp(params[6]) # Exponential keeps underlying value unconstrained, which is much easier for the sampler.
+  
+  # Sample data according to index
+  y <- Y[index %% dim(Y)[1] + 1, ]
+  
+  # Define model
+  target <- 0
+  target <- target + sum(dnorm(y, mean = intercept + beta_age*X[,1] + beta_females*X[,2] + beta_males*X[,3] + beta_unks*X[,4],
+                               sd = sigma, log = TRUE))                   # Main model
+  target <- target + dnorm(intercept,    mean = 0, sd = 0.5, log = TRUE)  # Prior on intercept
+  target <- target + dnorm(beta_age,     mean = 0, sd = 0.5, log = TRUE)  # Prior on age coefficient
+  target <- target + dnorm(beta_females, mean = 0, sd = 0.5, log = TRUE)  # Prior on female coefficient
+  target <- target + dnorm(beta_males,   mean = 0, sd = 0.5, log = TRUE)  # Prior on male coefficient
+  target <- target + dnorm(beta_unks,    mean = 0, sd = 0.5, log = TRUE)  # Prior on unknown coefficient
+  target <- target + dexp(sigma, 1, log = TRUE)                           # Prior on sigma
+  
+  return(target)
+}
 
+# predictor matrix
+predictor_matrix <- matrix(0, nrow = length(nodes$id), ncol = 10)
+colnames(predictor_matrix) <- c('age1','age2','age3','age4','age5','age6','age7',
+                                'female', 'male','unknown')
+predictor_matrix[which(nodes$age_cat_id == '1'), 1] <- 1
+predictor_matrix[which(nodes$age_cat_id == '2'), 2] <- 1
+predictor_matrix[which(nodes$age_cat_id == '3'), 3] <- 1
+predictor_matrix[which(nodes$age_cat_id == '4'), 4] <- 1
+predictor_matrix[which(nodes$age_cat_id == '5'), 5] <- 1
+predictor_matrix[which(nodes$age_cat_id == '6'), 6] <- 1
+predictor_matrix[which(nodes$age_cat_id == '7'), 7] <- 1
+predictor_matrix[which(nodes$sex == 'F'), 8] <- 1
+predictor_matrix[which(nodes$sex == 'M'), 9] <- 1
+predictor_matrix[which(nodes$sex == 'U'), 10] <- 1
+predictor_matrix
 
+# fit model
+target <- function(params, index) loglik(params, centrality_matrix_std, predictor_matrix, index)
 
-#
+chain <- metropolis(target, initial = rep(0,12), iterations=100000, thin=100, refresh=10000)
+
+colnames(chain) <- c("intercept",
+                     "beta_age1", "beta_age2", "beta_age3", "beta_age4", "beta_age5", "beta_age6", "beta_age7", 
+                     "beta_females", "beta_males", "beta_unks", "sigma")
+head(chain)
+
+par(mfrow=c(4,3))
+for (i in 1:12) {
+  plot(chain[, i], type="l", 
+       ylab = colnames(chain)[i])
+}
+
+par(mfrow = c(1,1))
+plot(density(centrality_matrix_std[1, ]), ylim=c(0, 1.5), main="", xlab="Standardised network strength")
+sample_ids <- sample(1:1000, size=200)
+for (i in sample_ids) {
+  pred <- rnorm(8, mean = chain[i, "intercept"] + 
+                  chain[i,"beta_age1"]*predictor_matrix[,1] + 
+                  chain[i,"beta_age2"]*predictor_matrix[,2] + 
+                  chain[i,"beta_age3"]*predictor_matrix[,3] + 
+                  chain[i,"beta_age4"]*predictor_matrix[,4] + 
+                  chain[i,"beta_age5"]*predictor_matrix[,5] + 
+                  chain[i,"beta_age6"]*predictor_matrix[,6] + 
+                  chain[i,"beta_age7"]*predictor_matrix[,7] + 
+                  chain[i,"beta_females"]*predictor_matrix[,8] + 
+                  chain[i,"beta_males"]*predictor_matrix[,9] + 
+                  chain[i,'beta_unks']*predictor_matrix[,10],
+                sd = exp(chain[i, "sigma"]))
+  lines(density(centrality_matrix_std[i, ]), col=rgb(0, 0, 0, 0.25))
+  lines(density(pred), col=rgb(0, 0, 1, 0.25))
+}
+
+coefficient_quantiles <- t(apply(chain, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
+coefficient_quantiles
+
+beta_difference <- chain[, "beta_females"] - chain[, "beta_males"]
+quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
+
+beta_difference <- chain[, "beta_females"] - chain[, "beta_unks"]
+quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
+
+beta_difference <- chain[, "beta_males"] - chain[, "beta_unks"]
+quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
+
 ################ 11) Dyadic regression ################
 # A common type of analysis in studies of social networks is to consider factors that affectedge weights.  This type of analysis is often called dyadic regression, where explanatoryfactors such as sex or age difference are regressed against edge weight. The edge weightsin dyadic regression are non-independent, as variables such as age difference or sex dif-ference are inherently linked to individual-level attributes.  This means that effects dueto age or sex in individualiaffect all dyads that connecti.  This non-independence canbe controlled for by including node-level effects in the regression (Tranmer et al., 2014).Using the count data example discussed earlier, we propose to conduct dyadic regres-sion using a standard regression model of the form:
 #         X_ij ∼ Poisson(lambda_ij)
@@ -1629,7 +1716,7 @@ simdat_ls <- list(
   together = dyads$event_count, # count number of sightings seen together
   apart    = dyads$apart,       # count number of sightings seen apart
   age_diff = dyads$age_diff)    # age difference between individuals
-  #dem_dyad = dyads$dem_dyad_f)  # demographic pair of dyad
+#dem_dyad = dyads$dem_dyad_f)  # demographic pair of dyad
 
 simdat_ls$together <- simdat_ls$together+1
 simdat_ls$apart <- simdat_ls$apart+1
@@ -1660,7 +1747,7 @@ test2 <- d_reg_test$sample(
 ### check model
 test2$summary()
 
-#### real data ###
+#### real data ####
 nodes$age_sex <- paste(nodes$age_cat_id ,nodes$sex, sep = '')
 nodes$family[which(nodes$family == "M26 M87 Dead 1 Jul 17 Poached")] <- 'M26 M87'
 nodes$family[which(nodes$family == 'n/a')] <- NA
@@ -1692,16 +1779,21 @@ counts_df$family3 <- ifelse(counts_df$family_1.3 == counts_df$id_2, 'family',
                             ifelse(counts_df$family_2.3 == counts_df$id_1, 'family', 'not_family'))
 
 counts_df$family <- ifelse(counts_df$family1 == 'family' | counts_df$family2 == 'family' | counts_df$family3 == 'family',
-                           'family','not_family')
+                           'mother_calf','not_family')
 table(counts_df$family)
 
-family <- counts_df[counts_df$family == 'family',]
+family <- counts_df[counts_df$family == 'mother_calf',]
 unique(family$dem_type)
 
-counts_df$family <- ifelse(counts_df$family == 'family','mother_calf',counts_df$family)
-counts_df$family <- ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_PF',
-                           'family',)
+counts_df$family <- ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_AF','family',
+                           ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_PF','family',
+                                  ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_PM','family',
+                                         ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'JM_CM','family',
+                                                ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'CM_CU','family',
+                                                       ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'JM_CU','family',
+                                                              ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'PM_CM','family',
+                                                                     ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'JU_CU','family',counts_df$family))))))))
 
-
+table(counts_df$family)
 
 
