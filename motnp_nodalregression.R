@@ -229,22 +229,22 @@ dyads$apart <- N - dyads$event_count   # apart = 20-together
 
 ################ 3) Import edge weight and nodal data ################
 ### model draws ####
-draws_motnp1.1 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv') %>%
-  data.matrix()
+#draws_motnp2.2 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.csv') %>%
+#  data.matrix()
 
 # summarise -- look for any anomalies in draw values or chain variation
-summaries <- data.frame(dyad = colnames(draws_motnp1.1[,2:106954]),
-                        min = rep(NA, ncol(draws_motnp1.1)-1),
-                        max = rep(NA, ncol(draws_motnp1.1)-1),
-                        mean = rep(NA, ncol(draws_motnp1.1)-1),
-                        median = rep(NA, ncol(draws_motnp1.1)-1),
-                        sd = rep(NA, ncol(draws_motnp1.1)-1))
+summaries <- data.frame(dyad = colnames(draws_motnp2.2[,2:106954]),
+                        min = rep(NA, ncol(draws_motnp2.2)-1),
+                        max = rep(NA, ncol(draws_motnp2.2)-1),
+                        mean = rep(NA, ncol(draws_motnp2.2)-1),
+                        median = rep(NA, ncol(draws_motnp2.2)-1),
+                        sd = rep(NA, ncol(draws_motnp2.2)-1))
 for(i in 1:nrow(summaries)){
-  summaries$min[i]    <- min(draws_motnp1.1[,i+1])
-  summaries$max[i]    <- max(draws_motnp1.1[,i+1])
-  summaries$mean[i]   <- mean(draws_motnp1.1[,i+1])
-  summaries$median[i] <- median(draws_motnp1.1[,i+1])
-  summaries$sd[i]     <- sd(draws_motnp1.1[,i+1])
+  summaries$min[i]    <- min(draws_motnp2.2[,i+1])
+  summaries$max[i]    <- max(draws_motnp2.2[,i+1])
+  summaries$mean[i]   <- mean(draws_motnp2.2[,i+1])
+  summaries$median[i] <- median(draws_motnp2.2[,i+1])
+  summaries$sd[i]     <- sd(draws_motnp2.2[,i+1])
 }
 
 ### nodes data ####
@@ -478,7 +478,7 @@ table(counts_df$family)
 
 # add some summary data
 counts_df <- left_join(counts_df, summaries, by = 'dyad')
-colnames(counts_df)
+colnames(counts_df)[2:3] <- c('id_1','id_2')
 
 ################ 4) Nodal regression ################
 # The final common type of network analysis we will cover here is nodal regression, where a regression is performed to analyse the relationship between a nodal network metric(such as centrality) and nodal traits (such as age and sex).  These analyses are usually used to assess how network position depends on various biological factors, but can also be used where network position is a predictor.  Since node metrics are derivative measures of the network, uncertainty in edge weights should ideally propagate through to node metrics, and on to coefficients in regression analyses, giving an accurate estimate of the total uncertainty in inferred parameters.  The core of the nodal regression is similar to dyadic regression, taking the form:
@@ -614,11 +614,11 @@ legend(x = 1, y = 0.65, legend = c('male','female','unknown sex'),
        pt.bg = c('blue','magenta','yellow'), pch = 21)
 
 population_tidy <- pivot_longer(data = population, cols = 8:16,
-                           names_to = 'centrality_type', values_to = 'centrality')
+                                names_to = 'centrality_type', values_to = 'centrality')
 population_tidy$centrality_type <- factor(population_tidy$centrality_type,
-                                     levels = c('strength_lwr', 'strength_mid', 'strength_upr',
-                                                'btwn_lwr', 'btwn_mid', 'btwn_upr',
-                                                'eigen_lwr', 'eigen_mid', 'eigen_upr'))
+                                          levels = c('strength_lwr', 'strength_mid', 'strength_upr',
+                                                     'btwn_lwr', 'btwn_mid', 'btwn_upr',
+                                                     'eigen_lwr', 'eigen_mid', 'eigen_upr'))
 ggplot(population_tidy, aes(y = centrality, x = as.factor(age), fill = centrality_type))+
   geom_boxplot(notch = T)+
   facet_wrap(.~centrality_type, scales = 'free')+ # lwr, mid and upr = very similar patterns. degree = very variable depending on level
@@ -900,7 +900,7 @@ target <- function(params, index) loglik(params, centrality_matrix_std[,,3], pre
 ### create centrality matrix -- degree centrality for each individual at every draw from posterior distribution ####
 adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
                          NROW(unique(counts_df$id_2))+1,
-                         NROW(draws_motnp1.1)),
+                         NROW(draws_motnp2.2)),
                     dimnames = list(c(unique(counts_df$id_1),'U9'),
                                     c('F1',unique(counts_df$id_2)),
                                     NULL))
@@ -908,31 +908,42 @@ N <- nrow(counts_df)
 
 for (i in 1:54000) {            # can cope with jumps of 50000 dyads at a time
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp1.1[, i+1]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp2.2[, i+1]
 }
 for (i in 54001:N) {
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp1.1[, i+1]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_motnp2.2[, i+1]
 }
 adj_tensor[,,1]
 
-centrality_matrix <- matrix(0, nrow = NROW(draws_motnp1.1), ncol = length(unique(counts_df$id_1))+1)
-for (i in 1:NROW(draws_motnp1.1)) {
+centrality_matrix <- array(0, c(NROW(draws_motnp2.2),length(unique(counts_df$id_1))+1, 3))
+for (i in 1:NROW(draws_motnp2.2)) {
   g <- graph_from_adjacency_matrix(adj_tensor[, , i], mode="undirected", weighted=TRUE)
-  centrality_matrix[i, ] <- strength(g)
+  centrality_matrix[i, ,1] <- strength(g)
+  centrality_matrix[i, ,2] <- eigen_centrality(g)$vector
+  centrality_matrix[i, ,3] <- betweenness(g)
 }
 
 colnames(centrality_matrix) <- c(sort(unique(counts_df$id_1)),unique(counts_df$id_2)[462])
 head(centrality_matrix)
-write_csv(as.data.frame(centrality_matrix), 'data_processed/motnp_bayesian_nodalregression_centralitymatrix_22.03.14.csv')
+write_csv(as.data.frame(centrality_matrix[,,1]), 'data_processed/motnp_bayesian_nodalregression_degreematrix_2.2_22.03.21.csv')
+write_csv(as.data.frame(centrality_matrix[,,2]), 'data_processed/motnp_bayesian_nodalregression_eigenvectormatrix_2.2_22.03.21.csv')
+write_csv(as.data.frame(centrality_matrix[,,3]), 'data_processed/motnp_bayesian_nodalregression_betweennessmatrix_2.2_22.03.21.csv')
 
-centrality_quantiles <- t(apply(centrality_matrix, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
-centrality_quantiles
+d_quant <- t(apply(centrality_matrix[,,1], 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
+e_quant <- t(apply(centrality_matrix[,,2], 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
+b_quant <- t(apply(centrality_matrix[,,3], 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
 
 cq <- data.frame(id = rownames(centrality_quantiles),
-                 strength_lwr = centrality_quantiles[,1],
-                 strength_mid = centrality_quantiles[,2],
-                 strength_upr = centrality_quantiles[,3])
+                 strength_lwr = d_quant[,1],
+                 strength_mid = d_quant[,2],
+                 strength_upr = d_quant[,3],
+                 eigen_lwr = e_quant[,1],
+                 eigen_mid = e_quant[,2],
+                 eigen_upr = e_quant[,3],
+                 btwn_lwr = b_quant[,1],
+                 btwn_mid = b_quant[,2],
+                 btwn_upr = b_quant[,3])
 cq$id[which(cq$strength_mid == max(cq$strength_mid))]
 
 nodes <- left_join(nodes, cq, by = 'id')
@@ -947,101 +958,12 @@ ggplot(nodes, aes(y = strength_mid, x = age_cat_id))+
   geom_jitter()+
   theme_light()
 
-nodes$age <- jitter(as.numeric(nodes$age_cat_id),1.5)
-plot(nodes$strength_mid ~ nodes$age, las =  1, pch = 21, col = 'black', ylim = c(10, 75),
-     bg = ifelse(nodes$sex == 'F', 'magenta',
-                 ifelse(nodes$sex == 'M', 'blue', 'yellow')),
-     xlab = 'age category (jittered)', ylab = 'network centrality')
-for(i in 1:nrow(nodes)){
-  lines(c(nodes$age[i], nodes$age[i]),
-        c(nodes$strength_lwr[i], nodes$strength_upr[i]),
-        col = ifelse(nodes$sex[i] == 'F', 'magenta',
-                     ifelse(nodes$sex[i] == 'M', 'blue', 'yellow')),
-        lwd = 1, lty = 1)
-}
-legend(x = 1.5, y = 22, legend = c('male','female','unknown sex'),
-       pt.bg = c('blue','magenta','yellow'), pch = 21)
-
-nodes_tidy <- pivot_longer(data = nodes, cols = 15:22,
-                           names_to = 'centrality_type', values_to = 'centrality')
-nodes_tidy$centrality_type <- factor(nodes_tidy$centrality_type,
-                                     levels = c('strength_lwr', 'strength_mid', 'strength_upr',
-                                                'degree_0.1','degree_0.2','degree_0.3',
-                                                'degree_0.4','degree_0.5'))
-ggplot(nodes_tidy, aes(y = centrality, x = age_cat_id, fill = centrality_type))+
-  geom_boxplot()+
-  facet_wrap(.~centrality_type, scales = 'free')+ # lwr, mid and upr = very similar patterns. degree = very variable depending on level
-  theme_light()+
-  theme(legend.position = 'none',
-        strip.text = element_text(colour = 'black'))
-
-ggplot(nodes_tidy[nodes_tidy$centrality_type == 'degree_0.2' |
-                    nodes_tidy$centrality_type == 'strength_mid',],
-       aes(y = centrality, x = age))+
-  geom_boxplot()+
-  facet_wrap( . ~ centrality_type )
-
-### write nodes data frame to file
-write_csv(nodes, 'data_processed/motnp_elenodes_centrality_22.03.14.csv')
-
-nodes_tidy$centrality_type <- factor(nodes_tidy$centrality_type,
-                                     levels = c('strength_lwr', 'strength_mid', 'strength_upr',
-                                                'degree_0.1','degree_0.3','degree_0.5',
-                                                'degree_0.2','degree_0.4'))
-ggplot(nodes_tidy, aes(y = centrality, x = age_cat_id, fill = centrality_type))+
-  geom_boxplot()+
-  facet_wrap(.~centrality_type, scales = 'free')+ # lwr, mid and upr = very similar patterns. degree = very variable depending on level
-  theme_light()+
-  theme(legend.position = 'none',
-        strip.text = element_text(colour = 'black'))
-
-# all centrality measures ####
-centrality_matrix <- array(0, c(nrow = NROW(draws_motnp1.1), ncol = length(unique(counts_df$id_1))+1, 3))
-for (i in 1:NROW(draws_motnp1.1)) {
-  g <- graph_from_adjacency_matrix(adj_tensor[, , i], mode="undirected", weighted=TRUE)
-  centrality_matrix[i, , 1] <- strength(g)
-  centrality_matrix[i, , 2] <- betweenness(g)
-  centrality_matrix[i, , 3] <- eigen_centrality(g)$vector
-}
-
-colnames(centrality_matrix) <- c(sort(unique(counts_df$id_1)),unique(counts_df$id_2)[462])
-head(centrality_matrix)
-
-strength_quantiles <- t(apply(centrality_matrix[,,1], 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
-strength_quantiles
-btwn_quantiles <- t(apply(centrality_matrix[,,2], 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
-btwn_quantiles
-eigen_quantiles <- t(apply(centrality_matrix[,,3], 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
-eigen_quantiles
-
-cq <- data.frame(id = c(sort(unique(counts_df$id_1)),'U9'),
-                 strength_lwr = strength_quantiles[,1],
-                 strength_mid = strength_quantiles[,2],
-                 strength_upr = strength_quantiles[,3],
-                 btwn_lwr = btwn_quantiles[,1],
-                 btwn_mid = btwn_quantiles[,2],
-                 btwn_upr = btwn_quantiles[,3],
-                 eigen_lwr = eigen_quantiles[,1],
-                 eigen_mid = eigen_quantiles[,2],
-                 eigen_upr = eigen_quantiles[,3])
-
-nodes <- left_join(nodes, cq, by = 'id')
-head(nodes)
-
-boxplot(nodes$strength_mid ~ nodes$sex, notch = T)
-boxplot(nodes$strength_mid ~ nodes$age_cat_id, notch = T)
-
-boxplot(nodes$btwn_mid ~ nodes$sex, notch = T)
-boxplot(nodes$btwn_mid ~ nodes$age_cat_id, notch = T)
-
-boxplot(nodes$eigen_mid ~ nodes$sex, notch = T)
-boxplot(nodes$eigen_mid ~ nodes$age_cat_id, notch = T)
-
 nodes$age_jit <- jitter(as.numeric(nodes$age_cat_id),1.5)
-plot(nodes$strength_mid ~ nodes$age_jit, las =  1, pch = 21, col = 'black', ylim = c(10, 80),
+par(mfrow = c(2,2))
+plot(nodes$strength_mid ~ nodes$age_jit, las =  1, pch = 21, col = 'black', ylim = c(20,110),
      bg = ifelse(nodes$sex == 'F', 'magenta',
                  ifelse(nodes$sex == 'M', 'blue', 'yellow')),
-     xlab = 'age category (jittered)', ylab = 'degree centrality')
+     xlab = 'age category (jittered)', ylab = 'degree centrality', cex.lab = 1.5, cex.axis = 1.2)
 for(i in 1:nrow(nodes)){
   lines(c(nodes$age_jit[i], nodes$age_jit[i]),
         c(nodes$strength_lwr[i], nodes$strength_upr[i]),
@@ -1049,14 +971,32 @@ for(i in 1:nrow(nodes)){
                      ifelse(nodes$sex[i] == 'M', 'blue', 'yellow')),
         lwd = 1, lty = 1)
 }
-legend(x = 1.4, y = 25, legend = c('male','female','unknown'),
-       pt.bg = c('blue','magenta','yellow'), pch = 21, bg = 'transparent')
-text('a)', x = 1, y = 79, cex = 3)
+legend(x = 1.4, y = 38, legend = c('male','female','unknown'),
+       pt.bg = c('blue','magenta','yellow'), pch = 21,
+       bg = 'transparent', lty = 1,
+       col = c('black','black','black','blue','magenta','yellow'),
+       cex = 1.5, bty = 'n')
+text('a)', x = 1, y = 105, cex = 3)
+
+plot(nodes$eigen_mid ~ nodes$age_jit, las =  1, pch = 21, col = 'black', ylim = c(0.1, 1),
+     bg = ifelse(nodes$sex == 'F', 'magenta',
+                 ifelse(nodes$sex == 'M', 'blue', 'yellow')),
+     xlab = 'age category (jittered)', ylab = 'eigenvector', cex.lab = 1.5, cex.axis = 1.2)
+for(i in 1:nrow(nodes)){
+  lines(c(nodes$age_jit[i], nodes$age_jit[i]),
+        c(nodes$eigen_lwr[i], nodes$eigen_upr[i]),
+        col = ifelse(nodes$sex[i] == 'F', 'magenta',
+                     ifelse(nodes$sex[i] == 'M', 'blue', 'yellow')),
+        lwd = 1, lty = 1)
+}
+#legend(x = 1.4, y = 0.2, legend = c('male','female','unknown'),
+#       pt.bg = c('blue','magenta','yellow'), pch = 21)
+text('b)', x = 1, y = 0.98, cex = 3)
 
 plot(nodes$btwn_mid ~ nodes$age_jit, las =  1, pch = 21, col = 'black', ylim = c(0, 15000),
      bg = ifelse(nodes$sex == 'F', 'magenta',
                  ifelse(nodes$sex == 'M', 'blue', 'yellow')),
-     xlab = 'age category (jittered)', ylab = 'betweenness centrality')
+     xlab = 'age category (jittered)', ylab = 'betweenness', cex.lab = 1.5, cex.axis = 1.2)
 for(i in 1:nrow(nodes)){
   lines(c(nodes$age_jit[i], nodes$age_jit[i]),
         c(nodes$btwn_lwr[i], nodes$btwn_upr[i]),
@@ -1065,37 +1005,28 @@ for(i in 1:nrow(nodes)){
         lwd = 1, lty = 1)
 }
 legend(x = 1.6, y = 14000, legend = c('male','female','unknown'),
-       pt.bg = c('blue','magenta','yellow'), pch = 21)
-text('b)', x = 1, y = 14700, cex = 3)
+       pt.bg = c('blue','magenta','yellow'), pch = 21, lwd = 1, cex = 2, pt.cex = 2)
+text('c)', x = 1, y = 14700, cex = 3)
 
-plot(nodes$eigen_mid ~ nodes$age_jit, las =  1, pch = 21, col = 'black', ylim = c(0, 1),
-     bg = ifelse(nodes$sex == 'F', 'magenta',
-                 ifelse(nodes$sex == 'M', 'blue', 'yellow')),
-     xlab = 'age category (jittered)', ylab = 'eigenvector centrality')
-for(i in 1:nrow(nodes)){
-  lines(c(nodes$age_jit[i], nodes$age_jit[i]),
-        c(nodes$eigen_lwr[i], nodes$eigen_upr[i]),
-        col = ifelse(nodes$sex[i] == 'F', 'magenta',
-                     ifelse(nodes$sex[i] == 'M', 'blue', 'yellow')),
-        lwd = 1, lty = 1)
-}
-legend(x = 1.4, y = 0.2, legend = c('male','female','unknown'),
-       pt.bg = c('blue','magenta','yellow'), pch = 21)
-text('c)', x = 1, y = 0.98, cex = 3)
-
-nodes_tidy <- pivot_longer(data = nodes, cols = 8:16,
-                                names_to = 'centrality_type', values_to = 'centrality')
+colnames(nodes)
+nodes_tidy <- pivot_longer(data = nodes, cols = 15:28,
+                           names_to = 'centrality_type', values_to = 'centrality')
 nodes_tidy$centrality_type <- factor(nodes_tidy$centrality_type,
-                                          levels = c('strength_lwr', 'strength_mid', 'strength_upr',
-                                                     'btwn_lwr', 'btwn_mid', 'btwn_upr',
-                                                     'eigen_lwr', 'eigen_mid', 'eigen_upr'))
-ggplot(nodes_tidy, aes(y = centrality, x = as.factor(age), fill = centrality_type))+
-  geom_boxplot(notch = T)+
+                                     levels = c('strength_lwr', 'strength_mid', 'strength_upr',
+                                                'eigen_lwr', 'eigen_mid', 'eigen_upr',
+                                                'btwn_lwr', 'btwn_mid', 'btwn_upr',
+                                                'degree_0.1','degree_0.2','degree_0.3',
+                                                'degree_0.4','degree_0.5'))
+nodes_tidy2 <- nodes_tidy[nodes_tidy$centrality_type != 'degree_0.1' & nodes_tidy$centrality_type != 'degree_0.2' & nodes_tidy$centrality_type != 'degree_0.3' & nodes_tidy$centrality_type != 'degree_0.4' & nodes_tidy$centrality_type != 'degree_0.5',]
+ggplot(nodes_tidy2, aes(y = centrality, x = age_cat_id, fill = centrality_type))+
+  geom_boxplot()+
   facet_wrap(.~centrality_type, scales = 'free')+ # lwr, mid and upr = very similar patterns. degree = very variable depending on level
   theme_light()+
   theme(legend.position = 'none',
         strip.text = element_text(colour = 'black'))
 
+### write nodes data frame to file
+write_csv(nodes, 'data_processed/motnp_elenodes_centrality_prior2.2_22.03.21.csv')
 
 ### define functions and predictor matrix for running model ####
 loglik <- function(params, Y, X, index) {
@@ -1158,27 +1089,6 @@ sample_ids <- sample(1:1000, size=200)
 for (i in sample_ids) {
   pred <- rnorm(8, mean=chain[i, "intercept"] + chain[i,"beta_age"]*predictor_matrix[,1] + chain[i,"beta_females"]*predictor_matrix[,2] + chain[i,"beta_males"]*predictor_matrix[,3] + chain[i,'beta_unks']*predictor_matrix[,4], sd=exp(chain[i, "sigma"]))
   lines(density(centrality_matrix_std[i, ]), col=rgb(0, 0, 0, 0.25))
-  lines(density(pred), col=rgb(0, 0, 1, 0.25))
-}
-
-par(mfrow = c(1,1))
-plot(density(centrality_matrix_std[1, ,1]), ylim=c(0,40), xlim = c(-0.5,0.1),
-     main="", xlab="Standardised network strength")
-sample_ids <- sample(1:1000, size=200)
-for (i in sample_ids) {
-  pred <- rnorm(8, mean = chain[i, "intercept"] + 
-                  chain[i,"beta_age1"]*predictor_matrix[,1] + 
-                  chain[i,"beta_age2"]*predictor_matrix[,2] + 
-                  chain[i,"beta_age3"]*predictor_matrix[,3] + 
-                  chain[i,"beta_age4"]*predictor_matrix[,4] + 
-                  chain[i,"beta_age5"]*predictor_matrix[,5] + 
-                  chain[i,"beta_age6"]*predictor_matrix[,6] + 
-                  chain[i,"beta_age7"]*predictor_matrix[,7] + 
-                  chain[i,"beta_females"]*predictor_matrix[,8] + 
-                  chain[i,"beta_males"]*predictor_matrix[,9] + 
-                  chain[i,'beta_unks']*predictor_matrix[,10],
-                sd = exp(chain[i, "sigma"]))
-  lines(density(centrality_matrix_std[i, ,1]), col=rgb(0, 0, 0, 0.25))
   lines(density(pred), col=rgb(0, 0, 1, 0.25))
 }
 
@@ -1287,60 +1197,3 @@ beta_difference <- chain[, "beta_males"] - chain[, "beta_unks"]
 quantile(beta_difference, probs=c(0.025, 0.5, 0.975))
 
 #
-################ 5) Dyadic regression ################
-# A common type of analysis in studies of social networks is to consider factors that affectedge weights.  This type of analysis is often called dyadic regression, where explanatoryfactors such as sex or age difference are regressed against edge weight. The edge weightsin dyadic regression are non-independent, as variables such as age difference or sex dif-ference are inherently linked to individual-level attributes.  This means that effects dueto age or sex in individualiaffect all dyads that connecti.  This non-independence canbe controlled for by including node-level effects in the regression (Tranmer et al., 2014).Using the count data example discussed earlier, we propose to conduct dyadic regres-sion using a standard regression model of the form:
-#         X_ij ∼ Poisson(lambda_ij)
-#         log(lambda_ij) = weight_ij + Location_ij
-#         weight_ij ∼ Normal(beta_0 + beta_1*x_ij + u_i + u_j, sigma_sq)
-# where beta_0 is the intercept parameter, beta_1 is the slope parameter, ui and uj are parameters accounting for the effect of node membership on edge weight, and sigma is the standard deviation of the residuals.  The dashed line indicates that the model can be fit in two separate parts:the first part being the core edge weight model, and the second part being the dyadic regression model.  It is not strictly necessary to separate out the model like this, but do-ing so makes it possible to fit the edge weight model once and conduct multiple types of analysis on it afterwards without fitting the entire model again.Theβ0andβ1parameters can be interpreted in the same way as usual regression coefficients, and will be accompanied with credible intervals describing the probability distribution of coefficient values.  There are several ways to gain inference from these values.  The overlap of the credible interval with zero is often used to indicate the presence of a ‘significant effect’, though this approach has been criticised for several reasons(Gelman et al., 2012; Ogle et al., 2019).  An alternative option is to use Bayes factorsto quantify support for or against the hypothesis H1:β16=0 (Kass and Raftery, 1995;Jeffreys, 1998). In regression settings, the Bayes factor for a point null hypothesis can be calculated quickly using the Savage-Dickey method (Wagenmakers et al., 2010).The model shown here is intended as a minimal example of a simple linear regression with node-level effects to account for the non-independence of edges. The regression can be extended to support different family distributions, hierarchical effects, non-linearities,and more. We have included examples of diagnostics and some extensions in the example code.
-adults <- counts_df[counts_df$age_cat_id_1 > 3 & counts_df$age_cat_id_2 > 3,]
-ggplot(adults, aes(x = all_events, y = median, col = dem_type))+
-  geom_point()+
-  scale_x_continuous(limits = c(0,20))+
-  scale_y_continuous(limits = c(0,0.8))
-
-ggplot(adults, aes(x = all_events, y = median, col = dem_type))+
-  geom_point()+
-  #scale_x_continuous(limits = c(0,20))+
-  #scale_y_continuous(limits = c(0,0.8))+
-  facet_wrap(. ~ dem_type, scales = 'free')
-
-
-#### simulated data ####
-### create data list
-simdat_ls <- list(
-  n_dyads  = nrow(dyads),       # total number of times one or other of the dyad was observed
-  together = dyads$event_count, # count number of sightings seen together
-  apart    = dyads$apart,       # count number of sightings seen apart
-  age_diff = dyads$age_diff)    # age difference between individuals
-19:10
-simdat_ls$together <- simdat_ls$together+1
-simdat_ls$apart <- simdat_ls$apart+1
-
-#test <- ulam(alist(events ~ dbeta(together, apart)),  data = simdat_ls, chains = 1, cores = 4)
-test <- ulam(alist(
-  events ~ dbeta(together, apart),
-  weight ~ dnorm(mu, sigma),
-  mu <- events + b1 * age_diff, # + u_i[id_1] + u_j[id_2], -- should include individual effects but no idea how to do this so that unaffected by which is id_1 and which is id_2
-  b1 ~ dnorm(-0.5,2),
-  sigma ~ dexp(1)),
-  data = simdat_ls, chains = 1, cores = 4)
-stancode(test)
-precis(test)
-traceplot(test)
-
-d_reg_test <- cmdstan_model("models/dyadic_regression_hkm_22.03.03.stan")
-d_reg_test
-
-### Fit model
-test2 <- d_reg_test$sample(
-  data = simdat_ls, 
-  seed = 12345, 
-  chains = 4, 
-  parallel_chains = 4
-)
-
-### check model
-test2$summary()
-
-
