@@ -1,158 +1,8 @@
-### summarise data from different sources
-
-#### MOTNP ####
-summary <- read_csv('data_processed/motnp_6thJan2022/motnp_elenodes_22.01.06.csv')
-summary <- summary[summary$id != 'F157' & summary$id != 'F158' & summary$id != 'F176' &
-                     summary$id != 'M125' & summary$id != 'M13' & summary$id != 'M138' &
-                     summary$id != 'M21' & summary$id != 'M223' & summary$id != 'M227',] # remove all individuals that can't be in analysis due to identity queries
-summary$age_cat_id <- ifelse(summary$age_category == '0-3', 1, 
-                             ifelse(summary$age_category == '1-2', 1,
-                               ifelse(summary$age_category == '3-4', 1,
-                                 ifelse(summary$age_category == '4-5', 1,
-                                   ifelse(summary$age_category == '5-6', 2,
-                                     ifelse(summary$age_category == '6-7', 2,
-                                       ifelse(summary$age_category == '7-8', 2,
-                                         ifelse(summary$age_category == '8-9', 2,
-                                           ifelse(summary$age_category == '9-10', 2,
-                                             ifelse(summary$age_category == '10-15', 3,
-                                               ifelse(summary$age_category == '15-19', 4,
-                                                 ifelse(summary$age_category == '20-25', 5,
-                                                   ifelse(summary$age_category == '20-35', 5,
-                                                     ifelse(summary$age_category == '25-40', 6,
-                                                       ifelse(summary$age_category == '35-50', 6,
-                                                         ifelse(summary$age_category == '40+', 7,
-                                                           ifelse(summary$age_category == '50+', 7,
-                                                                  summary$age_category)))))))))))))))))
-table(summary$sex, summary$age_category)
-table(summary$sex, summary$age_cat_id)
-independents <- summary[summary$age_cat_id > 2,]
-prop.table(table(independents$sex))*100
-
-m <- independents[independents$sex == 'M',] ; m <- m[!is.na(m$id_no),]
-f <- independents[independents$sex == 'F',] ; f <- f[!is.na(f$id_no),]
-
-mean(m$count)
-mean(f$count)
-sd(m$count)
-sd(f$count)
-min(m$count)
-min(f$count)
-max(m$count)
-max(f$count)
-
-eles_long <- read_csv('data_processed/motnp_6thJan2022/motnp_eles_long_22.01.06.csv')
-gs <- eles_long$total_elephants_numeric
-which(is.na(gs))
-mean(gs)
-median(gs)
-sd(gs)
-min(gs)
-max(gs)
-
-obs <- read_delim('data_processed/motnp_6thJan2022/motnp_recording_sessions.csv', delim = ';')
-sum(obs$mins)/60
-min(obs$date)
-max(obs$date)
-max(obs$date) - min(obs$date) # 581 days
-
-sightings <- read_csv('data_processed/motnp_encounters_22.01.13.csv')
-head(sightings)
-summary(sightings$total_elephants_numeric, na.rm = T)
-quantile(sightings$total_elephants_numeric, seq(0,1,length.out = 101), na.rm = T)
-
-# edge weight
-draws_motnp1.1 <- read_csv('data_processed/motnp_bayesian_edgedistributions_a1.b1_22.03.03.csv') %>%
-  data.matrix()
-summaries <- data.frame(dyad = colnames(draws_motnp1.1[,2:106954]),
-                        min = rep(NA, ncol(draws_motnp1.1)-1),
-                        max = rep(NA, ncol(draws_motnp1.1)-1),
-                        mean = rep(NA, ncol(draws_motnp1.1)-1),
-                        median = rep(NA, ncol(draws_motnp1.1)-1),
-                        sd = rep(NA, ncol(draws_motnp1.1)-1))
-for(i in 1:nrow(summaries)){
-  summaries$min[i]    <- min(draws_motnp1.1[,i+1])
-  summaries$max[i]    <- max(draws_motnp1.1[,i+1])
-  summaries$mean[i]   <- mean(draws_motnp1.1[,i+1])
-  summaries$median[i] <- median(draws_motnp1.1[,i+1])
-  summaries$sd[i]     <- sd(draws_motnp1.1[,i+1])
-}
-
-# nodes data
-ele_nodes <- read_csv('data_processed/motnp_elenodes_22.01.13.csv')
-nodes <- data.frame(id = sort(unique(ele_nodes$id)))
-nodes <- left_join(nodes, ele_nodes, by = 'id')
-nodes$sex       <- as.factor(nodes$sex)
-nodes$age_class <- as.factor(nodes$age_class)
-nodes$dem_class <- as.factor(nodes$dem_class)
-str(nodes)
-
-# correct age and demographic classes for nodes
-unique(nodes$age_category) # "50+"   "10-15" "35-50" "20-35" "15-19" "8-9"   "9-10"  "4-5"   "5-6"   "6-7"   "0-3"   "7-8"   "20-25" "25-40" "40+"   "3-4" "1-2"   NA
-nodes$age_category <- ifelse(nodes$age_category == '1-2','0-3',nodes$age_category)
-nodes$age_cat_id <- ifelse(nodes$age_category == '0-3', 1,
-                           ifelse(nodes$age_category == '3-4', 1,
-                                  ifelse(nodes$age_category == '4-5', 1,
-                                         ifelse(nodes$age_category == '5-6', 2,
-                                                ifelse(nodes$age_category == '6-7', 2,
-                                                       ifelse(nodes$age_category == '7-8', 2,
-                                                              ifelse(nodes$age_category == '8-9', 2,
-                                                                     ifelse(nodes$age_category == '9-10', 2,
-                                                                            ifelse(nodes$age_category == '10-15', 3,
-                                                                                   ifelse(nodes$age_category == '15-19', 4,
-                                                                                          ifelse(nodes$age_category == '20-25', 5,
-                                                                                                 ifelse(nodes$age_category == '20-35', 5,
-                                                                                                        ifelse(nodes$age_category == '25-40', 6,
-                                                                                                               ifelse(nodes$age_category == '35-50', 6,
-                                                                                                                      ifelse(nodes$age_category == '40+', 7,
-                                                                                                                             ifelse(nodes$age_category == '50+', 7, nodes$age_category))))))))))))))))
-nodes[is.na(nodes$age_category),]   # U8 doesn't have an age but not a problem -- won't be part of the main analysis. Is a calf so age_cat_id = 1
-nodes$age_cat_id[which(is.na(nodes$age_cat_id))] <- 1
-
-unique(nodes$age_category[nodes$age_class == 'Calf'])      # shouldn't include any ages over 4-5
-unique(nodes$age_category[nodes$age_class == 'Juvenile'])  # shouldn't include any ages under 5-6
-unique(nodes$age_category[nodes$age_class == 'Pubescent']) # shouldn't include any ages under 9-10 or over 15-19
-unique(nodes$age_category[nodes$age_class == 'Adult'])     # shouldn't include any ages under 20-25
-
-nodes$age_class <- ifelse(nodes$age_cat_id == 1, 'Calf',
-                          ifelse(nodes$age_cat_id == 2, 'Juvenile',
-                                 ifelse(nodes$age_cat_id > 4, 'Adult','Pubescent')))
-
-nodes$dem_class <- ifelse(nodes$age_class == 'Adult', paste('A',nodes$sex, sep = ''),
-                          ifelse(nodes$age_class == 'Pubescent', paste('P',nodes$sex, sep = ''),
-                                 ifelse(nodes$age_class == 'Juvenile', paste('J',nodes$sex, sep = ''),
-                                        paste('C',nodes$sex, sep = ''))))
-
-rm(ele_nodes)
-
-# create variables for different degrees of node connectedness
-nodes$degree_0.1 <- NA
-nodes$degree_0.2 <- NA
-nodes$degree_0.3 <- NA
-nodes$degree_0.4 <- NA
-nodes$degree_0.5 <- NA
-
-summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
-for(i in 1:NROW(nodes)){
-  rows <- summaries[summaries$id_1 == nodes$id[i] | summaries$id_2 == nodes$id[i],]
-  nodes$degree_0.1[i] <- length(which(rows$median > 0.1))
-  nodes$degree_0.2[i] <- length(which(rows$median > 0.2))
-  nodes$degree_0.3[i] <- length(which(rows$median > 0.3))
-  nodes$degree_0.4[i] <- length(which(rows$median > 0.4))
-  nodes$degree_0.5[i] <- length(which(rows$median > 0.5))
-}
-
-which(nodes$degree_0.1 < nodes$degree_0.2)
-which(nodes$degree_0.2 < nodes$degree_0.3)
-which(nodes$degree_0.3 < nodes$degree_0.4)
-which(nodes$degree_0.4 < nodes$degree_0.5)
-
-# create age_sex variable
-nodes$age_sex <- paste(nodes$age_cat_id ,nodes$sex, sep = '')
-nodes$family[which(nodes$family == "M26 M87 Dead 1 Jul 17 Poached")] <- 'M26 M87'
-nodes$family[which(nodes$family == 'n/a')] <- NA
-nodes <- separate(nodes, family, into = c('family.1','family.2','family.3'), sep = ' ')
-
-### dyads ####
+### Basic values for report
+library(tidyverse)
+library(igraph)
+### Number of elephants ####
+# read in data ####
 counts_df <- read_delim('data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
@@ -224,6 +74,9 @@ unique(counts_df$age_category_2[counts_df$age_class_2 == 'Juvenile'])  # shouldn
 unique(counts_df$age_category_2[counts_df$age_class_2 == 'Pubescent']) # shouldn't include any ages under 9-10 or over 15-19
 unique(counts_df$age_category_2[counts_df$age_class_2 == 'Adult'])     # shouldn't include any ages under 20-25
 
+### add column for age difference between dyad
+counts_df$age_diff <- abs(as.numeric(counts_df$age_cat_id_1) - as.numeric(counts_df$age_cat_id_2))
+
 ### correct dem_class with corrected age classes
 counts_df$dem_class_1 <- ifelse(counts_df$age_class_1 == 'Adult', paste('A',counts_df$sex_1, sep = ''),
                                 ifelse(counts_df$age_class_1 == 'Pubescent', paste('P',counts_df$sex_1, sep = ''),
@@ -234,105 +87,299 @@ counts_df$dem_class_2 <- ifelse(counts_df$age_class_2 == 'Adult', paste('A',coun
                                        ifelse(counts_df$age_class_2 == 'Juvenile', paste('J',counts_df$sex_2, sep = ''),
                                               paste('C',counts_df$sex_2, sep = ''))))
 
-### correct dem_type with new dem_class
-counts_df$age_class_id_1 <- ifelse(counts_df$age_class_1 == 'Adult',4,
-                                   ifelse(counts_df$age_class_1 == 'Pubescent',3,
-                                          ifelse(counts_df$age_class_1 == 'Juvenile',2,1)))
-counts_df$age_class_id_2 <- ifelse(counts_df$age_class_2 == 'Adult',4,
-                                   ifelse(counts_df$age_class_2 == 'Pubescent',3,
-                                          ifelse(counts_df$age_class_2 == 'Juvenile',2,1)))
-counts_df$dem_type <- ifelse(counts_df$age_class_id_1 > counts_df$age_class_id_2,
-                             paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'),
-                             ifelse(counts_df$age_class_id_1 < counts_df$age_class_id_2,
-                                    paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_'),
-                                    paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_')))
-sort(unique(counts_df$dem_type))
-
-### add column for age difference between dyad
-counts_df$age_diff <- abs(as.numeric(counts_df$age_cat_id_1) - as.numeric(counts_df$age_cat_id_2))
-
 ### add column for total number of sightings per pair
 counts_df$count_dyad <- (counts_df$count_1 + counts_df$count_2) - counts_df$all_events  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
 
 ### add column for total number of sightings per pair where they were NOT together
 counts_df$apart <- counts_df$count_dyad - counts_df$all_events
 
-# reassign dyad numbers to remove gaps
-counts_df$node_1_nogaps <- as.integer(as.factor(counts_df$node_1))
-counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
+### ele_nodes -- ages corrected in counts_df so use this for most things
+eles <- read_csv('data_processed/motnp_elenodes_22.01.13.csv')
+str(eles)
+eles[463,]
+U9 <- c('U9',463,NA,'Calf','0-3','U',2,'CU',1)
 
-# add in age_sex variable
-age_sex_family <- nodes[,c('id','age_sex','family.1','family.2','family.3')]
-colnames(age_sex_family) <- c('id_1','age_sex_1','family_1.1','family_1.2','family_1.3')
-counts_df <- left_join(x = counts_df, y = age_sex_family, by = 'id_1')
-colnames(age_sex_family) <- c('id_2','age_sex_2','family_2.1','family_2.2','family_2.3')
-counts_df <- left_join(x = counts_df, y = age_sex_family, by = 'id_2')
-rm(age_sex_family)
-counts_df$dem_dyad <- paste(counts_df$age_sex_1, counts_df$age_sex_2, sep = '_')
-barplot(table(counts_df$dem_dyad), las = 1, horiz = T) # some have only a very few pairs
+### observations
+sightings <- read_csv('data_processed/motnp_eles_long_22.01.13.csv')
 
-# add in variable for family relationships
-for(i in 1:nrow(counts_df)){
-  counts_df$family_1.1[i] <- ifelse(is.na(counts_df$family_1.1[i]) == TRUE, 'NA', counts_df$family_1.1[i])
-  counts_df$family_1.2[i] <- ifelse(is.na(counts_df$family_1.2[i]) == TRUE, 'NA', counts_df$family_1.2[i])
-  counts_df$family_1.3[i] <- ifelse(is.na(counts_df$family_1.3[i]) == TRUE, 'NA', counts_df$family_1.3[i])
-  counts_df$family_2.1[i] <- ifelse(is.na(counts_df$family_2.1[i]) == TRUE, 'NA', counts_df$family_2.1[i])
-  counts_df$family_2.2[i] <- ifelse(is.na(counts_df$family_2.2[i]) == TRUE, 'NA', counts_df$family_2.2[i])
-  counts_df$family_2.3[i] <- ifelse(is.na(counts_df$family_2.3[i]) == TRUE, 'NA', counts_df$family_2.2[i])
+# actually produce the values I need ####
+nodes <- counts_df[c(2,4,12,14,16,18,20,22,28)]
+colnames(nodes) <- c("id", "node", "name", "age_class", "age_category", "sex", "count", "dem_class", "age_cat_id")
+nodes <- distinct(nodes)
+nodes <- rbind(nodes,U9)
+
+# number of elephants in each demographic group
+table(nodes$age_class, nodes$sex)
+
+# sightings per individual
+m <- nodes[nodes$dem_class == 'AM' | nodes$dem_class == 'PM',]
+str(m)
+m$count <- as.numeric(m$count)
+summary(m$count)
+sd(m$count)
+rethinking::dens(m$count)
+
+f <- nodes[nodes$dem_class == 'AF' | nodes$dem_class == 'PF',]
+f$count <- as.numeric(f$count)
+summary(f$count)
+sd(f$count)
+rethinking::dens(f$count)
+
+# observations
+s <- sightings[,c(1:7,10,13:14)] %>% 
+  distinct()
+table(s$total_elephants_numeric)
+nrow(s)-table(s$total_elephants_numeric)[1] # 485
+rethinking::dens(s$total_elephants_numeric)
+quantile(s$total_elephants_numeric, 0.7)
+
+loners <- s[s$total_elephants_numeric == 1,]
+table(loners$herd_type)
+summary(s$total_elephants_numeric)
+
+groups <- s[s$total_elephants_numeric > 1,]
+table(groups$herd_type)
+
+u <- sightings[sightings$herd_type == 'UK',]
+table(u$elephant, u$encounter)
+
+max(sightings$total_elephants_numeric)
+
+### simulate graphs for planning ####
+sim_eles <- data.frame(dyad   = 1:1200,
+                       pop    = rep(c('motnp','mpnp','anp'), each = 400),
+                       k_pop  = rep(c(3,2,4), each = 400),
+                       k_dyad = rep(NA, 1200))
+sim_eles$k_dyad[1:400]    <- sample(1:3, 400, prob = c(0.6,0.3,0.1), replace = T)
+sim_eles$k_dyad[401:800]  <- sample(1:2, 400, prob = c(0.9,0.1), replace = T)
+sim_eles$k_dyad[801:1200] <- sample(1:4, 400, prob = c(0.6,0.2,0.15,0.05), replace = T)
+
+table(sim_eles$k_dyad, sim_eles$pop)
+
+sim_eles$edge <- NA
+for(i in 1:nrow(sim_eles)){
+  sim_eles$edge[i] <- rbeta(n = 1,
+                            shape1 = ifelse(sim_eles$k_dyad[i] == 1, 2,
+                                            ifelse(sim_eles$k_dyad[i] == 2, 4,
+                                                   ifelse(sim_eles$k_dyad[i] == 3, 8, 16))),
+                            shape2 = ifelse(sim_eles$k_dyad[i] == 4, 2,
+                                            ifelse(sim_eles$k_dyad[i] == 3, 4,
+                                                   ifelse(sim_eles$k_dyad[i] == 2, 8, 16))))
+}
+sim_eles$k_dyad <- as.character(sim_eles$k_dyad)
+ggplot(sim_eles, aes(x = pop, y = edge, fill = k_dyad))+
+  geom_boxplot(notch = T)+
+  scale_fill_viridis_d()+
+  labs(fill = 'k', x = 'population', y = 'edge weight')+
+  theme_light()
+
+### 
+N <- 1200
+sim_eles <- data.frame(id  = 1:N,
+                       pop = rep(c('motnp','mpnp','anp'), each = N/3),
+                       age = sample(3:7, replace = T, size = N),
+                       bet = rep(NA, N),
+                       deg = rep(NA, N),
+                       eig = rep(NA, N))
+for(i in 1:N){
+  sim_eles$bet[i] <- ifelse(sim_eles$pop[i] == 'anp',
+                            rbeta(1, shape1 = (sim_eles$age[i]-2)*4, shape2 = sim_eles$age[i]),
+                            ifelse(sim_eles$pop[i] == 'motnp',
+                                   rbeta(1, shape1 = sim_eles$age[i], shape2 = sim_eles$age[i]*2),
+                                   rbeta(1, shape1 = (sim_eles$age[i]+6)*2, shape2 = sim_eles$age[i]*2)))
+  sim_eles$deg[i] <- ifelse(sim_eles$pop[i] == 'anp',
+                            rpois(n = 1, lambda = sim_eles$age[i]*2),
+                            ifelse(sim_eles$pop[i] == 'motnp',
+                                   rpois(n = 1, lambda = sim_eles$age[i]),
+                                   rpois(n = 1, lambda = 3)))
+  sim_eles$eig[i] <- ifelse(sim_eles$pop[i] == 'anp',
+                            rbeta(1, shape1 = sim_eles$age[i], shape2 = sim_eles$age[i]),
+                            ifelse(sim_eles$pop[i] == 'motnp',
+                                   rbeta(1, shape1 = sim_eles$age[i]*3, shape2 = sim_eles$age[i]*2),
+                                   rbeta(1, shape1 = sim_eles$age[i], shape2 = sim_eles$age[i]*2)))
 }
 
-counts_df$family1 <- ifelse(counts_df$family_1.1 == counts_df$id_2, 'family', 
-                            ifelse(counts_df$family_2.1 == counts_df$id_1, 'family', 'not_family'))
-counts_df$family2 <- ifelse(counts_df$family_1.2 == counts_df$id_2, 'family',  
-                            ifelse(counts_df$family_2.2 == counts_df$id_1, 'family', 'not_family'))
-counts_df$family3 <- ifelse(counts_df$family_1.3 == counts_df$id_2, 'family', 
-                            ifelse(counts_df$family_2.3 == counts_df$id_1, 'family', 'not_family'))
+ggplot(sim_eles, aes(x = age, col = pop, y = bet))+
+  geom_jitter()+
+  geom_smooth()+
+  scale_y_continuous(limits = c(0,1))
 
-counts_df$family <- ifelse(counts_df$family1 == 'family' | counts_df$family2 == 'family' | counts_df$family3 == 'family',
-                           'mother_calf','not_family')
-table(counts_df$family)
+ggplot(sim_eles, aes(x = age, col = pop, y = deg))+
+  geom_jitter()+
+  geom_smooth()
 
-family <- counts_df[counts_df$family == 'mother_calf',]
-unique(family$dem_type)
+ggplot(sim_eles, aes(x = age, col = pop, y = eig))+
+  geom_jitter()+
+  geom_smooth()+
+  scale_y_continuous(limits = c(0,1))
 
-counts_df$family <- ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_AF','family',
-                           ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_PF','family',
-                                  ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'AF_PM','family',
-                                         ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'JM_CM','family',
-                                                ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'CM_CU','family',
-                                                       ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'JM_CU','family',
-                                                              ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'PM_CM','family',
-                                                                     ifelse(counts_df$family == 'mother_calf' & counts_df$dem_type == 'JU_CU','family',counts_df$family))))))))
+sim_eles2 <- pivot_longer(sim_eles, cols = c(bet, deg, eig),
+                          values_to = 'centrality', names_to = 'measure')
+sim_eles2$cent <- ifelse(sim_eles2$measure == 'bet','betweenness',
+                         ifelse(sim_eles2$measure == 'deg','degree','eigenvector'))
+ggplot(sim_eles2, aes(x = age, col = pop, y = centrality))+
+  geom_jitter()+
+  geom_smooth()+
+  facet_wrap(.~cent, scale = 'free')+
+  scale_color_viridis_d(name="population",
+                     labels=c("ANP","MOTNP","MPNP"))+
+  theme_light()
+  
+### edge weight ####
+draws <- read_csv('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.csv')
+draws <- draws[,2:106954]
+weight_summary <- data.frame(dyad = colnames(draws),
+                             mean = apply(draws, 2, mean),
+                             median = apply(draws, 2, median),
+                             min = apply(draws, 2, min),
+                             max = apply(draws, 2, max),
+                             stdev = apply(draws, 2, sd))
+median(weight_summary$median)
 
-table(counts_df$family)
+100*length(which(weight_summary$mean < 0.1)) / length(weight_summary$mean)
 
-# add some summary data
-counts_df <- left_join(counts_df, summaries, by = 'dyad')
-counts_df <- counts_df[,c(1:6,12:36,39:43)]
-colnames(counts_df)[2:3] <- c('id_1','id_2')
+#Only XX dyads comprising males of independent age had mean values over 0.3, indicating a potential for spending over 30% of their time together (Fig 1c), but these individuals all had low sighting frequencies (range) so high uncertainty estimations around their mean values (standard deviations).
+males <- draws[,which(counts_df$dem_type == 'AM_AM' | counts_df$dem_type == 'AM_PM' | counts_df$dem_type == 'PM_PM')]
+male_summary <- data.frame(dyad = colnames(males),
+                           mean = apply(males, 2, mean),
+                           median = apply(males, 2, median),
+                           min = apply(males, 2, min),
+                           max = apply(males, 2, max),
+                           stdev = apply(males, 2, sd),
+                           upr = apply(males, 2, quantile, 0.975),
+                           lwr = apply(males, 2, quantile, 0.025))
+male_summary$range <- male_summary$upr - male_summary$lwr
+100*length(which(male_summary$mean > 0.3)) / length(male_summary$mean)
 
-head(counts_df)
-hist(counts_df$median)
-hist(counts_df$mean)
-hist(counts_df$sd)
+male_counts <- counts_df[counts_df$dem_type == 'AM_AM' | counts_df$dem_type == 'AM_PM' | counts_df$dem_type == 'PM_PM',]
+m0.3 <- male_counts[which(male_summary$mean > 0.3),]
+males0.3 <- data.frame(id = sort(unique(c(unique(m0.3$id_1),unique(m0.3$id_2)))))
+eles <- read_csv('data_processed/motnp_elenodes_22.01.13.csv')
+males0.3 <- left_join(x = males0.3, y = eles, by = 'id')
+table(males0.3$count)
 
-med0.1 <- length(counts_df$median[which(counts_df$median > 0.1)])
-100*(med0.1/length(counts_df$median)) # 26.4%
+summary(male_summary$stdev[which(male_summary$mean > 0.3)])
+hist(male_summary$stdev[which(male_summary$mean > 0.3)], breaks = 100)
+quantile(male_summary$stdev[which(male_summary$mean > 0.3)], 0.001)
 
-m_ind <- counts_df[counts_df$dem_type == 'AM_AM' | counts_df$dem_type == 'AM_PM' | counts_df$dem_type == 'PM_PM',]
-med_m0.3 <- length(m_ind$median[which(m_ind$median > 0.3)])
-100*(med_m0.3/length(m_ind$median))
-unique(m_ind$sex_1) ; unique(m_ind$sex_2)
-unique(m_ind$age_category_1) ; unique(m_ind$age_category_2)
+summary(male_summary$stdev[which(male_summary$mean < 0.3)])
+quantile(male_summary$stdev[which(male_summary$mean < 0.3)], 0.73)
 
-length(which(counts_df$sd[which(counts_df$median > 0.3)] > 0.1)) / length(counts_df$sd[which(counts_df$median > 0.3)])
-length(which(counts_df$sd[which(counts_df$median < 0.3)] > 0.1)) / length(counts_df$sd[which(counts_df$median < 0.3)])
+male_summary <- left_join(male_summary, counts_df, by = 'dyad')
+head(male_summary)
 
-length(which(m_ind$sd[which(m_ind$median > 0.3)] > 0.1)) / length(m_ind$sd[which(m_ind$median > 0.3)])
-length(which(m_ind$sd[which(m_ind$median < 0.3)] > 0.1)) / length(m_ind$sd[which(m_ind$median < 0.3)])
+unique(male_summary$age_category_1)
+unique(male_summary$age_category_2)
+male_summary$age_type2 <- ifelse(male_summary$age_cat_id_1 > male_summary$age_cat_id_2,
+                                 paste(male_summary$age_cat_id_2, male_summary$age_cat_id_1, sep = '_'),
+                                 paste(male_summary$age_cat_id_1, male_summary$age_cat_id_2, sep = '_'))
+male_plot_median <- male_summary[,c('id_1','id_2','median','age_type2')]
+male_plot_range  <- male_summary[,c('id_1','id_2','range','age_type2')]
+colnames(male_plot_median)[3:4] <- c('weight','type')
+colnames(male_plot_range)[3:4]  <- c('weight','type')
 
+unique(male_plot_median$type)
+male_plot_median <- male_plot_median[male_plot_median$type != '2_2' &
+                                       male_plot_median$type != '2_3' &
+                                       male_plot_median$type != '2_4' &
+                                       male_plot_median$type != '2_5' &
+                                       male_plot_median$type != '2_6' &
+                                       male_plot_median$type != '2_7',]
+male_plot_range <- male_plot_range[male_plot_range$type != '2_2' &
+                                       male_plot_range$type != '2_3' &
+                                       male_plot_range$type != '2_4' &
+                                       male_plot_range$type != '2_5' &
+                                       male_plot_range$type != '2_6' &
+                                       male_plot_range$type != '2_7',]
 
+### plots for TAP report ####
+# Generate two igraph objects, one from the median and one from the standardised width.
+g_mid <- igraph::graph_from_data_frame(male_plot_median, directed = F)
+g_rng <- igraph::graph_from_data_frame(male_plot_range,  directed = F)
 
+male_nodes1 <- male_counts[,c(2,12,14,16,18,20,22)]
+male_nodes2 <- male_counts[,c(3,13,15,17,19,21,23)]
+colnames(male_nodes1) <- c('id','name','age_class','age_category','sex','count','dem_class')
+colnames(male_nodes2) <- c('id','name','age_class','age_category','sex','count','dem_class')
+male_nodes <- rbind(male_nodes1, male_nodes2) %>% 
+  distinct()
+male_nodes <- male_nodes[male_nodes$age_class != 'Juvenile',]
 
+# Plot all
+coords <- igraph::layout_nicely(g_mid)
+plot(g_mid,
+     edge.width = male_plot_median$weight*5,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = 'black',
+     layout = coords)
+plot(g_mid,
+     edge.width = male_plot_range$weight*5,
+     edge.color = rgb(0, 0, 0, 0.25), 
+     vertex.size = 8,
+     vertex.label = male_nodes$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(male_nodes$age_class == 'Adult','seagreen1',
+                          ifelse(male_nodes$age_class == 'Pubescent','skyblue','yellow')),
+     layout = coords, add = TRUE)
 
+plot(g_mid,
+     edge.width = male_plot_median$weight,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = ifelse(male_plot_median$weight < 0.3,'transparent','black'),
+     layout = coords)
+plot(g_mid,
+     edge.width = male_plot_range$weight,
+     edge.color = ifelse(male_plot_median$weight < 0.3,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 8,
+     vertex.label = male_nodes$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(male_nodes$age_class == 'Adult','seagreen1',
+                          ifelse(male_nodes$age_class == 'Pubescent','skyblue','yellow')),
+     layout = coords, add = TRUE)
+
+# create variables for different degrees of node connectedness
+male_nodes$degree_0.3 <- NA
+for(i in 1:NROW(male_nodes)){
+  male_rows <- male_plot_median[male_plot_median$id_1 == male_nodes$id[i] |
+                                  male_plot_median$id_2 == male_nodes$id[i],]
+  male_nodes$degree_0.3[i] <- length(which(male_rows$weight > 0.3))
+}
+
+#  plot network with reduced nodes -- only those with degree values > 0.3
+g_mid_0.3 <- igraph::delete.vertices(graph = g_mid,
+                             v = male_nodes$id[which(male_nodes$degree_0.3 == 0)])
+g_rng_0.3 <- igraph::delete.vertices(graph = g_rng,
+                             v = male_nodes$id[which(male_nodes$degree_0.3 == 0)])
+
+coords_0.3 <- layout_nicely(g_mid_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight, 0),
+     edge.color = 'black',
+     vertex.size = 7,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight, 0),
+     vertex.size = 7,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(male_nodes[which(male_nodes$degree_0.3 != 0),]$age_class == 'Adult',
+                           'seagreen1',
+                           ifelse(male_nodes[which(male_nodes$degree_0.3 != 0),]$age_class == 'Pubescent', 'skyblue','yellow')),
+     layout = coords_0.3, add = TRUE)
+
+write_csv(male_nodes, 'Random/gephi_males_22.2.22.csv')
+write_csv(male_plot_median, 'Random/gephi_maleweights_22.2.22.csv')
+write_csv(male_plot_range, 'Random/gephi_maleuncertainties_22.2.22.csv')
 
