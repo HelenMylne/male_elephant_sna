@@ -1161,6 +1161,27 @@ for (i in sample_ids) {
   lines(density(pred), col=rgb(0, 0, 1, 0.25))
 }
 
+par(mfrow = c(1,1))
+plot(density(centrality_matrix_std[1, ,1]), ylim=c(0,40), xlim = c(-0.5,0.1),
+     main="", xlab="Standardised network strength")
+sample_ids <- sample(1:1000, size=200)
+for (i in sample_ids) {
+  pred <- rnorm(8, mean = chain[i, "intercept"] + 
+                  chain[i,"beta_age1"]*predictor_matrix[,1] + 
+                  chain[i,"beta_age2"]*predictor_matrix[,2] + 
+                  chain[i,"beta_age3"]*predictor_matrix[,3] + 
+                  chain[i,"beta_age4"]*predictor_matrix[,4] + 
+                  chain[i,"beta_age5"]*predictor_matrix[,5] + 
+                  chain[i,"beta_age6"]*predictor_matrix[,6] + 
+                  chain[i,"beta_age7"]*predictor_matrix[,7] + 
+                  chain[i,"beta_females"]*predictor_matrix[,8] + 
+                  chain[i,"beta_males"]*predictor_matrix[,9] + 
+                  chain[i,'beta_unks']*predictor_matrix[,10],
+                sd = exp(chain[i, "sigma"]))
+  lines(density(centrality_matrix_std[i, ,1]), col=rgb(0, 0, 0, 0.25))
+  lines(density(pred), col=rgb(0, 0, 1, 0.25))
+}
+
 coefficient_quantiles <- t(apply(chain, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
 coefficient_quantiles
 
