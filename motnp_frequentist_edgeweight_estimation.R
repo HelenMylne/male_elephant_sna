@@ -1,8 +1,14 @@
 #### Information ####
-# Script to process and plot association data from Mosi-Oa-Tunya National Park, Zambia.
+# Script to process association data from Mosi-Oa-Tunya National Park, Zambia.
+# Combines together two scripts (21.12.07_ALERT_frequentist.R and 22.01.04_ALERT_bayesian.R) to go from raw data to analysable in a single script.
+# 21.12.07_ALERT_frequentist.R : Remove anything based on frequentist SRI calculated values. Did have concerns that only 574 of the potential 1313 sightings were contained in the elephant data set ("eles_long") but I have confirmed that this is correct -- only 574 sightings had confirmed IDs.
+# 22.01.04_ALERT_bayesian.R : Remove workings to leave only clean script and use full length eles_long input data instead of half-length.
+
 # Data collected: 19th May 2016-21st December 2017
 # Collected by: Mr David Youldon, Mr Dabwiso Sakala, Miss Helen Mylne and other volunteers/interns/facilitated research students working with ALERT during this time
 # Data supplied by: ALERT and Mr David Youldon (11th August 2021) and via Volunteer Encounter (Bex Saunders, 19th October 2021)
+
+# NOTE: Complete script will take up about 2 days to run on a standard 6-core i7 processor. Avoid running sections unnecessarily by checking for pre-saved data frames created in previous runs.
 
 #### Set up ####
 library(tidyverse)  # data manipulation
@@ -158,16 +164,21 @@ write_delim(id, "data_processed/motnp_id.csv", delim = ",", col_names = T)
 ### Clear Environment
 rm(ages, days.numbers, id, id.raw, names, nkash, days, i, months, weeks)
 #### Encounters ####
+### import data
 encounters <- readxl::read_excel("data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3)
 e <- encounters[c(1:3,8:27)]
+
+### rename columns
 e <- janitor::clean_names(e)
 colnames(e)[c(4,5,7,8,23)] <- c('gps_s','gps_e','total_id','perc_id','present')
 group.size <- paste('e',1:76, sep = '')
 
+### separate column of elephants present into a whole set of columns
 d <- e %>% separate(present,
                     as.character(c(1:max(e$total_id, na.rm = T))))
 colnames(d)[23:98] <- group.size
 
+# remove herd sightings (elephant IDs still present but removes herd ID -- e.g. a sighting of the matriarch from breeding herd 7 would show as "B7(F52)", and this will change to just say "F52")
 for(i in 23:98) {
   for(j in 1:nrow(d)){
     d[j,i] <- ifelse(d[j,i] == 'B1', NA,
@@ -186,7 +197,19 @@ d <- e %>% separate(col = present, sep = '_',
 colnames(d)[23:98] <- group.size
 d$e1 <- ifelse(d$e1 == '', NA, d$e1)
 
-# recount total_id and perc_id
+### convert "total_elephants" to numeric -- can't just do "d$total_elephants <- as.numeric(d$total_elephants)" because makes all "50+" (or similar) values NA.
+counts <- data.frame(total = d$total_elephants)
+unique(counts$total) # convert manually everything with a + in it: "50+" "22+" "10+" "4+"  "27+" "30+" "55+" "15+" "3+"  "78+" "2+"  "61+" "37+" "52+" "40+" "60+" "5+"  "9+" "43+" "20+" "7+"  "11+"  "6+"  "23+" "12+" "42+" "18+" "25+" "70+" "28+" "14+" "17+" "77+" "97+" "13+" "16+" "19+" "51+" "24+" "1+"  "8+"  "36+" "34+" "41+" "59+" "88+" "29+" "66+" "32+" "21+" "38+"  "48+"  "39+"
+plus <- data.frame(total = c("50+","22+","10+","4+","27+","30+","55+","15+","3+","78+","2+","61+","37+","52+","40+","60+","5+","9+","43+","20+","7+","11+","6+","23+","12+","42+","18+","25+","70+","28+","14+","17+","77+","97+","13+","16+","19+","51+","24+","1+","8+","36+","34+","41+","59+","88+","29+","66+","32+","21+","38+","48+","39+"))
+plus$type <- 'minimum'
+plus$value <- c(50,22,10,4,27,30,55,15,3,78,2,61,37,52,40,60,5,9,43,20,7,11,6,23,12,42,18,25,70,28,14,17,77,97,13,16,19,51,24,1,8,36,34,41,59,88,29,66,32,21,38,48,39)
+counts <- left_join(x = counts, y = plus, by = 'total')
+counts$type  <- ifelse(is.na(counts$value) == TRUE, 'estimate', 'minimum')
+counts$value <- ifelse(is.na(counts$value) == TRUE, counts$total, counts$value)
+d$total_elephants_numeric <- as.numeric(counts$value)
+d$total_elephants_uncert  <- as.character(counts$type)
+
+# recount total_id and perc_id -- some of these counts don't match to the number of elephants identified, and others the count given does not make up the correct percentage of those observed
 d$count <- rowSums(!is.na(d[23:98]))
 d$count_mismatch <- d$count-d$total_id
 summary(d$count_mismatch) # range -7 to +8
