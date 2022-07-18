@@ -3,11 +3,11 @@
 # load packages
 library(tidyverse)
 library(dplyr)
-library(rstan)
-library(rethinking)
-library(igraph)
-library(dagitty)
-library(cmdstanr)
+#library(rstan)
+#library(rethinking)
+#library(igraph)
+#library(dagitty)
+#library(cmdstanr)
 
 # information
 R.Version()
@@ -51,7 +51,7 @@ rm(binom)
 dev.off()
 ################ 2) Create data lists ################
 ### import data for aggregated model (binomial)
-counts_df <- read_delim('data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',')
+counts_df <- read_delim('motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
 unique(counts_df$sex_1) # FALSE or NA
@@ -1259,4 +1259,40 @@ ggplot(elephants, aes(x = age_cat_id, y = max_edge, pch = sex, colour = max_edge
        x = 'age category',
        y = 'median edge weight')+
   theme_light()
+
+################ 10) Extract centrality metrics for each individual ################
+N <- length(unique(counts_df$id_1))+1
+num_iterations <- length(draws_motnp2.2$F1_F10)
+centrality_matrix <- matrix(0, nrow = num_iterations, ncol = N)
+for (i in 1:num_iterations) {
+  g <- graph_from_adjacency_matrix(adj_tensor[, , i], mode="undirected", weighted=TRUE)
+  centrality_matrix[i, ] <- strength(g)
+}
+
+colnames(centrality_matrix) <- c("Rey", "Leia", "Obi-Wan", "Luke", "C-3PO", "BB-8", "R2-D2", "D-O")
+head(centrality_matrix)
+
+centrality_quantiles <- t(apply(centrality_matrix, 2, function(x) quantile(x, probs=c(0.025, 0.5, 0.975))))
+centrality_quantiles
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
