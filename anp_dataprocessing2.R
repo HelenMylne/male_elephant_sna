@@ -41,6 +41,10 @@ nrow(sightings) # 24176 = length(unique(sightings$obs_id))+2 -- remove duplicate
 sightings <- sightings[c(1:12,15:24176),]
 
 eles <- ate[,c('id','node_id')]
+eles <- distinct(eles)
+
+## clean environment
+rm(ate_nums, date_row, i)
 
 ### read in processed data files ####
 aa <- read_csv('data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings1.250.csv') %>% distinct()
@@ -148,15 +152,13 @@ all <- rbind(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,a
              ca,cb,cc,cd,ce,cf,cg,ch,ci,cj,ck,cl,cm,cn,co,cp,cq,cr,cs,ct,cu,cv,cw,cx,cy,cz,
              da,db,dc,dd,de,df,dg,dh,di,dj,dk,dl,dm,dn,do,dp,dq)
 
-# clean environment ####
+# clean environment
 rm(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az,ba,bb,bc,bd,be,bf,bg,bh,bi,bj,bk,bl,bm,bn,bo,bp,bq,br,bs,bt,bu,bv,bw,bx,by,bz,ca,cb,cc,cd,ce,cf,cg,ch,ci,cj,ck,cl,cm,cn,co,cp,cq,cr,cs,ct,cu,cv,cw,cx,cy,cz,da,db,dc,dd,de,df,dg,dh,di,dj,dk,dl,dm,dn,do,dp,dq)
-
-## clean environment
-rm(ate_nums, date_row, i)
 
 ### merge sightings information into dyad data #####
 colnames(all)[4] <- 'obs_id_intfact'
 all <- left_join(x = all, y = sightings, by = 'obs_id_intfact') %>% distinct()
+rm(ate)
 
 ### convert to Bernoulli model data format -- can't actually use Bernoulli as would require too much computing power ####
 all$dyad <- paste(all$node_1, all$node_2, sep = '_')
@@ -164,79 +166,97 @@ all$dyad_id <- as.integer(as.factor(all$dyad))
 all$location_id <- as.integer(as.factor(all$grid_code))
 head(all)
 
-all$period <- NA
-max(sightings$obs_date) ; min(sightings$obs_date)
-max(sightings$obs_date) - min(sightings$obs_date) # 17999 days (call that 18000 including both ends!). Time period for ALERT data = 581 days
-17999/581 # ~31 blocks = split into 32
+max(sightings$obs_date) - min(sightings$obs_date) # 17999 days (call that 18000 including both ends!). Time period for ALERT data = 581 days --> split into 31 time windows (so need 32 boundaries)
 periods <- seq(from = min(sightings$obs_date), to = max(sightings$obs_date), length.out = 32)
-#for(i in 1:nrow(all)){
-#  for(j in 1:length(periods)){
-#    all$period[i] <- ifelse(all$obs_date[i] >= periods[j] & all$obs_date[i] < periods[j+1],
-#                            j,
-#                            all$period[i])
-#  }
-#}
-#nrow(all) - length(which(is.na(all$period) == TRUE)) # in 2 hours this managed 3070 rows -- would take about 25500 hours to complete!
-
-#for(i in 11306:nrow(all)){
-#  all$period[i] <- which(periods < all$obs_date[i])[length(which(periods < all$obs_date[i]))] # take last value in vector
-#  if(i %% 25 == 0) {print(i)}
-#} # this will take about 45 days to complete...
-
-events <- all[all$social_event == 1,] # cuts down to 114209 dyad pairs from 38098504
+events <- all[all$social_event == 1,] # cuts down to 114209 dyad pairs from 38098504 -- assigning to time window doesn't take forever
 events$period <- NA
 for(i in 1:nrow(events)){
   events$period[i] <- which(periods <= events$obs_date[i])[length(which(periods <= events$obs_date[i]))] # take last value in vector
   if(i %% 1000 == 0) {print(i)}
 }
-unique(events$period)
-periods ; View(events[c(sample(x = 1:nrow(events), size = 30, replace = F)),]) # visual check that periods have come out right
+periods ; View(events[c(sample(x = 1:nrow(events), size = 20, replace = F)),]) # visual check that periods have come out right
 
-eles <- ate[,c('id','node_id')] %>% distinct()
-colnames(eles) <- c('id_1','node_1')
-data <- left_join(events, eles, by = 'node_1')
-colnames(eles) <- c('id_2','node_2')
-data <- left_join(data, eles, by = 'node_2')
+# check elephants all match up
+length(unique(all$node_1))
+length(unique(all$node_2))
+length(unique(events$node_1))
+length(unique(events$node_2))
 
 ### convert to Binomial model data format -- aggregate all sightings of each dyad together into a count ####
 ## all time:
 df_agg <- all %>%
   group_by(node_1, node_2) %>%
   summarise(event_count=sum(social_event), dyad_id=cur_group_id())
-length(df_agg$node_1) == cumsum(1:length(unique(events$node_1)))[length(unique(events$node_1))] # NOT SURE I HAVE THE CORRECT NUMBER OF DYADS BUT DON'T KNOW WHY IT WOULD BE WRONG?!! number should be the (n-1)th value of the triangular number sequence in which n = total number of elephants in analysis (596). If TRUE, correct number of pairs.
+length(unique(df_agg$node_1)) ; length(unique(df_agg$node_2))
+length(df_agg$node_1) == cumsum(1:length(unique(all$node_1)))[length(unique(all$node_1))] # number should be the nth value of the triangular number sequence in which n = total number of elephants in analysis (693). If TRUE, correct number of pairs.
+rm(all)
 
 ## by time window:
-df_split <- data %>%
+df_split <- events %>%
   group_by(node_1, node_2, period) %>%
   summarise(event_count=sum(social_event),
             dyad_id=cur_group_id())
-head(df_split) ; tail(df_split)
+head(df_split)
 
 colnames(eles) <- c('id_1','node_1')
-df <- left_join(df_split, eles, by = 'node_1')
+df <- left_join(df_split, eles, by = 'node_1') %>% distinct()
 colnames(eles) <- c('id_2','node_2')
-df <- left_join(df, eles, by = 'node_2')
+df <- left_join(df, eles, by = 'node_2') %>% distinct()
+head(df) ; tail(df)
 
 df$dyad <- paste(df$id_1, df$id_2, sep = '_')
 df$dyad_id_period <- df$dyad_id              # every dyad has it's own ID number, including if same dyad in a different time window
 df$dyad_id <- as.integer(as.factor(df$dyad)) # every dyad has it's own ID number, but same dyad in different windows share ID number
-table(df$dyad_id)
+
+### create dyad row for all pairs per period ####
+dyads <- data.frame(id_1 = rep(sort(eles$id_2), each = nrow(eles)),
+                    id_2 = rep(sort(eles$id_2), nrow(eles)))
+
+colnames(eles) <- c('id_1','node_1')
+dyads <- left_join(dyads, eles, by = 'id_1')
+colnames(eles) <- c('id_2','node_2')
+dyads <- left_join(dyads, eles, by = 'id_2')
+dyads <- dyads[dyads$node_1 < dyads$node_2,]
+
+dyads <- data.frame(id_1 = rep(dyads$id_1, length(unique(df$period))),
+                    id_2 = rep(dyads$id_2, length(unique(df$period))),
+                    node_1 = rep(dyads$node_1, length(unique(df$period))),
+                    node_2 = rep(dyads$node_2, length(unique(df$period))),
+                    period = rep(sort(unique(df$period)), each = nrow(dyads)))
+head(df) ; head(dyads)
+
+#rm(date_row, events, df_split) # may need to clear environment a little before running next step
+data <- left_join(x = dyads, y = df, by = c('id_1','id_2','period'))
+data <- data[,c(1:5,8:10)]
+colnames(data)[3:4] <- c('node_1','node_2')
+data$event_count <- ifelse(is.na(data$event_count) == TRUE, 0, data$event_count)
+table(data$event_count)
+data$dyad <- paste(data$id_1, data$id_2, sep = '_')
+data$dyad_id <- as.integer(as.factor(data$dyad))
+head(data, 20)
+
+periods <- data.frame(period_start = seq(from = min(sightings$obs_date), to = max(sightings$obs_date), length.out = 32)[1:31],
+                      period = 1:31)
+data <- left_join(x = data, y = periods, by = 'period')
+head(data)
 
 ### add data about nodes ####
 males <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 males$id <- paste('M',males$casename, sep = '')
-males <- males[,c(21,2,6,9,14,18)]
-colnames(males) ; colnames(df)
+males <- males[,c(21,2,5,6,8,9,14,18)]
+colnames(males) ; colnames(data)
 
 colnames(males)[1] <- 'id_1'
-dyads <- left_join(x = df, y = males, by = 'id_1')
-colnames(dyads)[c(10:14)] <- c('id_no_1','byr_1','dyr_1','indyr_1','musthyr_1')
+data <- left_join(x = data, y = males, by = 'id_1')
+colnames(data)[c(10:16)] <- c('id_no_1','bmo_1','byr_1','dmo_1','dyr_1','indyr_1','musthyr_1')
 colnames(males)[1] <- 'id_2'
-dyads <- left_join(x = dyads, y = males, by = 'id_2')
-colnames(dyads)[c(15:19)] <- c('id_no_2','byr_2','dyr_2','indyr_2','musthyr_2')
-dyads <- dyads[,c(8,9,5:7,1:4,10,15,11,16,12,17,13,18,14,19)]
-head(dyads)
+data <- left_join(x = data, y = males, by = 'id_2')
+colnames(data)[c(17:23)] <- c('id_no_2','bmo_2','byr_2','dmo_2','dyr_2','indyr_2','musthyr_2')
+data <- data[,c(8,7,1:5,9,6,10,17,11,18,12,19,13,20,14,21,15,22,16,23)]
+head(data)
 
-### write csv
-readr::write_delim(dyads, 'data_processed/anp_bayesian_pairwiseevents_22.03.22.csv', delim = ',')
+### write to file ####
+readr::write_delim(data, 'data_processed/anp_bayesian_pairwiseevents_22.03.28.csv', delim = ',')
 
+## clean environment
+rm(list = ls())
