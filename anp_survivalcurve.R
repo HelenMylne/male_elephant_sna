@@ -25,6 +25,7 @@ boxplot(as.numeric(all_nodes$Age_death) ~ all_nodes$Death_accuracy) # adds NA va
 str(all_nodes)
 
 ### calculate oldest age each observed ####
+# create dataframe that only considers node ages
 ages <- all_nodes[,c(1:3,15,16,18:20)] %>% 
   janitor::clean_names()
 ages$id_no <- ifelse(ages$sex == 'unknown', paste('U', ages$id, sep = ''),
@@ -32,34 +33,20 @@ ages$id_no <- ifelse(ages$sex == 'unknown', paste('U', ages$id, sep = ''),
                             ifelse(ages$sex == 'Male', paste('M', ages$id, sep = ''),
                                    'check')))
 
+# generate numeric variable for age in 2021 of living elephants or age at death
 ages$age_death_num <- as.numeric(ifelse(ages$age_death == 'living', 2021 - ages$birth_year, ages$age_death))
-
-ages$dacc <- ifelse(ages$death_accuracy == 'within 1mo', (1/12)*3,
-                    ifelse(ages$death_accuracy == 'within 3mo', (3/12)*2,
-                           ifelse(ages$death_accuracy == 'within 6mo', (6/12)*1.5,
-                                  ifelse(ages$death_accuracy == 'within 1yr', 1.5, NA))))
-ages$bacc <- ifelse(ages$birth_accuracy == '+/- 1mo', (1/12)*3,
-                    ifelse(ages$birth_accuracy == '+/- 6mo', (6/12)*1.5,
-                           ifelse(ages$birth_accuracy == '+/- 1yr', 1.5,
-                                  ifelse(ages$birth_accuracy == '+/- 2.5yrs', 2.5, 5))))
-ages$youngest_death <- ifelse(ages$death_accuracy == 'living',
-                              ages$age_death_num + ages$bacc,
-                              ages$age_death_num - ages$dacc + ages$bacc)
-ages$oldest_death <- ifelse(ages$death_accuracy == 'living',
-                            ages$age_death_num - ages$bacc,
-                            ages$age_death_num + ages$dacc - ages$bacc)
-
 ages$age_death_round <- round(ages$age_death_num, 0)
 table(ages$age_death_round, ages$sex)
-hist(ages$age_death_round, breaks = 75)
-hist(ages$age_death_round[which(ages$sex == 'Male')], breaks = 70)
-hist(ages$age_death_round[which(ages$sex == 'Female')], breaks = 75)
+hist(ages$age_death_round, breaks = 75)                               # overall age distribution
+hist(ages$age_death_round[which(ages$sex == 'Male')], breaks = 70)    # male age distribution
+hist(ages$age_death_round[which(ages$sex == 'Female')], breaks = 75)  # female age distribution
+ages <- ages[,c(9,1,3,8,10)]
 
-ages <- ages[,c(9,1,3,8,10,15,13:14)]
-ages$censor <- ifelse(ages$age_death == 'living', 'TRUE', 'FALSE') ; table(ages$censor)
+# create new 
+ages$censor <- ifelse(ages$age_death == 'living', 'TRUE', 'FALSE')    # censor = TRUE when elephant is still alive
 
-age_cens <- ages[!is.na(ages$age_death_num),c('age_death_num','censor','sex')]
-
+# clean up
+age_cens <- ages[!is.na(ages$age_death_num),c('age_death_num','censor','sex')] # single data frame for age at death/2021
 rm(ages, all_nodes)
 
 ### Weibull example - Statwonk (https://statwonk.com/bayesian-right-censored-weibull-model.html) ####
@@ -284,3 +271,43 @@ summary(df$value[which(df$true_age == 7)])
 quantile(df$value[which(df$true_age == 7)], seq(0,1,0.01))
 
 
+
+### estimate Weibull distribution -- DWF 28th March 2022 ####
+colnames(age_cens)[1] <- 'age'
+age_cens$age_non0 <- age_cens$age+0.01 # wouldn't run when I allowed age = 0, so increased all values by 0.01 to make it run
+
+age_cens$censor <- as.integer(as.logical(age_cens$censor))  # 1647 elephants LIVING = 1647 elephants need to be censor=1
+
+# Examine default brms priors
+# prior_summary(bfit_m)
+
+# run model for male elephants with slightly better priors
+bfit_m <- age_cens %>% filter(sex == 'Male') %>%
+  brm(age_non0 | cens(censor) ~ 1,
+      prior = c(
+        prior(student_t(3, 5, 5), class = Intercept),
+        prior(exponential(0.5), class = shape)
+      ),
+      data = ., family = "weibull", 
+      chains = 4, cores = 4)
+
+plot(bfit_m)
+
+# extract scale and shape from posterior draws
+# to convert to scale we need to both undo the link function by taking the exponent
+# and then refer to the brms documentation to understand how the mean relates to the scale
+bfit_m_draws <- as_draws_df(bfit_m) %>%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape)))
+
+est_shape <- mean(bfit_m_draws$shape)
+est_scale <- mean(bfit_m_draws$scale)
+
+# Let's do a posterior predictive plot based on the mean
+probs <- dweibull(1:100, shape = est_shape, scale = est_scale)
+probs <- probs / sum(probs)
+plot(probs) 
+
+# Lets simulate ages for 3k elephants
+hist(rweibull(3000,est_shape,est_scale))
+
+# Shape = 1.29, scale = 29.5 (so we will use shape = 1.3 and scale = 30)
