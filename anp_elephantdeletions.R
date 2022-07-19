@@ -4,7 +4,7 @@ library(tidyverse)
 library(igraph)
 
 ### Simulate population ####
-# threeclangroups[i.e.,K1(bondgroupsB1,B2,B3andB4);K2(B5,B6andB7);andK3(B8)]
+# three clan groups [i.e.,K1 (bond groups B1, B2, B3 and B4); K2 (B5, B6 and B7); and K3 (B8)]
 # Doesn't specify actual number of elephants
 # 10 core groups, 8 bond groups, 3 clan groups: K1 = [B1 = 1 group of 10, B2 = 1 group of 6, B3 = 2 groups of 9 and 10, B4 = 1 group of 4], K2 = [B5 = 2 groups of 6 and 10, B6 = 1 group of 11, B7 = 1 group of 9], K3 = [B8 = 1 group of 8].
 # 4 age classes (oldest is matriarch)
