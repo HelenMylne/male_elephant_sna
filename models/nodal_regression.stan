@@ -3,8 +3,8 @@ data {
   //int num_node_types;                        // length(unique(node_age))
   vector[num_nodes] centrality_mu;             // Means of Gaussian approximation of logit edge weights
   matrix[num_nodes, num_nodes] centrality_cov; // Covariance matrix of Gaussian approximation of logit edge weights
-  vector[num_nodes] node_age;                  // Node ages (point estimate)
-  vector[num_nodes] node_age2;                  // Node ages (point estimate)
+  matrix[num_nodes, 8000] node_age;            // Node ages (draws from posterior distribution)
+  matrix[num_nodes, 8000] node_age2;           // Node ages squared (same as above, all estimates squared)
 }
 
 parameters {
@@ -16,7 +16,9 @@ parameters {
 
 transformed parameters {
   vector[num_nodes] predictor;
-  predictor = intercept + beta_age*node_age + beta_age2*node_age2;
+  for(i in 1:num_nodes){
+    predictor = intercept + beta_age*node_age[,i] + beta_age2*node_age2[,i];
+  }
 }
 
 model {
