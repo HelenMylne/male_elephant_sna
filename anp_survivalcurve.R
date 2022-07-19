@@ -8,9 +8,11 @@ lapply(c("BaSTA"), require, character.only = TRUE) # required packages for the r
 library(tidyverse)
 
 #### Read in Amboseli data ####
-males <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% 
-  select(CASENAME, BYR, DYR) %>% 
-  janitor::clean_names()
+males <- readxl::read_excel('data_raw/Raw_ATE_AllElephants_Lee220118.xlsx') %>% 
+  janitor::clean_names() %>% 
+  filter(sex == 'Male') %>% 
+  mutate('casename' = id) %>% 
+  select(casename, birth_year, death_year, age_death)
 str(males)
 
 sightings <- readxl::read_excel('data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
@@ -39,23 +41,41 @@ males$obs_2020 <- NA ; males$obs_2021 <- NA
 for(i in 1:nrow(males)){
   for(j in 1:N){
     casename <- sightings[sightings$id == males$casename[i],]
-    males[i,j+3] <- ifelse(length(which(casename$year == j+1971)) > 0, 1, 0)
+    males[i,j+4] <- ifelse(length(which(casename$year == j+1971)) > 0, 1, 0)
+    rm(casename)
   }
 }
 
 #### Prepare input data ####
-# Getting start and end times from the input datasets - will depend on your input if this works, but can also manually assign the year the observations began and ended
+# Study start and end years
 Ss <- 1972  # start of study
 Se <- 2021  # end of study
 
 # prep data
 basta_data <- males
-basta_data$casename <- paste0('M', basta_data$casename)
-basta_data <- basta_data[-c(1:4,6,8,11,14:18,22,23,26:30,35,38,44:46,52,55,56,58,59,62,63,66,68,71,72,76,83,87,90,93,94,96,105,107,108,111,114,115,118,127,128,132,133,135,136,138,145,146,151,155,159,162,174,179,182,186,187,190,191,193,197,201,208,210,213,220,224,230,235,238,244,248,250,254,256,259,261,263,266,268,288,291,292,295,298,306,307,309,319,327,339,342,346,370,384,416,417,435,449,472,717,693,708,735,769,774),]  # elephants that have sightings before birth/after death
-basta_data <- basta_data[basta_data$casename %in% sort(unique(paste0('M',sightings$id))),]
+basta_data$count_years <- rowSums(basta_data[5:54])
+sum(table(basta_data$count_years)[2:35])
 
 basta_data$dyr <- ifelse(basta_data$dyr < 100,  0, basta_data$dyr)
 basta_data$byr <- ifelse(basta_data$byr < 1972, 0, basta_data$byr)
+
+write_csv(basta_data, 'data_processed/anp_agesightings_basta_22.05.30.csv')
+
+old <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% 
+  janitor::clean_names() %>% 
+  select(casename, byr, dyr)
+old$casename <- paste0('M', old$casename)
+old <- old[-c(1:4,6,8,11,14:18,22,23,26:30,35,38,44:46,52,55,56,58,59,62,63,66,68,71,72,76,83,87,90,93,94,96,105,107,108,111,114,115,118,127,128,132,133,135,136,138,145,146,151,155,159,162,174,179,182,186,187,190,191,193,197,201,208,210,213,220,224,230,235,238,244,248,250,254,256,259,261,263,266,268,288,291,292,295,298,306,307,309,319,327,339,342,346,370,384,416,417,435,449,472,717,693,708,735,769,774),]  # elephants that have sightings before birth/after death
+old_inc <- old[old$casename %in% sort(unique(paste0('M',sightings$id))),]
+old_exc <- anti_join(old, old_inc)
+old_exc$age_death <- ifelse(old_exc$dyr < 10,
+                            paste0('living ', 2021 - old_exc$byr),
+                            old_exc$dyr - old_exc$byr)
+table(old_exc$age_death)
+
+old_readin <- read_csv('data_processed/anp_agesightings_basta_22.05.24.csv')
+old_readin$count_years <- rowSums(old_readin[4:53])
+table(old_readin$count_years)
 
 ################# Single chain, 500 iterations only #################
 # Set the arguments for the iterations
@@ -126,6 +146,19 @@ Wb.Si <- basta(basta_data, studyStart = Ss,
 summary(Wb.Si)
 plot(Wb.Si)                       # Plot traces
 plot(Wb.Si, plot.trace = FALSE)   # Plot survival and mortality curves
+
+mortality <- weibull(b0 = 1.3, b1 = 30, age = 1:70)      ; plot(mortality)
+
+pM <-  c(1.3,30)    # prior means for parameters in a Weibull model with a simple shape
+pSD <- c(0.2, 5)    # prior standard deviation for parameters in a Weibull model with a simple shape -- smaller values makes no visible difference to final curves
+Wb.Si2 <- basta(basta_data, studyStart = Ss,
+               studyEnd = Se, nsim = 1, niter = iter,
+               burnin = warmup, thinning = thin,
+               thetaPriorMean = pM,thetaPriorSd = pSD,
+               model = "WE", shape = c("simple"))
+summary(Wb.Si2)
+plot(Wb.Si2)                       # Plot traces
+plot(Wb.Si2, plot.trace = FALSE)   # Plot survival and mortality curves
 
 par(mfrow = c(1,1))
 
@@ -221,6 +254,17 @@ summary(Wb.Si)
 plot(Wb.Si)                       # Plot traces
 plot(Wb.Si, plot.trace = FALSE)   # Plot survival and mortality curves
 
+pM <-  c(1.3,30)    # prior means for parameters in a Weibull model with a simple shape
+pSD <- c(0.2, 5)    # prior standard deviation for parameters in a Weibull model with a simple shape -- smaller values makes no visible difference to final curves
+Wb.Si2 <- basta(basta_data, studyStart = Ss,
+                studyEnd = Se, nsim = sim, niter = iter,
+                burnin = warmup, thinning = thin,
+                thetaPriorMean = pM,thetaPriorSd = pSD,
+                model = "WE", shape = c("simple"))
+summary(Wb.Si2)                    # DIC lower than for priors given above, and output estimates look no better 
+plot(Wb.Si2)                       # Plot traces
+plot(Wb.Si2, plot.trace = FALSE)   # Plot survival and mortality curves
+
 #### Weibull bathtub -- DIC = uncalculated, lack of convergence ####
 pM <-  c(0.5,0.2,1,1.2,0.5) # prior means for parameters in a Weibull model with a bathtub shape
 pSD <- c(0.3,0.1,1,0.5,0.3)  # prior standard deviation for parameters in a Weibull model with a bathtub shape
@@ -235,6 +279,7 @@ plot(Wb.Bt)                       # Plot traces
 plot(Wb.Bt, plot.trace = FALSE)   # Plot survival and mortality curves
 
 ################# Improve priors using AEDD ####
+rm(ages, amr, basta_data, casename, males, sightings, iter, j, N, pM, pSD, Se, sim, Ss, thin, warmup)
 #### Load packages ####
 library(cmdstanr)
 library(posterior)
@@ -246,546 +291,17 @@ library(ggthemes)
 library(dplyr)
 library(data.table)
 
-#### Read in AEDD -- old ####
-#aedd <- read_csv('data_raw/AfricanElephantDemographicDatabase_aedd_22.04.04.csv') %>% 
-  filter(sex == 'male' | sex == 'dispersed_male' | sex == 'family_male')
-table(aedd$metric)
-aedd <- aedd[!is.na(aedd$age_reported), c(1,3,5,6,7,8,13,14,15,22)]
-boxplot(as.numeric(aedd$age_reported) ~ aedd$sex)
-par(mai = c(1,5,0.2,0.2)); boxplot(as.numeric(aedd$age_reported) ~ aedd$sitename,
-                                   horizontal = T, las = 1, ylab = '', xlab = 'age') ; par(mai = c(1,1,1,1))
-str(aedd)
-
-# create age data frame
-table(aedd$age_reported)          # every study uses a different format!
-length(unique(aedd$age_reported)) # 877 different values
-
-aedd <- separate(aedd, age_reported, sep = '>', into = c('min_age','value'), remove = F) # if age is reported as >x, then x is minimum age it might have lived to -- censor at x
-aedd$min_age <- ifelse(aedd$min_age == '', aedd$value, aedd$min_age)
-aedd <- aedd %>% select(-value)
-
-aedd <- separate(aedd, min_age, sep = '<', into = c('max_age','value'), remove = F)      # if age is reported as <x, then x is maximum age and can't assume it actually reached that age -- subtract 1
-aedd$max_age <- ifelse(aedd$max_age == '', as.numeric(aedd$value) - 1, aedd$max_age)
-aedd <- aedd %>% select(-value)
-
-aedd <- separate(aedd, max_age, sep = '-', into = c('lwr_age','upr_age'), remove = F)    # split age ranges up to give a maximum and minimum possible.
-aedd$upr_age <- ifelse(is.na(aedd$upr_age) == TRUE, aedd$lwr_age, aedd$upr_age)
-length(unique(aedd$upr_age))
-
-str(aedd$upr_age)
-aedd$age_all <- ifelse(aedd$upr_age == "calf",                 median(x = c(0,5)),
-                ifelse(aedd$upr_age == "infant",               median(x = c(0,5)),
-                ifelse(aedd$upr_age == "juvenile; infant",     median(x = c(0,10)),
-                ifelse(aedd$upr_age == "offspring",            median(x = c(0,10)),
-                ifelse(aedd$upr_age == "young",                median(x = c(0,25)),
-                ifelse(aedd$upr_age == "juvenile",             median(x = c(5,10)),
-                ifelse(aedd$upr_age == "halfgrown",            median(x = c(5,15)),
-                ifelse(aedd$upr_age == "juvenile; subadult",   median(x = c(5,15)),
-                ifelse(aedd$upr_age == "sexually_immature",    median(x = c(5,20)),
-                ifelse(aedd$upr_age == "subadult",             median(x = c(10,20)),
-                ifelse(aedd$upr_age == "intermediate",         median(x = c(10,25)),
-                ifelse(aedd$upr_age == "subadult; adult",      median(x = c(15,25)),
-                ifelse(aedd$upr_age == "sexually_mature",      median(x = c(15,30)),
-                ifelse(aedd$upr_age == "fullgrown",            median(x = c(20,30)),
-                ifelse(aedd$upr_age == "adult",                median(x = c(20,50)),
-                ifelse(aedd$upr_age == "old, nonreproductive", median(x = c(50,70)),
-                ifelse(aedd$upr_age == "unknown",              NA,    aedd$upr_age)))))))))))))))))
-table(aedd$age_all)
-aedd$lwr_age <- as.numeric(aedd$lwr_age)
-aedd$upr_age <- as.numeric(aedd$upr_age)
-aedd$age <- NA
-for(i in 1:nrow(aedd)){
-  aedd$age[i] <- median(x = c(aedd$lwr_age[i], aedd$upr_age[i]))
-}
-
-# add censorship (all are alive, censor = 1)
-aedd$censor <- 1
-
-# clean up data
-age_cens <- aedd[!is.na(aedd$age),c('age','censor','sex')]
-
-#### estimate Weibull distribution -- old, 22.04.04_Weibull.R ####
-colnames(age_cens)[1] <- 'age'
-length(which(age_cens$age == 0))
-age_cens$age_non0 <- ifelse(age_cens$age == 0, 0.01, age_cens$age) # wouldn't run when age = 0
-
-# Examine default brms priors (male elephants)
-bfit_m_default <- age_cens_m %>%
-  brm(age_non0 | cens(censor) ~ 1,
-      data = ., family = "weibull", 
-      chains = 4, cores = 4)
-prior_summary(bfit_m_default)
-# Defaults
-#intercept - student_t(3, 3.1, 2.5)
-#shape - gamma(0.01, 0.01)
-plot(bfit_m_default)
-
-# Default prior predictive check
-prior_intercept <- rstudent_t(num_samples, 3, 3.1, 2.5)
-prior_shape <- rgamma(num_samples, 0.01, 0.01)
-prior_scale <- exp(prior_intercept) / (gamma(1 + 1 / prior_shape))
-
-hist(prior_shape)
-hist(prior_scale[prior_scale<100])
-
-probs <- dweibull(1:100, shape = prior_shape[1], scale = prior_scale[1])
-probs <- probs / sum(probs)
-plot(probs, type="l", lwd=0.5, ylim = c(0,1))
-for( i in 2:num_samples) {
-  probs <- dweibull(1:100, shape = prior_shape[i], scale = prior_scale[i])
-  probs <- probs / sum(probs)
-  lines(probs, lwd=0.5)
-}
-
-# Prior predictive check
-num_samples <- 500
-prior_intercept <- rstudent_t(num_samples, 3, 5, 5)
-prior_shape <- rexp(num_samples, 0.5)
-prior_scale <- exp(prior_intercept) / (gamma(1 + 1 / prior_shape))
-
-hist(prior_shape)
-hist(prior_scale[prior_scale<100])
-
-probs <- dweibull(1:100, shape = prior_shape[1], scale = prior_scale[1])
-probs <- probs / sum(probs)
-plot(probs, type="l", lwd=0.5, ylim = c(0,1))
-for( i in 2:num_samples) {
-  probs <- dweibull(1:100, shape = prior_shape[i], scale = prior_scale[i])
-  probs <- probs / sum(probs)
-  lines(probs, lwd=0.5)
-}
-
-# Run model for male elephants with slightly better priors
-bfit_m <- age_cens_m %>%
-  brm(age_non0 | cens(censor) ~ 1,
-      prior = c(
-        prior(NEW_PRIOR(NEW_PRIOR_PARAMETERS), class = Intercept),
-        prior(NEW_PRIOR(NEW_PRIOR_PARAMETERS), class = shape)
-      ),
-      data = ., family = "weibull", 
-      chains = 4, cores = 4)
-plot(bfit_m)
-
-# extract scale and shape from posterior draws
-bfit_m_draws <- as_draws_df(bfit_m) %>%
-  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape)))
-
-est_shape <- mean(bfit_m_draws$shape)  # 
-est_scale <- mean(bfit_m_draws$scale)  # 
-
-# posterior predictive plot based on the mean
-probs <- dweibull(1:100, shape = est_shape, scale = est_scale)
-probs <- probs / sum(probs)
-plot(probs) 
-
-# simulate ages for 3k elephants
-hist(rweibull(3000,est_shape,est_scale)) # still horrendous
-
-
-### start over -- need to use the rest of the data too: e.g. for population size, if estimate = 8 that's 8 individuals of that age, not 1, but for age at first calving there is no estimate for age_reported but they must have reached at least the calving age, and for survivorship they provide an estimate for the proportion reaching those ages ####
+#### read in AEDD data -- need to use just population size, if estimate = 8 that's 8 individuals of that age, not 1 ####
 aedd <- read_csv('data_raw/AfricanElephantDemographicDatabase_aedd_22.04.04.csv')
 aedd <- aedd[aedd$species == 'L. africana' & !is.na(aedd$species),]
 sort(unique(aedd$metric))
 
 ## studies of interest
-ages <- aedd[aedd$metric == 'first calf age min' |
-               aedd$metric == 'first calf age mean' |
-               aedd$metric == 'first calf age median' |
-               aedd$metric == 'first calf age log_mean' |
-               aedd$metric == 'population size' |
-               aedd$metric == 'life span max',
-             c(1,6,7,8,13,14,22)]
-colnames(ages)
-#rm(aedd)
-
-## minimum age first calf: estimate = censored age, 31 elephants made it to at least 9 -- all individuals in study birthed, minimum age was 9, therefore all reached at least 9 years old
-fca_min <- ages[ages$metric == 'first calf age min',]
-fca_min
-fca_min_cens <- data.frame(age = rep(NA, nrow(fca_min)),
-                           sex = rep(NA, nrow(fca_min)),
-                           sid = rep(NA, nrow(fca_min)),
-                           loc = rep(NA, nrow(fca_min)))
-for(i in 1:nrow(fca_min)){
-  fca_min_cens$age[i] <- list(rep(fca_min$estimate[i], fca_min$sample_size[i]))
-  fca_min_cens$sex[i] <- list(rep(fca_min$sex[i], fca_min$sample_size[i]))
-  fca_min_cens$sid[i] <- list(rep(fca_min$study_id[i], fca_min$sample_size[i]))
-  fca_min_cens$loc[i] <- list(rep(fca_min$sitename[i], fca_min$sample_size[i]))
-}
-fca_min_cens_unlist <- data.frame(age = unlist(fca_min_cens$age),
-                                  alive = TRUE,
-                                  cens = 1,
-                                  sex = unlist(fca_min_cens$sex),
-                                  study_id = unlist(fca_min_cens$sid),
-                                  location = unlist(fca_min_cens$loc))
-rm(fca_min, fca_min_cens)
-
-## median age first calf: estimate = censored age, sample size/2 = number made it to at least that age -- median age for first calf, so at least half must have reached this age
-fca_mid <- ages[ages$metric == 'first calf age median',]
-fca_mid
-fca_mid_cens <- data.frame(age = rep(NA, nrow(fca_mid)),
-                           sex = rep(NA, nrow(fca_mid)),
-                           sid = rep(NA, nrow(fca_mid)),
-                           loc = rep(NA, nrow(fca_mid)))
-for(i in 1:nrow(fca_mid)){
-  fca_mid_cens$age[i] <- list(rep(fca_mid$estimate[i], fca_mid$sample_size[i]/2))
-  fca_mid_cens$sex[i] <- list(rep(fca_mid$sex[i], fca_mid$sample_size[i]/2))
-  fca_mid_cens$sid[i] <- list(rep(fca_mid$study_id[i], fca_mid$sample_size[i]/2))
-  fca_mid_cens$loc[i] <- list(rep(fca_mid$sitename[i], fca_mid$sample_size[i]/2))
-}
-fca_mid_cens_unlist <- data.frame(age = unlist(fca_mid_cens$age),
-                                  alive = TRUE,
-                                  cens = 1,
-                                  sex = unlist(fca_mid_cens$sex),
-                                  study_id = unlist(fca_mid_cens$sid),
-                                  location = unlist(fca_mid_cens$loc))
-
-rm(fca_mid, fca_mid_cens)
-
-## mean age first calf: estimate = censored age, sample size 1 if not indicated, not sure if it is. remove study which is also present in fca_mid to avoid including same elephants twice. approximately half will have birthed above average age, therefore reasonable to assume that at least half survived to this age. if no sample size given, only include as a single record
-fca_mean <- ages[ages$metric == 'first calf age mean' & ages$study_id != 3891,]
-fca_mean
-fca_mean$sex <- 'female'
-fca_mean$sample_size[is.na(fca_mean$sample_size)] <- 1
-fca_mean_cens <- data.frame(age = rep(NA, nrow(fca_mean)),
-                            sex = rep(NA, nrow(fca_mean)),
-                            sid = rep(NA, nrow(fca_mean)),
-                            loc = rep(NA, nrow(fca_mean)))
-for(i in 1:nrow(fca_mean)){
-  fca_mean_cens$age[i] <- list(rep(fca_mean$estimate[i],
-                                   ifelse(fca_mean$sample_size[i] > 1,
-                                          fca_mean$sample_size[i]/2,
-                                          fca_mean$sample_size[i])))
-  fca_mean_cens$sex[i] <- list(rep(fca_mean$sex[i],
-                                   ifelse(fca_mean$sample_size[i] > 1,
-                                          fca_mean$sample_size[i]/2,
-                                          fca_mean$sample_size[i])))
-  fca_mean_cens$sid[i] <- list(rep(fca_mean$study_id[i],
-                                   ifelse(fca_mean$sample_size[i] > 1,
-                                          fca_mean$sample_size[i]/2,
-                                          fca_mean$sample_size[i])))
-  fca_mean_cens$loc[i] <- list(rep(fca_mean$sitename[i],
-                                   ifelse(fca_mean$sample_size[i] > 1,
-                                          fca_mean$sample_size[i]/2,
-                                          fca_mean$sample_size[i])))
-}
-fca_mean_cens_unlist <- data.frame(age = unlist(fca_mean_cens$age),
-                                   alive = TRUE,
-                                   cens = 1,
-                                   sex = unlist(fca_mean_cens$sex),
-                                   study_id = unlist(fca_mean_cens$sid),
-                                   location = unlist(fca_mean_cens$loc))
-rm(fca_mean, fca_mean_cens)
-
-## log means age first calf: as above, but anti-log estimate first
-fca_lmean <- ages[ages$metric == 'first calf age log_mean',]
-fca_lmean$exp_estimate <- round(exp(fca_lmean$estimate),1)
-fca_lmean
-fca_lmean_cens <- data.frame(age = rep(NA, nrow(fca_lmean)),
-                             sex = rep(NA, nrow(fca_lmean)),
-                             sid = rep(NA, nrow(fca_lmean)),
-                             loc = rep(NA, nrow(fca_lmean)))
-for(i in 1:nrow(fca_lmean)){
-  fca_lmean_cens$age[i] <- list(rep(fca_lmean$exp_estimate[i], fca_lmean$sample_size[i]/2))
-  fca_lmean_cens$sex[i] <- list(rep(fca_lmean$sex[i], fca_lmean$sample_size[i]/2))
-  fca_lmean_cens$sid[i] <- list(rep(fca_lmean$study_id[i], fca_lmean$sample_size[i]/2))
-  fca_lmean_cens$loc[i] <- list(rep(fca_lmean$sitename[i], fca_lmean$sample_size[i]/2))
-}
-fca_lmean_cens_unlist <- data.frame(age = unlist(fca_lmean_cens$age),
-                                    alive = TRUE,
-                                    cens = 1,
-                                    sex = unlist(fca_lmean_cens$sex),
-                                    study_id = unlist(fca_lmean_cens$sid),
-                                    location = unlist(fca_lmean_cens$loc))
-rm(fca_lmean, fca_lmean_cens)
-
-## maximum life span: estimate = uncensored age, but only for a single individual (199 animals in study, but only one reached this age)
-lsm <- ages[ages$metric == 'life span max',]
-lsm
-lsm_cens_unlist <- data.frame(age = lsm$estimate,
-                              alive = FALSE,
-                              cens = 0,
-                              sex = lsm$sex,
-                              study_id = lsm$study_id,
-                              location = lsm$sitename)
-rm(lsm)
+aedd <- aedd[aedd$metric == 'population size', c(1,6,7,8,13,14,22)]
+colnames(aedd)
 
 ## population size: estimate = number observed to reach minimum age (censor at min or median?)
-ps <- ages[ages$metric == 'population size' & !is.na(ages$age_reported),]
-unique(ps$age_reported)
-ps$age <- with(ps,
-               case_when(#age_reported == 'calf'    ~ min(x = c(0,5)),
-                 #age_reported == 'juvenile' ~ min(x = c(5,10)),
-                 #age_reported == 'halfgrown' ~ min(x = c(10,20)),
-                 #age_reported == 'sexually_immature' ~ min(x = c(10,20)),
-                 #age_reported == 'sexually_mature' ~ min(x = c(20,30)),
-                 #age_reported == 'fullgrown' ~ min(x = c(20,50)),
-                 #age_reported == 'adult'   ~ min(x = c(20,50)),
-                 age_reported == '<1'      ~ min(x = c(0.1,1)),
-                 age_reported == '0-1'     ~ min(x = c(0.1,1)),
-                 age_reported == '0-4.9'   ~ min(x = c(0.1,4.9)),
-                 age_reported == '0-5'     ~ min(x = c(0.1,5)),
-                 age_reported == '<10'     ~ min(x = c(0.1,10)),
-                 age_reported == '1-11'    ~ min(x = c(1,11)),
-                 age_reported == '1-12'    ~ min(x = c(1,12)),
-                 age_reported == '4-10'    ~ min(x = c(4,10)),
-                 age_reported == '5-9.9'   ~ min(x = c(5,9.9)),
-                 age_reported == '6-15'    ~ min(x = c(6,15)),
-                 age_reported == '10-14.9' ~ min(x = c(10,14.9)),
-                 age_reported == '10-20'   ~ min(x = c(10,20)),
-                 age_reported == '15-19.9' ~ min(x = c(15,19.9)),
-                 age_reported == '16-30'   ~ min(x = c(16,30)),
-                 age_reported == '20-24.9' ~ min(x = c(20,24.9)),
-                 age_reported == '20-42'   ~ min(x = c(20,42)),
-                 age_reported == '25-34.9' ~ min(x = c(25,34.9)),
-                 age_reported == '35-39.9' ~ min(x = c(35,39.9)),
-                 age_reported == '25-29.9' ~ min(x = c(10,20)),
-                 age_reported == '30-34.9' ~ min(x = c(30,34.9)),
-                 age_reported == '20-34.9' ~ min(x = c(20,34.9)),
-                 age_reported == '35-49.9' ~ min(x = c(35,49.9)),
-                 age_reported == '>30'     ~ min(x = c(30,65)),
-                 age_reported == '5-10'    ~ min(x = c(5,10)),
-                 age_reported == '10-15'   ~ min(x = c(10,15)),
-                 age_reported == '15-20'   ~ min(x = c(15,20)),
-                 age_reported == '20-25'   ~ min(x = c(20,25)),
-                 age_reported == '25-30'   ~ min(x = c(25,30)),
-                 age_reported == '30-35'   ~ min(x = c(30,35)),
-                 age_reported == '35-40'   ~ min(x = c(35,40)),
-                 age_reported == '40-45'   ~ min(x = c(40,45)),
-                 age_reported == '>40'     ~ min(x = c(40,65)),
-                 age_reported == '45-50'   ~ min(x = c(45,50)),
-                 age_reported == '50-55'   ~ min(x = c(50,55)),
-                 age_reported == '>50'     ~ min(x = c(50,65)),
-                 age_reported == '55-60'   ~ min(x = c(55,60)),
-                 age_reported == '60-65'   ~ min(x = c(60,65))))
-ps <- ps[!is.na(ps$age),]
-ps
-ps_cens <- data.frame(age = rep(NA, nrow(ps)),
-                      sex = rep(NA, nrow(ps)),
-                      sid = rep(NA, nrow(ps)),
-                      loc = rep(NA, nrow(ps)))
-for(i in 1:nrow(ps)){
-  ps_cens$age[i] <- list(rep(ps$age[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
-  ps_cens$sex[i] <- list(rep(ps$sex[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
-  ps_cens$sid[i] <- list(rep(ps$study_id[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
-  ps_cens$loc[i] <- list(rep(ps$sitename[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
-}
-ps_cens_unlist <- data.frame(age = unlist(ps_cens$age),
-                             alive = TRUE,
-                             cens = 1,
-                             sex = unlist(ps_cens$sex),
-                             study_id = unlist(ps_cens$sid),
-                             location = unlist(ps_cens$loc))
-rm(ps, ps_cens)
-
-age_cens <- rbind(fca_min_cens_unlist, fca_mid_cens_unlist, fca_mean_cens_unlist, fca_lmean_cens_unlist, lsm_cens_unlist, ps_cens_unlist)
-rm(fca_min_cens_unlist, fca_mid_cens_unlist, fca_mean_cens_unlist, fca_lmean_cens_unlist, lsm_cens_unlist, ps_cens_unlist, i)
-
-#####
-## annual mortality rate: estimate = proportion of elephants in that age category found dead that year -- can only include those with a recorded sample size, else any kind of simulated individuals would contribute a weird amount to the final total
-amr <-  ages[!is.na(ages$age_reported) & ages$metric == 'annual mortality rate',]
-amr
-amr$sim_sample <- round(10-10*amr$estimate,0)
-
-
-
-
-
-s <-    ages[!is.na(ages$age_reported) & ages$metric == 'survivorship',]           # estimate = proportion of the population that survives up to a given age
-sd <-   ages[!is.na(ages$age_reported) & ages$metric == 'survivorship: drought in first two years',]      # estimate = proportion of the population that survives up to a given age for elephants that experienced a drought year in the first two years of their life
-snd <-  ages[!is.na(ages$age_reported) & ages$metric == 'survivorship: no drought in first two years',]   # estimate = proportion of the population that survives up to a given age for elephants that did not experience a drought year in the first two years of their life -- same study as that looking at drought in first two years, but no crossover with survivorship studies that ignore drought. All three can be included?
-pgb <-  ages[!is.na(ages$age_reported) & ages$metric == 'probability of giving birth',]                   # sample size indicates the number of individuals in the study that reached each age category -- censor at minimum?
-cp <-   ages[!is.na(ages$age_reported) & ages$metric == 'carcass proportion',]   # estimate = number of carcasses of a given age(-class) and/or sex divided by the number of all carcasses
-##### old ####
-# including reported ages
-ages_reported <- aedd[!is.na(aedd$age_reported), c(1,3,5,6,7,8,13,14,15,22)]
-str(ages_reported)
-table(ages_reported$metric)
-table(ages_reported$age_reported)          # every study uses a different format depending on focus
-length(unique(ages_reported$age_reported)) # 877 different values
-
-ages_reported <- separate(ages_reported, age_reported, sep = '>', into = c('min_age','value'), remove = F) # if age is reported as >x, then x is minimum age it might have lived to -- censor at x
-ages_reported$min_age <- ifelse(ages_reported$min_age == '', ages_reported$value, ages_reported$min_age)
-ages_reported <- ages_reported %>% select(-value)
-
-ages_reported <- separate(ages_reported, min_age, sep = '<', into = c('max_age','value'), remove = F)      # if age is reported as <x, then x is maximum age and can't assume it actually reached that age -- subtract 1
-ages_reported$max_age <- ifelse(ages_reported$max_age == '', as.numeric(ages_reported$value) - 1, ages_reported$max_age)
-ages_reported <- ages_reported %>% select(-value)
-
-ages_reported <- separate(ages_reported, max_age, sep = '-', into = c('lwr_age','upr_age'), remove = F)    # split age ranges up to give a maximum and minimum possible.
-ages_reported$upr_age <- ifelse(is.na(ages_reported$upr_age) == TRUE, ages_reported$lwr_age, ages_reported$upr_age)
-length(unique(ages_reported$upr_age))
-
-str(ages_reported$upr_age)
-ages_reported$age_all <- ifelse(ages_reported$upr_age == "calf",                 median(x = c(0,5)),
-                                ifelse(ages_reported$upr_age == "infant",               median(x = c(0,5)),
-                                       ifelse(ages_reported$upr_age == "juvenile; infant",     median(x = c(0,10)),
-                                              ifelse(ages_reported$upr_age == "offspring",            median(x = c(0,10)),
-                                                     ifelse(ages_reported$upr_age == "young",                median(x = c(0,25)),
-                                                            ifelse(ages_reported$upr_age == "juvenile",             median(x = c(5,10)),
-                                                                   ifelse(ages_reported$upr_age == "halfgrown",            median(x = c(5,15)),
-                                                                          ifelse(ages_reported$upr_age == "juvenile; subadult",   median(x = c(5,15)),
-                                                                                 ifelse(ages_reported$upr_age == "sexually_immature",    median(x = c(5,20)),
-                                                                                        ifelse(ages_reported$upr_age == "subadult",             median(x = c(10,20)),
-                                                                                               ifelse(ages_reported$upr_age == "intermediate",         median(x = c(10,25)),
-                                                                                                      ifelse(ages_reported$upr_age == "subadult; adult",      median(x = c(15,25)),
-                                                                                                             ifelse(ages_reported$upr_age == "sexually_mature",      median(x = c(15,30)),
-                                                                                                                    ifelse(ages_reported$upr_age == "fullgrown",            median(x = c(20,30)),
-                                                                                                                           ifelse(ages_reported$upr_age == "adult",                median(x = c(20,50)),
-                                                                                                                                  ifelse(ages_reported$upr_age == "old, nonreproductive", median(x = c(50,70)),
-                                                                                                                                         ifelse(ages_reported$upr_age == "unknown",              NA,
-                                                                                                                                                ages_reported$upr_age)))))))))))))))))
-table(ages_reported$age_all)
-ages_reported$lwr_age <- as.numeric(ages_reported$lwr_age)
-ages_reported$upr_age <- as.numeric(ages_reported$upr_age)
-ages_reported$age <- NA
-for(i in 1:nrow(ages_reported)){
-  ages_reported$age[i] <- median(x = c(ages_reported$lwr_age[i], ages_reported$upr_age[i]))
-}
-
-ages_reported$censor <- 1    # censor = 1 when elephant is still alive -- database contains no information about whether individual is still alive or not, so assume all are alive
-
-# ages unreported
-ages_unrep <- aedd[is.na(aedd$age_reported), c(1,3,5,6,7,8,13,14,15,22)]
-str(ages_unrep)
-table(ages_unrep$metric)
-
-ages_unrep$age <- NA
-for(i in 1:nrow(ages_unrep)){
-  ages_unrep$age[i]
-}
-
-
-ages_unrep <- separate(ages_unrep, age_reported, sep = '>', into = c('min_age','value'), remove = F) # if age is reported as >x, then x is minimum age it might have lived to -- censor at x
-ages_unrep$min_age <- ifelse(ages_unrep$min_age == '', ages_unrep$value, ages_unrep$min_age)
-ages_unrep <- ages_unrep %>% select(-value)
-
-ages_unrep <- separate(ages_unrep, min_age, sep = '<', into = c('max_age','value'), remove = F)      # if age is reported as <x, then x is maximum age and can't assume it actually reached that age -- subtract 1
-ages_unrep$max_age <- ifelse(ages_unrep$max_age == '', as.numeric(ages_unrep$value) - 1, ages_unrep$max_age)
-ages_unrep <- ages_unrep %>% select(-value)
-
-ages_unrep <- separate(ages_unrep, max_age, sep = '-', into = c('lwr_age','upr_age'), remove = F)    # split age ranges up to give a maximum and minimum possible.
-ages_unrep$upr_age <- ifelse(is.na(ages_unrep$upr_age) == TRUE, ages_unrep$lwr_age, ages_unrep$upr_age)
-length(unique(ages_unrep$upr_age))
-
-str(ages_unrep$upr_age)
-ages_unrep$age_all <- ifelse(ages_unrep$upr_age == "calf",                 median(x = c(0,5)),
-                             ifelse(ages_unrep$upr_age == "infant",               median(x = c(0,5)),
-                                    ifelse(ages_unrep$upr_age == "juvenile; infant",     median(x = c(0,10)),
-                                           ifelse(ages_unrep$upr_age == "offspring",            median(x = c(0,10)),
-                                                  ifelse(ages_unrep$upr_age == "young",                median(x = c(0,25)),
-                                                         ifelse(ages_unrep$upr_age == "juvenile",             median(x = c(5,10)),
-                                                                ifelse(ages_unrep$upr_age == "halfgrown",            median(x = c(5,15)),
-                                                                       ifelse(ages_unrep$upr_age == "juvenile; subadult",   median(x = c(5,15)),
-                                                                              ifelse(ages_unrep$upr_age == "sexually_immature",    median(x = c(5,20)),
-                                                                                     ifelse(ages_unrep$upr_age == "subadult",             median(x = c(10,20)),
-                                                                                            ifelse(ages_unrep$upr_age == "intermediate",         median(x = c(10,25)),
-                                                                                                   ifelse(ages_unrep$upr_age == "subadult; adult",      median(x = c(15,25)),
-                                                                                                          ifelse(ages_unrep$upr_age == "sexually_mature",      median(x = c(15,30)),
-                                                                                                                 ifelse(ages_unrep$upr_age == "fullgrown",            median(x = c(20,30)),
-                                                                                                                        ifelse(ages_unrep$upr_age == "adult",                median(x = c(20,50)),
-                                                                                                                               ifelse(ages_unrep$upr_age == "old, nonreproductive", median(x = c(50,70)),
-                                                                                                                                      ifelse(ages_unrep$upr_age == "unknown",              NA,
-                                                                                                                                             ages_unrep$upr_age)))))))))))))))))
-table(ages_unrep$age_all)
-ages_unrep$lwr_age <- as.numeric(ages_unrep$lwr_age)
-ages_unrep$upr_age <- as.numeric(ages_unrep$upr_age)
-ages_unrep$age <- NA
-for(i in 1:nrow(ages_unrep)){
-  ages_unrep$age[i] <- median(x = c(ages_unrep$lwr_age[i], ages_unrep$upr_age[i]))
-}
-
-ages_unrep$censor <- 1    # censor = 1 when elephant is still alive -- database contains no information about whether individual is still alive or not, so assume all are alive
-
-
-##### continue ####
-# clean up
-colnames(age_cens)[3] <- 'censor'
-age_cens$sex <- ifelse(age_cens$sex == 'female', 'F', 'M')
-age_cens$location_id <- as.integer(as.factor(age_cens$location))
-sort(unique(age_cens$location)) # many different studies based on Amboseli: a) don't add in extra Amboseli data and b) should it be just one or is this biasing it towards the Amboseli shape?
-
-### estimate Weibull distribution -- new, but still shit ####
-length(which(age_cens$age == 0))
-
-# Examine default brms priors (all elephants together)
-bfit_default <- age_cens %>%
-  brm(age | cens(censor) ~ 1,
-      data = ., family = "weibull", 
-      chains = 4, cores = 4)
-prior_summary(bfit_default)
-# Defaults
-#intercept - student_t(3, 1.6, 2.5)
-#shape - gamma(0.01, 0.01)
-plot(bfit_default) # shape max >600
-
-# Prior predictive check
-num_samples <- 500
-
-# Default priors
-prior_intercept <- rstudent_t(num_samples, 3, 1.6, 2.5)
-prior_shape <- rgamma(num_samples, 0.01, 0.01)
-prior_scale <- exp(prior_intercept) / (gamma(1 + 1 / prior_shape))
-
-hist(prior_shape)
-hist(prior_scale[prior_scale<100])
-
-probs <- dweibull(1:100, shape = prior_shape[1], scale = prior_scale[1])
-probs <- probs / sum(probs)
-plot(probs, type="l", lwd=0.5, ylim = c(0,1))
-for( i in 2:num_samples) {
-  probs <- dweibull(1:100, shape = prior_shape[i], scale = prior_scale[i])
-  probs <- probs / sum(probs)
-  lines(probs, lwd=0.5)
-}
-
-# Priors used
-prior_intercept <- rstudent_t(num_samples, 3, 5, 5)
-prior_shape <- rexp(num_samples, 0.5)
-prior_scale <- exp(prior_intercept) / (gamma(1 + 1 / prior_shape))
-
-hist(prior_shape)
-hist(prior_scale[prior_scale<100])
-
-probs <- dweibull(1:100, shape = prior_shape[1], scale = prior_scale[1])
-probs <- probs / sum(probs)
-plot(probs, type="l", lwd=0.5, ylim = c(0,1))
-for( i in 2:num_samples) {
-  probs <- dweibull(1:100, shape = prior_shape[i], scale = prior_scale[i])
-  probs <- probs / sum(probs)
-  lines(probs, lwd=0.5)
-}
-
-# Run model for male elephants with slightly better priors
-bfit <- age_cens %>% 
-  brm(age | cens(censor) ~ 1,
-      prior = c(
-        prior(student_t(3,5,5), class = Intercept),
-        prior(exponential(0.5), class = shape)
-      ),
-      data = ., family = "weibull", 
-      chains = 4, cores = 4)
-plot(bfit)  # much shorter shape tail, but a lot wider distribution
-
-# extract scale and shape from posterior draws
-# to convert to scale we need to both undo the link function by taking the exponent
-# and then refer to the brms documentation to understand how the mean relates to the scale
-bfit_draws <- as_draws_df(bfit) %>%
-  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape)))
-
-est_shape <- mean(bfit_draws$shape)  # 6.72
-est_scale <- mean(bfit_draws$scale)  # 4279.97?!!
-
-# posterior predictive plot based on the mean
-probs <- dweibull(1:100, shape = est_shape, scale = est_scale)
-probs <- probs / sum(probs)
-plot(probs) 
-
-# simulate ages for 3k elephants
-hist(rweibull(3000,est_shape,est_scale)) # horrendous -- left skewed not right, peaking ay 4500 years old!)
-
-#### Age estimation for mega data set based on Amboseli distribution ####
-## population size: estimate = number observed to reach minimum age (censor at min or median?)
-ps <- ages[ages$metric == 'population size' & !is.na(ages$age_reported),]
+ps <- aedd[!is.na(aedd$age_reported),]
 unique(ps$age_reported)
 ps$min <- with(ps, case_when(age_reported == '<1'      ~ min(x = c(0.1,1)),
                              age_reported == '0-1'     ~ min(x = c(0.1,1)),
@@ -934,37 +450,255 @@ ps$age <- with(ps, case_when(age_reported == '<1'      ~ '0-5',
 unique(ps$age)
 ps <- ps[ps$age != 'NA',]
 ps
+ps$age_censor <- ifelse(ps$age == '0-5', 1,
+                        ifelse(ps$age == '5-10', 5,
+                               ifelse(ps$age == '10-15', 10,
+                                      ifelse(ps$age == '15-20', 15,
+                                             ifelse(ps$age == '20-25', 20,
+                                                    ifelse(ps$age == '25-40', 25,
+                                                           ifelse(ps$age == '40+', 40,
+                                                                  ifelse(ps$age == '20-35', 20,
+                                                                         ifelse(ps$age == '35-50', 35,
+                                                                                ifelse(ps$age == '50+', 50, NA))))))))))
+
 ps_cens <- data.frame(age = rep(NA, nrow(ps)),
                       sex = rep(NA, nrow(ps)),
                       sid = rep(NA, nrow(ps)),
                       loc = rep(NA, nrow(ps)))
 for(i in 1:nrow(ps)){
-  ps_cens$age[i] <- list(rep(ps$age[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
+  ps_cens$age[i] <- list(rep(ps$age_censor[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
   ps_cens$sex[i] <- list(rep(ps$sex[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
   ps_cens$sid[i] <- list(rep(ps$study_id[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
   ps_cens$loc[i] <- list(rep(ps$sitename[i], ifelse(ps$estimate[i] < 1, 0, ps$estimate[i])))
 }
-ps_cens_unlist <- data.frame(age = unlist(ps_cens$age),
-                             alive = TRUE,
-                             cens = 1,
-                             sex = unlist(ps_cens$sex),
-                             study_id = unlist(ps_cens$sid),
-                             location = unlist(ps_cens$loc))
+age_cens <- data.frame(age = unlist(ps_cens$age),
+                       alive = TRUE,
+                       cens = 1,
+                       sex = unlist(ps_cens$sex),
+                       study_id = unlist(ps_cens$sid),
+                       location = unlist(ps_cens$loc))
 rm(ps, ps_cens)
 
-ps_cens_unlist$k <- ifelse(ps_cens_unlist$age == '0-5', 1,
-                           ifelse(ps_cens_unlist$age == '5-10', 2,
-                                  ifelse(ps_cens_unlist$age == '10-15', 3,
-                                         ifelse(ps_cens_unlist$age == '15-20', 4,
-                                                ifelse(ps_cens_unlist$age == '20-25' | 
-                                                         ps_cens_unlist$age == '20-35', 5,
-                                                       ifelse(ps_cens_unlist$age == '25-40' | 
-                                                                ps_cens_unlist$age == '35-50', 6, 7))))))
-unique(ps_cens_unlist$k)
+age_cens$k <- ifelse(age_cens$age == 1, 1,
+                     ifelse(age_cens$age == 5, 2,
+                            ifelse(age_cens$age == 10, 3,
+                                   ifelse(age_cens$age == 15, 4,
+                                          ifelse(age_cens$age == 20, 5,
+                                                 ifelse(age_cens$age == 25 | 
+                                                          age_cens$age == 35, 6, 7))))))
+unique(age_cens$k)
 
+# clean up
+colnames(age_cens)[3] <- 'censor'
+age_cens$sex <- ifelse(is.na(age_cens$sex), 'U', ifelse(age_cens$sex == 'female', 'F', 'M'))
+age_cens$location_id <- as.integer(as.factor(age_cens$location))
+sort(unique(age_cens$location)) # should we remove the Amboseli study from this given that that is already included in the prior, or retain it?
+
+#### improve Weibull distribution parameters for prior -- https://statwonk.com/bayesian-right-censored-weibull-model.html ####
+length(which(age_cens$age == 0))
+
+# Priors used
+summary(Wb.Si)
+num_samples <- 500
+prior_intercept <- rnorm(num_samples, Wb.Si$coefficients[3,1], Wb.Si$coefficients[3,2]) # parameter pi.1972
+prior_shape <- rnorm(num_samples, Wb.Si$coefficients[2,1], Wb.Si$coefficients[2,2])     # parameter b1
+prior_scale1 <- exp(prior_intercept) / (gamma(1 + 1 / prior_shape))                     # Formula Dan previously used. Output values are REALLY tiny
+prior_scale2 <- rnorm(num_samples, Wb.Si$coefficients[1,1], Wb.Si$coefficients[1,2])    # parameter b0
+
+hist(prior_intercept)
+hist(prior_shape)
+hist(prior_scale1)
+hist(prior_scale2)
+
+probs <- dweibull(1:100, shape = prior_shape[1], scale = prior_scale2[1])
+probs <- probs / sum(probs)
+plot(probs, type = "l", lwd = 0.5, ylim = c(0,1), las = 1)
+for( i in 2:num_samples) {
+  probs <- dweibull(1:100, shape = prior_shape[i], scale = prior_scale2[i])
+  probs <- probs / sum(probs)
+  lines(probs, lwd=0.5)
+} # this just shows that everything will be dead by age 5? no variation at all -- coefficients are SE not SD --> tried multiplying by sqrt(iter/2) but gave same shape graphs
+
+# Run model for male elephants with Amboseli priors
+exp(Wb.Si$coefficients[3,1]) # pi.1972 mean -- exponentiated because one of Dan's emails mentioned that these would be on the log scale, but I actually think he was walking about something else! These don't make sense as reasonable parameters though... log scale or not!
+exp(Wb.Si$coefficients[3,2]) # pi.1972 SE
+exp(Wb.Si$coefficients[2,1]) # b1 mean
+exp(Wb.Si$coefficients[2,2]) # b1 SD
+
+hist(age_cens$age)
+
+bfit <- age_cens %>% 
+  brm(age | cens(censor) ~ 1,
+      prior = c(
+        prior(normal(0.4928, 0.00476), class = Intercept), # values from pi.1972
+        prior(normal(0.0318, 0.000585), class = shape)     # values from b1
+      ),
+      data = ., family = "weibull", 
+      chains = 4, cores = 4)
+plot(bfit)
+
+as_sample_tibble(bfit) %>%
+  mutate_at(vars(b_Intercept), exp) %>%
+  ggplot(aes(x = b_Intercept, y = shape)) +
+  geom_density_2d(colour = "red", size = 1) +
+  geom_point(alpha = 0.1) +
+  #geom_hline(yintercept = 3.35, colour = "blue") +
+  #geom_vline(xintercept = 170, colour = "blue") +
+  geom_hline(yintercept = 0.0835, colour = "blue") +
+  geom_vline(xintercept = 1.6875, colour = "blue") +
+  xlab("Scale") +
+  ylab("Shape") +
+  ggtitle("Right-censored weibull(shape, scale)") +
+  theme_fivethirtyeight()
+
+# extract scale and shape from posterior draws
+# to convert to scale we need to both undo the link function by taking the exponent
+# and then refer to the brms documentation to understand how the mean relates to the scale
+bfit_draws <- as_draws_df(bfit) %>%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape)))
+
+est_shape <- mean(bfit_draws$shape)  # 0.40977
+est_scale <- mean(bfit_draws$scale)  # 0.57311
+
+# posterior predictive plot based on the mean
+probs <- dweibull(1:100, shape = est_shape, scale = est_scale)
+probs <- probs / sum(probs)
+plot(probs, type = 'l') ; abline(h = 0, lty = 2) # all dead by 40, almost all by 20
+
+# simulate ages for 3k elephants
+hist(rweibull(3000,est_shape,est_scale), ylim = c(0,20),
+     #xlim = c(0,50),
+     breaks = 1000) # early death rate much too high, up to 150 years
+
+#### I don't think it works to use basta again to refine the parameters, because these are also categories -- ignore this section ####
+rethinking::dens(rweibull(1000, Wb.Si$coefficients[2,1], Wb.Si$coefficients[1,1]))
+rethinking::dens(rweibull(1000, Wb.Si$coefficients[1,1], Wb.Si$coefficients[2,1]))
+
+weibull <- function(b0, b1, age){
+  y <- (b0) * (b1^b0) * (age^(b0-1))
+  return(y)
+}
+mortality <- weibull(b0 = Wb.Si$coefficients[1,1],
+                     b1 = Wb.Si$coefficients[2,1],
+                     age = 1:70)
+plot(mortality)
+
+max(age_cens$age)
+aedd_basta <- data.frame(id = 1:nrow(age_cens),
+                         byr = 2000-age_cens$age,
+                         dyr = rep(0,nrow(age_cens)))
+aedd_basta$obs_1950 <- NA ; aedd_basta$obs_1951 <- NA ; aedd_basta$obs_1952 <- NA ; aedd_basta$obs_1953 <- NA ; aedd_basta$obs_1954 <- NA ; aedd_basta$obs_1955 <- NA ; aedd_basta$obs_1956 <- NA ; aedd_basta$obs_1957 <- NA ; aedd_basta$obs_1958 <- NA ; aedd_basta$obs_1959 <- NA ; aedd_basta$obs_1960 <- NA ; aedd_basta$obs_1961 <- NA ; aedd_basta$obs_1962 <- NA ; aedd_basta$obs_1963 <- NA ; aedd_basta$obs_1964 <- NA ; aedd_basta$obs_1965 <- NA ; aedd_basta$obs_1966 <- NA ; aedd_basta$obs_1967 <- NA ; aedd_basta$obs_1968 <- NA ; aedd_basta$obs_1969 <- NA ; aedd_basta$obs_1970 <- NA ; aedd_basta$obs_1971 <- NA ; aedd_basta$obs_1972 <- NA ; aedd_basta$obs_1973 <- NA ; aedd_basta$obs_1974 <- NA ; aedd_basta$obs_1975 <- NA ; aedd_basta$obs_1976 <- NA ; aedd_basta$obs_1977 <- NA ; aedd_basta$obs_1978 <- NA ; aedd_basta$obs_1979 <- NA ; aedd_basta$obs_1980 <- NA ; aedd_basta$obs_1981 <- NA ; aedd_basta$obs_1982 <- NA ; aedd_basta$obs_1983 <- NA ; aedd_basta$obs_1984 <- NA ; aedd_basta$obs_1985 <- NA ; aedd_basta$obs_1986 <- NA ; aedd_basta$obs_1987 <- NA ; aedd_basta$obs_1988 <- NA ; aedd_basta$obs_1989 <- NA ; aedd_basta$obs_1990 <- NA ; aedd_basta$obs_1991 <- NA ; aedd_basta$obs_1992 <- NA ; aedd_basta$obs_1993 <- NA ; aedd_basta$obs_1994 <- NA ; aedd_basta$obs_1995 <- NA ; aedd_basta$obs_1996 <- NA ; aedd_basta$obs_1997 <- NA ; aedd_basta$obs_1998 <- NA ; aedd_basta$obs_1999 <- NA ; aedd_basta$obs_2000 <- NA
+
+for(i in 1:nrow(aedd_basta)){
+  for(j in 4:ncol(aedd_basta)){
+    aedd_basta[i,j] <- ifelse(aedd_basta$byr[i] < j + 1946, 1, 0)
+  }
+}
+
+pM <-  c(Wb.Si$coefficients[1,1], Wb.Si$coefficients[2,1])
+pSD <- c(Wb.Si$coefficients[1,2], Wb.Si$coefficients[2,2])
+
+sim <- 1 ; iter <- 500 ; warmup <- iter/2 ; thin <- 10
+
+Wb.Si.updated <- basta(aedd_basta, studyStart = 1950,
+                       studyEnd = 2000, nsim = sim, niter = iter,
+                       burnin = warmup, thinning = thin,
+                       thetaPriorMean = pM,thetaPriorSd = pSD,
+                       model = "WE", shape = c("simple"))
+summary(Wb.Si.updated)
+plot(Wb.Si.updated)                       # Plot traces
+plot(Wb.Si.updated, plot.trace = FALSE)   # Plot survival and mortality curves
+
+#### improve Gompertz bathtub distribution parameters for prior ####
+# Priors used
+summary(Go.Bt)
+num_samples <- 500
+prior_a0 <- rnorm(num_samples, Go.Bt$coefficients[1,1], Go.Bt$coefficients[1,2])        # parameter a1
+prior_a1 <- rnorm(num_samples, Go.Bt$coefficients[2,1], Go.Bt$coefficients[2,2])        # parameter a0
+prior_c  <- rnorm(num_samples, Go.Bt$coefficients[3,1], Go.Bt$coefficients[3,2])        # parameter c
+prior_b0 <- rnorm(num_samples, Go.Bt$coefficients[4,1], Go.Bt$coefficients[4,2])        # parameter b1
+prior_b1 <- rnorm(num_samples, Go.Bt$coefficients[5,1], Go.Bt$coefficients[5,2])        # parameter b0
+prior_intercept <- rnorm(num_samples, Go.Bt$coefficients[6,1], Go.Bt$coefficients[6,2]) # parameter pi.1972
+
+hist(prior_a0)
+hist(prior_a1)
+hist(prior_c)
+hist(prior_b0)
+hist(prior_b1)
+hist(prior_intercept)
+
+gompertz <- function(b0, b1, age){
+  y <- exp(b0 + b1*age)
+  return(y)
+}
+gompertz_bt <- function(a0, a1, c, b0, b1, age){
+  gompertz <- gompertz(b0, b1, age)
+  bathtub <- exp(a0 - a1*age) + c + gompertz
+  return(bathtub)
+}
+mortality <- gompertz_bt(a0 = Go.Bt$coefficients[1,1],
+                         a1 = Go.Bt$coefficients[2,1],
+                         c  = Go.Bt$coefficients[3,1],
+                         b0 = Go.Bt$coefficients[4,1],
+                         b1 = Go.Bt$coefficients[5,1],
+                         1:60)  ; plot(mortality) # no infant mortality, could this be because ATE only supplied sightings data for post-independence?
+
+# Run model for male elephants with Amboseli priors
+Go.Bt$coefficients[1,1]
+Go.Bt$coefficients[1,2]
+Go.Bt$coefficients[2,1]
+Go.Bt$coefficients[2,2]
+Go.Bt$coefficients[3,1]
+Go.Bt$coefficients[3,2]
+Go.Bt$coefficients[4,1]
+Go.Bt$coefficients[4,2]
+Go.Bt$coefficients[5,1]
+Go.Bt$coefficients[5,2]
+
+hist(age_cens$age)
+
+bfit <- age_cens %>% 
+  brm(age | cens(censor) ~ 1,
+      prior = c(
+        prior(normal(), class = Intercept), # values from pi.1972
+        prior(normal(), class = shape)      # values from b0
+      ),
+      data = ., family = "SIMPLE GOMPERTZ AND BOTH BATHTUBS DON'T APPEAR TO BE OPTIONS", 
+      chains = 4, cores = 4)
+plot(bfit)
+
+as_sample_tibble(bfit) %>%
+  mutate_at(vars(b_Intercept), exp) %>%
+  ggplot(aes(x = b_Intercept, y = shape)) +
+  geom_density_2d(colour = "red", size = 1) +
+  geom_point(alpha = 0.1) +
+  geom_hline(yintercept = 3.35, colour = "blue") +
+  geom_vline(xintercept = 170, colour = "blue") +
+  xlab("Scale") +
+  ylab("Shape") +
+  ggtitle("Right-censored weibull(shape, scale)") +
+  theme_fivethirtyeight()
+
+# extract scale and shape from posterior draws
+# to convert to scale we need to both undo the link function by taking the exponent
+# and then refer to the brms documentation to understand how the mean relates to the scale
+bfit_draws <- as_draws_df(bfit) %>%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape)))
+
+est_shape <- mean(bfit_draws$shape)  # 0.40977
+est_scale <- mean(bfit_draws$scale)  # 0.57311
+
+# posterior predictive plot based on the mean
+probs <- dweibull(1:100, shape = est_shape, scale = est_scale)
+probs <- probs / sum(probs)
+plot(probs, type = 'l') ; abline(h = 0, lty = 2) # all dead by 40, almost all by 20
+
+# simulate ages for 3k elephants
+hist(rweibull(3000,est_shape,est_scale)) # early death rate much too high, up to 150 years
+
+#### Age estimation for mega data set based on Amboseli distribution -- this is just to test quality of prior, not actually change anything in the values. Run this method for MOTNP after testing. ####
 ### create data lists 
-males <- ps_cens_unlist[ps_cens_unlist$sex == 'M',]   ; males   <-   males[!is.na(males$age),]
-females <- ps_cens_unlist[ps_cens_unlist$sex == 'F',] ; females <- females[!is.na(females$age),]
+males <- age_cens[age_cens$sex == 'M',]   ; males   <-   males[!is.na(males$age),]
 
 # Males
 N_m <- nrow(males)                     # Number of individuals
@@ -974,16 +708,9 @@ males_ls <- list(
   K = K,
   age_category_index = males$k)        # age category
 
-# Females
-N_f <- nrow(females)                   # Number of individuals
-females_ls <- list(
-  N = N_f,
-  K = K,
-  age_category_index = females$k)      # age category
-
 ### 1) Fit male model of ages 
-# Shape = 1.29, scale = 29.5 (so we will use shape = 1.3 and scale = 30)
-aedd_male_age_ord_mod <- cmdstan_model("models/age_estimation/male_age_ordreg_22.03.31.stan")
+# Shape = 0.41, scale = 0.57
+aedd_male_age_ord_mod <- cmdstan_model("models/age_estimation/male_age_ordreg_22.05.24.stan")
 male_age_fit <- aedd_male_age_ord_mod$sample(
   data = males_ls, 
   chains = 4, 
@@ -992,7 +719,8 @@ male_age_fit <- aedd_male_age_ord_mod$sample(
 )
 
 # Examine the estimates.
-age_est_m <- male_age_fit$summary()[906:1809,]
+#age_est_m <- male_age_fit$summary()[906:1809,]
+age_est_m <- male_age_fit$summary()[2051:4099,]
 plot_male <- data.frame(age_cat = males_ls$age,         # Biologists original age est
                         model_age = age_est_m$mean)     # Mean modelled age
 plot_male %>%
@@ -1021,119 +749,29 @@ df_m %>% ggplot(aes(x=jitter(true_age), y=value, group=factor(id))) +
   geom_point(size=2,alpha=0.1) +
   geom_boxplot(aes(group = factor(true_age)), col = 'skyblue', fill = 'transparent') +
   geom_hline(yintercept=c(5,10,15,20,25,40), linetype="dashed", alpha=0.6) +
+  scale_y_continuous(limits = c(0,100)) +
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")
 summary(df_m$value[which(df_m$true_age == 7)])
-quantile(df_m$value[which(df_m$true_age == 7)], seq(0,1,0.01)) # top 3% over 70 years
-
-### 2) Fit female model of ages
-# Shape = 1.25, scale = 32.9 (so we will use shape = 1.3 and scale = 33)
-aedd_female_age_ord_mod <- cmdstan_model("models/age_estimation/female_age_ordreg_22.03.31.stan")
-female_age_fit <- aedd_female_age_ord_mod$sample(
-  data = females_ls, 
-  chains = 4, 
-  parallel_chains = 1,
-  iter_sampling = 2000
-)
-
-# Examine the estimates.
-age_est_f <- female_age_fit$summary()[N_f+2:2*N_f+3,]
-plot_female <- data.frame(age_cat = females_ls$age,         # Biologists original age est
-                          model_age = age_est_f$mean)     # Mean modelled age
-plot_female %>%
-  ggplot(aes(x = factor(age_cat), y = model_age)) +
-  geom_point(size = 4, alpha = 0.6) +
-  geom_hline(yintercept = c(5,10,15,20,35,50), linetype = "dashed", alpha = 0.6) +
-  theme_minimal() + 
-  xlab("Age category") + ylab("Modelled age") # plot the estimated ages against the biologist assigned ages
-
-# Now an equivalent posterior predictive plot from draws from the distribution to show uncertainty around the mean age (then need to do it with full uncertainty).
-true_ages_f <- female_age_fit$draws("true_age", format="df")
-true_ages_f <- true_ages_f[1:100,1:N_f]
-means_f <- apply(true_ages_f, 2, mean)
-stdevs_f <- apply(true_ages_f, 2, sd)
-
-summary(means_f)
-summary(stdevs_f)
-
-df_f <- as.data.frame(do.call(rbind, true_ages_f)) %>%
-  mutate(true_age = females_ls$age) %>%
-  relocate(true_age) %>%
-  mutate(id = 1:ncol(true_ages_f)) %>% # changed nrow to ncol, else it had to be the same number of draws as elephants
-  relocate(id)
-df_f <- df_f %>% pivot_longer(cols = 3:102) %>% dplyr::select(-name)
-df_f %>% ggplot(aes(x=jitter(true_age), y=value, group=factor(id))) +
-  geom_point(size=2,alpha=0.1) +
-  geom_boxplot(aes(group = factor(true_age)), col = 'magenta', fill = 'transparent') +
-  geom_hline(yintercept=c(5,10,15,20,35,50), linetype="dashed", alpha=0.6) +
-  theme_bw() + 
-  xlab("Assigned age") + ylab("Modelled age")
-summary(df_f$value[which(df_f$true_age == 7)])
-quantile(df_f$value[which(df_f$true_age == 7)], seq(0,1,0.01)) # top 6% over 75 years
-
-
-
-
-
-
-
-
-
-
-
-# Examine default brms priors (all elephants together)
-bfit_default <- age_cens %>%
-  brm(age_non0 | cens(censor) ~ 1,
-      data = ., family = "weibull", 
-      chains = 4, cores = 4)
-prior_summary(bfit_default)
-# Defaults
-#intercept - student_t(3, 2.9, 2.5)
-#shape - gamma(0.01, 0.01)
-plot(bfit_default) # shape max >600
-
-
-# Run model for male elephants with slightly better priors
-bfit <- age_cens %>% 
-  brm(age_non0 | cens(censor) ~ 1,
-      prior = c(
-        prior(student_t(3,5,5), class = Intercept),
-        prior(exponential(0.5), class = shape)
-      ),
-      data = ., family = "weibull", 
-      chains = 4, cores = 4)
-plot(bfit)  # looks very similar shape to the default one, but much shorter tail
-
-# extract scale and shape from posterior draws
-# to convert to scale we need to both undo the link function by taking the exponent
-# and then refer to the brms documentation to understand how the mean relates to the scale
-bfit_draws <- as_draws_df(bfit) %>%
-  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape)))
-
-est_shape <- mean(bfit_draws$shape)  # 3.47
-est_scale <- mean(bfit_draws$scale)  # 2.53
-
-# posterior predictive plot based on the mean
-probs <- dweibull(1:100, shape = est_shape, scale = est_scale)
-probs <- probs / sum(probs)
-plot(probs) 
-
-# simulate ages for 3k elephants
-hist(rweibull(3000,est_shape,est_scale)) # horrendous -- looks like a normal and the age values are insane (peaks at 2500000000000000000000000000000000000000 years old!)
-
-# Shape = 3.47, scale = 2.53 BUT histogram and distribution look terrible
+quantile(df_m$value[which(df_m$true_age == 7)], seq(0,1,0.01))
 
 ### Run on MOTNP data ####
 # read in male elephant data
 motnp <- read_csv('data_processed/motnp_elenodes_22.01.13.csv') %>% 
   filter(sex == 'M')
 
+sort(unique(motnp$age_category))
 motnp$age_cat <- ifelse(motnp$age_category == '40+', '7',
-                        ifelse(motnp$age_category == '25-40', '6',
+                        ifelse(motnp$age_category == '25-40','6',
                                ifelse(motnp$age_category == '20-25', '5',
-                                      ifelse(motnp$age_category == '16-20', '4',
+                                      ifelse(motnp$age_category == '15-19', '4',
                                              ifelse(motnp$age_category == '10-15', '3',
-                                                    ifelse(motnp$age_category == '6-9', '2', '1'))))))
+                                                    ifelse(motnp$age_category == '8-9', '2',
+                                                           ifelse(motnp$age_category == '7-8', '2',
+                                                                  ifelse(motnp$age_category == '6-7', '2',
+                                                                         ifelse(motnp$age_category == '5-6', '2',
+                                                                                '1')))))))))
+motnp$age_cat
 
 # create data list
 N <- nrow(motnp)                      # Number of individuals
@@ -1144,7 +782,7 @@ elephants_ls <- list(
   age_category_index = motnp$age_cat) # Age category
 
 # fit Stan model to estimate ages from the categories based on a Weibull distribution (for real data these will be centred on parameters from fitting to age estimates based on another elephant population)
-anp_age_ord_mod <- cmdstan_model("models/age_estimation/male_age_ordreg_test_22.04.04.stan")
+anp_age_ord_mod <- cmdstan_model("models/age_estimation/male_age_ordreg_test_22.05.25.stan")
 
 age_estimation_fit <- anp_age_ord_mod$sample(
   data = elephants_ls, 
@@ -1154,9 +792,8 @@ age_estimation_fit <- anp_age_ord_mod$sample(
 )
 
 # Examine the estimates.
-age_est_mat <- age_estimation_fit$summary()[1640:3277,]
+age_est_mat <- age_estimation_fit$summary()[247:491,]
 plot_data <- data.frame(age_cat = elephants_ls$age,                       # Biologists original age est
-                        age_true = males$age[!is.na(males$age_cat)],      # real age
                         model_age = age_est_mat$mean)                     # Mean modelled age
 plot_data %>%
   ggplot(aes(x = factor(age_cat), y = model_age)) +
@@ -1165,16 +802,9 @@ plot_data %>%
   theme_minimal() + 
   xlab("Assigned age") + ylab("Modelled age") # plot the estimated ages against the biologist assigned ages
 
-plot_data %>%
-  ggplot(aes(x = age_true, y = model_age)) +
-  geom_point(size = 4, alpha = 0.2) +
-  geom_vline(xintercept = c(5,10,15,20,25,40), linetype = "dashed", alpha = 0.6) +
-  theme_minimal() + 
-  xlab("Actual age") + ylab("Modelled age") # plot the estimated ages against the biologist assigned ages
-
 # Now an equivalent posterior predictive plot from draws from the distribution to show uncertainty around the mean age (then need to do it with full uncertainty).
-true_ages <- age_estimation_fit$draws("true_age", format="df")
-true_ages <- true_ages[1:100,1:N]
+true_ages <- age_estimation_fit$draws("true_age", format = "df")
+true_ages <- true_ages[1:1000,1:N]
 means <- apply(true_ages, 2, mean)
 stdevs <- apply(true_ages, 2, sd)
 
@@ -1186,8 +816,8 @@ df <- as.data.frame(do.call(rbind, true_ages)) %>%
   relocate(true_age) %>%
   mutate(id = 1:ncol(true_ages)) %>% # changed nrow to ncol, else it had to be the same number of draws as elephants
   relocate(id)
-df <- df %>% pivot_longer(cols = 3:102) %>% dplyr::select(-name)
-df %>% ggplot(aes(x=jitter(as.numeric(true_age)), y=value, group=factor(id))) +
+df <- df %>% pivot_longer(cols = 3:1002) %>% dplyr::select(-name) %>% distinct()
+df %>% ggplot(aes(x = jitter(as.numeric(true_age)), y = value, group = factor(id))) +
   geom_point(size=2,alpha=0.1) +
   #geom_vline(xintercept=c(5,10,15,20,25,40), linetype="dashed", alpha=0.6) +
   geom_hline(yintercept=c(5,10,15,20,25,40), linetype="dashed", alpha=0.6) +
@@ -1195,5 +825,3 @@ df %>% ggplot(aes(x=jitter(as.numeric(true_age)), y=value, group=factor(id))) +
   xlab("Assigned age") + ylab("Modelled age")
 summary(df$value[which(df$true_age == 7)])
 quantile(df$value[which(df$true_age == 7)], seq(0,1,0.01))
-
-### males only -- old ####
