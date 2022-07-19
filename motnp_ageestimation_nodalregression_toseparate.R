@@ -109,6 +109,179 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")
 
+### save output
+colnames(true_ages) <- motnp_males$id
+saveRDS(true_ages, file = 'data_processed/motnp_ageestimates_mcmcoutput_22.07.13.rds')
+
+#### recreate network plots with new ages ####
+draws_motnp2.2 <- readRDS('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.rds') %>% 
+  data.matrix()
+summaries <- data.frame(dyad = colnames(draws_motnp2.2[,2:106954]),
+                        min = rep(NA, ncol(draws_motnp2.2)-1),
+                        max = rep(NA, ncol(draws_motnp2.2)-1),
+                        mean = rep(NA, ncol(draws_motnp2.2)-1),
+                        median = rep(NA, ncol(draws_motnp2.2)-1),
+                        sd = rep(NA, ncol(draws_motnp2.2)-1))
+for(i in 1:nrow(summaries)){
+  summaries$min[i]    <- min(draws_motnp2.2[,i+1])
+  summaries$max[i]    <- max(draws_motnp2.2[,i+1])
+  summaries$mean[i]   <- mean(draws_motnp2.2[,i+1])
+  summaries$median[i] <- median(draws_motnp2.2[,i+1])
+  summaries$sd[i]     <- sd(draws_motnp2.2[,i+1])
+}
+
+par(mai = c(0.2,0.2,0.2,0.2))
+
+# create array of draws per dyad (distributions)
+counts_df <- read_csv('data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv')
+adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
+                         NROW(unique(counts_df$id_2))+1,
+                         NROW(draws_motnp2.2)),
+                    dimnames = list(c(unique(counts_df$id_1),'U9'),
+                                    c('F1',unique(counts_df$id_2)),
+                                    NULL))
+N <- nrow(counts_df)
+half_draws1 <- draws_motnp2.2[,2:54000]
+half_draws2 <- draws_motnp2.2[,54001:N+1]
+rm(draws_motnp2.2)
+
+for (i in 1:54000) {            # can cope with jumps of 50000 dyads at a time
+  dyad_row <- counts_df[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- half_draws1[, i]
+}
+rm(half_draws1)
+for (i in 54001:N) {
+  dyad_row <- counts_df[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- half_draws2[, i-54000]
+}
+rm(half_draws2)
+adj_tensor[,,1]
+
+# convert to array of medians and 95% credible intervals
+adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
+(adj_lower <- adj_quantiles[1, , ])
+(adj_mid   <- adj_quantiles[2, , ])
+(adj_upper <- adj_quantiles[3, , ])
+adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
+rm(adj_tensor, adj_quantiles, adj_lower, adj_upper, dyad_row)
+
+# Generate two igraph objects, one from the median and one from the standardised width.
+g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
+g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
+
+# Generate nodes data for plotting characteristics
+ages <- as.matrix(true_ages)
+motnp_males$age_mean <- NA
+for(i in 1:nrow(motnp_males)){
+  motnp_males$age_mean[i] <- mean(as.numeric(ages[i]))
+}
+
+# create variables for different degrees of node connectedness
+motnp_males$degree_0.1 <- NA
+motnp_males$degree_0.2 <- NA
+motnp_males$degree_0.3 <- NA
+motnp_males$degree_0.4 <- NA
+motnp_males$degree_0.5 <- NA
+
+summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
+for(i in 1:NROW(motnp_males)){
+  rows <- summaries[summaries$id_1 == motnp_males$id[i] | summaries$id_2 == motnp_males$id[i],]
+  motnp_males$degree_0.1[i] <- length(which(rows$median > 0.1))
+  motnp_males$degree_0.2[i] <- length(which(rows$median > 0.2))
+  motnp_males$degree_0.3[i] <- length(which(rows$median > 0.3))
+  motnp_males$degree_0.4[i] <- length(which(rows$median > 0.4))
+  motnp_males$degree_0.5[i] <- length(which(rows$median > 0.5))
+}
+
+which(motnp_males$degree_0.1 < motnp_males$degree_0.2)
+which(motnp_males$degree_0.2 < motnp_males$degree_0.3)
+which(motnp_males$degree_0.3 < motnp_males$degree_0.4)
+which(motnp_males$degree_0.4 < motnp_males$degree_0.5)
+
+### create data frame of all nodes to subset out males
+all_eles <- counts_df[,c(2,4,12,14,16,18,22)] %>% distinct()
+u9 <- counts_df[counts_df$id_2 == 'U9',c(3,5,13,15,17,19,23)] %>% distinct()
+colnames(all_eles) <- c("id","node","name","age_class","age_category","sex","dem_class")
+colnames(u9) <- c("id","node","name","age_class","age_category","sex","dem_class")
+all_eles <- rbind(all_eles, u9) ; rm(u9)
+
+males <- all_eles[all_eles$id %in% motnp_males$id,]
+females <- anti_join(all_eles, males)
+
+### create small df for plotting
+plot_males <- motnp_males[,c('id','degree_0.3','age_mean','count')]
+plot_males <- left_join(males, plot_males, by = 'id')
+
+### All males
+g_mid_m <- delete.vertices(graph = g_mid,
+                           v = all_eles$id[all_eles$id %in% females$id])
+g_rng_m <- delete.vertices(graph = g_rng,
+                           v = all_eles$id[all_eles$id %in% females$id])
+coords_m <- layout_nicely(g_mid_m)
+plot(g_mid_m,
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = E(g_rng_m)$weight,
+     vertex.size = 7,
+     vertex.label = NA,
+     layout = coords_m)
+plot(g_mid_m,
+     edge.width = E(g_mid_m)$weight,
+     edge.color = 'black',
+     vertex.size = 7,
+     vertex.label = plot_males$id,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = plot_males$age_mean,
+     layout = coords_m, add = TRUE)
+
+### Only males degree > 0.3
+males0.3 <- plot_males[plot_males$degree_0.3 > 0,]
+g_mid_m0.3 <- delete.vertices(graph = g_mid_m,
+                              v = plot_males$id[plot_males$degree_0.3 == 0])
+g_rng_m0.3 <- delete.vertices(graph = g_rng_m,
+                              v = plot_males$id[plot_males$degree_0.3 == 0])
+
+coords_m0.3 <- layout_nicely(g_mid_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
+                         E(g_rng_m0.3)$weight,0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 7,
+     vertex.label = NA,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
+                         E(g_mid_m0.3)$weight, 0),
+     edge.color = 'black',
+     vertex.size = 7,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = males0.3$age_mean,
+     layout = coords_m0.3, add = TRUE)
+
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
+                         E(g_rng_m0.3)$weight,0),
+     edge.color = rgb(0,0,0,0.25),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_m0.3)
+plot(g_mid_m0.3,
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
+                         E(g_mid_m0.3)$weight, 0),
+     edge.color = 'black',
+     vertex.size = males0.3$count,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = males0.3$age_mean,
+     layout = coords_m0.3, add = TRUE)
+
 ############ 2) Extract node centralities ############
 #### read in MOTNP data ########
 ### import data for aggregated model (binomial)
@@ -392,7 +565,7 @@ for(i in 1:num_nodes){
 # Calculate the 95% credible intervals of the model parameters
 round(summary(fit_nodal_eigen)$summary[1:4, c(1:4, 8)], 5) # basically no effect whatsoever (remembering this is in standard deviations on the outcome scale but years of age on the exponent)
 
-#### betweenness ~ age ####
+#### betweenness ~ age -- NEEDS A MULTIVARIATE POISSON OR SOMETHING -- THIS IS NOT A NORMALLY DISTRIBUTED VARIABLE ####
 model_data_motnp <- list(
   num_nodes = num_nodes,               # Number of dyads
   centrality_mu  = btwn_mu_motnp,      # Sample means of logit edge weights
@@ -403,7 +576,7 @@ model_data_motnp <- list(
 str(model_data_motnp)
 
 model_btwn_cent <- stan_model("models/nodal_regression/nodal_regression_hkm_distributionage_betweenness_22.07.13.stan")
-fit_nodal_btwn <- sampling(model_nodal_cent, data = model_data_motnp, cores = 1, chains = 1)
+fit_nodal_btwn <- sampling(model_btwn_cent, data = model_data_motnp, cores = 1, chains = 1)
 
 ### check traceplot
 traceplot(fit_nodal_btwn)
@@ -411,45 +584,49 @@ traceplot(fit_nodal_btwn)
 ### calculate leave-one-out cross validation
 fit_nodal_btwn
 
-hist(summary(fit_nodal_btwn)$summary[,10], breaks = 20, xlim = c(0.99,1.02))
+hist(summary(fit_nodal_btwn)$summary[,10], breaks = 20, xlim = c(0.99,1.02), xlab = 'rhat', main = 'rhat')
 
 ### posterior predictive checks
 params <- rstan::extract(fit_nodal_btwn)
 plot(density(btwn_samples_motnp_std[1, ]), main = "Posterior predictive density (standardised centrality)",
-     col = rgb(0, 0, 0, 0.25), ylim = c(0, 1), las = 1)
+     col = rgb(0, 0, 0, 0.25), ylim = c(0, 2), las = 1)
 for (i in 1:100) {
   j <- sample(1:num_samples, 1)                                         # select a network to plot
-  lines(density(btwn_samples_motnp_std[j, ]), col=rgb(0, 0, 0, 0.25)) # plot centrality density for network j (black)
-  mu <- params$beta_age[j]*apply(model_data_motnp$node_age,1,mean)     # extract age slope parameter for network j
-  sigma <- btwn_cov_motnp + diag(rep(params$sigma[j], num_nodes))     # extract variance parameter for network j
-  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))  # plot predicted centralities for network j (blue)
+  lines(density(btwn_samples_motnp_std[j, ]), col=rgb(0, 0, 0, 0.25))   # plot centrality density for network j (black)
+  mu <- params$beta_age[j]*apply(model_data_motnp$node_age,1,mean)      # extract age slope parameter for network j
+  sigma <- btwn_cov_motnp + diag(rep(params$sigma[j], num_nodes))       # extract variance parameter for network j
+  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))   # plot predicted centralities for network j (blue)
 } # POOR FIT -- predicted are all falling as a bell curve, observed centrality density as multimodal
+abline(v = c(0, -0.5), lty = 2, lwd = 2, col = 'red')
 
 ### plot age against predictions
 node_age <- 1:60
 beta_age_mean  <- summary(fit_nodal_btwn)$summary[1,1]
 beta_age_2.5   <- summary(fit_nodal_btwn)$summary[1,4]
 beta_age_97.5  <- summary(fit_nodal_btwn)$summary[1,8]
-beta_age2_mean <- summary(fit_nodal_btwn)$summary[2,1]
-beta_age2_2.5  <- summary(fit_nodal_btwn)$summary[2,4]
-beta_age2_97.5 <- summary(fit_nodal_btwn)$summary[2,8]
+#beta_age2_mean <- summary(fit_nodal_btwn)$summary[2,1]
+#beta_age2_2.5  <- summary(fit_nodal_btwn)$summary[2,4]
+#beta_age2_97.5 <- summary(fit_nodal_btwn)$summary[2,8]
 intercept_mean <- summary(fit_nodal_btwn)$summary[3,1]
 intercept_2.5  <- summary(fit_nodal_btwn)$summary[3,4]
 intercept_97.5 <- summary(fit_nodal_btwn)$summary[3,8]
-mu <- intercept_mean  + beta_age_mean*node_age + beta_age2_mean*(node_age^2)
-min <- intercept_2.5  + beta_age_2.5*node_age  + beta_age2_2.5*(node_age^2)
-max <- intercept_97.5 + beta_age_97.5*node_age + beta_age2_97.5*(node_age^2)
+#intercept_mean <- summary(fit_nodal_btwn)$summary[2,1]
+#intercept_2.5  <- summary(fit_nodal_btwn)$summary[2,4]
+#intercept_97.5 <- summary(fit_nodal_btwn)$summary[2,8]
+mu <- intercept_mean  + beta_age_mean*node_age# + beta_age2_mean*(node_age^2)
+min <- intercept_2.5  + beta_age_2.5*node_age#  + beta_age2_2.5*(node_age^2)
+max <- intercept_97.5 + beta_age_97.5*node_age# + beta_age2_97.5*(node_age^2)
 summary(mu)
 summary(min)
 summary(max)
-plot(NULL, xlim = c(0,60), ylim = c(-5, 5), lwd = 2, las = 1,
+plot(NULL, xlim = c(0,60), ylim = c(-1,5), lwd = 2, las = 1,
      xlab = 'age (years)', ylab = 'betweenness centrality (std)')
 for(i in 1:100){
-  j <- sample(1:4000, 1)
+  j <- sample(1:num_samples, 1)
   int <- params$intercept[j]
   bA1 <- params$beta_age[j]
-  bA2 <- params$beta_age2[j]
-  mean <- int + bA1*age + bA2*age
+  #bA2 <- params$beta_age2[j]
+  mean <- int + bA1*age# + bA2*age
   lines(c(1:60), mean, col = rgb(0.5,0,1,0.2))
 }
 lines(mu ~ node_age, lwd = 2) 
@@ -459,7 +636,7 @@ abline(h = c(-2,2), lty = 2)
 for(i in 1:num_nodes){
   s <- sample(x = 1:num_samples, size = 100, replace = F)
   for(j in 1:length(s)){
-    points(btwn_mu_motnp[i] ~ model_data_motnp$node_age[i,s[j]], pch = 19, col = rgb(0,0,0,0.05))
+    points(btwn_samples_motnp_std[i,j] ~ model_data_motnp$node_age[i,s[j]], pch = 19, cex = 0.5, col = rgb(0,0,1,0.05))
   }
 }
 
