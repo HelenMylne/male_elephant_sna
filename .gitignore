@@ -45,3 +45,6 @@ vignettes/*.pdf
 
 # DS Store files for Mac Finder navigation
 .DS_Store
+
+# R markdown files -- currently don't need them
+.Rmd
