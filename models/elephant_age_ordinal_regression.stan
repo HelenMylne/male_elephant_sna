@@ -19,11 +19,12 @@ transformed parameters {
   real<lower=0> shape;
   real<lower=0> scale;
   // Thresholds for age classes
-  thresholds[1] = 15;
-  thresholds[2] = 30;
-  thresholds[3] = 45;
-  thresholds[4] = 60;
-  thresholds[5] = 75;
+  thresholds[1] = 5;
+  thresholds[2] = 10;
+  thresholds[3] = 15;
+  thresholds[4] = 20;
+  thresholds[5] = 25;
+  thresholds[6] = 40;
   // Non-centred age. The same as observed_age ~ normal(true_age,sigma_age)
   observed_age = true_age + sigma_age*observed_age_std; // if one sigma for all
   
@@ -47,8 +48,6 @@ model {
   shape_std ~ std_normal();
   scale_std ~ std_normal();
 }
-
-
 
 
 //functions {
