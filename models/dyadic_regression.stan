@@ -9,19 +9,19 @@ data {
 }
 
 parameters {
-  vector[3] beta_dyadtype;
+  vector[30] beta_dyadtype;
   vector[K] mm_nodes;
   real<lower=0> sigma;
   real<lower=0> sigma_mm;
 }
 
 transformed parameters {
-  vector[N] predictor;
-  predictor = beta_dyadtype[dyad_type] + mm_nodes[node_1_id] + mm_nodes[node_2_id];
+  vector[N] age_effect;
+  age_effect = beta_dyadtype[dyad_type] + mm_nodes[node_1_id] + mm_nodes[node_2_id];
 }
 
 model {
-  logit_edge_mu ~ multi_normal(predictor, logit_edge_cov + diag_matrix(rep_vector(sigma, N)));
+  logit_edge_mu ~ multi_normal(age_effect, logit_edge_cov + diag_matrix(rep_vector(sigma, N)));
   beta_dyadtype ~ normal(0, 1);
   mm_nodes ~ normal(0, sigma_mm);
   sigma ~ normal(0, 1);
