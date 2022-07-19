@@ -21,3 +21,4 @@ Step 4 -- nodal regression) Perform nodal regression of eigenvector and betweenn
 
 Step 5 -- dyadic regression) Perform dyadic regression of edge weight from node age and age difference, using age distributions calculated in step 2 as a predictor and edge weight distributions from 3.
 
+Step 6 -- network complexity) Compare networks using Faust (2006) method of quanitifying network complexity.
