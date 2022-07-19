@@ -13,9 +13,11 @@ Step 1b -- data_processing) Convert gbi data to counts of frequency with which a
 
 Step 2a -- age estimation) Use ANP data to develop a survival curve for elephants
 
-Step 2b -- age estimation) Use ANP survival curve to convert categorical age estimations in MOTNP and MPNP into probability dsitributions of true age
+Step 2b -- age estimation) Use ANP survival curve to convert categorical age estimations in MOTNP and MPNP into probability distributions of true age
 
 Step 3 -- edge weight estimation) Use counts of dyad sightings produced in step 1 to estimate dyadic edge weights.
 
-Step 4 -- data_analysis) Perform nodal and dyadic regressions of edge weight on age/age difference, using age distributions calculated in step 2 as a predictor and edge weight distributions from 3 as a y variable.
+Step 4 -- nodal regression) Perform nodal regression of eigenvector and betweenness centrality from node age, using age distributions calculated in step 2 as a predictor and edge weight distributions from 3.
+
+Step 5 -- dyadic regression) Perform dyadic regression of edge weight from node age and age difference, using age distributions calculated in step 2 as a predictor and edge weight distributions from 3.
 
