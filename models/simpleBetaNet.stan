@@ -7,5 +7,5 @@ parameters {
     vector<lower=0,upper=1>[n_dyads] weight; 
 }
 model {
-  weight ~ beta( 5 + together, 5 + apart );
+  weight ~ beta( 2 + together, 2 + apart );
 }
