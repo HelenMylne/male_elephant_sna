@@ -40,17 +40,10 @@ for(i in 1:nrow(males)){ # 1 = sighting in that year, 0 = no sighting
   }
 }
 
-#### prepare input data ####
 # prep data
 basta_data <- males
 basta_data$count_years <- rowSums(basta_data[4:53])
 summary(basta_data$count_years) # no individuals never observed, as it should be. No NAs.
-
-# set birth and death years
-basta_data$birth_year <- ifelse(basta_data$byr < 1972, 0, basta_data$byr)
-basta_data$death_year <- ifelse(basta_data$dyr < 100,  0, basta_data$dyr)
-
-basta_data <- basta_data[,c(1,55,56,4:53,2:3,54)]
 
 #### remove elephants with incorrect sightings ####
 check_birth <- basta_data[c(638,648,665,682,686),] # elephants recorded before birth
@@ -59,7 +52,7 @@ basta_data <- anti_join(basta_data, check_birth, by = 'casename')
 basta_data <- anti_join(basta_data, check_death, by = 'casename')
 rm(check_birth, check_death)
 
-#### convert birth years to year first sighted ####
+#### add minimum age of independence to all birth years ####
 basta_data$year_first_sighted <- NA
 for(i in 1:nrow(basta_data)){ # loop through all rows and all years, identify first column with a "1" per row -- apparent "birth" year will be first sighting -1, as basta won't allow an individual to be sighted in the year it is born.
   for(j in 4:53){
@@ -74,27 +67,25 @@ for(i in 1:nrow(basta_data)){ # loop through all rows and all years, identify fi
 
 # look at ages each individual was first seen
 basta_data$age_first_sighted <- basta_data$year_first_sighted - basta_data$byr
-hist(basta_data$age_first_sighted)
+hist(basta_data$age_first_sighted, breaks = 50)
 
-# remove all individuals first observed at <8 years old or > 20 years old, but retaining those already over 20 at the strat of the study to avoid truncating maximum age data.
-basta_data <- basta_data[,c(1,57,2,54,3:53,55:56,58)]
-basta_data$remove <- ifelse(basta_data$byr > 1962 & basta_data$age_first_sighted > 20 | 
-                              basta_data$age_first_sighted < 8, 'remove', 'keep')
-table(basta_data$age_first_sighted[which(basta_data$age_first_sighted < 8)])
-table(basta_data$remove)
-basta_data <- basta_data[basta_data$remove == 'keep',c(1:58)]
+# remove all individuals first observed at <8 years old
+table(basta_data$age_first_sighted)
+basta_data <- basta_data[basta_data$age_first_sighted > 7,]
 
-# set "birth year" to the year first sighted, with 0 if already of independent age in 1972.
-basta_data$byr_apparent <- ifelse(basta_data$byr < 1962, 0,
-                                  ifelse(basta_data$year_first_sighted == 1971, 0,
-                                         basta_data$year_first_sighted))
+# set "birth year" to 8 years after birth -- 8 years because minimum age reported for independence in literature
+basta_data$byr_apparent <- basta_data$byr + 8
 
-basta_data <- basta_data[,c(1,59,5:55,2:4,56:58)]
-basta_anp <- basta_data[,c(1:53)]
+# set birth and death years
+basta_data$birth_year <- ifelse(basta_data$byr_apparent < 1972, 0, basta_data$byr_apparent)
+basta_data$death_year <- ifelse(basta_data$dyr < 100,  0, basta_data$dyr)
+
+# create data frame for basta
+basta_anp <- basta_data[,c(1,58:59,4:53)]
 
 #### prior predictive check ####
 gompertz_bt <- function(a0, a1, c, b0, b1, age){
-  gompertz <- gompertz(b0, b1, age)
+  gompertz <- exp(b0 + b1*age)
   bathtub <- exp(a0 - a1*age) + c + gompertz
   return(bathtub)
 }
@@ -140,7 +131,7 @@ sim <- 4           # number of chains
 warmup <- iter/2   # number of iterations to use during warmup/burn-in period
 thin <- 100        # thinning number
 
-#### run model -- DIC = 10162 / 9601.075 (without cutting out very early/late dispersers / cut out) ####
+#### run model ####
 Go.Bt <- basta(basta_anp, studyStart = start_year,
                studyEnd = end_year, nsim = sim, niter = iter,
                burnin = warmup, thinning = thin,
@@ -200,36 +191,22 @@ for(i in 1:100){
   lines(data$y ~ data$age, col = rgb(0,0,1,0.2))
 }
 
-# following Dan's previous method for simulating population
+# draw new output curve
 mortality <- gompertz_bt(a0 = Go.Bt$coefficients[1,1],
                          a1 = Go.Bt$coefficients[2,1],
                          c  = Go.Bt$coefficients[3,1],
                          b0 = Go.Bt$coefficients[4,1],
-                         b1 = Go.Bt$coefficients[5,1], 1:50)
+                         b1 = Go.Bt$coefficients[5,1], 1:70)
 probs <- 1 - (mortality/max(mortality))
 plot(probs)
 
-# Now we create a fictional population with ages selected from that distribution. We also add an error for age estimation.
+# create a fictional population with ages selected from that distribution
 N <- 700
 elephants_ls <- list(
   N = N,
-  age = sample(1:50, N, replace = TRUE, prob = probs)
+  age = sample(1:70, N, replace = TRUE, prob = probs)
 )
 hist(elephants_ls$age)
 
-# Next simulate observing ages with error and then binning them into age groups
-E <- 3 # Error (in either direction) of age estimates
-elephants_ls$age_guess <- elephants_ls$age + sample(-E:E, N, replace=TRUE)
-elephants_ls$age_category_index <- sapply(elephants_ls$age_guess, function(x) which.max(x < c(5, 10, 15, 20, 25, 40, Inf)))
-hist(elephants_ls$age_guess)
-hist(elephants_ls$age_category_index)
-
-# Let's look at the actual age verses the biologist assigned age and look at the thresholds. You can see that the chance of being mis-classified is lower if an actual age is in the middle of the age category. Also, there is mostly a bias towards ages within the age class actually being towards the lower end of the class.
-data.frame(elephants_ls) %>%
-  ggplot(aes(x=age, y=age_guess, col=factor(age_category_index))) +
-  geom_point(size=4,alpha=0.6) +
-  geom_vline(xintercept=c(5, 10, 15, 20, 25, 40, 60), col=factor(1:7), linetype="dashed", alpha=0.6) +
-  theme_minimal() + 
-  theme(legend.position = 'none')+
-  xlab("Assigned age") + ylab("Age")
-
+basta_data$age_death <- ifelse(basta_data$death_year == 0, NA, basta_data$death_year - basta_data$byr)
+hist(basta_data$age_death)
