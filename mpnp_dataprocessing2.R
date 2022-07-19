@@ -4,11 +4,9 @@
 # Data supplied by Dr Kate Evans
 #### Set up ####
 library(tidyverse)
-library(rstan)
-library(rethinking)
-library(cmdstanr)
 library(lubridate)
 
+########## Create initial data ###########
 #### read in processed data files ####
 aa <- read_csv('data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1.250_22.03.10.csv') %>% distinct()
 ab <- read_csv('data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings251.387_22.03.08.csv') %>% distinct()
@@ -225,7 +223,10 @@ all$location_id <- as.integer(as.factor(all$location))
 head(all)
 
 max(all$date) - min(all$date) # 3430 days. Time period for ALERT data = 581 days --> split into 6 time windows (7 boundaries)
-periods <- seq(from = min(all$date), to = max(all$date), length.out = 7)
+periods <- seq(from = min(all$date),
+               to = max(all$date),
+               length.out = 7)
+periods[7] <- periods[7]+1 # set to be one higher than the final higher otherwise it takes the last date and creates a whole new period
 events <- all[all$social_event == 1,] ; events <- events[!is.na(events$node_1),] # cuts down to 55490933 dyad pairs from 13043 -- assigning to time window doesn't take forever
 events$period <- NA
 for(i in 1:nrow(events)){
@@ -233,6 +234,7 @@ for(i in 1:nrow(events)){
   if(i %% 1000 == 0) {print(i)}
 }
 range(events$obs_id)
+table(events$period)
 
 periods ; View(events[c(sample(x = 1:nrow(events), size = 20, replace = F)),]) # visual check that periods have come out right
 
@@ -276,7 +278,7 @@ dyads <- left_join(dyads, eles, by = 'id_1')
 colnames(eles) <- c('id_2','node_2')
 dyads <- left_join(dyads, eles, by = 'id_2')
 dyads <- dyads[dyads$node_1 < dyads$node_2,]
-rm(all, eles, i, periods)
+rm(all, eles, i)
 
 dyads <- data.frame(id_1 = rep(dyads$id_1, length(unique(df$period))),
                     id_2 = rep(dyads$id_2, length(unique(df$period))),
@@ -286,6 +288,7 @@ dyads <- data.frame(id_1 = rep(dyads$id_1, length(unique(df$period))),
 
 head(df) ; head(dyads)
 data <- left_join(x = dyads, y = df, by = c('id_1','id_2','period'))
+head(data)
 data <- data[,c(1:5,8:10)]
 colnames(data)[3:4] <- c('node_1','node_2')
 data$event_count <- ifelse(is.na(data$event_count) == TRUE, 0, data$event_count)
@@ -294,12 +297,131 @@ data$dyad <- paste(data$id_1, data$id_2, sep = '_')
 data$dyad_id <- as.integer(as.factor(data$dyad))
 head(data, 20)
 
-periods <- data.frame(period_start = seq(from = min(sightings$obs_date), to = max(sightings$obs_date), length.out = 32)[1:31],
-                      period = 1:31)
-data <- left_join(x = data, y = periods, by = 'period')
+efa <- readxl::read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% janitor::clean_names()
+efa$date <- lubridate::as_date(efa$date)
+
+windows <- data.frame(period_start = seq(from = min(efa$date),
+                                         to = max(efa$date),
+                                         length.out = 7)[1:6],
+                      period = 1:6,
+                      period_days = periods[1:6])
+
+windows$period_start[1]+windows$period_days[2]-windows$period_days[1]
+windows$period_start[2]+windows$period_days[3]-windows$period_days[2]
+windows$period_start[3]+windows$period_days[4]-windows$period_days[3]
+windows$period_start[4]+windows$period_days[5]-windows$period_days[4]
+windows$period_start[5]+windows$period_days[6]-windows$period_days[5]
+
+data <- left_join(x = data, y = windows, by = 'period')
 head(data)
 
+#### write to file ####
+readr::write_delim(data, 'data_processed/mpnp_bayesian_pairwiseevents_22.04.21.csv', delim = ',')
+
+## clean environment
+rm(df, dyads, efa, windows)
+
+########## add additional information and remove impossible sightings ##########
+data <- read_csv('data_processed/mpnp_bayesian_pairwiseevents_22.04.21.csv')
+
+#### break down into periods so easier to manipulate ####
+table(data$period)
+mpnp1 <- data[data$period == 1,]
+mpnp2 <- data[data$period == 2,]
+mpnp3 <- data[data$period == 3,]
+mpnp4 <- data[data$period == 4,]
+mpnp5 <- data[data$period == 5,]
+mpnp6 <- data[data$period == 6,]
+rm(data)
+
 #### add data about nodes ####
+sightings <- read_csv('data_processed/mpnp_eles_long_22.03.08.csv')
+sightings <- sightings[,c(3,4)]
+sightings$day <- as.numeric(sightings$date)
+sightings$day <- sightings$day - (min(sightings$day)-1)
+summary(sightings$day)
+
+sightings$period <- NA
+for(i in 1:nrow(sightings)){
+  sightings$period[i] <- which(periods <= sightings$day[i])[length(which(periods <= sightings$day[i]))] # take last value in vector
+}
+periods ; View(sightings[sample(1:nrow(sightings),20),])
+rm(periods)
+
+counts <- data.frame(id = rep(unique(sightings$elephant), 6),
+                     period = rep(1:6,
+                                  each = length(unique(sightings$elephant))),
+                     count_all = NA,
+                     count_period = NA)
+for(i in 1:nrow(counts)){
+  individual <- sightings[sightings$elephant == counts$id[i],]
+  counts$count_all[i] <- nrow(individual)
+  counts$count_period[i] <- nrow(individual[individual$period == counts$period[i],])
+  if(i %% 1000 == 0) {print(i)}
+}
+rm(individual, i)
+
+summary(counts$count_all)
+summary(counts$count_period)
+
+colnames(counts)[1] <- 'id_1'
+data1 <- left_join(x = mpnp1, y = counts[counts$period == 1,],
+                   by = c('id_1','period'))
+rm(mpnp1)
+data2 <- left_join(x = mpnp2, y = counts[counts$period == 2,],
+                   by = c('id_1','period'))
+rm(mpnp2)
+data3 <- left_join(x = mpnp3, y = counts[counts$period == 3,],
+                   by = c('id_1','period'))
+rm(mpnp3)
+data4 <- left_join(x = mpnp4, y = counts[counts$period == 4,],
+                   by = c('id_1','period'))
+rm(mpnp4)
+data5 <- left_join(x = mpnp5, y = counts[counts$period == 5,],
+                   by = c('id_1','period'))
+rm(mpnp5)
+data6 <- left_join(x = mpnp6, y = counts[counts$period == 6,],
+                   by = c('id_1','period'))
+rm(mpnp6)
+
+data1 <- data1[data1$count_period > 0,]
+data2 <- data2[data2$count_period > 0,]
+data3 <- data3[data3$count_period > 0,]
+data4 <- data4[data4$count_period > 0,]
+data5 <- data5[data5$count_period > 0,]
+data6 <- data6[data6$count_period > 0,]
+
+colnames(data1)[11:12] <- c('count_all_1','count_period_1')
+colnames(data2)[11:12] <- c('count_all_1','count_period_1')
+colnames(data3)[11:12] <- c('count_all_1','count_period_1')
+colnames(data4)[11:12] <- c('count_all_1','count_period_1')
+colnames(data5)[11:12] <- c('count_all_1','count_period_1')
+colnames(data6)[11:12] <- c('count_all_1','count_period_1')
+
+colnames(counts)[1] <- 'id_2'
+data1 <- left_join(x = data1, y = counts, by = c('id_2','period'))
+data2 <- left_join(x = data2, y = counts, by = c('id_2','period'))
+data3 <- left_join(x = data3, y = counts, by = c('id_2','period'))
+data4 <- left_join(x = data4, y = counts, by = c('id_2','period'))
+data5 <- left_join(x = data5, y = counts, by = c('id_2','period'))
+data6 <- left_join(x = data6, y = counts, by = c('id_2','period'))
+
+data1 <- data1[data1$count_period > 0,]
+data2 <- data2[data2$count_period > 0,]
+data3 <- data3[data3$count_period > 0,]
+data4 <- data4[data4$count_period > 0,]
+data5 <- data5[data5$count_period > 0,]
+data6 <- data6[data6$count_period > 0,]
+
+colnames(data1)[13:14] <- c('count_all_2','count_period_2')
+colnames(data2)[13:14] <- c('count_all_2','count_period_2')
+colnames(data3)[13:14] <- c('count_all_2','count_period_2')
+colnames(data4)[13:14] <- c('count_all_2','count_period_2')
+colnames(data5)[13:14] <- c('count_all_2','count_period_2')
+colnames(data6)[13:14] <- c('count_all_2','count_period_2')
+
+rm(counts,sightings)
+
 eles <- read_csv('data_processed/mpnp_eles_long_22.03.08.csv') %>% 
   select(elephant, sex, age_range) %>% 
   distinct()
@@ -323,11 +445,26 @@ for (i in 1:nrow(eles)) {
 }
 summary(eles$age_median)
 
-colnames(eles)[1] <- 'id'
-mpnp <- left_join(x = data, y = eles, by = 'id')
+eles <- eles[,c(1,3,5:8)]
 
-#### write to file ####
-readr::write_delim(mpnp, 'data_processed/mpnp_bayesian_pairwiseevents_22.04.14.csv', delim = ',')
+colnames(eles) <- c('id_1','age_range_NA_1','age_min_1','age_max_1','age_maxmin_1','age_median_1')
+data1 <- left_join(x = data1, y = eles, by = 'id_1')
+data2 <- left_join(x = data2, y = eles, by = 'id_1')
+data3 <- left_join(x = data3, y = eles, by = 'id_1')
+data4 <- left_join(x = data4, y = eles, by = 'id_1')
+data5 <- left_join(x = data5, y = eles, by = 'id_1')
+data6 <- left_join(x = data6, y = eles, by = 'id_1')
 
-## clean environment
-rm(list = ls())
+colnames(eles) <- c('id_2','age_range_NA_2','age_min_2','age_max_2','age_maxmin_2','age_median_2')
+data1 <- left_join(x = data1, y = eles, by = 'id_2')
+data2 <- left_join(x = data2, y = eles, by = 'id_2')
+data3 <- left_join(x = data3, y = eles, by = 'id_2')
+data4 <- left_join(x = data4, y = eles, by = 'id_2')
+data5 <- left_join(x = data5, y = eles, by = 'id_2')
+data6 <- left_join(x = data6, y = eles, by = 'id_2')
+
+rm(eles, individual)
+
+## save data #####
+write_csv(data1,'data_processed/mpnp_period1_pairwiseevents.csv')
+
