@@ -28,3 +28,10 @@ model {
   beta_age2 ~ normal(0, 0.003);
   sigma ~ normal(0, 1);
 }
+
+//generated quantities {
+//  vector[num_nodes] log_lik;
+//  for (i in 1:num_nodes) {
+//    log_lik[i] = (multi_normal_cholesky_rng(centrality_mu[i] | predictor[i]);
+//  }
+//}
