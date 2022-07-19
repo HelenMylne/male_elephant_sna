@@ -195,8 +195,6 @@ summary(Go.Si)
 plot(Go.Si)                       # Plot traces
 plot(Go.Si, plot.trace = FALSE)   # Plot survival and mortality curves
 
-par(mfrow = c(1,1))
-
 #### Gompertz bathtub -- DIC = 10256.84 ####
 pM <-  c(0,0.2,0.001,-4,0.05)  # prior means for parameters in a Gompertz model with a bathtub shape
 pSD <- c(1,0.05,0.001,1,0.01)  # prior standard deviation for parameters in a Gompertz model with a bathtub shape
@@ -210,9 +208,7 @@ summary(Go.Bt)
 plot(Go.Bt)                       # Plot traces
 plot(Go.Bt, plot.trace = FALSE)   # Plot survival and mortality curves
 
-par(mfrow = c(1,1))
-
-#### Weibull simple -- DIC = 10126.57 ####
+#### Weibull simple -- DIC = 10167.53 ####
 pM <-  c(4,2)    # prior means for parameters in a Weibull model with a simple shape
 pSD <- c(1.5,1)  # prior standard deviation for parameters in a Weibull model with a simple shape
 
@@ -225,9 +221,7 @@ summary(Wb.Si)
 plot(Wb.Si)                       # Plot traces
 plot(Wb.Si, plot.trace = FALSE)   # Plot survival and mortality curves
 
-par(mfrow = c(1,1))
-
-#### Weibull bathtub -- DIC = 10352.98 ####
+#### Weibull bathtub -- DIC = uncalculated, lack of convergence ####
 pM <-  c(0.5,0.2,1,1.2,0.5) # prior means for parameters in a Weibull model with a bathtub shape
 pSD <- c(0.3,0.1,1,0.5,0.3)  # prior standard deviation for parameters in a Weibull model with a bathtub shape
 
@@ -252,14 +246,8 @@ library(ggthemes)
 library(dplyr)
 library(data.table)
 
-#### Compare model fit with information criteria ####
-WAIC(Go.Si)
-WAIC(Go.Bt)
-WAIC(Wb.Si)
-WAIC(Wb.Bt)
-
-#### Read in AEDD ####
-aedd <- read_csv('data_raw/AfricanElephantDemographicDatabase_aedd_22.04.04.csv') %>% 
+#### Read in AEDD -- old ####
+#aedd <- read_csv('data_raw/AfricanElephantDemographicDatabase_aedd_22.04.04.csv') %>% 
   filter(sex == 'male' | sex == 'dispersed_male' | sex == 'family_male')
 table(aedd$metric)
 aedd <- aedd[!is.na(aedd$age_reported), c(1,3,5,6,7,8,13,14,15,22)]
@@ -305,6 +293,7 @@ aedd$age_all <- ifelse(aedd$upr_age == "calf",                 median(x = c(0,5)
 table(aedd$age_all)
 aedd$lwr_age <- as.numeric(aedd$lwr_age)
 aedd$upr_age <- as.numeric(aedd$upr_age)
+aedd$age <- NA
 for(i in 1:nrow(aedd)){
   aedd$age[i] <- median(x = c(aedd$lwr_age[i], aedd$upr_age[i]))
 }
