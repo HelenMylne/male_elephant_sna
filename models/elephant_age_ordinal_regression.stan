@@ -28,10 +28,10 @@ transformed parameters {
   // Non-centred age. The same as observed_age ~ normal(true_age,sigma_age)
   observed_age = true_age + sigma_age*observed_age_std; // if one sigma for all
   
-  // Non-centred shape. The same as shape = normal(0.87,0.02)
-  shape = 0.87 + 0.02*shape_std;
-  // Non-centred scale. The same as scale = normal(30,1);
-  scale = 14.7 + scale_std;
+  // Non-centred shape. The same as shape = normal(0.87,0.2)
+  shape = 1.3 + 0.2*shape_std;
+  // Non-centred scale. The same as scale = normal(30,5);
+  scale = 30 + 5*scale_std;
 }
 
 model {
@@ -44,15 +44,3 @@ model {
   shape_std ~ std_normal();
   scale_std ~ std_normal();
 }
-
-
-//functions {
-  // 1 - gompertz to give survival to an age
-  // a is the asymtote
-  // b shifts x axis
-  // c + number, 'growth' rate
-  // t number of years (first parameter is response)
-//  real gompertz_lpdf(vector t, real a, real b, real c) {
-//    return sum(log(1-(a * exp(-b*exp(-c*t)))));
-//  }
-//}
