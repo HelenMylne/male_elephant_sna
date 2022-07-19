@@ -28,10 +28,10 @@ transformed parameters {
   // Non-centred age. The same as observed_age ~ normal(true_age,sigma_age)
   observed_age = true_age + sigma_age*observed_age_std; // if one sigma for all
   
-  // Non-centred shape. The same as shape = normal(0.87,0.2)
-  shape = 1.3 + 0.2*shape_std;
-  // Non-centred scale. The same as scale = normal(30,5);
-  scale = 30 + 5*scale_std;
+  // Non-centred shape. Output from basta: 
+  shape = 1.2 + 0.1*shape_std;
+  // Non-centred scale. Output from basta: 
+  scale = 30 + scale_std;
 }
 
 model {
