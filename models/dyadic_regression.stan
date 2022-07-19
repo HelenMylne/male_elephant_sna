@@ -9,7 +9,7 @@ data {
 }
 
 parameters {
-  vector[30] beta_dyadtype;
+  vector[6] beta_dyadtype;
   vector[K] mm_nodes;
   real<lower=0> sigma;
   real<lower=0> sigma_mm;
