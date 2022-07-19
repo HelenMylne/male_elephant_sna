@@ -3,8 +3,17 @@
 # Data collected by Elephants for Africa (EfA) 2012-2021
 # Data supplied by Dr Kate Evans
 #### Set up ####
-library(tidyverse)
-library(lubridate)
+library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
+library(janitor, lib.loc = 'packages/')     # library(janitor)
+library(lubridate, lib.loc = 'packages/')   # library(lubridate)
+library(hms, lib.loc = 'packages/')         # library(hms)
+library(readxl, lib.loc = 'packages/')      # library(readxl)
+library(dplyr, lib.loc = 'packages/')       # library(dplyr)
+
+
+library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
+library(rethinking, lib.loc = 'packages/')  # library(rethinking)
+library(igraph, lib.loc = 'packages/')      # library(igraph)
 
 ########## Create initial data ###########
 #### read in processed data files ####
@@ -93,24 +102,24 @@ rm(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az
 
 #### Recreate how data were produced to match up obs_id to actual encounters ####
 # sightings data
-s <- readxl::read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')
+s <- read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')
 str(s)
 colnames(s)[c(1:23,57)] <- s[2,c(1:23,57)]
 colnames(s)[24:56] <- c('CM','CF','CU','CM','CF','CU','JM','JF','JU','YPM','YPF','YPU','OPM','OPF','OPU',
                         'YAM','YAF','YAU','MAM','MAF','MAU','OAM','OAF','OAU','UM','UF','UU','SM','SF','SU',
                         'AM','AF','AU')
 s <- s[3:nrow(s),]
-s <- janitor::clean_names(s)
+s <- clean_names(s)
 
 # individual data
-efa <- readxl::read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
+efa <- read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
 str(efa)
-efa$time_cat <- lubridate::hour(efa$Time)
+efa$time_cat <- hour(efa$Time)
 efa <- separate(efa, Time, into = c('wrong_date','time'), sep = ' ')
-efa$time <- hms::as_hms(efa$time)
-efa$Date <- lubridate::as_date(efa$Date)
+efa$time <- as_hms(efa$time)
+efa$Date <- as_date(efa$Date)
 efa <- efa[,c(1:5,7,33,8:15,18:27,31:32)]
-efa <- janitor::clean_names(efa)
+efa <- clean_names(efa)
 
 efa_long <- data.frame(encounter = efa$elephant_sighting_id,
                        date = efa$date,
@@ -190,8 +199,8 @@ eles_asnipe3$in_order_time <- c('yes',rep(NA,nrow(eles_asnipe3)-1))
 for(i in 2:nrow(eles_asnipe3)){
   eles_asnipe3$in_order_date[i] <- ifelse(eles_asnipe3$Date[i] > eles_asnipe3$Date[i-1], 'no', 'yes')
   eles_asnipe3$in_order_time[i] <- ifelse(eles_asnipe3$Date[i] == eles_asnipe3$Date[i-1], 
-                                         ifelse(eles_asnipe3$Time[i] <= eles_asnipe3$Time[i-1], 'yes', 'no'),
-                                         'yes')
+                                          ifelse(eles_asnipe3$Time[i] <= eles_asnipe3$Time[i-1], 'yes', 'no'),
+                                          'yes')
 }
 table(eles_asnipe3$in_order_date) ; table(eles_asnipe3$in_order_time) # sightings now in reverse chronological order, both by date and time
 
@@ -236,7 +245,8 @@ for(i in 1:nrow(events)){
 range(events$obs_id)
 table(events$period)
 
-periods ; View(events[c(sample(x = 1:nrow(events), size = 20, replace = F)),]) # visual check that periods have come out right
+periods
+events[c(sample(x = 1:nrow(events), size = 20, replace = F)),] # visual check that periods have come out right
 
 # check elephants all match up
 length(unique(all$node_1))
@@ -297,8 +307,8 @@ data$dyad <- paste(data$id_1, data$id_2, sep = '_')
 data$dyad_id <- as.integer(as.factor(data$dyad))
 head(data, 20)
 
-efa <- readxl::read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% janitor::clean_names()
-efa$date <- lubridate::as_date(efa$date)
+efa <- read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% clean_names()
+efa$date <- as_date(efa$date)
 
 windows <- data.frame(period_start = seq(from = min(efa$date),
                                          to = max(efa$date),
@@ -316,13 +326,13 @@ data <- left_join(x = data, y = windows, by = 'period')
 head(data)
 
 #### write to file ####
-readr::write_delim(data, 'data_processed/mpnp_bayesian_pairwiseevents_22.04.21.csv', delim = ',')
+write_delim(data, 'data_processed/mpnp_bayesian_pairwiseevents_22.05.30.csv', delim = ',')
 
 ## clean environment
-rm(df, dyads, efa, windows)
+rm(df, dyads, efa)
 
 ########## add additional information and remove impossible sightings ##########
-data <- read_csv('data_processed/mpnp_bayesian_pairwiseevents_22.04.21.csv')
+#data <- read_csv('data_processed/mpnp_bayesian_pairwiseevents_22.05.30.csv')
 
 #### break down into periods so easier to manipulate ####
 table(data$period)
@@ -334,7 +344,8 @@ mpnp5 <- data[data$period == 5,]
 mpnp6 <- data[data$period == 6,]
 rm(data)
 
-#### add data about nodes ####
+#### add count data per elephant and remove sightings where elephant not seen at all in period ####
+# insert column for sighting period
 sightings <- read_csv('data_processed/mpnp_eles_long_22.03.08.csv')
 sightings <- sightings[,c(3,4)]
 sightings$day <- as.numeric(sightings$date)
@@ -345,9 +356,10 @@ sightings$period <- NA
 for(i in 1:nrow(sightings)){
   sightings$period[i] <- which(periods <= sightings$day[i])[length(which(periods <= sightings$day[i]))] # take last value in vector
 }
-periods ; View(sightings[sample(1:nrow(sightings),20),])
-rm(periods)
+periods
+sightings[sample(1:nrow(sightings),20),]
 
+# create counts data frame
 counts <- data.frame(id = rep(unique(sightings$elephant), 6),
                      period = rep(1:6,
                                   each = length(unique(sightings$elephant))),
@@ -364,25 +376,14 @@ rm(individual, i)
 summary(counts$count_all)
 summary(counts$count_period)
 
+# join counts data frame with dyad data
 colnames(counts)[1] <- 'id_1'
-data1 <- left_join(x = mpnp1, y = counts[counts$period == 1,],
-                   by = c('id_1','period'))
-rm(mpnp1)
-data2 <- left_join(x = mpnp2, y = counts[counts$period == 2,],
-                   by = c('id_1','period'))
-rm(mpnp2)
-data3 <- left_join(x = mpnp3, y = counts[counts$period == 3,],
-                   by = c('id_1','period'))
-rm(mpnp3)
-data4 <- left_join(x = mpnp4, y = counts[counts$period == 4,],
-                   by = c('id_1','period'))
-rm(mpnp4)
-data5 <- left_join(x = mpnp5, y = counts[counts$period == 5,],
-                   by = c('id_1','period'))
-rm(mpnp5)
-data6 <- left_join(x = mpnp6, y = counts[counts$period == 6,],
-                   by = c('id_1','period'))
-rm(mpnp6)
+data1 <- left_join(x = mpnp1, y = counts, by = c('id_1','period')) ; rm(mpnp1)
+data2 <- left_join(x = mpnp2, y = counts, by = c('id_1','period')) ; rm(mpnp2)
+data3 <- left_join(x = mpnp3, y = counts, by = c('id_1','period')) ; rm(mpnp3)
+data4 <- left_join(x = mpnp4, y = counts, by = c('id_1','period')) ; rm(mpnp4)
+data5 <- left_join(x = mpnp5, y = counts, by = c('id_1','period')) ; rm(mpnp5)
+data6 <- left_join(x = mpnp6, y = counts, by = c('id_1','period')) ; rm(mpnp6)
 
 data1 <- data1[data1$count_period > 0,]
 data2 <- data2[data2$count_period > 0,]
@@ -422,49 +423,183 @@ colnames(data6)[13:14] <- c('count_all_2','count_period_2')
 
 rm(counts,sightings)
 
-eles <- read_csv('data_processed/mpnp_eles_long_22.03.08.csv') %>% 
-  select(elephant, sex, age_range) %>% 
-  distinct()
-nrow(eles) - length(unique(eles$elephant)) # 472 elephants age/sex reclassified
-unique(eles$sex)
-eles <- eles[,c(1,3)] %>% distinct()
-nrow(eles) - length(unique(eles$elephant)) # 450 elephants age reclassified
+table(data1$count_period_1)
+table(data1$count_period_2)
 
-table(eles$age_range) # no 1, 9 is meant to be UK and 10 is not classified, but no 9s and 148 10s I'm thinking 10 is unknown age
+table(data2$count_period_1)
+table(data2$count_period_2)
+
+table(data3$count_period_1)
+table(data3$count_period_2)
+
+table(data4$count_period_1)
+table(data4$count_period_2)
+
+table(data5$count_period_1)
+table(data5$count_period_2)
+
+table(data6$count_period_1)
+table(data6$count_period_2)
+
+unique(data1$id_1) # 695 B numbers,    1 F number
+unique(data2$id_1) # 554 B numbers,  716 T numbers
+unique(data3$id_1) # 150 B numbers, 2684 T numbers
+unique(data4$id_1) # 111 B numbers, 1204 T numbers
+unique(data5$id_1) #  29 B numbers,  338 T numbers
+unique(data6$id_1) #   2 B numbers,  493 T numbers
+
+data1_id <- data1 %>%
+  separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num) %>%
+  separate(id_2, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num)
+data2_id <- data2 %>%
+  separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num) %>%
+  separate(id_2, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num)
+data3_id <- data3 %>%
+  separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num) %>%
+  separate(id_2, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num)
+data4_id <- data4 %>%
+  separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num) %>%
+  separate(id_2, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num)
+data5_id <- data5 %>%
+  separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num) %>%
+  separate(id_2, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num)
+data6_id <- data6 %>%
+  separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num) %>%
+  separate(id_2, into = c('BT','num'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-BT, -num)
+
+#rm(data1, data2, data3, data4, data5, data6)
+
+#### add data about individual elephant ages ####
+# read in data
+eles <- read_csv('data_processed/mpnp_eles_long_22.03.08.csv') %>% 
+  select(elephant, sex, age_range, date) %>% 
+  distinct()
+
+# identify period of each sighting
+eles$period <- NA
+for(i in 1:nrow(eles)){
+  eles$period[i] <- which(windows$period_start <= eles$date[i])[length(which(windows$period_start <= eles$date[i]))] # take last value in vector
+}
+windows$period_start
+eles[sample(1:nrow(eles),20),]
+
+eles <- eles %>% separate(elephant, into = c('BT','id_number'), sep = 1, remove = FALSE) %>% 
+  filter(BT == 'B') %>% 
+  select(-date, -BT, -id_number) %>%
+  distinct()
+unique(eles$elephant)
+
+# identify elephants whose age category changes within time window
+table(eles$age_range) # no 1, 9 is meant to be UK and 10 is not classified, but no 9s and 120 10s I'm thinking 10 is unknown age
 eles$age_range_NA <- ifelse(eles$age_range == 10, NA, eles$age_range)
 
 eles$age_unsure <- NA ; eles$age_min <- NA ; eles$age_max <- NA ; eles$age_maxmin <- NA ; eles$age_median <- NA
 for (i in 1:nrow(eles)) {
-  individual <- eles[eles$elephant == eles$elephant[i],]
+  individual <- eles[eles$elephant == eles$elephant[i] & eles$period == eles$period[i],]
   summary <- summary(individual$age_range_NA, na.rm = T)
   eles$age_unsure[i] <- nrow(individual)
-  eles$age_min[i] <- summary[1]
-  eles$age_max[i] <- summary[6]
-  eles$age_maxmin[i] <- eles$age_max[i] - eles$age_min[i]
+  eles$age_min[i]    <- summary[1]
+  eles$age_max[i]    <- summary[6]
+  eles$age_maxmin[i] <- summary[6] - summary[1]
   eles$age_median[i] <- summary[3]
 }
 summary(eles$age_median)
 
-eles <- eles[,c(1,3,5:8)]
+eles <- eles %>% select(-sex, -age_range, -age_range_NA, -age_unsure) %>% distinct()
 
-colnames(eles) <- c('id_1','age_range_NA_1','age_min_1','age_max_1','age_maxmin_1','age_median_1')
-data1 <- left_join(x = data1, y = eles, by = 'id_1')
-data2 <- left_join(x = data2, y = eles, by = 'id_1')
-data3 <- left_join(x = data3, y = eles, by = 'id_1')
-data4 <- left_join(x = data4, y = eles, by = 'id_1')
-data5 <- left_join(x = data5, y = eles, by = 'id_1')
-data6 <- left_join(x = data6, y = eles, by = 'id_1')
+# add age data
+colnames(eles)[c(1,3:6)] <- c('id_1','age_min_1','age_max_1','age_range_1','age_median_1')
+data1_id <- left_join(x = data1_id, y = eles, by = c('id_1','period'))
+data2_id <- left_join(x = data2_id, y = eles, by = c('id_1','period'))
+data3_id <- left_join(x = data3_id, y = eles, by = c('id_1','period'))
+data4_id <- left_join(x = data4_id, y = eles, by = c('id_1','period'))
+data5_id <- left_join(x = data5_id, y = eles, by = c('id_1','period'))
+data6_id <- left_join(x = data6_id, y = eles, by = c('id_1','period'))
 
-colnames(eles) <- c('id_2','age_range_NA_2','age_min_2','age_max_2','age_maxmin_2','age_median_2')
-data1 <- left_join(x = data1, y = eles, by = 'id_2')
-data2 <- left_join(x = data2, y = eles, by = 'id_2')
-data3 <- left_join(x = data3, y = eles, by = 'id_2')
-data4 <- left_join(x = data4, y = eles, by = 'id_2')
-data5 <- left_join(x = data5, y = eles, by = 'id_2')
-data6 <- left_join(x = data6, y = eles, by = 'id_2')
+colnames(eles)[c(1,3:6)] <- c('id_2','age_min_2','age_max_2','age_range_2','age_median_2')
+data1_id <- left_join(x = data1_id, y = eles, by = c('id_2','period'))
+data2_id <- left_join(x = data2_id, y = eles, by = c('id_2','period'))
+data3_id <- left_join(x = data3_id, y = eles, by = c('id_2','period'))
+data4_id <- left_join(x = data4_id, y = eles, by = c('id_2','period'))
+data5_id <- left_join(x = data5_id, y = eles, by = c('id_2','period'))
+data6_id <- left_join(x = data6_id, y = eles, by = c('id_2','period'))
 
 rm(eles, individual)
 
-## save data #####
-write_csv(data1,'data_processed/mpnp_period1_pairwiseevents.csv')
+### add variable for sightings apart ####
+data1_id$count_dyad <- (data1_id$count_period_1 + data1_id$count_period_2) - data1_id$event_count
+data1_id$apart <- data1_id$count_dyad - data1_id$event_count
+colnames(data1_id)[6] <- 'together'
+table(data1_id$together)
+table(data1_id$apart)
 
+data2_id$count_dyad <- (data2_id$count_period_1 + data2_id$count_period_2) - data2_id$event_count
+data2_id$apart <- data2_id$count_dyad - data2_id$event_count
+colnames(data2_id)[6] <- 'together'
+table(data2_id$together)
+table(data2_id$apart)
+
+data3_id$count_dyad <- (data3_id$count_period_1 + data3_id$count_period_2) - data3_id$event_count
+data3_id$apart <- data3_id$count_dyad - data3_id$event_count
+colnames(data3_id)[6] <- 'together'
+table(data3_id$together)
+table(data3_id$apart)
+
+data4_id$count_dyad <- (data4_id$count_period_1 + data4_id$count_period_2) - data4_id$event_count
+data4_id$apart <- data4_id$count_dyad - data4_id$event_count
+colnames(data4_id)[6] <- 'together'
+table(data4_id$together)
+table(data4_id$apart)
+
+data5_id$count_dyad <- (data5_id$count_period_1 + data5_id$count_period_2) - data5_id$event_count
+data5_id$apart <- data5_id$count_dyad - data5_id$event_count
+colnames(data5_id)[6] <- 'together'
+table(data5_id$together)
+table(data5_id$apart)
+
+data6_id$count_dyad <- (data6_id$count_period_1 + data6_id$count_period_2) - data6_id$event_count
+data6_id$apart <- data6_id$count_dyad - data6_id$event_count
+colnames(data6_id)[6] <- 'together'
+table(data6_id$together)
+table(data6_id$apart)
+
+## save data #####
+data1_id <- data1_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
+data2_id <- data2_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
+data3_id <- data3_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
+data4_id <- data4_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
+data5_id <- data5_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
+data6_id <- data6_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
+
+write_csv(data1_id,'data_processed/mpnp_period1_pairwiseevents_22.05.30.csv')
+write_csv(data2_id,'data_processed/mpnp_period2_pairwiseevents_22.05.30.csv')
+write_csv(data3_id,'data_processed/mpnp_period3_pairwiseevents_22.05.30.csv')
+write_csv(data4_id,'data_processed/mpnp_period4_pairwiseevents_22.05.30.csv')
+write_csv(data5_id,'data_processed/mpnp_period5_pairwiseevents_22.05.30.csv')
+write_csv(data6_id,'data_processed/mpnp_period6_pairwiseevents_22.05.30.csv')
+
+length(unique(data5_id$id_1))
