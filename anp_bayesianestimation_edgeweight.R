@@ -5,14 +5,37 @@
 # Data input: raw data provided by ATE processed in scripts 22.03.20_anp_dataprocessing1.R and 22.03.22_anp_dataprocessing2.R
 
 #### Set up ####
+# set working directory for working on research cluster
+#setwd(EleSNA_researchcluster/)
+
+# install packages
+# install.packages('tidyverse')
+# install.packages('dplyr')
+# install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+# install.packages(c("StanHeaders","rstan"),type="source")
+# install.packages("remotes") ; remotes::install_github("stan-dev/cmdstanr") ## OR USE # install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+# install.packages('rethinking')
+# install.packages('igraph')
+# install.packages('dagitty')
+# install.packages('janitor')
+# install.packages('lubridate')
+# install.packages('hms')
+# install.packages('readxl')
+
 # load packages
-library(tidyverse)
-library(dplyr)
-library(rstan)
-library(rethinking)
-library(igraph)
-library(dagitty)
-library(cmdstanr)
+library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
+library(dplyr, lib.loc = 'packages/')       # library(dplyr)
+#library(rstan, lib.loc = 'packages/')      # library(rstan)
+library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
+# check_cmdstan_toolchain(fix = TRUE, quiet = TRUE)
+# install_cmdstan(cores = 2)
+library(rethinking, lib.loc = 'packages/')  # library(rethinking)
+library(igraph, lib.loc = 'packages/')      # library(igraph)
+library(dagitty, lib.loc = 'packages/')     # library(dagitty)
+library(janitor, lib.loc = 'packages/')     # library(janitor)
+library(lubridate, lib.loc = 'packages/')   # library(lubridate)
+library(hms, lib.loc = 'packages/')         # library(hms)
+library(readxl, lib.loc = 'packages/')      # library(readxl)
 
 # information
 sessionInfo()
@@ -22,17 +45,17 @@ rstan::stan_version()
 #citation('')
 
 # set stan path
-set_cmdstan_path('/Users/helen/.cmdstanr/cmdstan-2.28.2')
+set_cmdstan_path('/home/userfs/h/hkm513/.cmdstan/cmdstan-2.29.2')
 
 # load model
-mod_2.2 <- cmdstan_model("models/edge_weight_estimation/simpleBetaNet_HKM_2.2_22.02.03.stan")
+mod_2.2 <- cmdstan_model("models/simpleBetaNet_HKM_2.2_22.02.03.stan")
 mod_2.2
 
 # set seed
 set.seed(12345)
 
 # create file of output graphs
-pdf('anp_edgeweights_2.2_22.04.28.pdf', width = 10, height = 10)
+pdf('data_processed/anp_edgeweights_2.2_period1to5_22.05.06.pdf', width = 10, height = 10)
 
 ################ 2) Create data lists ################
 counts_df_non0 <- read_csv('data_processed/anp_bayesian_pairwiseevents_22.04.06.csv')
@@ -65,6 +88,7 @@ sightings <- sightings[c(1:12,15:24176),]
 
 males <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 males$id <- paste0('M',males$casename)
+ids <- sort(unique(ate$id))
 males <- males %>% dplyr::filter(id %in% ids)
 
 # counts per male per time period
@@ -129,607 +153,7 @@ table(counts_df_non0$event_count) ; hist(counts_df_non0$event_count, breaks = 3)
 
 rm(ate, counts, sightings, i)
 
-################ 6) Run model on real standardised data -- all ################
-### create data list -- can contain no NA values in any column, even if column is not specified in model -- NEED TO SEPARATE BY TIME PERIOD OR SOMETHING SOMEHOW
-counts_ls <- list(
-  n_dyads  = nrow(counts_df_non0),          # total number of times one or other of the dyad was observed
-  together = counts_df_non0$event_count,    # count number of sightings seen together
-  apart    = counts_df_non0$apart,          # count number of sightings seen apart
-  period   = counts_df_non0$period)         # which period it's within
-
-### Fit model
-weight_anp_2.2 <- mod_2.2$sample(
-  data = counts_ls, 
-  seed = 12345, 
-  chains = 4, 
-  parallel_chains = 4)
-
-### check model
-weight_anp_2.2
-# variable        mean      median     sd    mad          q5         q95 rhat ess_bulk ess_tail
-#lp__      -3125125.08 -3125130.00 480.56 489.26 -3125910.00 -3124320.00 1.00     1247     2132
-#weight[1]        0.18        0.16   0.11   0.10        0.04        0.39 1.00     5295     2343
-#weight[2]        0.28        0.26   0.16   0.16        0.07        0.57 1.00     5887     2562
-#weight[3]        0.29        0.27   0.16   0.17        0.06        0.57 1.00     4645     2136
-#weight[4]        0.17        0.15   0.10   0.10        0.03        0.36 1.00     4791     2023
-#weight[5]        0.25        0.23   0.14   0.15        0.06        0.52 1.00     5203     2650
-#weight[6]        0.22        0.20   0.13   0.13        0.05        0.46 1.00     3960     2120
-#weight[7]        0.29        0.27   0.16   0.16        0.07        0.58 1.00     4833     1618
-#weight[8]        0.28        0.26   0.16   0.17        0.06        0.58 1.00     4751     2500
-#weight[9]        0.29        0.26   0.16   0.16        0.06        0.58 1.00     4743     2359
-rm(counts_ls)
-
-# showing 10 of 402700 rows (change via 'max_rows' argument or 'cmdstanr_max_rows' option)
-output1 <- read_cmdstan_csv(weight_anp_2.2$output_files()[1])
-draws1_anp2.2 <- as.data.frame(output1$post_warmup_draws)
-rm(output1)
-write_csv('data_processed/anp_bayesian_edgedistributions_a2.b2_chain1_22.04.06.csv', x = draws1_anp2.2)
-
-output2 <- read_cmdstan_csv(weight_anp_2.2$output_files()[2])[,1:50]
-draws2_anp2.2 <- as.data.frame(output2$post_warmup_draws)
-rm(output2)
-
-output3 <- read_cmdstan_csv(weight_anp_2.2$output_files()[3])
-draws3_anp2.2 <- as.data.frame(output3$post_warmup_draws)
-r(output3)
-
-output4 <- read_cmdstan_csv(weight_anp_2.2$output_files()[4])
-draws4_anp2.2 <- as.data.frame(output4$post_warmup_draws)
-rm(output4)
-
-draws_anp2.2 <- rbind(draws1_anp2.2, draws2_anp2.2, draws3_anp2.2, draws4_anp2.2)
-
-colnames(draws_anp2.2)[2:402699] <- counts_df_non0$dyad
-
-# Assign random set of columns to check
-plot_cols <- sample(x = 2:402699, size = 20, replace = F)
-
-# tidy data -- vector memory usually exhausted and won't run
-tidy_draws_2.2 <- pivot_longer(draws_anp2.2[,2:402699], cols = everything(), names_to = 'dyad', values_to = 'draw')
-tidy_draws_2.2$chain <- rep(1:4, each = 402698000)
-tidy_draws_2.2$index <- rep(rep(1:1000, each = 402698),4)
-head(tidy_draws_2.2, 10)
-tail(tidy_draws_2.2, 10)
-
-### save data 
-write_csv(draws_anp2.2, 'data_processed/anp_bayesian_edgedistributions_a2.b2_22.04.05.csv')
-
-################ check single chain ################
-draws1_anp2.2 <- read_csv('data_processed/anp_bayesian_edgedistributions_a2.b2_chain1_22.04.06.csv')
-plot_cols <- sample(2:402699, size = 30, replace = F)
-
-### build traceplots -- some quite wide, generally not bad ####
-plot(draws1_anp2.2[,plot_cols[1]], type = 'l',
-     ylim = c(0,1), las = 1, ylab = 'edge weight')
-lines(draws1_anp2.2[,plot_cols[2]], col = 'tan')
-lines(draws1_anp2.2[,plot_cols[3]], col = 'orange')
-lines(draws1_anp2.2[,plot_cols[4]], col = 'green')
-lines(draws1_anp2.2[,plot_cols[5]], col = 'chocolate')
-lines(draws1_anp2.2[,plot_cols[6]], col = 'blue')
-lines(draws1_anp2.2[,plot_cols[7]], col = 'red')
-lines(draws1_anp2.2[,plot_cols[8]], col = 'seagreen')
-lines(draws1_anp2.2[,plot_cols[9]], col = 'purple')
-lines(draws1_anp2.2[,plot_cols[10]],col = 'magenta')
-lines(draws1_anp2.2[,plot_cols[11]],col = 'black')
-lines(draws1_anp2.2[,plot_cols[12]], col = 'tan')
-lines(draws1_anp2.2[,plot_cols[13]], col = 'orange')
-lines(draws1_anp2.2[,plot_cols[14]], col = 'green')
-lines(draws1_anp2.2[,plot_cols[15]], col = 'chocolate')
-lines(draws1_anp2.2[,plot_cols[16]], col = 'blue')
-lines(draws1_anp2.2[,plot_cols[17]], col = 'red')
-lines(draws1_anp2.2[,plot_cols[18]], col = 'seagreen')
-lines(draws1_anp2.2[,plot_cols[19]], col = 'purple')
-lines(draws1_anp2.2[,plot_cols[20]],col = 'magenta')
-lines(draws1_anp2.2[,plot_cols[21]],col = 'black')
-lines(draws1_anp2.2[,plot_cols[22]], col = 'tan')
-lines(draws1_anp2.2[,plot_cols[23]], col = 'orange')
-lines(draws1_anp2.2[,plot_cols[24]], col = 'green')
-lines(draws1_anp2.2[,plot_cols[25]], col = 'chocolate')
-lines(draws1_anp2.2[,plot_cols[26]], col = 'blue')
-lines(draws1_anp2.2[,plot_cols[27]], col = 'red')
-lines(draws1_anp2.2[,plot_cols[28]], col = 'seagreen')
-lines(draws1_anp2.2[,plot_cols[29]], col = 'purple')
-lines(draws1_anp2.2[,plot_cols[30]],col = 'magenta')
-
-### density plots -- most are very wide, high uncertainty####
-dens(draws1_anp2.2[,2], ylim = c(0,100),xlim = c(0,1), las = 1)
-for(i in 3:8000){  # looks like a poisson distribution - peaks just above 0 and then exponentiol decline. almost nothing above 0.5
-  dens(add = T, draws1_anp2.2[,i], col = col.alpha('blue', alpha = 0.01))
-}
-
-
-
-### summarise data ####
-# summarise -- look for any anomalies in draw values
-summaries <- data.frame(dyad = colnames(draws1_anp2.2[,2:402699]),
-                        min = rep(NA, ncol(draws1_anp2.2)-1),
-                        max = rep(NA, ncol(draws1_anp2.2)-1),
-                        mean = rep(NA, ncol(draws1_anp2.2)-1),
-                        median = rep(NA, ncol(draws1_anp2.2)-1),
-                        sd = rep(NA, ncol(draws1_anp2.2)-1))
-for(i in 1:nrow(summaries)){
-  summaries$min[i]    <- min(draws1_anp2.2[,i+1])
-  summaries$max[i]    <- max(draws1_anp2.2[,i+1])
-  summaries$mean[i]   <- mean(draws1_anp2.2[,i+1])
-  summaries$median[i] <- median(draws1_anp2.2[,i+1])
-  summaries$sd[i]     <- sd(draws1_anp2.2[,i+1])
-}
-
-summary(summaries) # generally higher than MOTNP but SD much higher
-
-# organise dem_class -- report age category based on age at start of period
-plot_data_anp2.2 <- left_join(x = summaries, y = counts_df_non0, by = 'dyad')
-head(plot_data_anp2.2)
-plot_data_anp2.2$age_cat_1 <- ifelse(plot_data_anp2.2$age_start_1 < 6, 'C',
-                                     ifelse(plot_data_anp2.2$age_start_1 < 11, 'J',
-                                            ifelse(plot_data_anp2.2$age_start_1 > 19, 'A','P')))
-plot_data_anp2.2$age_cat_2 <- ifelse(plot_data_anp2.2$age_start_2 < 6, 'C',
-                                     ifelse(plot_data_anp2.2$age_start_2 < 11, 'J',
-                                            ifelse(plot_data_anp2.2$age_start_2 > 19, 'A','P')))
-plot_data_anp2.2$age_catnum_1 <- ifelse(plot_data_anp2.2$age_start_1 < 6, 1,
-                                        ifelse(plot_data_anp2.2$age_start_1 < 11, 2,
-                                               ifelse(plot_data_anp2.2$age_start_1 < 16, 3,
-                                                      ifelse(plot_data_anp2.2$age_start_1 < 20, 4,
-                                                             ifelse(plot_data_anp2.2$age_start_1 < 25, 5,
-                                                                    ifelse(plot_data_anp2.2$age_start_1 < 40, 6, 7))))))
-plot_data_anp2.2$age_catnum_2 <- ifelse(plot_data_anp2.2$age_start_2 < 6, 1,
-                                        ifelse(plot_data_anp2.2$age_start_2 < 11, 2,
-                                               ifelse(plot_data_anp2.2$age_start_2 < 16, 3,
-                                                      ifelse(plot_data_anp2.2$age_start_2 < 20, 4,
-                                                             ifelse(plot_data_anp2.2$age_start_2 < 25, 5,
-                                                                    ifelse(plot_data_anp2.2$age_start_2 < 40, 6, 7))))))
-
-plot_data_anp2.2$age_dyad <- ifelse(plot_data_anp2.2$age_catnum_1 >= plot_data_anp2.2$age_catnum_2,
-                                    paste(plot_data_anp2.2$age_cat_1, plot_data_anp2.2$age_cat_2, sep = ''),
-                                    paste(plot_data_anp2.2$age_cat_2, plot_data_anp2.2$age_cat_1, sep = ''))
-
-# boxplot edge weights by demographic type of dyad -- all types
-(edge_vs_demtype_all <- 
-    ggplot(data = plot_data_anp2.2, aes(y = mean, x = age_dyad))+
-    geom_boxplot(notch = T, outlier.shape = 4, fill = c('blue','purple','blue','grey','purple','blue'))+
-    theme_classic()+
-    labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
-         y = 'mean edge weight')+
-    coord_flip())
-
-# scatter plot of all adult edges by age difference
-(edge_vs_agediff <- 
-    ggplot(plot_data_anp2.2, aes(x = age_diff, y = mean))+
-    geom_jitter(alpha = 0.2)+
-    theme_classic()+
-    theme(legend.position = 'none')+
-    scale_x_continuous('age difference between dyad members',
-                       expand = c(0.02,0))+
-    scale_y_continuous('mean edge weight',
-                       expand = c(0.02,0),
-                       limits = c(0,1)))
-
-# values for reporting
-summary(summaries)
-quantile(summaries$median, seq(0,1,length.out = 101))
-quantile(summaries$mean,   seq(0,1,length.out = 101))
-hist(summaries$median, breaks = 100, xlim = c(0,1), las = 1,
-     xlab = 'median estimated dyad strength', main = '', col = 'skyblue')
-
-m_sum <- plot_data_anp2.2[plot_data_anp2.2$age_dyad == 'AA' | plot_data_anp2.2$age_dyad == 'AP' | plot_data_anp2.2$age_dyad == 'PP',] ; m_sum <- m_sum[!is.na(m_sum$dyad),]
-quantile(m_sum$median, seq(0,1,length.out = 101))
-
-# clean up
-rm(counts_ls)
-rm(draws1_anp2.2, draws2_anp2.2, draws3_anp2.2, draws4_anp2.2, tidy_draws1_2.2)
-rm(edge_vs_agediff, edge_vs_demtype_all, m_sum)
-
-### create network plots -- single chain ################
-head(summaries)
-length(unique(plot_data_anp2.2$id_1))+1 # number of individuals = 55
-
-par(mai = c(0.1,0.1,0.1,0.1))
-
-# create array of draws per dyad (distributions)
-adj_tensor <- array(0, c(NROW(unique(counts_df_non0$id_1))+1,
-                         NROW(unique(counts_df_non0$id_2))+1,
-                         NROW(draws1_anp2.2)),
-                    dimnames = list(c(unique(counts_df_non0$id_1),'M119'),
-                                    c('M2',unique(counts_df_non0$id_2)),
-                                    NULL))
-N <- nrow(counts_df_non0)
-
-for (i in 1:N) {
-  dyad_row <- counts_df_non0[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws1_anp2.2[, i+1]
-}
-adj_tensor[,,1]
-
-# convert to array of medians and 95% credible intervals
-adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
-(adj_lower <- adj_quantiles[1, , ])
-(adj_mid   <- adj_quantiles[2, , ])
-(adj_upper <- adj_quantiles[3, , ])
-adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
-
-# Generate two igraph objects, one from the median and one from the standardised width.
-g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
-g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
-
-# Generate nodes data for plotting characteristics
-males <- males[,c(21,6,9,22:53)]
-View(males) # all ones born before start of study
-
-# create variables for different degrees of node connectedness
-males$degree_0.1 <- NA
-males$degree_0.2 <- NA
-males$degree_0.3 <- NA
-males$degree_0.4 <- NA
-males$degree_0.5 <- NA
-
-summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
-for(i in 1:NROW(males)){
-  rows <- summaries[summaries$id_1 == males$id[i] | summaries$id_2 == males$id[i],]
-  males$degree_0.1[i] <- length(which(rows$median > 0.1))
-  males$degree_0.2[i] <- length(which(rows$median > 0.2))
-  males$degree_0.3[i] <- length(which(rows$median > 0.3))
-  males$degree_0.4[i] <- length(which(rows$median > 0.4))
-  males$degree_0.5[i] <- length(which(rows$median > 0.5))
-}
-
-which(males$degree_0.1 < males$degree_0.2)
-which(males$degree_0.2 < males$degree_0.3)
-which(males$degree_0.3 < males$degree_0.4)
-which(males$degree_0.4 < males$degree_0.5)
-
-# Plot whole network
-coords <- igraph::layout_nicely(g_mid)
-plot(g_mid,
-     edge.width = E(g_rng)$weight*3,
-     edge.color = rgb(0, 0, 0, 0.25), 
-     vertex.label = NA,
-     vertex.size = 5,
-     layout = coords)
-plot(g_mid,
-     edge.width = E(g_mid)$weight*3,
-     edge.color = 'black',
-     vertex.size = 8,
-     vertex.label = males$id,
-     vertex.label.dist = 0,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     #vertex.color= ifelse(males$age_class == 'Adult','seagreen1',
-     #                    ifelse(males$age_class == 'Pubescent','skyblue',
-     #                           ifelse(males$age_class == 'Juvenile', 'yellow','magenta'))),
-     layout = coords, add = TRUE)
-
-plot(g_mid,
-     edge.width = E(g_mid)$weight*3,
-     vertex.label = NA,
-     vertex.size = 5,
-     edge.color = ifelse(adj_mid < 0.5,'transparent','black'),
-     layout = coords)
-plot(g_mid,
-     edge.width = E(g_rng)$weight*3,
-     edge.color = ifelse(adj_mid < 0.5,'transparent',rgb(0,0,0,0.25)),
-     vertex.size = 8,
-     vertex.label = males$id,
-     vertex.label.dist = 0,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     #vertex.color= ifelse(males$age_class == 'Adult','seagreen1',
-     #                     ifelse(males$age_class == 'Pubescent','skyblue',
-     #                            ifelse(males$age_class == 'Juvenile', 'yellow','magenta'))),
-     layout = coords, add = TRUE)
-
-### only elephants degree > 0.3 ####
-g_mid_0.3 <- delete.vertices(graph = g_mid, v = males$id[which(males$degree_0.3 == 0)])
-g_rng_0.3 <- delete.vertices(graph = g_rng, v = males$id[which(males$degree_0.3 == 0)])
-
-set.seed(2)
-coords_0.3 <- layout_nicely(g_mid_0.3)
-plot(g_mid_0.3,
-     edge.color = rgb(0,0,0,0.25),
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
-     vertex.size = 6,
-     vertex.label = NA,
-     layout = coords_0.3)
-plot(g_mid_0.3,
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
-     edge.color = 'black',
-     vertex.size = 6,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.label.dist = 0,
-     #vertex.color = ifelse(nodes[which(males$degree_0.3 != 0),]$age_class == 'Adult',
-     #                      'seagreen1',
-     #                      ifelse(nodes[which(males$degree_0.3 != 0),]$age_class == 'Pubescent','skyblue',
-     #                             ifelse(nodes[which(males$degree_0.3 != 0),]$age_class == 'Juvenile','yellow','magenta'))),
-     layout = coords_0.3, add = TRUE)
-
-plot(g_mid_0.3,
-     edge.color = rgb(0,0,0,0.25),
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
-     vertex.size = 1,
-     vertex.label = NA,
-     layout = coords_0.3)
-plot(g_mid_0.3,
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
-     edge.color = 'black',
-     vertex.size = log(males$count_all[which(males$degree_0.3 != 0)]),
-     vertex.color = 'green',
-     vertex.label = males$id[which(males$degree_0.3 != 0)],
-     vertex.label.color = 'magenta',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.label.dist = 0,
-     #vertex.color = ifelse(males[which(males$degree_0.3 != 0),]$age_class == 'Adult',
-     #                      'seagreen1',
-     #                      ifelse(males[which(males$degree_0.3 != 0),]$age_class == 'Pubescent','skyblue',
-     #                             ifelse(males[which(males$degree_0.3 != 0),]$age_class == 'Juvenile','yellow','magenta'))),
-     layout = coords_0.3, add = TRUE)
-
-################ repeat for all chains ################
-# draws_anp2.2 <- read_csv('data_processed/anp_bayesian_edgedistributions_a2.b2_22.04.05.csv') %>% 
-#   data.matrix()
-plot_cols <- sample(2:402699, size = 20, replace = F)
-### build traceplots -- most are very wide, high uncertainty ####
-plot(draws_anp2.2[,plot_cols[1]], type = 'l',
-     ylim = c(0,1), las = 1, ylab = 'edge weight')
-lines(draws_anp2.2[,plot_cols[2]], col = 'tan')
-lines(draws_anp2.2[,plot_cols[3]], col = 'orange')
-lines(draws_anp2.2[,plot_cols[4]], col = 'green')
-lines(draws_anp2.2[,plot_cols[5]], col = 'chocolate')
-lines(draws_anp2.2[,plot_cols[6]], col = 'blue')
-lines(draws_anp2.2[,plot_cols[7]], col = 'red')
-lines(draws_anp2.2[,plot_cols[8]], col = 'seagreen')
-lines(draws_anp2.2[,plot_cols[9]], col = 'purple')
-lines(draws_anp2.2[,plot_cols[10]],col = 'magenta')
-lines(draws_anp2.2[,plot_cols[11]],col = 'black')
-lines(draws_anp2.2[,plot_cols[12]], col = 'tan')
-lines(draws_anp2.2[,plot_cols[13]], col = 'orange')
-lines(draws_anp2.2[,plot_cols[14]], col = 'green')
-lines(draws_anp2.2[,plot_cols[15]], col = 'chocolate')
-lines(draws_anp2.2[,plot_cols[16]], col = 'blue')
-lines(draws_anp2.2[,plot_cols[17]], col = 'red')
-lines(draws_anp2.2[,plot_cols[18]], col = 'seagreen')
-lines(draws_anp2.2[,plot_cols[19]], col = 'purple')
-lines(draws_anp2.2[,plot_cols[20]],col = 'magenta')
-
-### density plots -- most are very wide, high uncertainty ####
-dens(draws_anp2.2[,2], ylim = c(0,10),xlim = c(0,1), las = 1)
-for(i in 3:402699){
-  dens(add = T, draws_anp2.2[,i], col = col.alpha('blue', alpha = 0.1))
-}
-
-### summarise data ####
-# summarise -- look for any anomalies in draw values or chain variation
-summaries <- data.frame(dyad = colnames(draws_anp2.2[,2:402699]),
-                        min = rep(NA, ncol(draws_anp2.2)-1),
-                        max = rep(NA, ncol(draws_anp2.2)-1),
-                        mean = rep(NA, ncol(draws_anp2.2)-1),
-                        median = rep(NA, ncol(draws_anp2.2)-1),
-                        sd = rep(NA, ncol(draws_anp2.2)-1))
-for(i in 1:nrow(summaries)){
-  summaries$min[i]    <- min(draws_anp2.2[,i+1])
-  summaries$max[i]    <- max(draws_anp2.2[,i+1])
-  summaries$mean[i]   <- mean(draws_anp2.2[,i+1])
-  summaries$median[i] <- median(draws_anp2.2[,i+1])
-  summaries$sd[i]     <- sd(draws_anp2.2[,i+1])
-}
-
-summary(summaries) # generally higher than MOTNP but SD much higher -- higher mean/median doesn't really make sense given that no pair was ever seen more than twice together in any 2-year period
-
-# organise dem_class -- report age category based on age at start of period
-plot_data_anp2.2 <- left_join(x = summaries, y = counts_df_non0, by = 'dyad')
-head(plot_data_anp2.2)
-plot_data_anp2.2$age_cat_1 <- ifelse(plot_data_anp2.2$age_start_1 < 6, 'C',
-                                     ifelse(plot_data_anp2.2$age_start_1 < 11, 'J',
-                                            ifelse(plot_data_anp2.2$age_start_1 > 19, 'A','P')))
-plot_data_anp2.2$age_cat_2 <- ifelse(plot_data_anp2.2$age_start_2 < 6, 'C',
-                                     ifelse(plot_data_anp2.2$age_start_2 < 11, 'J',
-                                            ifelse(plot_data_anp2.2$age_start_2 > 19, 'A','P')))
-plot_data_anp2.2$age_catnum_1 <- ifelse(plot_data_anp2.2$age_start_1 < 6, 1,
-                                        ifelse(plot_data_anp2.2$age_start_1 < 11, 2,
-                                               ifelse(plot_data_anp2.2$age_start_1 < 16, 3,
-                                                      ifelse(plot_data_anp2.2$age_start_1 < 20, 4,
-                                                             ifelse(plot_data_anp2.2$age_start_1 < 25, 5,
-                                                                    ifelse(plot_data_anp2.2$age_start_1 < 40, 6, 7))))))
-plot_data_anp2.2$age_catnum_2 <- ifelse(plot_data_anp2.2$age_start_2 < 6, 1,
-                                        ifelse(plot_data_anp2.2$age_start_2 < 11, 2,
-                                               ifelse(plot_data_anp2.2$age_start_2 < 16, 3,
-                                                      ifelse(plot_data_anp2.2$age_start_2 < 20, 4,
-                                                             ifelse(plot_data_anp2.2$age_start_2 < 25, 5,
-                                                                    ifelse(plot_data_anp2.2$age_start_2 < 40, 6, 7))))))
-
-plot_data_anp2.2$age_dyad <- ifelse(plot_data_anp2.2$age_catnum_1 >= plot_data_anp2.2$age_catnum_2,
-                                    paste(plot_data_anp2.2$age_cat_1, plot_data_anp2.2$age_cat_2, sep = ''),
-                                    paste(plot_data_anp2.2$age_cat_2, plot_data_anp2.2$age_cat_1, sep = ''))
-
-# boxplot edge weights by demographic type of dyad -- all types
-(edge_vs_demtype_all <- 
-    ggplot(data = plot_data_anp2.2, aes(y = mean, x = age_dyad))+
-    geom_boxplot(notch = T, outlier.shape = 4, fill = c('blue','purple','blue','grey','purple','blue'))+
-    theme_classic()+
-    labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
-         y = 'mean edge weight')+
-    coord_flip())
-
-# scatter plot of all adult edges by age difference
-(edge_vs_agediff <- 
-    ggplot(plot_data_anp2.2, aes(x = age_diff, y = mean))+
-    geom_jitter(alpha = 0.2)+
-    theme_classic()+
-    theme(legend.position = 'none')+
-    scale_x_continuous('age difference between dyad members',
-                       expand = c(0.02,0))+
-    scale_y_continuous('mean edge weight',
-                       expand = c(0.02,0),
-                       limits = c(0,1)))
-
-# values for reporting
-summary(summaries)
-quantile(summaries$median, seq(0,1,length.out = 101))
-quantile(summaries$mean,   seq(0,1,length.out = 101))
-hist(summaries$median, breaks = 100, xlim = c(0,1), las = 1,
-     xlab = 'median estimated dyad strength', main = '', col = 'skyblue')
-
-m_sum <- plot_data_anp2.2[plot_data_anp2.2$age_dyad == 'AA' | plot_data_anp2.2$age_dyad == 'AP' | plot_data_anp2.2$age_dyad == 'PP',] ; m_sum <- m_sum[!is.na(m_sum$dyad),]
-quantile(m_sum$median, seq(0,1,length.out = 101))
-
-# clean up
-rm(counts_ls)
-rm(draws1_anp2.2, draws2_anp2.2, draws3_anp2.2, draws4_anp2.2, tidy_draws_2.2)
-rm(edge_vs_agediff, edge_vs_demtype_all, m_sum)
-
-### create network plots ################
-head(summaries)
-length(unique(plot_data_anp2.2$id_1))+1 # number of individuals = 55
-
-par(mai = c(0.1,0.1,0.1,0.1))
-
-# create array of draws per dyad (distributions)
-adj_tensor <- array(0, c(NROW(unique(counts_df_non0$id_1))+1,
-                         NROW(unique(counts_df_non0$id_2))+1,
-                         NROW(draws_anp2.2)),
-                    dimnames = list(c(unique(counts_df_non0$id_1),'M119'),
-                                    c('M2',unique(counts_df_non0$id_2)),
-                                    NULL))
-N <- nrow(counts_df_non0)
-
-for (i in 1:N) {
-  dyad_row <- counts_df_non0[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_anp2.2[, i+1]
-}
-adj_tensor[,,1]
-
-# convert to array of medians and 95% credible intervals
-adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
-(adj_lower <- adj_quantiles[1, , ])
-(adj_mid   <- adj_quantiles[2, , ])
-(adj_upper <- adj_quantiles[3, , ])
-adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
-
-# Generate two igraph objects, one from the median and one from the standardised width.
-g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
-g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
-
-# Generate nodes data for plotting characteristics
-males <- males[,c(21,6,9,22:53)]
-View(males) # all ones born before start of study
-
-# create variables for different degrees of node connectedness
-males$degree_0.1 <- NA
-males$degree_0.2 <- NA
-males$degree_0.3 <- NA
-males$degree_0.4 <- NA
-males$degree_0.5 <- NA
-
-summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
-for(i in 1:NROW(males)){
-  rows <- summaries[summaries$id_1 == males$id[i] | summaries$id_2 == males$id[i],]
-  males$degree_0.1[i] <- length(which(rows$median > 0.1))
-  males$degree_0.2[i] <- length(which(rows$median > 0.2))
-  males$degree_0.3[i] <- length(which(rows$median > 0.3))
-  males$degree_0.4[i] <- length(which(rows$median > 0.4))
-  males$degree_0.5[i] <- length(which(rows$median > 0.5))
-}
-
-which(males$degree_0.1 < males$degree_0.2)
-which(males$degree_0.2 < males$degree_0.3)
-which(males$degree_0.3 < males$degree_0.4)
-which(males$degree_0.4 < males$degree_0.5)
-
-# Plot whole network
-coords <- igraph::layout_nicely(g_mid)
-plot(g_mid,
-     edge.width = E(g_rng)$weight*3,
-     edge.color = rgb(0, 0, 0, 0.25), 
-     vertex.label = NA,
-     vertex.size = 5,
-     layout = coords)
-plot(g_mid,
-     edge.width = E(g_mid)$weight*3,
-     edge.color = 'black',
-     vertex.size = 8,
-     vertex.label = males$id,
-     vertex.label.dist = 0,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     #vertex.color= ifelse(males$age_class == 'Adult','seagreen1',
-     #                    ifelse(males$age_class == 'Pubescent','skyblue',
-     #                           ifelse(males$age_class == 'Juvenile', 'yellow','magenta'))),
-     layout = coords, add = TRUE)
-
-plot(g_mid,
-     edge.width = E(g_mid)$weight*3,
-     vertex.label = NA,
-     vertex.size = 5,
-     edge.color = ifelse(adj_mid < 0.5,'transparent','black'),
-     layout = coords)
-plot(g_mid,
-     edge.width = E(g_rng)$weight*3,
-     edge.color = ifelse(adj_mid < 0.5,'transparent',rgb(0,0,0,0.25)),
-     vertex.size = 8,
-     vertex.label = males$id,
-     vertex.label.dist = 0,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     #vertex.color= ifelse(males$age_class == 'Adult','seagreen1',
-     #                     ifelse(males$age_class == 'Pubescent','skyblue',
-     #                            ifelse(males$age_class == 'Juvenile', 'yellow','magenta'))),
-     layout = coords, add = TRUE)
-
-### only elephants degree > 0.3 ####
-g_mid_0.3 <- delete.vertices(graph = g_mid, v = males$id[which(males$degree_0.3 == 0)])
-g_rng_0.3 <- delete.vertices(graph = g_rng, v = males$id[which(males$degree_0.3 == 0)])
-
-set.seed(2)
-coords_0.3 <- layout_nicely(g_mid_0.3)
-plot(g_mid_0.3,
-     edge.color = rgb(0,0,0,0.25),
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
-     vertex.size = 6,
-     vertex.label = NA,
-     layout = coords_0.3)
-plot(g_mid_0.3,
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
-     edge.color = 'black',
-     vertex.size = 6,
-     vertex.label.color = 'black',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.label.dist = 0,
-     #vertex.color = ifelse(nodes[which(males$degree_0.3 != 0),]$age_class == 'Adult',
-     #                      'seagreen1',
-     #                      ifelse(nodes[which(males$degree_0.3 != 0),]$age_class == 'Pubescent','skyblue',
-     #                             ifelse(nodes[which(males$degree_0.3 != 0),]$age_class == 'Juvenile','yellow','magenta'))),
-     layout = coords_0.3, add = TRUE)
-
-plot(g_mid_0.3,
-     edge.color = rgb(0,0,0,0.25),
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
-     vertex.size = 1,
-     vertex.label = NA,
-     layout = coords_0.3)
-plot(g_mid_0.3,
-     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
-     edge.color = 'black',
-     vertex.size = log(males$count_all[which(males$degree_0.3 != 0)]),
-     vertex.color = 'green',
-     vertex.label = males$id[which(males$degree_0.3 != 0)],
-     vertex.label.color = 'magenta',
-     vertex.label.family = 'Helvetica',
-     vertex.label.cex = 0.5,
-     vertex.label.dist = 0,
-     #vertex.color = ifelse(males[which(males$degree_0.3 != 0),]$age_class == 'Adult',
-     #                      'seagreen1',
-     #                      ifelse(males[which(males$degree_0.3 != 0),]$age_class == 'Pubescent','skyblue',
-     #                             ifelse(males[which(males$degree_0.3 != 0),]$age_class == 'Juvenile','yellow','magenta'))),
-     layout = coords_0.3, add = TRUE)
-
-
-
+################ Time windows 1:5 ################
 ################ 7.1) Run model on real standardised data -- period 1 ################
 ### create data list
 counts_df_period1 <- counts_df_non0[counts_df_non0$period == 1,]
@@ -848,27 +272,27 @@ for(i in 1:nrow(summaries)){
 plot_data_anp_1 <- left_join(x = summaries, y = counts_df_period1, by = 'dyad')
 head(plot_data_anp_1)
 plot_data_anp_1$age_cat_1 <- ifelse(plot_data_anp_1$age_start_1 < 6, 'C',
-                                     ifelse(plot_data_anp_1$age_start_1 < 11, 'J',
-                                            ifelse(plot_data_anp_1$age_start_1 > 19, 'A','P')))
+                                    ifelse(plot_data_anp_1$age_start_1 < 11, 'J',
+                                           ifelse(plot_data_anp_1$age_start_1 > 19, 'A','P')))
 plot_data_anp_1$age_cat_2 <- ifelse(plot_data_anp_1$age_start_2 < 6, 'C',
-                                     ifelse(plot_data_anp_1$age_start_2 < 11, 'J',
-                                            ifelse(plot_data_anp_1$age_start_2 > 19, 'A','P')))
+                                    ifelse(plot_data_anp_1$age_start_2 < 11, 'J',
+                                           ifelse(plot_data_anp_1$age_start_2 > 19, 'A','P')))
 plot_data_anp_1$age_catnum_1 <- ifelse(plot_data_anp_1$age_start_1 < 6, 1,
-                                        ifelse(plot_data_anp_1$age_start_1 < 11, 2,
-                                               ifelse(plot_data_anp_1$age_start_1 < 16, 3,
-                                                      ifelse(plot_data_anp_1$age_start_1 < 20, 4,
-                                                             ifelse(plot_data_anp_1$age_start_1 < 25, 5,
-                                                                    ifelse(plot_data_anp_1$age_start_1 < 40, 6, 7))))))
+                                       ifelse(plot_data_anp_1$age_start_1 < 11, 2,
+                                              ifelse(plot_data_anp_1$age_start_1 < 16, 3,
+                                                     ifelse(plot_data_anp_1$age_start_1 < 20, 4,
+                                                            ifelse(plot_data_anp_1$age_start_1 < 25, 5,
+                                                                   ifelse(plot_data_anp_1$age_start_1 < 40, 6, 7))))))
 plot_data_anp_1$age_catnum_2 <- ifelse(plot_data_anp_1$age_start_2 < 6, 1,
-                                        ifelse(plot_data_anp_1$age_start_2 < 11, 2,
-                                               ifelse(plot_data_anp_1$age_start_2 < 16, 3,
-                                                      ifelse(plot_data_anp_1$age_start_2 < 20, 4,
-                                                             ifelse(plot_data_anp_1$age_start_2 < 25, 5,
-                                                                    ifelse(plot_data_anp_1$age_start_2 < 40, 6, 7))))))
+                                       ifelse(plot_data_anp_1$age_start_2 < 11, 2,
+                                              ifelse(plot_data_anp_1$age_start_2 < 16, 3,
+                                                     ifelse(plot_data_anp_1$age_start_2 < 20, 4,
+                                                            ifelse(plot_data_anp_1$age_start_2 < 25, 5,
+                                                                   ifelse(plot_data_anp_1$age_start_2 < 40, 6, 7))))))
 
 plot_data_anp_1$age_dyad <- ifelse(plot_data_anp_1$age_catnum_1 >= plot_data_anp_1$age_catnum_2,
-                                    paste(plot_data_anp_1$age_cat_1, plot_data_anp_1$age_cat_2, sep = ''),
-                                    paste(plot_data_anp_1$age_cat_2, plot_data_anp_1$age_cat_1, sep = ''))
+                                   paste(plot_data_anp_1$age_cat_1, plot_data_anp_1$age_cat_2, sep = ''),
+                                   paste(plot_data_anp_1$age_cat_2, plot_data_anp_1$age_cat_1, sep = ''))
 
 # boxplot edge weights by demographic type of dyad -- all types
 (edge_vs_demtype_all <- 
@@ -970,10 +394,10 @@ which(males1$degree_0.4 < males1$degree_0.5)
 males1$age <- lubridate::year(periods$period_start[periods$period == 1]) - males1$byr
 summary(males1$age)
 males1$age_class <- ifelse(males1$age < 10, 2,
-                            ifelse(males1$age < 15, 3,
-                                   ifelse(males1$age < 20, 4,
-                                          ifelse(males1$age < 25, 5,
-                                                 ifelse(males1$age < 40, 6, 7)))))
+                           ifelse(males1$age < 15, 3,
+                                  ifelse(males1$age < 20, 4,
+                                         ifelse(males1$age < 25, 5,
+                                                ifelse(males1$age < 40, 6, 7)))))
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
@@ -1200,27 +624,27 @@ for(i in 1:nrow(summaries)){
 plot_data_anp_2 <- left_join(x = summaries, y = counts_df_period2, by = 'dyad')
 head(plot_data_anp_2)
 plot_data_anp_2$age_cat_1 <- ifelse(plot_data_anp_2$age_start_1 < 6, 'C',
-                                     ifelse(plot_data_anp_2$age_start_1 < 11, 'J',
-                                            ifelse(plot_data_anp_2$age_start_1 > 19, 'A','P')))
+                                    ifelse(plot_data_anp_2$age_start_1 < 11, 'J',
+                                           ifelse(plot_data_anp_2$age_start_1 > 19, 'A','P')))
 plot_data_anp_2$age_cat_2 <- ifelse(plot_data_anp_2$age_start_2 < 6, 'C',
-                                     ifelse(plot_data_anp_2$age_start_2 < 11, 'J',
-                                            ifelse(plot_data_anp_2$age_start_2 > 19, 'A','P')))
+                                    ifelse(plot_data_anp_2$age_start_2 < 11, 'J',
+                                           ifelse(plot_data_anp_2$age_start_2 > 19, 'A','P')))
 plot_data_anp_2$age_catnum_1 <- ifelse(plot_data_anp_2$age_start_1 < 6, 1,
-                                        ifelse(plot_data_anp_2$age_start_1 < 11, 2,
-                                               ifelse(plot_data_anp_2$age_start_1 < 16, 3,
-                                                      ifelse(plot_data_anp_2$age_start_1 < 20, 4,
-                                                             ifelse(plot_data_anp_2$age_start_1 < 25, 5,
-                                                                    ifelse(plot_data_anp_2$age_start_1 < 40, 6, 7))))))
+                                       ifelse(plot_data_anp_2$age_start_1 < 11, 2,
+                                              ifelse(plot_data_anp_2$age_start_1 < 16, 3,
+                                                     ifelse(plot_data_anp_2$age_start_1 < 20, 4,
+                                                            ifelse(plot_data_anp_2$age_start_1 < 25, 5,
+                                                                   ifelse(plot_data_anp_2$age_start_1 < 40, 6, 7))))))
 plot_data_anp_2$age_catnum_2 <- ifelse(plot_data_anp_2$age_start_2 < 6, 1,
-                                        ifelse(plot_data_anp_2$age_start_2 < 11, 2,
-                                               ifelse(plot_data_anp_2$age_start_2 < 16, 3,
-                                                      ifelse(plot_data_anp_2$age_start_2 < 20, 4,
-                                                             ifelse(plot_data_anp_2$age_start_2 < 25, 5,
-                                                                    ifelse(plot_data_anp_2$age_start_2 < 40, 6, 7))))))
+                                       ifelse(plot_data_anp_2$age_start_2 < 11, 2,
+                                              ifelse(plot_data_anp_2$age_start_2 < 16, 3,
+                                                     ifelse(plot_data_anp_2$age_start_2 < 20, 4,
+                                                            ifelse(plot_data_anp_2$age_start_2 < 25, 5,
+                                                                   ifelse(plot_data_anp_2$age_start_2 < 40, 6, 7))))))
 
 plot_data_anp_2$age_dyad <- ifelse(plot_data_anp_2$age_catnum_1 >= plot_data_anp_2$age_catnum_2,
-                                    paste(plot_data_anp_2$age_cat_1, plot_data_anp_2$age_cat_2, sep = ''),
-                                    paste(plot_data_anp_2$age_cat_2, plot_data_anp_2$age_cat_1, sep = ''))
+                                   paste(plot_data_anp_2$age_cat_1, plot_data_anp_2$age_cat_2, sep = ''),
+                                   paste(plot_data_anp_2$age_cat_2, plot_data_anp_2$age_cat_1, sep = ''))
 
 # boxplot edge weights by demographic type of dyad -- all types
 (edge_vs_demtype_all <- 
@@ -1982,7 +1406,7 @@ plot_data_anp_4$age_dyad <- ifelse(plot_data_anp_4$age_catnum_1 >= plot_data_anp
     ggplot(data = plot_data_anp_4, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -2185,7 +1609,7 @@ plot(g_mid_0.2,
      layout = coords_0.2, add = TRUE)
 
 ### save summary data -- period 4 ####
-summaries$period <- 3
+summaries$period <- 4
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -2216,7 +1640,6 @@ dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
 
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.2,
    counts_df_period4, draws_anp_4, dyad_row, g_mid,g_mid_0.2, g_rng, g_rng_0.2, males4, plot_data_anp_4, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids4, N, plot_cols)
-
 
 ################ 7.5) Run model on real standardised data -- period 5 ################
 ### create data list
@@ -2363,7 +1786,7 @@ plot_data_anp_5$age_dyad <- ifelse(plot_data_anp_5$age_catnum_1 >= plot_data_anp
     ggplot(data = plot_data_anp_5, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -2566,7 +1989,7 @@ plot(g_mid_0.2,
      layout = coords_0.2, add = TRUE)
 
 ### save summary data -- period 5 ####
-summaries$period <- 3
+summaries$period <- 5
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -2597,6 +2020,26 @@ dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
 
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
    counts_df_period5, draws_anp_5, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males5, plot_data_anp_5, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids5, N, plot_cols)
+
+#### Save outputs to file #####
+# write out csv file
+write_csv(dyad_period_weights, 'data_processed/anp_dyad_weightdistributions_2.2_periods1to5_22.05.06.csv')
+
+# produce PDF of graphs
+dev.off()
+
+# add progress stamp
+print(paste0('Time windows 1:5 completed at ', Sys.time()))
+
+################ Time windows 6:10 ################
+# set seed
+set.seed(12345)
+
+# create file of output graphs
+pdf('data_processed/anp_edgeweights_2.2_period6to10_22.05.06.pdf', width = 10, height = 10)
+
+# read in previous summary file
+#dyad_period_weights <- read_csv('data_processed/anp_dyad_weightdistributions_2.2_periods1to5_22.05.06.csv')
 
 ################ 7.6) Run model on real standardised data -- period 6 ################
 ### create data list
@@ -2742,7 +2185,7 @@ plot_data_anp_6$age_dyad <- ifelse(plot_data_anp_6$age_catnum_1 >= plot_data_anp
     ggplot(data = plot_data_anp_6, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -2945,7 +2388,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 6 ####
-summaries$period <- 3
+summaries$period <- 6
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -3121,7 +2564,7 @@ plot_data_anp_7$age_dyad <- ifelse(plot_data_anp_7$age_catnum_1 >= plot_data_anp
     ggplot(data = plot_data_anp_7, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -3324,7 +2767,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 7 ####
-summaries$period <- 3
+summaries$period <- 7
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -3491,7 +2934,7 @@ plot_data_anp_8$age_dyad <- ifelse(plot_data_anp_8$age_catnum_1 >= plot_data_anp
     ggplot(data = plot_data_anp_8, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -3694,7 +3137,7 @@ plot(g_mid_0.2,
      layout = coords_0.2, add = TRUE)
 
 ### save summary data -- period 8 ####
-summaries$period <- 3
+summaries$period <- 8
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -3861,7 +3304,7 @@ plot_data_anp_9$age_dyad <- ifelse(plot_data_anp_9$age_catnum_1 >= plot_data_anp
     ggplot(data = plot_data_anp_9, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -4064,7 +3507,7 @@ plot(g_mid_0.2,
      layout = coords_0.2, add = TRUE)
 
 ### save summary data -- period 9 ####
-summaries$period <- 3
+summaries$period <- 9
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -4204,34 +3647,34 @@ for(i in 1:nrow(summaries)){
 plot_data_anp_10 <- left_join(x = summaries, y = counts_df_period10, by = 'dyad')
 head(plot_data_anp_10)
 plot_data_anp_10$age_cat_1 <- ifelse(plot_data_anp_10$age_start_1 < 6, 'C',
-                                    ifelse(plot_data_anp_10$age_start_1 < 11, 'J',
-                                           ifelse(plot_data_anp_10$age_start_1 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_10$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_10$age_start_1 > 19, 'A','P')))
 plot_data_anp_10$age_cat_2 <- ifelse(plot_data_anp_10$age_start_2 < 6, 'C',
-                                    ifelse(plot_data_anp_10$age_start_2 < 11, 'J',
-                                           ifelse(plot_data_anp_10$age_start_2 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_10$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_10$age_start_2 > 19, 'A','P')))
 plot_data_anp_10$age_catnum_1 <- ifelse(plot_data_anp_10$age_start_1 < 6, 1,
-                                       ifelse(plot_data_anp_10$age_start_1 < 11, 2,
-                                              ifelse(plot_data_anp_10$age_start_1 < 16, 3,
-                                                     ifelse(plot_data_anp_10$age_start_1 < 30, 4,
-                                                            ifelse(plot_data_anp_10$age_start_1 < 35, 5,
-                                                                   ifelse(plot_data_anp_10$age_start_1 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_10$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_10$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_10$age_start_1 < 30, 4,
+                                                             ifelse(plot_data_anp_10$age_start_1 < 35, 5,
+                                                                    ifelse(plot_data_anp_10$age_start_1 < 40, 6, 7))))))
 plot_data_anp_10$age_catnum_2 <- ifelse(plot_data_anp_10$age_start_2 < 6, 1,
-                                       ifelse(plot_data_anp_10$age_start_2 < 11, 2,
-                                              ifelse(plot_data_anp_10$age_start_2 < 16, 3,
-                                                     ifelse(plot_data_anp_10$age_start_2 < 30, 4,
-                                                            ifelse(plot_data_anp_10$age_start_2 < 35, 5,
-                                                                   ifelse(plot_data_anp_10$age_start_2 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_10$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_10$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_10$age_start_2 < 30, 4,
+                                                             ifelse(plot_data_anp_10$age_start_2 < 35, 5,
+                                                                    ifelse(plot_data_anp_10$age_start_2 < 40, 6, 7))))))
 
 plot_data_anp_10$age_dyad <- ifelse(plot_data_anp_10$age_catnum_1 >= plot_data_anp_10$age_catnum_2,
-                                   paste(plot_data_anp_10$age_cat_1, plot_data_anp_10$age_cat_2, sep = ''),
-                                   paste(plot_data_anp_10$age_cat_2, plot_data_anp_10$age_cat_1, sep = ''))
+                                    paste(plot_data_anp_10$age_cat_1, plot_data_anp_10$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_10$age_cat_2, plot_data_anp_10$age_cat_1, sep = ''))
 
 # boxplot edge weights by demographic type of dyad -- all types
 (edge_vs_demtype_all <- 
     ggplot(data = plot_data_anp_10, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -4328,11 +3771,11 @@ which(males10$degree_0.4 < males10$degree_0.5)
 males10$age <- lubridate::year(periods$period_start[periods$period == 10]) - males10$byr
 summary(males10$age)
 males10$age_class <- ifelse(males10$age < 5, 1,
-                           ifelse(males10$age < 10, 2,
-                                  ifelse(males10$age < 15, 3,
-                                         ifelse(males10$age < 30, 4,
-                                                ifelse(males10$age < 35, 5,
-                                                       ifelse(males10$age < 40, 6, 7))))))
+                            ifelse(males10$age < 10, 2,
+                                   ifelse(males10$age < 15, 3,
+                                          ifelse(males10$age < 30, 4,
+                                                 ifelse(males10$age < 35, 5,
+                                                        ifelse(males10$age < 40, 6, 7))))))
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
@@ -4434,7 +3877,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 10 ####
-summaries$period <- 3
+summaries$period <- 10
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -4465,6 +3908,26 @@ dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
 
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
    counts_df_period10, draws_anp_10, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males10, plot_data_anp_10, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids10, N, plot_cols)
+
+#### Save outputs to file #####
+# write out csv file
+write_csv(dyad_period_weights, 'data_processed/anp_dyad_weightdistributions_2.2_periods1to10_22.05.06.csv')
+
+# produce PDF of graphs
+dev.off()
+
+# add progress stamp
+print(paste0('Time windows 6:10 completed at ', Sys.time()))
+
+################ Time windows 11:15 -- not yet tested individually ################
+# set seed
+set.seed(12345)
+
+# create file of output graphs
+pdf('data_processed/anp_edgeweights_2.2_period11to15_22.05.06.pdf', width = 10, height = 10)
+
+# read in previous summary file
+#dyad_period_weights <- read_csv('data_processed/anp_dyad_weightdistributions_2.2_periods6to10_22.05.06.csv')
 
 ################ 7.11) Run model on real standardised data -- period 11 ################
 ### create data list
@@ -4574,34 +4037,34 @@ for(i in 1:nrow(summaries)){
 plot_data_anp_11 <- left_join(x = summaries, y = counts_df_period11, by = 'dyad')
 head(plot_data_anp_11)
 plot_data_anp_11$age_cat_1 <- ifelse(plot_data_anp_11$age_start_1 < 6, 'C',
-                                    ifelse(plot_data_anp_11$age_start_1 < 11, 'J',
-                                           ifelse(plot_data_anp_11$age_start_1 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_11$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_11$age_start_1 > 19, 'A','P')))
 plot_data_anp_11$age_cat_2 <- ifelse(plot_data_anp_11$age_start_2 < 6, 'C',
-                                    ifelse(plot_data_anp_11$age_start_2 < 11, 'J',
-                                           ifelse(plot_data_anp_11$age_start_2 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_11$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_11$age_start_2 > 19, 'A','P')))
 plot_data_anp_11$age_catnum_1 <- ifelse(plot_data_anp_11$age_start_1 < 6, 1,
-                                       ifelse(plot_data_anp_11$age_start_1 < 11, 2,
-                                              ifelse(plot_data_anp_11$age_start_1 < 16, 3,
-                                                     ifelse(plot_data_anp_11$age_start_1 < 30, 4,
-                                                            ifelse(plot_data_anp_11$age_start_1 < 35, 5,
-                                                                   ifelse(plot_data_anp_11$age_start_1 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_11$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_11$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_11$age_start_1 < 30, 4,
+                                                             ifelse(plot_data_anp_11$age_start_1 < 35, 5,
+                                                                    ifelse(plot_data_anp_11$age_start_1 < 40, 6, 7))))))
 plot_data_anp_11$age_catnum_2 <- ifelse(plot_data_anp_11$age_start_2 < 6, 1,
-                                       ifelse(plot_data_anp_11$age_start_2 < 11, 2,
-                                              ifelse(plot_data_anp_11$age_start_2 < 16, 3,
-                                                     ifelse(plot_data_anp_11$age_start_2 < 30, 4,
-                                                            ifelse(plot_data_anp_11$age_start_2 < 35, 5,
-                                                                   ifelse(plot_data_anp_11$age_start_2 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_11$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_11$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_11$age_start_2 < 30, 4,
+                                                             ifelse(plot_data_anp_11$age_start_2 < 35, 5,
+                                                                    ifelse(plot_data_anp_11$age_start_2 < 40, 6, 7))))))
 
 plot_data_anp_11$age_dyad <- ifelse(plot_data_anp_11$age_catnum_1 >= plot_data_anp_11$age_catnum_2,
-                                   paste(plot_data_anp_11$age_cat_1, plot_data_anp_11$age_cat_2, sep = ''),
-                                   paste(plot_data_anp_11$age_cat_2, plot_data_anp_11$age_cat_1, sep = ''))
+                                    paste(plot_data_anp_11$age_cat_1, plot_data_anp_11$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_11$age_cat_2, plot_data_anp_11$age_cat_1, sep = ''))
 
 # boxplot edge weights by demographic type of dyad -- all types
 (edge_vs_demtype_all <- 
     ggplot(data = plot_data_anp_11, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -4698,11 +4161,11 @@ which(males11$degree_0.4 < males11$degree_0.5)
 males11$age <- lubridate::year(periods$period_start[periods$period == 11]) - males11$byr
 summary(males11$age)
 males11$age_class <- ifelse(males11$age < 5, 1,
-                           ifelse(males11$age < 10, 2,
-                                  ifelse(males11$age < 15, 3,
-                                         ifelse(males11$age < 30, 4,
-                                                ifelse(males11$age < 35, 5,
-                                                       ifelse(males11$age < 40, 6, 7))))))
+                            ifelse(males11$age < 10, 2,
+                                   ifelse(males11$age < 15, 3,
+                                          ifelse(males11$age < 30, 4,
+                                                 ifelse(males11$age < 35, 5,
+                                                        ifelse(males11$age < 40, 6, 7))))))
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
@@ -4804,7 +4267,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 11 ####
-summaries$period <- 3
+summaries$period <- 11
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -4944,34 +4407,34 @@ for(i in 1:nrow(summaries)){
 plot_data_anp_12 <- left_join(x = summaries, y = counts_df_period12, by = 'dyad')
 head(plot_data_anp_12)
 plot_data_anp_12$age_cat_1 <- ifelse(plot_data_anp_12$age_start_1 < 6, 'C',
-                                    ifelse(plot_data_anp_12$age_start_1 < 11, 'J',
-                                           ifelse(plot_data_anp_12$age_start_1 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_12$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_12$age_start_1 > 19, 'A','P')))
 plot_data_anp_12$age_cat_2 <- ifelse(plot_data_anp_12$age_start_2 < 6, 'C',
-                                    ifelse(plot_data_anp_12$age_start_2 < 11, 'J',
-                                           ifelse(plot_data_anp_12$age_start_2 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_12$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_12$age_start_2 > 19, 'A','P')))
 plot_data_anp_12$age_catnum_1 <- ifelse(plot_data_anp_12$age_start_1 < 6, 1,
-                                       ifelse(plot_data_anp_12$age_start_1 < 11, 2,
-                                              ifelse(plot_data_anp_12$age_start_1 < 16, 3,
-                                                     ifelse(plot_data_anp_12$age_start_1 < 30, 4,
-                                                            ifelse(plot_data_anp_12$age_start_1 < 35, 5,
-                                                                   ifelse(plot_data_anp_12$age_start_1 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_12$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_12$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_12$age_start_1 < 30, 4,
+                                                             ifelse(plot_data_anp_12$age_start_1 < 35, 5,
+                                                                    ifelse(plot_data_anp_12$age_start_1 < 40, 6, 7))))))
 plot_data_anp_12$age_catnum_2 <- ifelse(plot_data_anp_12$age_start_2 < 6, 1,
-                                       ifelse(plot_data_anp_12$age_start_2 < 11, 2,
-                                              ifelse(plot_data_anp_12$age_start_2 < 16, 3,
-                                                     ifelse(plot_data_anp_12$age_start_2 < 30, 4,
-                                                            ifelse(plot_data_anp_12$age_start_2 < 35, 5,
-                                                                   ifelse(plot_data_anp_12$age_start_2 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_12$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_12$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_12$age_start_2 < 30, 4,
+                                                             ifelse(plot_data_anp_12$age_start_2 < 35, 5,
+                                                                    ifelse(plot_data_anp_12$age_start_2 < 40, 6, 7))))))
 
 plot_data_anp_12$age_dyad <- ifelse(plot_data_anp_12$age_catnum_1 >= plot_data_anp_12$age_catnum_2,
-                                   paste(plot_data_anp_12$age_cat_1, plot_data_anp_12$age_cat_2, sep = ''),
-                                   paste(plot_data_anp_12$age_cat_2, plot_data_anp_12$age_cat_1, sep = ''))
+                                    paste(plot_data_anp_12$age_cat_1, plot_data_anp_12$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_12$age_cat_2, plot_data_anp_12$age_cat_1, sep = ''))
 
 # boxplot edge weights by demographic type of dyad -- all types
 (edge_vs_demtype_all <- 
     ggplot(data = plot_data_anp_12, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -5068,11 +4531,11 @@ which(males12$degree_0.4 < males12$degree_0.5)
 males12$age <- lubridate::year(periods$period_start[periods$period == 12]) - males12$byr
 summary(males12$age)
 males12$age_class <- ifelse(males12$age < 5, 1,
-                           ifelse(males12$age < 10, 2,
-                                  ifelse(males12$age < 15, 3,
-                                         ifelse(males12$age < 30, 4,
-                                                ifelse(males12$age < 35, 5,
-                                                       ifelse(males12$age < 40, 6, 7))))))
+                            ifelse(males12$age < 10, 2,
+                                   ifelse(males12$age < 15, 3,
+                                          ifelse(males12$age < 30, 4,
+                                                 ifelse(males12$age < 35, 5,
+                                                        ifelse(males12$age < 40, 6, 7))))))
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
@@ -5174,7 +4637,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 12 ####
-summaries$period <- 3
+summaries$period <- 12
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -5314,34 +4777,34 @@ for(i in 1:nrow(summaries)){
 plot_data_anp_13 <- left_join(x = summaries, y = counts_df_period13, by = 'dyad')
 head(plot_data_anp_13)
 plot_data_anp_13$age_cat_1 <- ifelse(plot_data_anp_13$age_start_1 < 6, 'C',
-                                    ifelse(plot_data_anp_13$age_start_1 < 11, 'J',
-                                           ifelse(plot_data_anp_13$age_start_1 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_13$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_13$age_start_1 > 19, 'A','P')))
 plot_data_anp_13$age_cat_2 <- ifelse(plot_data_anp_13$age_start_2 < 6, 'C',
-                                    ifelse(plot_data_anp_13$age_start_2 < 11, 'J',
-                                           ifelse(plot_data_anp_13$age_start_2 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_13$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_13$age_start_2 > 19, 'A','P')))
 plot_data_anp_13$age_catnum_1 <- ifelse(plot_data_anp_13$age_start_1 < 6, 1,
-                                       ifelse(plot_data_anp_13$age_start_1 < 11, 2,
-                                              ifelse(plot_data_anp_13$age_start_1 < 16, 3,
-                                                     ifelse(plot_data_anp_13$age_start_1 < 30, 4,
-                                                            ifelse(plot_data_anp_13$age_start_1 < 35, 5,
-                                                                   ifelse(plot_data_anp_13$age_start_1 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_13$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_13$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_13$age_start_1 < 30, 4,
+                                                             ifelse(plot_data_anp_13$age_start_1 < 35, 5,
+                                                                    ifelse(plot_data_anp_13$age_start_1 < 40, 6, 7))))))
 plot_data_anp_13$age_catnum_2 <- ifelse(plot_data_anp_13$age_start_2 < 6, 1,
-                                       ifelse(plot_data_anp_13$age_start_2 < 11, 2,
-                                              ifelse(plot_data_anp_13$age_start_2 < 16, 3,
-                                                     ifelse(plot_data_anp_13$age_start_2 < 30, 4,
-                                                            ifelse(plot_data_anp_13$age_start_2 < 35, 5,
-                                                                   ifelse(plot_data_anp_13$age_start_2 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_13$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_13$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_13$age_start_2 < 30, 4,
+                                                             ifelse(plot_data_anp_13$age_start_2 < 35, 5,
+                                                                    ifelse(plot_data_anp_13$age_start_2 < 40, 6, 7))))))
 
 plot_data_anp_13$age_dyad <- ifelse(plot_data_anp_13$age_catnum_1 >= plot_data_anp_13$age_catnum_2,
-                                   paste(plot_data_anp_13$age_cat_1, plot_data_anp_13$age_cat_2, sep = ''),
-                                   paste(plot_data_anp_13$age_cat_2, plot_data_anp_13$age_cat_1, sep = ''))
+                                    paste(plot_data_anp_13$age_cat_1, plot_data_anp_13$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_13$age_cat_2, plot_data_anp_13$age_cat_1, sep = ''))
 
 # boxplot edge weights by demographic type of dyad -- all types
 (edge_vs_demtype_all <- 
     ggplot(data = plot_data_anp_13, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -5438,11 +4901,11 @@ which(males13$degree_0.4 < males13$degree_0.5)
 males13$age <- lubridate::year(periods$period_start[periods$period == 13]) - males13$byr
 summary(males13$age)
 males13$age_class <- ifelse(males13$age < 5, 1,
-                           ifelse(males13$age < 10, 2,
-                                  ifelse(males13$age < 15, 3,
-                                         ifelse(males13$age < 30, 4,
-                                                ifelse(males13$age < 35, 5,
-                                                       ifelse(males13$age < 40, 6, 7))))))
+                            ifelse(males13$age < 10, 2,
+                                   ifelse(males13$age < 15, 3,
+                                          ifelse(males13$age < 30, 4,
+                                                 ifelse(males13$age < 35, 5,
+                                                        ifelse(males13$age < 40, 6, 7))))))
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
@@ -5544,7 +5007,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 13 ####
-summaries$period <- 3
+summaries$period <- 13
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -5684,34 +5147,34 @@ for(i in 1:nrow(summaries)){
 plot_data_anp_14 <- left_join(x = summaries, y = counts_df_period14, by = 'dyad')
 head(plot_data_anp_14)
 plot_data_anp_14$age_cat_1 <- ifelse(plot_data_anp_14$age_start_1 < 6, 'C',
-                                    ifelse(plot_data_anp_14$age_start_1 < 11, 'J',
-                                           ifelse(plot_data_anp_14$age_start_1 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_14$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_14$age_start_1 > 19, 'A','P')))
 plot_data_anp_14$age_cat_2 <- ifelse(plot_data_anp_14$age_start_2 < 6, 'C',
-                                    ifelse(plot_data_anp_14$age_start_2 < 11, 'J',
-                                           ifelse(plot_data_anp_14$age_start_2 > 19, 'A','P')))
+                                     ifelse(plot_data_anp_14$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_14$age_start_2 > 19, 'A','P')))
 plot_data_anp_14$age_catnum_1 <- ifelse(plot_data_anp_14$age_start_1 < 6, 1,
-                                       ifelse(plot_data_anp_14$age_start_1 < 11, 2,
-                                              ifelse(plot_data_anp_14$age_start_1 < 16, 3,
-                                                     ifelse(plot_data_anp_14$age_start_1 < 30, 4,
-                                                            ifelse(plot_data_anp_14$age_start_1 < 35, 5,
-                                                                   ifelse(plot_data_anp_14$age_start_1 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_14$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_14$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_14$age_start_1 < 30, 4,
+                                                             ifelse(plot_data_anp_14$age_start_1 < 35, 5,
+                                                                    ifelse(plot_data_anp_14$age_start_1 < 40, 6, 7))))))
 plot_data_anp_14$age_catnum_2 <- ifelse(plot_data_anp_14$age_start_2 < 6, 1,
-                                       ifelse(plot_data_anp_14$age_start_2 < 11, 2,
-                                              ifelse(plot_data_anp_14$age_start_2 < 16, 3,
-                                                     ifelse(plot_data_anp_14$age_start_2 < 30, 4,
-                                                            ifelse(plot_data_anp_14$age_start_2 < 35, 5,
-                                                                   ifelse(plot_data_anp_14$age_start_2 < 40, 6, 7))))))
+                                        ifelse(plot_data_anp_14$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_14$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_14$age_start_2 < 30, 4,
+                                                             ifelse(plot_data_anp_14$age_start_2 < 35, 5,
+                                                                    ifelse(plot_data_anp_14$age_start_2 < 40, 6, 7))))))
 
 plot_data_anp_14$age_dyad <- ifelse(plot_data_anp_14$age_catnum_1 >= plot_data_anp_14$age_catnum_2,
-                                   paste(plot_data_anp_14$age_cat_1, plot_data_anp_14$age_cat_2, sep = ''),
-                                   paste(plot_data_anp_14$age_cat_2, plot_data_anp_14$age_cat_1, sep = ''))
+                                    paste(plot_data_anp_14$age_cat_1, plot_data_anp_14$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_14$age_cat_2, plot_data_anp_14$age_cat_1, sep = ''))
 
 # boxplot edge weights by demographic type of dyad -- all types
 (edge_vs_demtype_all <- 
     ggplot(data = plot_data_anp_14, aes(y = mean, x = age_dyad))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
-                 )+
+    )+
     theme_classic()+
     labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
          y = 'mean edge weight')+
@@ -5808,11 +5271,11 @@ which(males14$degree_0.4 < males14$degree_0.5)
 males14$age <- lubridate::year(periods$period_start[periods$period == 14]) - males14$byr
 summary(males14$age)
 males14$age_class <- ifelse(males14$age < 5, 1,
-                           ifelse(males14$age < 10, 2,
-                                  ifelse(males14$age < 15, 3,
-                                         ifelse(males14$age < 30, 4,
-                                                ifelse(males14$age < 35, 5,
-                                                       ifelse(males14$age < 40, 6, 7))))))
+                            ifelse(males14$age < 10, 2,
+                                   ifelse(males14$age < 15, 3,
+                                          ifelse(males14$age < 30, 4,
+                                                 ifelse(males14$age < 35, 5,
+                                                        ifelse(males14$age < 40, 6, 7))))))
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
@@ -5914,7 +5377,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 14 ####
-summaries$period <- 3
+summaries$period <- 14
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -5945,9 +5408,6 @@ dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
 
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
    counts_df_period14, draws_anp_14, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males14, plot_data_anp_14, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids14, N, plot_cols)
-
-
-
 
 ################ 7.15) Run model on real standardised data -- period 15 ################
 ### create data list
@@ -6287,7 +5747,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 15 ####
-summaries$period <- 3
+summaries$period <- 15
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -6318,6 +5778,23 @@ dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
 
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
    counts_df_period15, draws_anp_15, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males15, plot_data_anp_15, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids15, N, plot_cols)
+
+#### Save outputs to file #####
+# write out csv file
+write_csv(dyad_period_weights, 'data_processed/anp_dyad_weightdistributions_2.2_periods1to15_22.05.06.csv')
+
+# produce PDF of graphs
+dev.off()
+
+################ Time windows 16:20 ################
+# set seed
+set.seed(12345)
+
+# create file of output graphs
+pdf('anp_edgeweights_2.2_period16to20_22.05.06.pdf', width = 10, height = 10)
+
+# read in previous summary file
+#dyad_period_weights <- read_csv('data_processed/anp_dyad_weightdistributions_2.2_periods1to15_22.05.06.csv')
 
 ################ 7.16) Run model on real standardised data -- period 16 ################
 ### create data list
@@ -6657,7 +6134,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 16 ####
-summaries$period <- 3
+summaries$period <- 16
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -7027,7 +6504,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 17 ####
-summaries$period <- 3
+summaries$period <- 17
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -7397,7 +6874,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 18 ####
-summaries$period <- 3
+summaries$period <- 18
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -7767,7 +7244,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 19 ####
-summaries$period <- 3
+summaries$period <- 19
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -8137,7 +7614,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 20 ####
-summaries$period <- 3
+summaries$period <- 20
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -8168,6 +7645,26 @@ dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
 
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
    counts_df_period20, draws_anp_20, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males20, plot_data_anp_20, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids20, N, plot_cols)
+
+#### Save outputs to file #####
+# write out csv file
+write_csv(dyad_period_weights, 'data_processed/anp_dyad_weightdistributions_2.2_periods1to20_22.05.06.csv')
+
+# produce PDF of graphs
+dev.off()
+
+# add progress stamp
+print(paste0('Time windows 16:20 completed at ', Sys.time()))
+
+######## periods 21:24 #########
+# set seed
+set.seed(12345)
+
+# create file of output graphs
+pdf('anp_edgeweights_2.2_period21to24_22.05.06.pdf', width = 10, height = 10)
+
+# read in previous summary file
+#dyad_period_weights <- read_csv('data_processed/anp_dyad_weightdistributions_2.2_periods1to20_22.05.06.csv')
 
 ################ 7.21) Run model on real standardised data -- period 21 ################
 ### create data list
@@ -8507,7 +8004,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 21 ####
-summaries$period <- 3
+summaries$period <- 21
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -8877,7 +8374,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 22 ####
-summaries$period <- 3
+summaries$period <- 22
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -9247,7 +8744,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 23 ####
-summaries$period <- 3
+summaries$period <- 23
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -9617,7 +9114,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 24 ####
-summaries$period <- 3
+summaries$period <- 24
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -9648,6 +9145,26 @@ dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
 
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
    counts_df_period24, draws_anp_24, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males24, plot_data_anp_24, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids24, N, plot_cols)
+
+#### Save outputs to file #####
+# write out csv file
+write_csv(dyad_period_weights, 'data_processed/anp_dyad_weightdistributions_2.2_periods1to24_22.05.06.csv')
+
+# produce PDF of graphs
+dev.off()
+
+# add progress stamp
+print(paste0('Time windows 21:24 completed at ', Sys.time()))
+
+##################### time windows 25:28 ########################
+# set seed
+set.seed(12345)
+
+# create file of output graphs
+pdf('anp_edgeweights_2.2_period25to28_22.05.06.pdf', width = 10, height = 10)
+
+# read in previous summary file
+#dyad_period_weights <- read_csv('data_processed/anp_dyad_weightdistributions_2.2_periods1to24_22.05.06.csv')
 
 ################ 7.25) Run model on real standardised data -- period 25 ################
 ### create data list
@@ -9987,7 +9504,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 25 ####
-summaries$period <- 3
+summaries$period <- 25
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -10357,7 +9874,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 26 ####
-summaries$period <- 3
+summaries$period <- 26
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -10727,7 +10244,7 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### save summary data -- period 27 ####
-summaries$period <- 3
+summaries$period <- 27
 summaries <- summaries[,c(1,4:9)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
@@ -11131,7 +10648,10 @@ rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.2,
 
 #### Save outputs to file #####
 # write out csv file
-write_csv(dyad_period_weights, 'anp_dyad_weightdistributions_2.2_22.04.29.csv')
+write_csv(dyad_period_weights, 'data_processed/anp_dyad_weightdistributions_2.2_period1to28_22.05.06.csv')
 
 # produce PDF of graphs
 dev.off()
+
+# add progress stamp
+print(paste0('Time windows 25:28 completed at ', Sys.time()))
