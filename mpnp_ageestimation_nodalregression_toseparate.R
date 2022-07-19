@@ -25,10 +25,10 @@ latent_age_ordinal_model <- cmdstan_model("models/age_estimation/mpnp_elephant_l
 #10	UK
 
 #### load MPNP data ####
-#mpnp1_males <- read_delim('data_processed/mpnp_elenodes_22.03.08.csv', delim = ' ') %>% 
+#mpnp1_long <- read_delim('data_processed/mpnp_elenodes_22.03.08.csv', delim = ' ') %>% 
 #  filter(sex == 'M')
-#unique(mpnp1_males$age_class) # AGE CLASS RECORDED HERE IS MODAL CATEGORY ACROSS ALL SIGHTINGS PER INDIVIDUAL
-#rm(mpnp1_males)
+#unique(mpnp1_long$age_class) # AGE CLASS RECORDED HERE IS MODAL CATEGORY ACROSS ALL SIGHTINGS PER INDIVIDUAL
+#rm(mpnp1_long)
 #mpnp_groups <- readxl::read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')
 #colnames(mpnp_groups) <- mpnp_groups[2,]
 #mpnp_groups <- mpnp_groups[3:nrow(mpnp_groups),c(1:23,57)] %>% janitor::clean_names()
@@ -80,28 +80,23 @@ mpnp1_long$age_average <- ifelse(mpnp1_long$age_mid - mpnp1_long$age_mean == 0, 
 to.check <- mpnp1_long[mpnp1_long$age_average > 10,c(3,7,32:37)]
 length(unique(to.check$elephant_id)) # 32
 
-# DISCUSS WITH DAN AND COLIN HOW BEST TO USE THESE
+rm(to.check)
 
+# DISCUSS WITH DAN AND COLIN HOW BEST TO USE THESE -- Take the median category and round down. State how many elephants that affects. You will probably at the time of publishing have to include what happens if you round up -- make sure your code all pipes together so you can just change a single line and run the entire thing again, and put those results into a supplementary materials
 
+mpnp1_long$age_mid_round <- floor(mpnp1_long$age_mid)
+mpnp1_long <- mpnp1_long[mpnp1_long$age_mid_round < 10 , c(3,5,6,7,34,38)]
 
-
-
-
-
-
-
-
-
+rm(mpnp_long)
 
 #### create data list ####
-N_mpnp1 <- nrow(mpnp1_males)
+N_mpnp1 <- nrow(mpnp1_long)
 K <- 9
 mpnp1_ls <- list(
   N = N_mpnp1,
   K = K,
-  age_category_index = mpnp1_males$age_cat_id)
-hist(mpnp1_ls$age_category_index)
-#hist(elephants_ls$age_category_index)
+  age_category_index = mpnp1_long$age_mid_round)
+hist(mpnp1_ls$age_category_index) # VERY DIFFERENT KIND OF POPULATION TO ANP BUT SHOULD STILL HAVE SIMILAR LIFE EXPECTANCY
 
 #### fit model to MPNP data ####
 # Fit model with cmdstanr
@@ -130,8 +125,8 @@ plot_data <- data.frame(age = ifelse(mpnp1_ls$age == 1, 1,
 plot_data %>%
   ggplot(aes(x=factor(age), y=model_age)) +
   geom_point(size=4,col = 'blue', alpha=0.6) +
-  geom_vline(xintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
-  geom_hline(yintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
+  geom_vline(xintercept = c(5, 9, 15, 20, 25, 35, 60), linetype = "dashed", alpha = 0.6) +
+  geom_hline(yintercept = c(5, 9, 15, 20, 25, 35, 60), linetype = "dashed", alpha = 0.6) +
   #geom_abline(slope = 1, intercept = 0)+
   scale_y_continuous(limits = c(0,60))+
   theme_minimal() + 
@@ -144,16 +139,17 @@ true_ages <- true_ages[,1:N_mpnp1]
 
 df <- as.data.frame(do.call(rbind, true_ages)) %>%
   mutate(age_cat = mpnp1_ls$age) %>% relocate(age_cat) %>%
-  mutate(ID = mpnp1_males$id) %>% relocate(ID)
+  mutate(ID = mpnp1_long$elephant_id) %>% relocate(ID)
 
 df <- df %>% pivot_longer(cols = 3:102) %>% select(-name)
 
-df$true_age <- ifelse(df$age_cat == 1, 3, 
-                      ifelse(df$age_cat == 2, 8,
-                             ifelse(df$age_cat == 3, 12,
-                                    ifelse(df$age_cat == 4, 18,
-                                           ifelse(df$age_cat == 5, 22, 
-                                                  ifelse(df$age_cat == 6, 32, 45))))))
+df$true_age <- ifelse(df$age_cat == 1, 1, 
+                      ifelse(df$age_cat == 2, 3,
+                             ifelse(df$age_cat == 3, 7,
+                                    ifelse(df$age_cat == 4, 12,
+                                           ifelse(df$age_cat == 5, 18, 
+                                                  ifelse(df$age_cat == 6, 22, 
+                                                         ifelse(df$age_cat == 6, 30, 45)))))))
 
 df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   geom_point(size=2,col = 'blue', alpha=0.1) +
@@ -163,8 +159,13 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")
 
+### save data
+saveRDS(true_ages, 'data_processed/mpnp_age_estimates_period1_22.07.18.rds')
+
+### clean environment
+rm(age_est_mat, age_mpnp1_fit, df, latent_age_ordinal_model, mpnp1_ls, plot_data, i, K, N_mpnp1)
+
 ############ Second half of script: Use in nodal regression ############
-rm(elephants_ls, age_estimation_fit, latent_age_ordinal_model, plot_data)
 #### load packages ####
 library(rstan)
 library(igraph)
@@ -172,49 +173,26 @@ library(tidyverse)
 library(LaplacesDemon)
 
 #### read in MPNP data ########
-### clean environment ###
-rm(df_long_mpnp1, df_wide_mpnp1, )
-
 ### import data for aggregated model (binomial)
-df_agg_mpnp1 <- read_delim('data_processed/mpnp1_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',') %>% 
-  filter(dem_class_1 == 'AM' | dem_class_1 == 'PM') %>% 
-  filter(dem_class_2 == 'AM' | dem_class_2 == 'PM')
+df_agg_mpnp1 <- read_delim('data_processed/mpnp_period1_pairwiseevents_22.05.30.csv', delim = ',') %>% 
+  select(-age_min_1,-age_min_2,-age_max_1,-age_max_2,-age_range_1,-age_range_2)
 df_agg_mpnp1$sex_1 <- 'M'
-df_agg_mpnp1$age_cat_id_1 <- ifelse(df_agg_mpnp1$age_category_1 == '9-10', 2,
-                                    ifelse(df_agg_mpnp1$age_category_1 == '10-15', 3,
-                                           ifelse(df_agg_mpnp1$age_category_1 == '15-19', 4,
-                                                  ifelse(df_agg_mpnp1$age_category_1 == '20-25', 5,
-                                                         ifelse(df_agg_mpnp1$age_category_1 == '25-40', 6,
-                                                                ifelse(df_agg_mpnp1$age_category_1 == '40+', 7,
-                                                                       df_agg_mpnp1$age_category_1))))))
-df_agg_mpnp1$age_class_1 <- ifelse(df_agg_mpnp1$age_cat_id_1 == 2, 'Juvenile',
-                                   ifelse(df_agg_mpnp1$age_cat_id_1 > 4, 'Adult','Pubescent'))
-df_agg_mpnp1$age_cat_id_2 <- ifelse(df_agg_mpnp1$age_category_2 == '9-10', 2,
-                                    ifelse(df_agg_mpnp1$age_category_2 == '10-15', 3,
-                                           ifelse(df_agg_mpnp1$age_category_2 == '15-19', 4,
-                                                  ifelse(df_agg_mpnp1$age_category_2 == '20-25', 5,
-                                                         ifelse(df_agg_mpnp1$age_category_2 == '25-40', 6,
-                                                                ifelse(df_agg_mpnp1$age_category_2 == '40+', 7,
-                                                                       df_agg_mpnp1$age_category_2))))))
-df_agg_mpnp1$age_class_2 <- ifelse(df_agg_mpnp1$age_cat_id_2 == 2, 'Juvenile',
-                                   ifelse(df_agg_mpnp1$age_cat_id_2 > 4, 'Adult','Pubescent'))
-df_agg_mpnp1$dem_class_1 <- ifelse(df_agg_mpnp1$age_class_1 == 'Adult', 'AM',
-                                   ifelse(df_agg_mpnp1$age_class_1 == 'Pubescent', 'PM', 'JM'))
-df_agg_mpnp1$dem_class_2 <- ifelse(df_agg_mpnp1$age_class_2 == 'Adult', 'AM',
-                                   ifelse(df_agg_mpnp1$age_class_2 == 'Pubescent', 'PM', 'JM'))
-df_agg_mpnp1$dem_type <- ifelse(df_agg_mpnp1$age_cat_id_1 >= df_agg_mpnp1$age_cat_id_2,
-                                paste(df_agg_mpnp1$dem_class_1, df_agg_mpnp1$dem_class_2, sep = '_'),
-                                paste(df_agg_mpnp1$dem_class_2, df_agg_mpnp1$dem_class_1, sep = '_'))
-df_agg_mpnp1$count_dyad <- (df_agg_mpnp1$count_1 + df_agg_mpnp1$count_2) - df_agg_mpnp1$all_events  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
+df_agg_mpnp1$age_mid_round_1 <- floor(df_agg_mpnp1$age_median_1)
+df_agg_mpnp1$age_mid_round_2 <- floor(df_agg_mpnp1$age_median_2)
 df_agg_mpnp1$node_1_nogaps <- as.integer(as.factor(df_agg_mpnp1$node_1))
 df_agg_mpnp1$node_2_nogaps <- as.integer(as.factor(df_agg_mpnp1$node_2))+1
 df_agg_mpnp1$dyad_id_nogaps <- as.integer(as.factor(df_agg_mpnp1$dyad))
 
 ### load the edge weights
-mpnp1 <- readRDS('data_processed/mpnp1_bayesian_edgedistributions_a2.b2_22.02.07.rds') %>% 
+mpnp1 <- readRDS('data_processed/mpnp1_bayesian_edgedistributions_a2.b2_period1_22.05.30-002.rds') %>% 
   select(-`1.lp__`)
 mpnp1 <- mpnp1[, which(colnames(mpnp1) %in% df_agg_mpnp1$dyad)]
-logit_edge_samples_mpnp1 <- logit(mpnp1)
+logit_edge_samples_mpnp1 <- matrix(data = NA, nrow = nrow(mpnp1), ncol = ncol(mpnp1))
+for(j in 1:ncol(mpnp1)){
+  for(i in 1:nrow(mpnp1)){
+    logit_edge_samples_mpnp1[i,j] <- logit(mpnp1[i,j])
+  }
+}
 
 #### calculate posterior centralities ####
 mpnp1 <- as.matrix(logit_edge_samples_mpnp1)
@@ -314,8 +292,8 @@ model_nodal_cont <- stan_model("models/nodal_regression_hkm_continuousage_22.07.
 
 
 #### fit the model ####
-colnames(true_ages) <- mpnp1_males$id # check this shouldn't be as.integer(as.factor(mpnp1_males$id)), but 90% sure this is correct -- goes into the model in order so should come out in same order?
-mpnp1_ap <- mpnp1_males[mpnp1_males$id %in% node_ages_mpnp1$id, ]
+colnames(true_ages) <- mpnp1_long$id # check this shouldn't be as.integer(as.factor(mpnp1_long$id)), but 90% sure this is correct -- goes into the model in order so should come out in same order?
+mpnp1_ap <- mpnp1_long[mpnp1_long$id %in% node_ages_mpnp1$id, ]
 true_ages_ap <- true_ages[, colnames(true_ages) %in% node_ages_mpnp1$id]
 
 node_ages_mpnp1$age_mean <- NA
