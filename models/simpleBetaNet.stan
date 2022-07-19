@@ -4,10 +4,8 @@ data{
     vector[n_dyads] together;
 }
 parameters {
-    vector<lower=0,upper=1>[n_dyads] weight;            // Outcome variable
+    vector<lower=0,upper=1>[n_dyads] weight; 
 }
 model {
-  for (n in 1:n_dyads){
-    weight[n] ~ beta( 1 + together[n], 1 +  apart[n] );
-  }
+  weight ~ beta( 4 + together, 10 + apart );
 }
