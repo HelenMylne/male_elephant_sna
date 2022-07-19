@@ -28,14 +28,10 @@ transformed parameters {
   // Non-centred age. The same as observed_age ~ normal(true_age,sigma_age)
   observed_age = true_age + sigma_age*observed_age_std; // if one sigma for all
   
-  // In a loop to have a different sigma for each individual
-  //for(i in 1:N) {
-  //  observed_age[i] = true_age[i] + sigma_age[i]*observed_age_std[i];
-  //}
-  // Non-centred shape. The same as shape = normal(1.2,0.1)
-  shape = 1.2 + 0.1*shape_std;
+  // Non-centred shape. The same as shape = normal(0.87,0.02)
+  shape = 0.87 + 0.02*shape_std;
   // Non-centred scale. The same as scale = normal(30,1);
-  scale = 30 + scale_std;
+  scale = 14.7 + scale_std;
 }
 
 model {
