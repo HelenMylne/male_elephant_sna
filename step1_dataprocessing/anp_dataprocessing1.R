@@ -3,14 +3,30 @@
 # Data collected by Amboseli Trust for Elephants (ATE) 1972-2021
 # Data supplied by Vicki Fishlock, 24th February 2022
 #### Set up ####
-library(tidyverse)
-library(rstan)
-library(rethinking)
-library(cmdstanr)
-library(lubridate)
+#install.packages('data.table')
 
-#### Import sightings data ####
-ate <- read_csv('data_processed/anp_sightings_updated_22.06.22.csv') %>% janitor::clean_names()
+library(tidyverse, lib.loc = 'packages')
+library(lubridate, lib.loc = 'packages')
+library(janitor, lib.loc = 'packages')
+library(hms, lib.loc = 'packages')
+library(readxl, lib.loc = 'packages')
+library(data.table, lib.loc = 'packages')
+library(spatsoc, lib.loc = 'packages')
+
+#library(tidyverse)
+#library(lubridate)
+#library(janitor)
+#library(hms)
+#library(readxl)
+#library(data.table)
+#library(spatsoc)
+
+#### Import sightings data -- remove final two columns and convert two to character just to ensure exactly the same as previously when it was working, other than the 13 removed rows ####
+ate <- read_csv('data_processed/anp_sightings_updated_22.06.22.csv') %>% 
+  janitor::clean_names() %>% 
+  select(-obs_casename, -row_num)
+ate$bull_q_c <- as.character(ate$bull_q_c)
+ate$grp_q_c <- as.character(ate$grp_q_c)
 str(ate)
 
 ## casename = MaleID number -- make character string obvious so clearly different from node_id later on
@@ -133,6 +149,9 @@ colnames(ate)
 ## clean environment
 rm(ate_nums, date_row, test, gps, i, no_gps, test_nums)
 
+## progress report
+print(paste0('sightings data imported at ', Sys.time()))
+
 #### Import nodes data ####
 nodes <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 
@@ -144,6 +163,9 @@ nodes_id <- sort(unique(nodes$id))
 ate_id <- sort(unique(ate$id))
 length(nodes_id) ; length(ate_id) ## DO NOT MATCH, OR EVEN CLOSE!
 
+## progress report
+print(paste0('nodes data imported at ', Sys.time()))
+
 #### create group-by-individual matrix ####
 ate$obs_id_std <- as.integer(as.factor(ate$obs_id))
 ate_asnipe <- ate[,c(4,27)]
@@ -151,6 +173,9 @@ colnames(ate_asnipe) <- c('ID','group')
 ate_asnipe <- data.table::setDT(ate_asnipe) # just converts to a data table, no other change. 
 gbi_matrix <- spatsoc::get_gbi(DT = ate_asnipe, group = 'group', id = 'ID')
 # NOTE: THE ORDER OF SIGHTINGS IS ACCORDING TO ate$obs_id_std NOT ate$obs_id -- USE OBS_ID_STD TO MATCH UP SIGHTING INFORMATION TO INDIVIDUALS
+
+## progress report
+print(paste0('gbi_matrix created at ', Sys.time()))
 
 #### convert group-by-individual matrix to dyadic data frame of sightings ####
 ### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md) -- NOTE: this step takes at least 2 weeks to run
@@ -181,6 +206,10 @@ for (obs_id in 1:250) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings1.250.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 1-250 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 251:500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -206,6 +235,10 @@ for (obs_id in 251:500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings251.500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 251-500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 501:750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -231,6 +264,10 @@ for (obs_id in 501:750) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings501.750.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 501-750 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 751:1000) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -256,7 +293,10 @@ for (obs_id in 751:1000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings751.1000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 751-1000 completed at ', Sys.time()))
 
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1001:1250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -282,6 +322,10 @@ for (obs_id in 1001:1250) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings1001.1250.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 1001-1250 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1251:1500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -307,6 +351,10 @@ for (obs_id in 1251:1500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings1251.1500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 1251-1500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1501:1750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -332,6 +380,10 @@ for (obs_id in 1501:1750) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings1501.1750.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 1501-1750 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1751:2000) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -356,6 +408,9 @@ for (obs_id in 1751:2000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings1751.2000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 1751-2000 completed at ', Sys.time()))
 
 ## sightings 2001-4000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -383,6 +438,10 @@ for (obs_id in 2001:2250) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings2001.2250.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 2001-2250 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 2251:2500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -408,6 +467,10 @@ for (obs_id in 2251:2500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings2251.2500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 2251-2500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 2501:2750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -433,6 +496,10 @@ for (obs_id in 2501:2750) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings2501.2750.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 2501-2750 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 2751:3000) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -458,7 +525,10 @@ for (obs_id in 2751:3000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings2751.3000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 2751-3000 completed at ', Sys.time()))
 
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3001:3250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -484,6 +554,10 @@ for (obs_id in 3001:3250) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings3001.3250.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 3001-3250 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3251:3500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -509,6 +583,10 @@ for (obs_id in 3251:3500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings3251.3500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 3251-3500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3501:3750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -534,6 +612,10 @@ for (obs_id in 3501:3750) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings3501.3750.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 3501-3750 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3751:4000) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -558,6 +640,9 @@ for (obs_id in 3751:4000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings3751.4000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 3751-4000 completed at ', Sys.time()))
 
 ## sightings 4001-6000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -610,6 +695,10 @@ for (obs_id in 4251:4500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings4251.4500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 4001-4500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 4501:4750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -660,7 +749,10 @@ for (obs_id in 4751:5000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings4751.5000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 4501-5000 completed at ', Sys.time()))
 
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 5001:5250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -711,6 +803,10 @@ for (obs_id in 5251:5500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings5251.5500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 5001-5500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 5501:5750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -760,6 +856,9 @@ for (obs_id in 5751:6000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings5751.6000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 5501-6000 completed at ', Sys.time()))
 
 ## sightings 6001-8000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -812,6 +911,10 @@ for (obs_id in 6251:6500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings6251.6500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 6001-6500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 6501:6750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -862,7 +965,10 @@ for (obs_id in 6751:7000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings6751.7000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 6501-7000 completed at ', Sys.time()))
 
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 7001:7250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -913,6 +1019,10 @@ for (obs_id in 7251:7500) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings7251.7500.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 7001-7500 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 7501:7750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -962,6 +1072,9 @@ for (obs_id in 7751:8000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings7751.8000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 7501-8000 completed at ', Sys.time()))
 
 ## sightings 8001-10000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -1064,9 +1177,10 @@ for (obs_id in 8751:9000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings8751.9000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 8001-9000 completed at ', Sys.time()))
 
-
-
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 9001:9250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -1166,6 +1280,9 @@ for (obs_id in 9751:10000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings9751.10000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 9001-10000 completed at ', Sys.time()))
 
 ## sightings 10001-12000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -1268,6 +1385,10 @@ for (obs_id in 10751:11000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings10751.11000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 10001-11000 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 11001:11250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -1367,6 +1488,9 @@ for (obs_id in 11751:12000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings11751.12000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 11001-12000 completed at ', Sys.time()))
 
 ## sightings 12001-14000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -1469,6 +1593,10 @@ for (obs_id in 12751:13000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings12751.13000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 12001-13000 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 13001:13250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -1568,6 +1696,9 @@ for (obs_id in 13751:14000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings13751.14000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 13001-14000 completed at ', Sys.time()))
 
 ## sightings 14001-16000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -1670,7 +1801,10 @@ for (obs_id in 14751:15000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings14751.15000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 14001-15000 completed at ', Sys.time()))
 
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 15001:15250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -1770,6 +1904,9 @@ for (obs_id in 15751:16000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings15751.16000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 15001-16000 completed at ', Sys.time()))
 
 ## sightings 16001-18000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -1872,8 +2009,10 @@ for (obs_id in 16751:17000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings16751.17000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 16001-17000 completed at ', Sys.time()))
 
-
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 17001:17250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -1973,6 +2112,9 @@ for (obs_id in 17751:18000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings17751.18000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 17001-18000 completed at ', Sys.time()))
 
 ## sightings 18001-20000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -2075,8 +2217,10 @@ for (obs_id in 18751:19000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings18751.19000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 18001-19000 completed at ', Sys.time()))
 
-
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 19001:19250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -2176,6 +2320,9 @@ for (obs_id in 19751:20000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings19751.20000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 19001-20000 completed at ', Sys.time()))
 
 ## sightings 20001-22000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -2278,8 +2425,10 @@ for (obs_id in 20751:21000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings20751.21000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 20001-21000 completed at ', Sys.time()))
 
-
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 21001:21250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -2379,6 +2528,9 @@ for (obs_id in 21751:22000) {
 }
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings21751.22000.csv', delim = ',')
+
+## progress report
+print(paste0('sightings 21001-22000 completed at ', Sys.time()))
 
 ## sightings 22001-end ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
@@ -2481,6 +2633,10 @@ for (obs_id in 22751:23000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings22751.23000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 22001-23000 completed at ', Sys.time()))
+
+## next section
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 23001:23250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -2581,6 +2737,10 @@ for (obs_id in 23751:24000) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings23751.24000.csv', delim = ',')
 
+## progress report
+print(paste0('sightings 23001-24000 completed at ', Sys.time()))
+
+## next section
 nrow(gbi_matrix) # 24174
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 24001:nrow(gbi_matrix)) {
@@ -2607,113 +2767,5 @@ for (obs_id in 24001:nrow(gbi_matrix)) {
 gbi_df
 write_delim(gbi_df, 'data_processed/anp_bayesian_allpairwiseevents_22.06.22_sightings24001.24174.csv', delim = ',')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-######
-### add elephant ID numbers to assigned index factors
-str(gbi_df)
-gbi_id <- data.frame(id_1 = colnames(gbi_matrix), node_1 = as.numeric(1:472))
-gbi_check <- left_join(x = gbi_df, y = gbi_id, by = 'node_1')
-gbi_id <- data.frame(id_2 = colnames(gbi_matrix), node_2 = as.numeric(1:472))
-gbi_check <- left_join(x = gbi_check, y = gbi_id, by = 'node_2')
-
-### correct obs_id to match encounter numbers in other spreadsheets (some encounters have missing data: encounter numbers 1,2,3,5,6,8... where obs_id 1,2,3,4,5,6...). Warning: sometimes this step can exceed vector memory and not run.
-eles$obs_id <- as.integer(as.factor(eles$encounter)) ; eles <- eles[,c(1,13,2:12)]
-gbi_encounter <- left_join(x = gbi_check, y = eles, by = 'obs_id')
-length(unique(gbi_encounter$encounter)) # 574 -- correct
-
-### remove duplicate rows where a dyad is recording as being observed together twice during the same sighting
-gbi_encounter$unique <- paste(gbi_encounter$node_1, gbi_encounter$node_2, gbi_encounter$social_event, gbi_encounter$obs_id, sep = '_')
-gbi_distinct <- dplyr::distinct(gbi_encounter) # 40708781 obs
-colnames(gbi_distinct) # "node_1","node_2","social_event","obs_id","id_1","id_2","encounter","elephant","date","time","location","gps_s","gps_e",'herd_type","total_elephants_numeric","total_elephants_uncert","total_id_hkm","perc_id_hkm","unique"
-head(gbi_distinct, 10)
-gbi_distinct <- gbi_distinct[,c(1:7,9:18)]
-colnames(gbi_distinct)[c(7,16:17)] <- c('encounter_id','total_id','perc_id')
-
-### convert to Bernoulli model data format -- can't actually use Bernoulli as would require too much computing power
-gbi_distinct$dyad <- paste(gbi_distinct$id_1, gbi_distinct$id_2, sep = '_')
-gbi_distinct$dyad_id <- as.integer(as.factor(gbi_distinct$dyad))
-gbi_distinct$location_id <- as.integer(as.factor(gbi_distinct$location))
-gbi_distinct <- dplyr::distinct(gbi_distinct)
-head(gbi_distinct)
-
-### convert to Binomial model data format -- aggregate all sightings of each dyad together into a count
-df_agg <- gbi_distinct %>%
-  group_by(id_1, id_2) %>%
-  summarise(event_count=sum(social_event), dyad_id=cur_group_id()) %>%
-  mutate(node_1_id=as.integer(as.factor(id_1)), node_2_id=as.integer(as.factor(id_2)))
-length(df_agg$id_1) == cumsum(1:471)[471] # check have correct number of dyads -- number will be the (n-1)th value of the triangular number sequence in which n = total number of elephants in analysis (472). If TRUE, correct number of pairs.
-head(df_agg) ; tail(df_agg)
-##   id_1  id_2  event_count dyad_id node_1_id node_2_id
-##   <chr> <chr>       <dbl>   <int>     <int>     <int>
-## 1 F1    F10             0       1         1         1  -- both F1 and F10 have registered as elephant number 1
-## 2 F1    F100            0       2         1         2
-## 3 F1    F101            0       3         1         3
-## 4 F1    F102            0       4         1         4
-## 5 F1    F103            0       5         1         5
-## 6 F1    F104            0       6         1         6  -- F10, F100-F104 never interacted with F1
-## | |     |               |       |         |         |
-## | |     |               |       |         |         |
-## | |     |               |       |         |         |
-## 1 U67   U7              0  111151         1         1  -- U67 and U7 both registering as elephant number 1 (like F1 and F10 above)
-## 2 U67   U8              0  111152         1         2
-## 3 U67   U9              0  111153         1         3
-## 4 U7    U8              1  111154         1         1
-## 5 U7    U9              1  111155         1         2
-## 6 U8    U9              2  111156         1         1
-# All good except node_1_id and node_2_id reset to 1 for every new value of id_1, so node_1_id contains nothing but "1" in every cell, and node_2_id counts all values when F1 is node_1, all-1 for F10, all-2 for F100..., only U8 and U9 when U7 is node_1, and only U9 when U8 is node_1
-
-### correct values in node_1_id and node_2_id using factor values.
-df_agg <- df_agg[,c(1:4)]
-df_agg$node_1 <- as.integer(as.factor(df_agg$id_1))
-df_agg$node_2 <- as.integer(as.factor(df_agg$id_2))+1 # add 1 so starts at 2 and F1 is "1"
-head(df_agg,10) ; tail(df_agg,10)
-
-### add data about nodes
-colnames(nodes)
-nodes <- nodes[,c(1,3:5,9,11:13)]
-nodes$id_1 <- nodes$id ; nodes$id_2 <- nodes$id
-colnames(nodes) ; colnames(df_agg)
-dyads <- left_join(x = df_agg, y = nodes, by = 'id_1')
-colnames(dyads)[c(2,7:15)] <- c('id_2','id_pad_1','name_1','age_class_1','age_category_1','sex_1','id1_deletecolumn','count_1','dem_class_1','deletecolumn1')
-dyads <- left_join(x = dyads, y = nodes, by = 'id_2')
-colnames(dyads)[c(1,16:24)] <- c('id_1','id_pad_2','name_2','age_class_2','age_category_2','sex_2','id2_deletecolumn','count_2','dem_class_2','deletecolumn2')
-dyads <- dyads[,c(4,1,2,5,6,3,7,16,8,17,9,18,10,19,11,20,13,22,14,23)]
-head(dyads)
-
-### remove any elephants from whom their is disagreement in the different data frames regarding their names or ID numbers
-unique(gbi_distinct$id_1) # 155 females, 250 males, 65 unknowns
-unique(nodes$id_1)        # 151 females, 245 males, 66 unknowns
-length(which(is.na(dyads$id_pad_1)))                 # 2639 entries where elephants have no information
-unique(dyads$id_1[which(is.na(dyads$id_pad_1))])     # "F157" "F158" "F176" "M125" "M13"  "M138" "M21"  "M223" "M227"
-length(which(is.na(dyads$id_pad_2)))                 # 1600 entries where elephants have no information
-unique(dyads$node_2[which(is.na(dyads$id_pad_1))])   # 412 elephants -- all individuals that come after F157 in the sequence
-# all of these should be removed -- these are sightings of elephants which were deleted previously from the ele_nodes and ele_links data frames due to very high uncertainty in their identity, and so their sightings are unreliable.
-
-dyads <- dyads[dyads$id_1 != "F157" & dyads$id_1 != "F158" & dyads$id_1 != "F176" & 
-                 dyads$id_1 != "M125" & dyads$id_1 != "M13" & dyads$id_1 !=  "M138" & 
-                 dyads$id_1 != "M21" & dyads$id_1 != "M223" & dyads$id_1 != "M227", ]
-dyads <- dyads[dyads$id_2 != "F157" & dyads$id_2 != "F158" & dyads$id_2 != "F176" & 
-                 dyads$id_2 != "M125" & dyads$id_2 != "M13" & dyads$id_2 !=  "M138" & 
-                 dyads$id_2 != "M21" & dyads$id_2 != "M223" & dyads$id_2 != "M227", ]
-length(which(is.na(dyads$id_pad_1)))                 # 0 entries where elephants have no information
-length(which(is.na(dyads$id_pad_2)))                 # 0 entries where elephants have no information
-
-### write csv
-readr::write_delim(dyads, 'data_processed/motnp_bayesian_trimmedpairwiseevents_22.01.10.csv', delim = ',')
-
+## progress report
+print(paste0('sightings 24001-end completed at ', Sys.time()))
