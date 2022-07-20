@@ -2,7 +2,6 @@
 # To estimate the ages of individuals in other populations, first come up with a survival curve for the Amboseli elephants which have good birth and death data. -- this identified the best curve as being the Gompertz-Bathtub.
 # Next fit this to the MPNP dataset
 
-############ First half of script: Obtain age estimates ############
 #### load packages ####
 library(tidyverse)
 library(cmdstanr)
@@ -25,13 +24,6 @@ latent_age_ordinal_model <- cmdstan_model("models/age_estimation/mpnp_elephant_l
 #10	UK
 
 #### load MPNP data ####
-#mpnp1_males <- read_delim('data_processed/mpnp_elenodes_22.03.08.csv', delim = ' ') %>% 
-#  filter(sex == 'M')
-#unique(mpnp1_males$age_class) # AGE CLASS RECORDED HERE IS MODAL CATEGORY ACROSS ALL SIGHTINGS PER INDIVIDUAL
-#rm(mpnp1_males)
-#mpnp_groups <- readxl::read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')
-#colnames(mpnp_groups) <- mpnp_groups[2,]
-#mpnp_groups <- mpnp_groups[3:nrow(mpnp_groups),c(1:23,57)] %>% janitor::clean_names()
 mpnp_long <- readxl::read_excel('data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>%
   janitor::clean_names()
 
@@ -73,25 +65,11 @@ for(i in 1:nrow(mpnp1_long)){
   rm(ele)
 }
 
-summary(mpnp1_long$age_range)
-to.check <- mpnp1_long[mpnp1_long$age_range > 0,]
+# take median category and then round down to nearest integer
+mpnp1_long$age_mid_round <- floor(mpnp1_long$age_mid)
+mpnp1_long <- mpnp1_long[mpnp1_long$age_mid_round < 10 , c(3,5,6,7,32:34)]
 
-mpnp1_long$age_average <- ifelse(mpnp1_long$age_mid - mpnp1_long$age_mean == 0, mpnp1_long$age_mid, 999)
-to.check <- mpnp1_long[mpnp1_long$age_average > 10,c(3,7,32:37)]
-length(unique(to.check$elephant_id)) # 32
-
-# DISCUSS WITH DAN AND COLIN HOW BEST TO USE THESE
-
-
-
-
-
-
-
-
-
-
-
+rm(mpnp_long, periods)
 
 #### create data list ####
 N_mpnp1 <- nrow(mpnp1_males)
