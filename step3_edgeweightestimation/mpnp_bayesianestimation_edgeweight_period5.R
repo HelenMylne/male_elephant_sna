@@ -384,3 +384,14 @@ write_csv(dyad_period_weights, 'data_processed/mpnp_dyad_weightdistributions_2.2
 
 # save graphs
 dev.off()
+
+################ combine data outputs from all MPNP models ####
+p1 <- read_csv('data_processed/mpnp_dyad_weightdistributions_2.2_period1_22.05.31.csv')
+p2 <- read_csv('data_processed/mpnp_dyad_weightdistributions_2.2_period2_22.05.31.csv')
+p3 <- read_csv('data_processed/mpnp_dyad_weightdistributions_2.2_period3_22.05.31.csv')
+p4 <- read_csv('data_processed/mpnp_dyad_weightdistributions_2.2_period4_22.05.31.csv')
+p5 <- read_csv('data_processed/mpnp_dyad_weightdistributions_2.2_period5_22.05.31.csv')
+
+### combine
+all <- rbind(p1, p2, p3, p4, p5)
+write_csv(all, 'data_processed/mpnp_dyad_weightdistributions_2.2_allperiods_22.06.01.csv')
