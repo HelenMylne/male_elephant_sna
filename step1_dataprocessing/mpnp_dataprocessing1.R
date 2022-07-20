@@ -229,7 +229,7 @@ ele_nodes$dem_class <- paste(ele_nodes$age, ele_nodes$sex, sep = '')
 ele_nodes <- ele_nodes[c(1:6)]
 
 write_delim(ele_nodes, 'data_processed/mpnp_elenodes_22.03.08.csv')
-# ele_nodes <- read_delim('data_processed/mpnp_elenodes_22.03.08.csv', delim = '_)
+# ele_nodes <- read_csv('data_processed/mpnp_elenodes_22.03.08.csv')
 
 ### clean environment
 rm(efa, efa_age, efa_id, efa_long, test, check, i)
