@@ -1,48 +1,52 @@
 # script to incorporate and correct data from Amboseli
 old <- readxl::read_xlsx('data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% 
-  janitor::clean_names()
+  janitor::clean_names() # read in original data
 new <- readxl::read_xlsx('data_raw/Raw_ATE_Corrections_Fishlock220622.xlsx', sheet = 2) %>% 
-  janitor::clean_names()
+  janitor::clean_names() # read in data with notes for what needs updating
 
+# create variable with unique value for every individual observation - will use to join changes to original
 old$obs_casename <- paste0(old$obs_id, old$casename)
 new$obs_casename <- paste0(new$obs_id, new$casename)
 
+# check which ones to delete immediately
 table(new$change_to)
-delete <- new[new$change_to == 'delete' | new$change_to == 'delete - is UNKID female group',]
-delete$obs_id
-old$row_num <- 1:nrow(old)
-#View(old[which(old$obs_id %in% delete$obs_id),])
-#View(old[which(old$obs_casename %in% delete$obs_casename),])
-delete
+delete <- new[new$change_to == 'delete' | new$change_to == 'delete - is UNKID female group',] # rows to delete
+delete$obs_id              # check obs_id of rows to delete
+old$row_num <- 1:nrow(old) # give all original data a unique row number
 
+# remove data in deleted rows
 updated <- anti_join(x = old, y = delete, by = "obs_casename")
-
 rm(delete)
-new <- new[new$change_to != 'delete' & new$change_to != 'delete - is UNKID female group',]
+new <- new[new$change_to != 'delete' & new$change_to != 'delete - is UNKID female group',] # remove rows already corrected
 
+# check which ones need alteration
 corrections <- new[new$change_to != '261 - as other pop',]
-to_correct <- updated[updated$obs_casename %in% corrections$obs_casename,]
-
-which(sort(corrections$obs_casename) != sort(to_correct$obs_casename))
+to_correct <- updated[updated$obs_casename %in% corrections$obs_casename,] # identify rows in original data require correction
+which(sort(corrections$obs_casename) != sort(to_correct$obs_casename))     # identify where corrections needed
 corrections <- corrections[corrections$obs_casename != "48678217",]
 
-barplot(table(to_correct$obs_id)) # all are 1 - no overlap, can just merge by obs_id
+# correct "to_correct" data with "corrections"
+barplot(table(to_correct$obs_id)) # all are 1 -- no overlap, can just merge by obs_id
 corrections <- corrections[,c('obs_id','change_to')]
 to_correct <- left_join(to_correct, corrections, by = 'obs_id')
 to_correct <- to_correct[,c(1,25,3:24)]
 colnames(to_correct)[2] <- 'casename'
 
+# check remaining corrections
 which(sort(to_correct$casename) != sort(corrections$change_to))
 
+# join corrected data into original
 updated2 <- anti_join(x = updated, y = to_correct, by = 'row_num')
 rm(updated)
 updated <- rbind(updated2, to_correct)
 rm(updated2)
 to_correct
 
+# remove corrected data from list of data to be removed
 new <- anti_join(new, corrections, by = 'obs_id')
 rm(corrections, to_correct)
 
+# additional corrections
 updated[updated$obs_id == new$obs_id[1],]
 updated$casename[which(updated$obs_id == new$obs_id[1] & updated$casename == new$casename[1])] <- '261'
 
