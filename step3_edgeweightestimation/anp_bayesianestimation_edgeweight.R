@@ -10655,3 +10655,1131 @@ dev.off()
 
 # add progress stamp
 print(paste0('Time windows 25:28 completed at ', Sys.time()))
+
+##################### time windows 29:31 ########################
+# set seed
+set.seed(12345)
+
+# create file of output graphs
+pdf('anp_edgeweights_2.2_period29to31_22.07.04.pdf', width = 10, height = 10)
+
+# read in previous summary file
+#dyad_period_weights <- read_csv('data_processed/anp_dyad_weightdistributions_2.2_periods1to28_22.05.06.csv')
+
+################ 7.29) Run model on real standardised data -- period 29 ################
+### create data list
+counts_df_period29 <- counts_df_non0[counts_df_non0$period == 29,]
+counts_ls <- list(
+  n_dyads  = nrow(counts_df_period29),          # total number of times one or other of the dyad was observed
+  together = counts_df_period29$event_count,    # count number of sightings seen together
+  apart    = counts_df_period29$apart,          # count number of sightings seen apart
+  period   = counts_df_period29$period)         # which period it's within
+
+### Fit model
+weight_anp_2.2_period29 <- mod_2.2$sample(
+  data = counts_ls, 
+  seed = 12345, 
+  chains = 4, 
+  parallel_chains = 4)
+
+### check model
+weight_anp_2.2_period29
+#variable       mean    median    sd   mad        q5       q95 rhat ess_bulk ess_tail
+#
+rm(counts_ls)
+
+# showing 10 of 402700 rows (change via 'max_rows' argument or 'cmdstanr_max_rows' option)
+output1 <- read_cmdstan_csv(weight_anp_2.2_period29$output_files()[1])
+draws1_anp_29 <- as.data.frame(output1$post_warmup_draws)
+rm(output1)
+
+output2 <- read_cmdstan_csv(weight_anp_2.2_period29$output_files()[2])
+draws2_anp_29 <- as.data.frame(output2$post_warmup_draws)
+rm(output2)
+
+output3 <- read_cmdstan_csv(weight_anp_2.2_period29$output_files()[3])
+draws3_anp_29 <- as.data.frame(output3$post_warmup_draws)
+rm(output3)
+
+output4 <- read_cmdstan_csv(weight_anp_2.2_period29$output_files()[4])
+draws4_anp_29 <- as.data.frame(output4$post_warmup_draws)
+rm(output4)
+
+draws_anp_29 <- rbind(draws1_anp_29, draws2_anp_29, draws3_anp_29, draws4_anp_29)
+
+colnames(draws_anp_29)[2:ncol(draws_anp_29)] <- counts_df_period29$dyad
+
+# Assign random set of columns to check
+plot_cols <- sample(x = 2:ncol(draws_anp_29), size = 30, replace = F)
+
+### save data 
+write_csv(draws_anp_29, 'data_processed/anp_bayesian_edgedistributions_a2.b2_period29_22.07.04.csv')
+rm(draws1_anp_29, draws2_anp_29, draws3_anp_29, draws4_anp_29)
+
+### build traceplots  -- period 29 ####
+plot(draws_anp_29[,plot_cols[1]], type = 'l', ylim = c(0,1), las = 1, ylab = 'edge weight')
+lines(draws_anp_29[,plot_cols[2]], col = 'tan')
+lines(draws_anp_29[,plot_cols[3]], col = 'orange')
+lines(draws_anp_29[,plot_cols[4]], col = 'green')
+lines(draws_anp_29[,plot_cols[5]], col = 'chocolate')
+lines(draws_anp_29[,plot_cols[6]], col = 'blue')
+lines(draws_anp_29[,plot_cols[7]], col = 'red')
+lines(draws_anp_29[,plot_cols[8]], col = 'seagreen')
+lines(draws_anp_29[,plot_cols[9]], col = 'purple')
+lines(draws_anp_29[,plot_cols[10]],col = 'magenta')
+lines(draws_anp_29[,plot_cols[11]],col = 'black')
+lines(draws_anp_29[,plot_cols[12]], col = 'tan')
+lines(draws_anp_29[,plot_cols[13]], col = 'orange')
+lines(draws_anp_29[,plot_cols[14]], col = 'green')
+lines(draws_anp_29[,plot_cols[15]], col = 'chocolate')
+lines(draws_anp_29[,plot_cols[16]], col = 'blue')
+lines(draws_anp_29[,plot_cols[17]], col = 'red')
+lines(draws_anp_29[,plot_cols[18]], col = 'seagreen')
+lines(draws_anp_29[,plot_cols[19]], col = 'purple')
+lines(draws_anp_29[,plot_cols[20]],col = 'magenta')
+lines(draws_anp_29[,plot_cols[21]],col = 'black')
+lines(draws_anp_29[,plot_cols[22]], col = 'tan')
+lines(draws_anp_29[,plot_cols[23]], col = 'orange')
+lines(draws_anp_29[,plot_cols[24]], col = 'green')
+lines(draws_anp_29[,plot_cols[25]], col = 'chocolate')
+lines(draws_anp_29[,plot_cols[26]], col = 'blue')
+lines(draws_anp_29[,plot_cols[27]], col = 'red')
+lines(draws_anp_29[,plot_cols[28]], col = 'seagreen')
+lines(draws_anp_29[,plot_cols[29]], col = 'purple')
+lines(draws_anp_29[,plot_cols[30]],col = 'magenta')
+
+### density plots  -- period 29 ####
+dens(draws_anp_29[,2], ylim = c(0,20),xlim = c(0,1), las = 1)
+for(i in 1:length(plot_cols)){
+  dens(add = T, draws_anp_29[,plot_cols[i]], col = col.alpha('blue', alpha = 0.3))
+}
+
+### summarise data -- period 29 ####
+# summarise -- look for any anomalies in draw values
+summaries <- data.frame(dyad = colnames(draws_anp_29[,2:ncol(draws_anp_29)]),
+                        min = rep(NA, ncol(draws_anp_29)-1),
+                        max = rep(NA, ncol(draws_anp_29)-1),
+                        mean = rep(NA, ncol(draws_anp_29)-1),
+                        median = rep(NA, ncol(draws_anp_29)-1),
+                        sd = rep(NA, ncol(draws_anp_29)-1))
+for(i in 1:nrow(summaries)){
+  summaries$min[i]    <- min(draws_anp_29[,i+1])
+  summaries$max[i]    <- max(draws_anp_29[,i+1])
+  summaries$mean[i]   <- mean(draws_anp_29[,i+1])
+  summaries$median[i] <- median(draws_anp_29[,i+1])
+  summaries$sd[i]     <- sd(draws_anp_29[,i+1])
+}
+
+# organise dem_class -- report age category based on age at start of period
+plot_data_anp_29 <- left_join(x = summaries, y = counts_df_period29, by = 'dyad')
+head(plot_data_anp_29)
+plot_data_anp_29$age_cat_1 <- ifelse(plot_data_anp_29$age_start_1 < 6, 'C',
+                                     ifelse(plot_data_anp_29$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_29$age_start_1 > 19, 'A','P')))
+plot_data_anp_29$age_cat_2 <- ifelse(plot_data_anp_29$age_start_2 < 6, 'C',
+                                     ifelse(plot_data_anp_29$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_29$age_start_2 > 19, 'A','P')))
+plot_data_anp_29$age_catnum_1 <- ifelse(plot_data_anp_29$age_start_1 < 6, 1,
+                                        ifelse(plot_data_anp_29$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_29$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_29$age_start_1 < 20, 4,
+                                                             ifelse(plot_data_anp_29$age_start_1 < 25, 5,
+                                                                    ifelse(plot_data_anp_29$age_start_1 < 40, 6, 7))))))
+plot_data_anp_29$age_catnum_2 <- ifelse(plot_data_anp_29$age_start_2 < 6, 1,
+                                        ifelse(plot_data_anp_29$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_29$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_29$age_start_2 < 20, 4,
+                                                             ifelse(plot_data_anp_29$age_start_2 < 25, 5,
+                                                                    ifelse(plot_data_anp_29$age_start_2 < 40, 6, 7))))))
+
+plot_data_anp_29$age_dyad <- ifelse(plot_data_anp_29$age_catnum_1 >= plot_data_anp_29$age_catnum_2,
+                                    paste(plot_data_anp_29$age_cat_1, plot_data_anp_29$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_29$age_cat_2, plot_data_anp_29$age_cat_1, sep = ''))
+
+# boxplot edge weights by demographic type of dyad -- all types
+(edge_vs_demtype_all <- 
+    ggplot(data = plot_data_anp_29, aes(y = mean, x = age_dyad))+
+    geom_boxplot(notch = T, outlier.shape = 4,
+                 #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
+    )+
+    theme_classic()+
+    labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
+         y = 'mean edge weight')+
+    coord_flip())
+
+# scatter plot of all adult edges by age difference
+(edge_vs_agediff <- 
+    ggplot(plot_data_anp_29, aes(x = age_diff, y = mean))+
+    geom_jitter(alpha = 0.2)+
+    theme_classic()+
+    theme(legend.position = 'none')+
+    scale_x_continuous('age difference between dyad members',
+                       expand = c(0.02,0))+
+    scale_y_continuous('mean edge weight',
+                       expand = c(0.02,0),
+                       limits = c(0,1)))
+
+# values for reporting
+summary(summaries) # generally about the same as MOTNP
+quantile(summaries$median, seq(0,1,length.out = 101))
+quantile(summaries$mean,   seq(0,1,length.out = 101))
+hist(summaries$median, breaks = 100, xlim = c(0,1), las = 1,
+     xlab = 'median estimated dyad strength', main = '', col = 'skyblue')
+
+m_sum <- plot_data_anp_29[plot_data_anp_29$age_dyad == 'AA' | plot_data_anp_29$age_dyad == 'AP' | plot_data_anp_29$age_dyad == 'PP',] ; m_sum <- m_sum[!is.na(m_sum$dyad),]
+quantile(m_sum$median, seq(0,1,length.out = 101))
+
+# clean up
+rm(edge_vs_agediff, edge_vs_demtype_all, m_sum)
+
+### create network plots -- period 29 ################
+head(summaries)
+length(unique(plot_data_anp_29$id_1))+1 # number of individuals = 
+
+par(mai = c(0.1,0.1,0.1,0.1))
+
+# create array of draws per dyad (distributions)
+adj_tensor <- array(0, c(NROW(unique(counts_df_period29$id_1))+1,
+                         NROW(unique(counts_df_period29$id_2))+1,
+                         NROW(draws_anp_29)),
+                    dimnames = list(c(unique(counts_df_period29$id_1),
+                                      unique(counts_df_period29$id_2)[length(unique(counts_df_period29$id_2))]),
+                                    c(unique(counts_df_period29$id_1),
+                                      unique(counts_df_period29$id_2)[length(unique(counts_df_period29$id_2))]),
+                                    NULL))
+N <- nrow(counts_df_period29)
+
+for (i in 1:N) {
+  dyad_row <- counts_df_period29[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_anp_29[, i+1]
+}
+adj_tensor[,,1]
+
+# convert to array of medians and 95% credible intervals
+adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
+(adj_lower <- adj_quantiles[1, , ])
+(adj_mid   <- adj_quantiles[2, , ])
+(adj_upper <- adj_quantiles[3, , ])
+adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
+
+# Generate two igraph objects, one from the median and one from the standardised width.
+g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
+g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
+
+# Generate nodes data for plotting characteristics
+ids29 <- c(unique(counts_df_period29$id_1), unique(counts_df_period29$id_2)[length(unique(counts_df_period29$id_2))])
+males29 <- males[,c(21,6,9,22:53)]
+males29 <- males29 %>% dplyr::filter(id %in% ids29)
+males29
+
+# create variables for different degrees of node connectedness
+males29$degree_0.1 <- NA
+males29$degree_0.2 <- NA
+males29$degree_0.3 <- NA
+males29$degree_0.4 <- NA
+males29$degree_0.5 <- NA
+
+summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
+for(i in 1:NROW(males29)){
+  rows <- summaries[summaries$id_1 == males29$id[i] | summaries$id_2 == males29$id[i],]
+  males29$degree_0.1[i] <- length(which(rows$median > 0.1))
+  males29$degree_0.2[i] <- length(which(rows$median > 0.2))
+  males29$degree_0.3[i] <- length(which(rows$median > 0.3))
+  males29$degree_0.4[i] <- length(which(rows$median > 0.4))
+  males29$degree_0.5[i] <- length(which(rows$median > 0.5))
+}
+
+which(males29$degree_0.1 < males29$degree_0.2)
+which(males29$degree_0.2 < males29$degree_0.3)
+which(males29$degree_0.3 < males29$degree_0.4)
+which(males29$degree_0.4 < males29$degree_0.5)
+
+# age variable
+males29$age <- lubridate::year(periods$period_start[periods$period == 29]) - males29$byr
+summary(males29$age)
+males29$age_class <- ifelse(males29$age < 5, 1,
+                            ifelse(males29$age < 10, 2,
+                                   ifelse(males29$age < 15, 3,
+                                          ifelse(males29$age < 20, 4,
+                                                 ifelse(males29$age < 25, 5,
+                                                        ifelse(males29$age < 40, 6, 7))))))
+
+# Plot whole network
+coords <- igraph::layout_nicely(g_mid)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = rgb(0, 0, 0, 0.25), 
+     vertex.label = NA,
+     vertex.size = 5,
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     edge.color = 'black',
+     vertex.size = 8,
+     vertex.label = males29$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(males29$age_class == 7,'seagreen4',
+                          ifelse(males29$age_class == 6,'seagreen3',
+                                 ifelse(males29$age_class == 5,'seagreen2',
+                                        ifelse(males29$age_class == 4,'steelblue3',
+                                               ifelse(males29$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords, add = TRUE)
+
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = ifelse(E(g_mid)$weight < 0.3,'transparent','black'),
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = ifelse(E(g_mid)$weight < 0.3,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 8,
+     vertex.label = males29$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(males29$age_class == 7,'seagreen4',
+                          ifelse(males29$age_class == 6,'seagreen3',
+                                 ifelse(males29$age_class == 5,'seagreen2',
+                                        ifelse(males29$age_class == 4,'steelblue3',
+                                               ifelse(males29$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords, add = TRUE)
+
+### only elephants degree > 0.3 -- period 29 ####
+g_mid_0.3 <- delete.vertices(graph = g_mid, v = males29$id[which(males29$degree_0.3 == 0)])
+g_rng_0.3 <- delete.vertices(graph = g_rng, v = males29$id[which(males29$degree_0.3 == 0)])
+
+set.seed(3)
+coords_0.3 <- layout_nicely(g_mid_0.3)
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.35),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
+     vertex.size = 6,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = 6,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color= ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 7,'seagreen4',
+                          ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 6,'seagreen3',
+                                 ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 5,'seagreen2',
+                                        ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 4,'steelblue3',
+                                               ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords_0.3, add = TRUE)
+
+par(mai = c(0.1,0.4,0.1,0.3))
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.35),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = males29$p28[which(males29$degree_0.3 != 0)],
+     vertex.label = males29$id[which(males29$degree_0.3 != 0)],
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color= ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 7,'seagreen4',
+                          ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 6,'seagreen3',
+                                 ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 5,'seagreen2',
+                                        ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 4,'steelblue3',
+                                               ifelse(males29[which(males29$degree_0.3 != 0),]$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords_0.3, add = TRUE)
+
+### save summary data -- period 29 ####
+summaries$period <- 29
+summaries <- summaries[,c(1,4:9)]
+dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
+                                 by = c('dyad','period'))
+colnames(dyad_period_weights)[36:40] <- c('min','max','mean','median','sd')
+for(i in 1:nrow(dyad_period_weights)){
+  dyad_period_weights$min[i] <- ifelse(is.na(dyad_period_weights$min[i]) == TRUE,
+                                       ifelse(is.na(dyad_period_weights$min.x[i]) == FALSE,
+                                              dyad_period_weights$min.x[i], NA),
+                                       dyad_period_weights$min[i])
+  dyad_period_weights$max[i] <- ifelse(is.na(dyad_period_weights$max[i]) == TRUE,
+                                       ifelse(is.na(dyad_period_weights$max.x[i]) == FALSE,
+                                              dyad_period_weights$max.x[i], NA),
+                                       dyad_period_weights$max[i])
+  dyad_period_weights$mean[i] <- ifelse(is.na(dyad_period_weights$mean[i]) == TRUE,
+                                        ifelse(is.na(dyad_period_weights$mean.x[i]) == FALSE,
+                                               dyad_period_weights$mean.x[i], NA),
+                                        dyad_period_weights$mean[i])
+  dyad_period_weights$median[i] <- ifelse(is.na(dyad_period_weights$median[i]) == TRUE,
+                                          ifelse(is.na(dyad_period_weights$median.x[i]) == FALSE,
+                                                 dyad_period_weights$median.x[i], NA),
+                                          dyad_period_weights$median[i])
+  dyad_period_weights$sd[i] <- ifelse(is.na(dyad_period_weights$sd[i]) == TRUE,
+                                      ifelse(is.na(dyad_period_weights$sd.x[i]) == FALSE,
+                                             dyad_period_weights$sd.x[i], NA),
+                                      dyad_period_weights$sd[i])
+}
+dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
+
+rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
+   counts_df_period29, draws_anp_29, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males29, plot_data_anp_29, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids29, N, plot_cols)
+
+################ 7.30) Run model on real standardised data -- period 30 ################
+### create data list
+counts_df_period30 <- counts_df_non0[counts_df_non0$period == 30,]
+counts_ls <- list(
+  n_dyads  = nrow(counts_df_period30),          # total number of times one or other of the dyad was observed
+  together = counts_df_period30$event_count,    # count number of sightings seen together
+  apart    = counts_df_period30$apart,          # count number of sightings seen apart
+  period   = counts_df_period30$period)         # which period it's within
+
+### Fit model
+weight_anp_2.2_period30 <- mod_2.2$sample(
+  data = counts_ls, 
+  seed = 12345, 
+  chains = 4, 
+  parallel_chains = 4)
+
+### check model
+weight_anp_2.2_period30
+#variable       mean    median    sd   mad        q5       q95 rhat ess_bulk ess_tail
+#
+rm(counts_ls)
+
+# showing 10 of 402700 rows (change via 'max_rows' argument or 'cmdstanr_max_rows' option)
+output1 <- read_cmdstan_csv(weight_anp_2.2_period30$output_files()[1])
+draws1_anp_30 <- as.data.frame(output1$post_warmup_draws)
+rm(output1)
+
+output2 <- read_cmdstan_csv(weight_anp_2.2_period30$output_files()[2])
+draws2_anp_30 <- as.data.frame(output2$post_warmup_draws)
+rm(output2)
+
+output3 <- read_cmdstan_csv(weight_anp_2.2_period30$output_files()[3])
+draws3_anp_30 <- as.data.frame(output3$post_warmup_draws)
+rm(output3)
+
+output4 <- read_cmdstan_csv(weight_anp_2.2_period30$output_files()[4])
+draws4_anp_30 <- as.data.frame(output4$post_warmup_draws)
+rm(output4)
+
+draws_anp_30 <- rbind(draws1_anp_30, draws2_anp_30, draws3_anp_30, draws4_anp_30)
+
+colnames(draws_anp_30)[2:ncol(draws_anp_30)] <- counts_df_period30$dyad
+
+# Assign random set of columns to check
+plot_cols <- sample(x = 2:ncol(draws_anp_30), size = 30, replace = F)
+
+### save data 
+write_csv(draws_anp_30, 'data_processed/anp_bayesian_edgedistributions_a2.b2_period30_22.07.04.csv')
+rm(draws1_anp_30, draws2_anp_30, draws3_anp_30, draws4_anp_30)
+
+### build traceplots  -- period 30 ####
+plot(draws_anp_30[,plot_cols[1]], type = 'l', ylim = c(0,1), las = 1, ylab = 'edge weight')
+lines(draws_anp_30[,plot_cols[2]], col = 'tan')
+lines(draws_anp_30[,plot_cols[3]], col = 'orange')
+lines(draws_anp_30[,plot_cols[4]], col = 'green')
+lines(draws_anp_30[,plot_cols[5]], col = 'chocolate')
+lines(draws_anp_30[,plot_cols[6]], col = 'blue')
+lines(draws_anp_30[,plot_cols[7]], col = 'red')
+lines(draws_anp_30[,plot_cols[8]], col = 'seagreen')
+lines(draws_anp_30[,plot_cols[9]], col = 'purple')
+lines(draws_anp_30[,plot_cols[10]],col = 'magenta')
+lines(draws_anp_30[,plot_cols[11]],col = 'black')
+lines(draws_anp_30[,plot_cols[12]], col = 'tan')
+lines(draws_anp_30[,plot_cols[13]], col = 'orange')
+lines(draws_anp_30[,plot_cols[14]], col = 'green')
+lines(draws_anp_30[,plot_cols[15]], col = 'chocolate')
+lines(draws_anp_30[,plot_cols[16]], col = 'blue')
+lines(draws_anp_30[,plot_cols[17]], col = 'red')
+lines(draws_anp_30[,plot_cols[18]], col = 'seagreen')
+lines(draws_anp_30[,plot_cols[19]], col = 'purple')
+lines(draws_anp_30[,plot_cols[20]],col = 'magenta')
+lines(draws_anp_30[,plot_cols[21]],col = 'black')
+lines(draws_anp_30[,plot_cols[22]], col = 'tan')
+lines(draws_anp_30[,plot_cols[23]], col = 'orange')
+lines(draws_anp_30[,plot_cols[24]], col = 'green')
+lines(draws_anp_30[,plot_cols[25]], col = 'chocolate')
+lines(draws_anp_30[,plot_cols[26]], col = 'blue')
+lines(draws_anp_30[,plot_cols[27]], col = 'red')
+lines(draws_anp_30[,plot_cols[28]], col = 'seagreen')
+lines(draws_anp_30[,plot_cols[29]], col = 'purple')
+lines(draws_anp_30[,plot_cols[30]],col = 'magenta')
+
+### density plots  -- period 30 ####
+dens(draws_anp_30[,2], ylim = c(0,20),xlim = c(0,1), las = 1)
+for(i in 1:length(plot_cols)){
+  dens(add = T, draws_anp_30[,plot_cols[i]], col = col.alpha('blue', alpha = 0.3))
+}
+
+### summarise data -- period 30 ####
+# summarise -- look for any anomalies in draw values
+summaries <- data.frame(dyad = colnames(draws_anp_30[,2:ncol(draws_anp_30)]),
+                        min = rep(NA, ncol(draws_anp_30)-1),
+                        max = rep(NA, ncol(draws_anp_30)-1),
+                        mean = rep(NA, ncol(draws_anp_30)-1),
+                        median = rep(NA, ncol(draws_anp_30)-1),
+                        sd = rep(NA, ncol(draws_anp_30)-1))
+for(i in 1:nrow(summaries)){
+  summaries$min[i]    <- min(draws_anp_30[,i+1])
+  summaries$max[i]    <- max(draws_anp_30[,i+1])
+  summaries$mean[i]   <- mean(draws_anp_30[,i+1])
+  summaries$median[i] <- median(draws_anp_30[,i+1])
+  summaries$sd[i]     <- sd(draws_anp_30[,i+1])
+}
+
+# organise dem_class -- report age category based on age at start of period
+plot_data_anp_30 <- left_join(x = summaries, y = counts_df_period30, by = 'dyad')
+head(plot_data_anp_30)
+plot_data_anp_30$age_cat_1 <- ifelse(plot_data_anp_30$age_start_1 < 6, 'C',
+                                     ifelse(plot_data_anp_30$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_30$age_start_1 > 19, 'A','P')))
+plot_data_anp_30$age_cat_2 <- ifelse(plot_data_anp_30$age_start_2 < 6, 'C',
+                                     ifelse(plot_data_anp_30$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_30$age_start_2 > 19, 'A','P')))
+plot_data_anp_30$age_catnum_1 <- ifelse(plot_data_anp_30$age_start_1 < 6, 1,
+                                        ifelse(plot_data_anp_30$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_30$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_30$age_start_1 < 20, 4,
+                                                             ifelse(plot_data_anp_30$age_start_1 < 25, 5,
+                                                                    ifelse(plot_data_anp_30$age_start_1 < 40, 6, 7))))))
+plot_data_anp_30$age_catnum_2 <- ifelse(plot_data_anp_30$age_start_2 < 6, 1,
+                                        ifelse(plot_data_anp_30$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_30$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_30$age_start_2 < 20, 4,
+                                                             ifelse(plot_data_anp_30$age_start_2 < 25, 5,
+                                                                    ifelse(plot_data_anp_30$age_start_2 < 40, 6, 7))))))
+
+plot_data_anp_30$age_dyad <- ifelse(plot_data_anp_30$age_catnum_1 >= plot_data_anp_30$age_catnum_2,
+                                    paste(plot_data_anp_30$age_cat_1, plot_data_anp_30$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_30$age_cat_2, plot_data_anp_30$age_cat_1, sep = ''))
+
+# boxplot edge weights by demographic type of dyad -- all types
+(edge_vs_demtype_all <- 
+    ggplot(data = plot_data_anp_30, aes(y = mean, x = age_dyad))+
+    geom_boxplot(notch = T, outlier.shape = 4,
+                 #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
+    )+
+    theme_classic()+
+    labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
+         y = 'mean edge weight')+
+    coord_flip())
+
+# scatter plot of all adult edges by age difference
+(edge_vs_agediff <- 
+    ggplot(plot_data_anp_30, aes(x = age_diff, y = mean))+
+    geom_jitter(alpha = 0.2)+
+    theme_classic()+
+    theme(legend.position = 'none')+
+    scale_x_continuous('age difference between dyad members',
+                       expand = c(0.02,0))+
+    scale_y_continuous('mean edge weight',
+                       expand = c(0.02,0),
+                       limits = c(0,1)))
+
+# values for reporting
+summary(summaries) # generally about the same as MOTNP
+quantile(summaries$median, seq(0,1,length.out = 101))
+quantile(summaries$mean,   seq(0,1,length.out = 101))
+hist(summaries$median, breaks = 100, xlim = c(0,1), las = 1,
+     xlab = 'median estimated dyad strength', main = '', col = 'skyblue')
+
+m_sum <- plot_data_anp_30[plot_data_anp_30$age_dyad == 'AA' | plot_data_anp_30$age_dyad == 'AP' | plot_data_anp_30$age_dyad == 'PP',] ; m_sum <- m_sum[!is.na(m_sum$dyad),]
+quantile(m_sum$median, seq(0,1,length.out = 101))
+
+# clean up
+rm(edge_vs_agediff, edge_vs_demtype_all, m_sum)
+
+### create network plots -- period 30 ################
+head(summaries)
+length(unique(plot_data_anp_30$id_1))+1 # number of individuals = 
+
+par(mai = c(0.1,0.1,0.1,0.1))
+
+# create array of draws per dyad (distributions)
+adj_tensor <- array(0, c(NROW(unique(counts_df_period30$id_1))+1,
+                         NROW(unique(counts_df_period30$id_2))+1,
+                         NROW(draws_anp_30)),
+                    dimnames = list(c(unique(counts_df_period30$id_1),
+                                      unique(counts_df_period30$id_2)[length(unique(counts_df_period30$id_2))]),
+                                    c(unique(counts_df_period30$id_1),
+                                      unique(counts_df_period30$id_2)[length(unique(counts_df_period30$id_2))]),
+                                    NULL))
+N <- nrow(counts_df_period30)
+
+for (i in 1:N) {
+  dyad_row <- counts_df_period30[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_anp_30[, i+1]
+}
+adj_tensor[,,1]
+
+# convert to array of medians and 95% credible intervals
+adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
+(adj_lower <- adj_quantiles[1, , ])
+(adj_mid   <- adj_quantiles[2, , ])
+(adj_upper <- adj_quantiles[3, , ])
+adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
+
+# Generate two igraph objects, one from the median and one from the standardised width.
+g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
+g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
+
+# Generate nodes data for plotting characteristics
+ids30 <- c(unique(counts_df_period30$id_1), unique(counts_df_period30$id_2)[length(unique(counts_df_period30$id_2))])
+males30 <- males[,c(21,6,9,22:53)]
+males30 <- males30 %>% dplyr::filter(id %in% ids30)
+males30
+
+# create variables for different degrees of node connectedness
+males30$degree_0.1 <- NA
+males30$degree_0.2 <- NA
+males30$degree_0.3 <- NA
+males30$degree_0.4 <- NA
+males30$degree_0.5 <- NA
+
+summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
+for(i in 1:NROW(males30)){
+  rows <- summaries[summaries$id_1 == males30$id[i] | summaries$id_2 == males30$id[i],]
+  males30$degree_0.1[i] <- length(which(rows$median > 0.1))
+  males30$degree_0.2[i] <- length(which(rows$median > 0.2))
+  males30$degree_0.3[i] <- length(which(rows$median > 0.3))
+  males30$degree_0.4[i] <- length(which(rows$median > 0.4))
+  males30$degree_0.5[i] <- length(which(rows$median > 0.5))
+}
+
+which(males30$degree_0.1 < males30$degree_0.2)
+which(males30$degree_0.2 < males30$degree_0.3)
+which(males30$degree_0.3 < males30$degree_0.4)
+which(males30$degree_0.4 < males30$degree_0.5)
+
+# age variable
+males30$age <- lubridate::year(periods$period_start[periods$period == 30]) - males30$byr
+summary(males30$age)
+males30$age_class <- ifelse(males30$age < 5, 1,
+                            ifelse(males30$age < 10, 2,
+                                   ifelse(males30$age < 15, 3,
+                                          ifelse(males30$age < 20, 4,
+                                                 ifelse(males30$age < 25, 5,
+                                                        ifelse(males30$age < 40, 6, 7))))))
+
+# Plot whole network
+coords <- igraph::layout_nicely(g_mid)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = rgb(0, 0, 0, 0.25), 
+     vertex.label = NA,
+     vertex.size = 5,
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     edge.color = 'black',
+     vertex.size = 8,
+     vertex.label = males30$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(males30$age_class == 7,'seagreen4',
+                          ifelse(males30$age_class == 6,'seagreen3',
+                                 ifelse(males30$age_class == 5,'seagreen2',
+                                        ifelse(males30$age_class == 4,'steelblue3',
+                                               ifelse(males30$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords, add = TRUE)
+
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = ifelse(E(g_mid)$weight < 0.3,'transparent','black'),
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = ifelse(E(g_mid)$weight < 0.3,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 8,
+     vertex.label = males30$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(males30$age_class == 7,'seagreen4',
+                          ifelse(males30$age_class == 6,'seagreen3',
+                                 ifelse(males30$age_class == 5,'seagreen2',
+                                        ifelse(males30$age_class == 4,'steelblue3',
+                                               ifelse(males30$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords, add = TRUE)
+
+### only elephants degree > 0.3 -- period 30 ####
+g_mid_0.3 <- delete.vertices(graph = g_mid, v = males30$id[which(males30$degree_0.3 == 0)])
+g_rng_0.3 <- delete.vertices(graph = g_rng, v = males30$id[which(males30$degree_0.3 == 0)])
+
+set.seed(3)
+coords_0.3 <- layout_nicely(g_mid_0.3)
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.35),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
+     vertex.size = 6,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = 6,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color= ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 7,'seagreen4',
+                          ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 6,'seagreen3',
+                                 ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 5,'seagreen2',
+                                        ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 4,'steelblue3',
+                                               ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords_0.3, add = TRUE)
+
+par(mai = c(0.1,0.4,0.1,0.3))
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.35),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = males30$p28[which(males30$degree_0.3 != 0)],
+     vertex.label = males30$id[which(males30$degree_0.3 != 0)],
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color= ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 7,'seagreen4',
+                          ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 6,'seagreen3',
+                                 ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 5,'seagreen2',
+                                        ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 4,'steelblue3',
+                                               ifelse(males30[which(males30$degree_0.3 != 0),]$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords_0.3, add = TRUE)
+
+### save summary data -- period 30 ####
+summaries$period <- 30
+summaries <- summaries[,c(1,4:9)]
+dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
+                                 by = c('dyad','period'))
+colnames(dyad_period_weights)[36:40] <- c('min','max','mean','median','sd')
+for(i in 1:nrow(dyad_period_weights)){
+  dyad_period_weights$min[i] <- ifelse(is.na(dyad_period_weights$min[i]) == TRUE,
+                                       ifelse(is.na(dyad_period_weights$min.x[i]) == FALSE,
+                                              dyad_period_weights$min.x[i], NA),
+                                       dyad_period_weights$min[i])
+  dyad_period_weights$max[i] <- ifelse(is.na(dyad_period_weights$max[i]) == TRUE,
+                                       ifelse(is.na(dyad_period_weights$max.x[i]) == FALSE,
+                                              dyad_period_weights$max.x[i], NA),
+                                       dyad_period_weights$max[i])
+  dyad_period_weights$mean[i] <- ifelse(is.na(dyad_period_weights$mean[i]) == TRUE,
+                                        ifelse(is.na(dyad_period_weights$mean.x[i]) == FALSE,
+                                               dyad_period_weights$mean.x[i], NA),
+                                        dyad_period_weights$mean[i])
+  dyad_period_weights$median[i] <- ifelse(is.na(dyad_period_weights$median[i]) == TRUE,
+                                          ifelse(is.na(dyad_period_weights$median.x[i]) == FALSE,
+                                                 dyad_period_weights$median.x[i], NA),
+                                          dyad_period_weights$median[i])
+  dyad_period_weights$sd[i] <- ifelse(is.na(dyad_period_weights$sd[i]) == TRUE,
+                                      ifelse(is.na(dyad_period_weights$sd.x[i]) == FALSE,
+                                             dyad_period_weights$sd.x[i], NA),
+                                      dyad_period_weights$sd[i])
+}
+dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
+
+rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
+   counts_df_period30, draws_anp_30, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males30, plot_data_anp_30, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids30, N, plot_cols)
+
+################ 7.31) Run model on real standardised data -- period 31 ################
+### create data list
+counts_df_period31 <- counts_df_non0[counts_df_non0$period == 31,]
+counts_ls <- list(
+  n_dyads  = nrow(counts_df_period31),          # total number of times one or other of the dyad was observed
+  together = counts_df_period31$event_count,    # count number of sightings seen together
+  apart    = counts_df_period31$apart,          # count number of sightings seen apart
+  period   = counts_df_period31$period)         # which period it's within
+
+### Fit model
+weight_anp_2.2_period31 <- mod_2.2$sample(
+  data = counts_ls, 
+  seed = 12345, 
+  chains = 4, 
+  parallel_chains = 4)
+
+### check model
+weight_anp_2.2_period31
+#variable       mean    median    sd   mad        q5       q95 rhat ess_bulk ess_tail
+#
+rm(counts_ls)
+
+# showing 10 of 402700 rows (change via 'max_rows' argument or 'cmdstanr_max_rows' option)
+output1 <- read_cmdstan_csv(weight_anp_2.2_period31$output_files()[1])
+draws1_anp_31 <- as.data.frame(output1$post_warmup_draws)
+rm(output1)
+
+output2 <- read_cmdstan_csv(weight_anp_2.2_period31$output_files()[2])
+draws2_anp_31 <- as.data.frame(output2$post_warmup_draws)
+rm(output2)
+
+output3 <- read_cmdstan_csv(weight_anp_2.2_period31$output_files()[3])
+draws3_anp_31 <- as.data.frame(output3$post_warmup_draws)
+rm(output3)
+
+output4 <- read_cmdstan_csv(weight_anp_2.2_period31$output_files()[4])
+draws4_anp_31 <- as.data.frame(output4$post_warmup_draws)
+rm(output4)
+
+draws_anp_31 <- rbind(draws1_anp_31, draws2_anp_31, draws3_anp_31, draws4_anp_31)
+
+colnames(draws_anp_31)[2:ncol(draws_anp_31)] <- counts_df_period31$dyad
+
+# Assign random set of columns to check
+plot_cols <- sample(x = 2:ncol(draws_anp_31), size = 30, replace = F)
+
+### save data 
+write_csv(draws_anp_31, 'data_processed/anp_bayesian_edgedistributions_a2.b2_period31_22.07.04.csv')
+rm(draws1_anp_31, draws2_anp_31, draws3_anp_31, draws4_anp_31)
+
+### build traceplots  -- period 31 ####
+plot(draws_anp_31[,plot_cols[1]], type = 'l', ylim = c(0,1), las = 1, ylab = 'edge weight')
+lines(draws_anp_31[,plot_cols[2]], col = 'tan')
+lines(draws_anp_31[,plot_cols[3]], col = 'orange')
+lines(draws_anp_31[,plot_cols[4]], col = 'green')
+lines(draws_anp_31[,plot_cols[5]], col = 'chocolate')
+lines(draws_anp_31[,plot_cols[6]], col = 'blue')
+lines(draws_anp_31[,plot_cols[7]], col = 'red')
+lines(draws_anp_31[,plot_cols[8]], col = 'seagreen')
+lines(draws_anp_31[,plot_cols[9]], col = 'purple')
+lines(draws_anp_31[,plot_cols[10]],col = 'magenta')
+lines(draws_anp_31[,plot_cols[11]],col = 'black')
+lines(draws_anp_31[,plot_cols[12]], col = 'tan')
+lines(draws_anp_31[,plot_cols[13]], col = 'orange')
+lines(draws_anp_31[,plot_cols[14]], col = 'green')
+lines(draws_anp_31[,plot_cols[15]], col = 'chocolate')
+lines(draws_anp_31[,plot_cols[16]], col = 'blue')
+lines(draws_anp_31[,plot_cols[17]], col = 'red')
+lines(draws_anp_31[,plot_cols[18]], col = 'seagreen')
+lines(draws_anp_31[,plot_cols[19]], col = 'purple')
+lines(draws_anp_31[,plot_cols[20]],col = 'magenta')
+lines(draws_anp_31[,plot_cols[21]],col = 'black')
+lines(draws_anp_31[,plot_cols[22]], col = 'tan')
+lines(draws_anp_31[,plot_cols[23]], col = 'orange')
+lines(draws_anp_31[,plot_cols[24]], col = 'green')
+lines(draws_anp_31[,plot_cols[25]], col = 'chocolate')
+lines(draws_anp_31[,plot_cols[26]], col = 'blue')
+lines(draws_anp_31[,plot_cols[27]], col = 'red')
+lines(draws_anp_31[,plot_cols[28]], col = 'seagreen')
+lines(draws_anp_31[,plot_cols[29]], col = 'purple')
+lines(draws_anp_31[,plot_cols[30]],col = 'magenta')
+
+### density plots  -- period 31 ####
+dens(draws_anp_31[,2], ylim = c(0,20),xlim = c(0,1), las = 1)
+for(i in 1:length(plot_cols)){
+  dens(add = T, draws_anp_31[,plot_cols[i]], col = col.alpha('blue', alpha = 0.3))
+}
+
+### summarise data -- period 31 ####
+# summarise -- look for any anomalies in draw values
+summaries <- data.frame(dyad = colnames(draws_anp_31[,2:ncol(draws_anp_31)]),
+                        min = rep(NA, ncol(draws_anp_31)-1),
+                        max = rep(NA, ncol(draws_anp_31)-1),
+                        mean = rep(NA, ncol(draws_anp_31)-1),
+                        median = rep(NA, ncol(draws_anp_31)-1),
+                        sd = rep(NA, ncol(draws_anp_31)-1))
+for(i in 1:nrow(summaries)){
+  summaries$min[i]    <- min(draws_anp_31[,i+1])
+  summaries$max[i]    <- max(draws_anp_31[,i+1])
+  summaries$mean[i]   <- mean(draws_anp_31[,i+1])
+  summaries$median[i] <- median(draws_anp_31[,i+1])
+  summaries$sd[i]     <- sd(draws_anp_31[,i+1])
+}
+
+# organise dem_class -- report age category based on age at start of period
+plot_data_anp_31 <- left_join(x = summaries, y = counts_df_period31, by = 'dyad')
+head(plot_data_anp_31)
+plot_data_anp_31$age_cat_1 <- ifelse(plot_data_anp_31$age_start_1 < 6, 'C',
+                                     ifelse(plot_data_anp_31$age_start_1 < 11, 'J',
+                                            ifelse(plot_data_anp_31$age_start_1 > 19, 'A','P')))
+plot_data_anp_31$age_cat_2 <- ifelse(plot_data_anp_31$age_start_2 < 6, 'C',
+                                     ifelse(plot_data_anp_31$age_start_2 < 11, 'J',
+                                            ifelse(plot_data_anp_31$age_start_2 > 19, 'A','P')))
+plot_data_anp_31$age_catnum_1 <- ifelse(plot_data_anp_31$age_start_1 < 6, 1,
+                                        ifelse(plot_data_anp_31$age_start_1 < 11, 2,
+                                               ifelse(plot_data_anp_31$age_start_1 < 16, 3,
+                                                      ifelse(plot_data_anp_31$age_start_1 < 20, 4,
+                                                             ifelse(plot_data_anp_31$age_start_1 < 25, 5,
+                                                                    ifelse(plot_data_anp_31$age_start_1 < 40, 6, 7))))))
+plot_data_anp_31$age_catnum_2 <- ifelse(plot_data_anp_31$age_start_2 < 6, 1,
+                                        ifelse(plot_data_anp_31$age_start_2 < 11, 2,
+                                               ifelse(plot_data_anp_31$age_start_2 < 16, 3,
+                                                      ifelse(plot_data_anp_31$age_start_2 < 20, 4,
+                                                             ifelse(plot_data_anp_31$age_start_2 < 25, 5,
+                                                                    ifelse(plot_data_anp_31$age_start_2 < 40, 6, 7))))))
+
+plot_data_anp_31$age_dyad <- ifelse(plot_data_anp_31$age_catnum_1 >= plot_data_anp_31$age_catnum_2,
+                                    paste(plot_data_anp_31$age_cat_1, plot_data_anp_31$age_cat_2, sep = ''),
+                                    paste(plot_data_anp_31$age_cat_2, plot_data_anp_31$age_cat_1, sep = ''))
+
+# boxplot edge weights by demographic type of dyad -- all types
+(edge_vs_demtype_all <- 
+    ggplot(data = plot_data_anp_31, aes(y = mean, x = age_dyad))+
+    geom_boxplot(notch = T, outlier.shape = 4,
+                 #fill = c('blue','purple','purple','blue','grey','purple','purple','blue')
+    )+
+    theme_classic()+
+    labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown)',
+         y = 'mean edge weight')+
+    coord_flip())
+
+# scatter plot of all adult edges by age difference
+(edge_vs_agediff <- 
+    ggplot(plot_data_anp_31, aes(x = age_diff, y = mean))+
+    geom_jitter(alpha = 0.2)+
+    theme_classic()+
+    theme(legend.position = 'none')+
+    scale_x_continuous('age difference between dyad members',
+                       expand = c(0.02,0))+
+    scale_y_continuous('mean edge weight',
+                       expand = c(0.02,0),
+                       limits = c(0,1)))
+
+# values for reporting
+summary(summaries) # generally about the same as MOTNP
+quantile(summaries$median, seq(0,1,length.out = 101))
+quantile(summaries$mean,   seq(0,1,length.out = 101))
+hist(summaries$median, breaks = 100, xlim = c(0,1), las = 1,
+     xlab = 'median estimated dyad strength', main = '', col = 'skyblue')
+
+m_sum <- plot_data_anp_31[plot_data_anp_31$age_dyad == 'AA' | plot_data_anp_31$age_dyad == 'AP' | plot_data_anp_31$age_dyad == 'PP',] ; m_sum <- m_sum[!is.na(m_sum$dyad),]
+quantile(m_sum$median, seq(0,1,length.out = 101))
+
+# clean up
+rm(edge_vs_agediff, edge_vs_demtype_all, m_sum)
+
+### create network plots -- period 31 ################
+head(summaries)
+length(unique(plot_data_anp_31$id_1))+1 # number of individuals = 
+
+par(mai = c(0.1,0.1,0.1,0.1))
+
+# create array of draws per dyad (distributions)
+adj_tensor <- array(0, c(NROW(unique(counts_df_period31$id_1))+1,
+                         NROW(unique(counts_df_period31$id_2))+1,
+                         NROW(draws_anp_31)),
+                    dimnames = list(c(unique(counts_df_period31$id_1),
+                                      unique(counts_df_period31$id_2)[length(unique(counts_df_period31$id_2))]),
+                                    c(unique(counts_df_period31$id_1),
+                                      unique(counts_df_period31$id_2)[length(unique(counts_df_period31$id_2))]),
+                                    NULL))
+N <- nrow(counts_df_period31)
+
+for (i in 1:N) {
+  dyad_row <- counts_df_period31[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- draws_anp_31[, i+1]
+}
+adj_tensor[,,1]
+
+# convert to array of medians and 95% credible intervals
+adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
+(adj_lower <- adj_quantiles[1, , ])
+(adj_mid   <- adj_quantiles[2, , ])
+(adj_upper <- adj_quantiles[3, , ])
+adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
+
+# Generate two igraph objects, one from the median and one from the standardised width.
+g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
+g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
+
+# Generate nodes data for plotting characteristics
+ids31 <- c(unique(counts_df_period31$id_1), unique(counts_df_period31$id_2)[length(unique(counts_df_period31$id_2))])
+males31 <- males[,c(21,6,9,22:53)]
+males31 <- males31 %>% dplyr::filter(id %in% ids31)
+males31
+
+# create variables for different degrees of node connectedness
+males31$degree_0.1 <- NA
+males31$degree_0.2 <- NA
+males31$degree_0.3 <- NA
+males31$degree_0.4 <- NA
+males31$degree_0.5 <- NA
+
+summaries <- separate(summaries, dyad, c('id_1','id_2'), '_', F)
+for(i in 1:NROW(males31)){
+  rows <- summaries[summaries$id_1 == males31$id[i] | summaries$id_2 == males31$id[i],]
+  males31$degree_0.1[i] <- length(which(rows$median > 0.1))
+  males31$degree_0.2[i] <- length(which(rows$median > 0.2))
+  males31$degree_0.3[i] <- length(which(rows$median > 0.3))
+  males31$degree_0.4[i] <- length(which(rows$median > 0.4))
+  males31$degree_0.5[i] <- length(which(rows$median > 0.5))
+}
+
+which(males31$degree_0.1 < males31$degree_0.2)
+which(males31$degree_0.2 < males31$degree_0.3)
+which(males31$degree_0.3 < males31$degree_0.4)
+which(males31$degree_0.4 < males31$degree_0.5)
+
+# age variable
+males31$age <- lubridate::year(periods$period_start[periods$period == 31]) - males31$byr
+summary(males31$age)
+males31$age_class <- ifelse(males31$age < 5, 1,
+                            ifelse(males31$age < 10, 2,
+                                   ifelse(males31$age < 15, 3,
+                                          ifelse(males31$age < 20, 4,
+                                                 ifelse(males31$age < 25, 5,
+                                                        ifelse(males31$age < 40, 6, 7))))))
+
+# Plot whole network
+coords <- igraph::layout_nicely(g_mid)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = rgb(0, 0, 0, 0.25),
+     vertex.label = NA,
+     vertex.size = 5,
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     edge.color = 'black',
+     vertex.size = 8,
+     vertex.label = males31$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(males31$age_class == 7,'seagreen4',
+                          ifelse(males31$age_class == 6,'seagreen3',
+                                 ifelse(males31$age_class == 5,'seagreen2',
+                                        ifelse(males31$age_class == 4,'steelblue3',
+                                               ifelse(males31$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords, add = TRUE)
+
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = ifelse(E(g_mid)$weight < 0.3,'transparent','black'),
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = ifelse(E(g_mid)$weight < 0.3,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 8,
+     vertex.label = males31$id,
+     vertex.label.dist = 0,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color= ifelse(males31$age_class == 7,'seagreen4',
+                          ifelse(males31$age_class == 6,'seagreen3',
+                                 ifelse(males31$age_class == 5,'seagreen2',
+                                        ifelse(males31$age_class == 4,'steelblue3',
+                                               ifelse(males31$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords, add = TRUE)
+
+### only elephants degree > 0.3 -- period 31 ####
+g_mid_0.3 <- delete.vertices(graph = g_mid, v = males31$id[which(males31$degree_0.3 == 0)])
+g_rng_0.3 <- delete.vertices(graph = g_rng, v = males31$id[which(males31$degree_0.3 == 0)])
+
+set.seed(3)
+coords_0.3 <- layout_nicely(g_mid_0.3)
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.35),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
+     vertex.size = 6,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = 6,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color= ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 7,'seagreen4',
+                          ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 6,'seagreen3',
+                                 ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 5,'seagreen2',
+                                        ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 4,'steelblue3',
+                                               ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords_0.3, add = TRUE)
+
+par(mai = c(0.1,0.4,0.1,0.3))
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.35),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*3, 0),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*3, 0),
+     edge.color = 'black',
+     vertex.size = males31$p28[which(males31$degree_0.3 != 0)],
+     vertex.label = males31$id[which(males31$degree_0.3 != 0)],
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color= ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 7,'seagreen4',
+                          ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 6,'seagreen3',
+                                 ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 5,'seagreen2',
+                                        ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 4,'steelblue3',
+                                               ifelse(males31[which(males31$degree_0.3 != 0),]$age_class == 3,'steelblue1',
+                                                      'yellow'))))),
+     layout = coords_0.3, add = TRUE)
+
+### save summary data -- period 31 ####
+summaries$period <- 31
+summaries <- summaries[,c(1,4:9)]
+dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
+                                 by = c('dyad','period'))
+colnames(dyad_period_weights)[36:40] <- c('min','max','mean','median','sd')
+for(i in 1:nrow(dyad_period_weights)){
+  dyad_period_weights$min[i] <- ifelse(is.na(dyad_period_weights$min[i]) == TRUE,
+                                       ifelse(is.na(dyad_period_weights$min.x[i]) == FALSE,
+                                              dyad_period_weights$min.x[i], NA),
+                                       dyad_period_weights$min[i])
+  dyad_period_weights$max[i] <- ifelse(is.na(dyad_period_weights$max[i]) == TRUE,
+                                       ifelse(is.na(dyad_period_weights$max.x[i]) == FALSE,
+                                              dyad_period_weights$max.x[i], NA),
+                                       dyad_period_weights$max[i])
+  dyad_period_weights$mean[i] <- ifelse(is.na(dyad_period_weights$mean[i]) == TRUE,
+                                        ifelse(is.na(dyad_period_weights$mean.x[i]) == FALSE,
+                                               dyad_period_weights$mean.x[i], NA),
+                                        dyad_period_weights$mean[i])
+  dyad_period_weights$median[i] <- ifelse(is.na(dyad_period_weights$median[i]) == TRUE,
+                                          ifelse(is.na(dyad_period_weights$median.x[i]) == FALSE,
+                                                 dyad_period_weights$median.x[i], NA),
+                                          dyad_period_weights$median[i])
+  dyad_period_weights$sd[i] <- ifelse(is.na(dyad_period_weights$sd[i]) == TRUE,
+                                      ifelse(is.na(dyad_period_weights$sd.x[i]) == FALSE,
+                                             dyad_period_weights$sd.x[i], NA),
+                                      dyad_period_weights$sd[i])
+}
+dyad_period_weights <- dyad_period_weights[,c(1:30,36:40)]
+
+rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
+   counts_df_period31, draws_anp_31, dyad_row, g_mid,g_mid_0.3, g_rng, g_rng_0.3, males31, plot_data_anp_31, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids31, N, plot_cols)
+
+#### Save outputs to file #####
+# write out csv file
+write_csv(dyad_period_weights, 'data_processed/anp_dyad_weightdistributions_2.2_periods1to31_22.07.04.csv')
+
+# produce PDF of graphs
+dev.off()
+
