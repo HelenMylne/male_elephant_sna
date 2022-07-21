@@ -3,11 +3,23 @@
 # Next fit this to the MPNP dataset
 
 #### load packages ####
-library(tidyverse)
-library(cmdstanr)
-library(ggdist)
-library(posterior)
-library(bayesplot)
+#library(tidyverse)
+#library(cmdstanr)
+#library(ggdist)
+#library(posterior)
+#library(bayesplot)
+
+library(tidyverse, lib.loc = 'packages/')
+library(cmdstanr, lib.loc = 'packages/')
+#library(ggdist, lib.loc = 'packages/')
+library(posterior, lib.loc = 'packages/')
+#library(bayesplot, lib.loc = 'packages/')
+library(janitor, lib.loc = 'packages/')
+library(readxl, lib.loc = 'packages/')
+library(MASS, lib.loc = 'packages/')
+
+#### set up graph outputs ####
+pdf('mpnp_age_ouputs.pdf', width = 20, height = 10)
 
 #### load model -- adapted from MOTNP to use MPNP thresholds ####
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
@@ -22,6 +34,7 @@ latent_age_ordinal_model <- cmdstan_model("models/mpnp_age_ordinal_regression.st
 # 7	26-35
 # 8	36+
 #10	UK
+print('model loaded')
 
 #### simulate data with full age ranges in population -- working fine (divergent transitions = 0%) ####
 gompertz_bt <- function(a0, a1, c, b0, b1, age){
@@ -121,6 +134,8 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   scale_x_continuous(breaks = c(1,4,9,15,20,35,60)) +
   xlab("Assigned age") + ylab("Modelled age")
 
+print('initial simulation with complete age range complete')
+
 #### repeat but now simulating absence of all individuals younger than category 3, and most from category 3 -- working almost fine (divergent transitions = 4%) ####
 # create a fictional population with ages selected from that distribution
 N2 <- 1000
@@ -204,6 +219,8 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   scale_x_continuous(breaks = c(1,4,9,15,20,35,60)) +
   xlab("Assigned age") + ylab("Modelled age")
 
+print('simulation without young males complete')
+
 #### load MPNP data ####
 mpnp_long <- readxl::read_excel('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>%
   janitor::clean_names()
@@ -255,6 +272,8 @@ mpnp1_ls <- list(
   age_category_index = mpnp1_males$age_mid_round)
 hist(mpnp1_ls$age_category_index)
 
+print('model data prepped')
+
 #### fit model to MPNP data -- divergent transitions = 3% ####
 # Fit model with cmdstanr
 age_mpnp1_fit <- latent_age_ordinal_model$sample(
@@ -263,6 +282,7 @@ age_mpnp1_fit <- latent_age_ordinal_model$sample(
   parallel_chains = 4,
   iter_sampling = 2000
 )
+print ('model fitted')
 
 # Examine the estimates. We can plot the estimated ages against the biologist assigned ages
 age_est_mat <- age_mpnp1_fit$summary()[(N_mpnp1+2):(N_mpnp1*2+1), ]
