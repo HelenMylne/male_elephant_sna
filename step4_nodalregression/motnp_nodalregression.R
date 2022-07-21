@@ -16,7 +16,7 @@ library(igraph)
 library(LaplacesDemon)
 
 #### load MOTNP nodes, edges and interactions data ####
-motnp_males <- read_csv('data_processed/motnp_elenodes_22.01.13.csv') %>% 
+motnp_males <- read_csv('../data_processed/not yet assimilated into github version/motnp_elenodes_22.01.13.csv') %>% 
   #filter(dem_class == 'AM' | dem_class == 'PM') %>% 
   filter(sex == 'M')
 unique(motnp_males$age_category)
@@ -37,7 +37,7 @@ motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2,
                                                                     motnp_males$age_cat_id))))))
 
 ### import data for aggregated model (binomial)
-df_agg_motnp <- read_delim('data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',') %>% 
+df_agg_motnp <- read_delim('../data_processed/not yet assimilated into github version/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',') %>% 
   filter(dem_class_1 == 'AM' | dem_class_1 == 'PM') %>% 
   filter(dem_class_2 == 'AM' | dem_class_2 == 'PM')
 df_agg_motnp$sex_1 <- 'M'
@@ -72,7 +72,7 @@ df_agg_motnp$node_2_nogaps <- as.integer(as.factor(df_agg_motnp$node_2))+1
 df_agg_motnp$dyad_id_nogaps <- as.integer(as.factor(df_agg_motnp$dyad))
 
 ### load the edge weights
-motnp <- readRDS('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.rds') %>% 
+motnp <- readRDS('../data_processed/not yet assimilated into github version/motnp_bayesian_edgedistributions_a2.b2_22.02.07.rds') %>% 
   select(-`1.lp__`)
 motnp <- motnp[, which(colnames(motnp) %in% df_agg_motnp$dyad)]
 logit_edge_samples_motnp <- logit(motnp)
@@ -103,14 +103,20 @@ for (i in 1:num_samples) {
   g <- graph_from_adjacency_matrix(adj_tensor[i, , ], mode="undirected", weighted=TRUE)
   eigen_samples_motnp[i, ] <- eigen_centrality(g)$vector
   eigen_samples_motnp_std[i, ] <- (eigen_samples_motnp[i, ] - mean(eigen_samples_motnp[i, ]))/sd(eigen_samples_motnp[i, ])
-  btwn_samples_motnp[i, ] <- betweenness(g)
-  btwn_samples_motnp_std[i, ] <- (btwn_samples_motnp[i, ] - mean(btwn_samples_motnp[i, ]))/sd(btwn_samples_motnp[i, ])
+  btwn_samples_motnp[i, ] <- betweenness(g, normalized = TRUE)
   rm(g)
 }
+
+# convert betweenness to a Z-score
+mu_btwn <- mean(btwn_samples_motnp)
+sd_btwn <- sd(btwn_samples_motnp)
+btwn_samples_motnp_std <- (btwn_samples_motnp - mu_btwn)/sd_btwn
+
+# check
 head(eigen_samples_motnp)     # Unstandardised eigenvector centrality
 head(eigen_samples_motnp_std) # Standardised eigenvector centrality
-head(btwn_samples_motnp)      # Unstandardised betweenness centrality
-head(btwn_samples_motnp_std)  # Standardised betweenness centrality
+head(btwn_samples_motnp)      # Unstandardised betweenness centrality -- 0-1 bounded
+hist(btwn_samples_motnp_std)  # betweenness centrality Z scores -- unbounded
 
 # visualise eigenvector centralities
 df_wide_motnp <- data.frame(eigen_samples_motnp_std)
@@ -171,8 +177,20 @@ ggplot(df_long_motnp, aes(x = btwn_centrality)) +
 
 #### compute normal approximation ####
 # The posterior centralities can now be characterised by the multivariate normal distribution as an approximation to their true posterior distributions. To highlight the importance of sampling from a multivariate normal rather than a univariate normal, we can plot centrality samples from two nodes against each other to see how they co-vary.
-plot(eigen_samples_motnp_std[, 1], eigen_samples_motnp_std[, 2])
-plot(btwn_samples_motnp_std[, 1], btwn_samples_motnp_std[, 2])
+plot(eigen_samples_motnp_std[, 1], eigen_samples_motnp_std[, 2], las = 1, pch = 19, col = rgb(0,0,1,0.2))
+plot(btwn_samples_motnp[, 1], btwn_samples_motnp[, 2], las = 1, pch = 19, col = rgb(0,0,1,0.2))
+plot(btwn_samples_motnp[, 1], btwn_samples_motnp[, 3], las = 1, pch = 19, col = rgb(0,0,1,0.2))
+plot(btwn_samples_motnp[, 3], btwn_samples_motnp[, 2], las = 1, pch = 19, col = rgb(0,0,1,0.2))
+plot(btwn_samples_motnp[, 4], btwn_samples_motnp[, 3], las = 1, pch = 19, col = rgb(0,0,1,0.2))
+
+plot(NULL, xlim = c(0,0.3), ylim = c(0,600), las = 1, xlab = 'betweenness', ylab = 'density')
+for(i in 1:num_nodes){
+  lines(density(btwn_samples_motnp[,i]), col = rgb(0,0,1,0.1))
+}
+plot(NULL, xlim = c(-2,20), ylim = c(0,10), las = 1, xlab = 'betweenness z-score', ylab = 'density')
+for(i in 1:num_nodes){
+  lines(density(btwn_samples_motnp_std[,i]), col = rgb(0,0,1,0.1))
+}
 
 # This joint distribution contains important information that we would ideally like to include in the model. The multivariate normal will allow us to do this. Parameterising the multivariate normal approximation is a relatively simple process and can be done by calculating the sample mean and sample covariance matrix of the posterior centrality samples:
 eigen_mu_motnp <- apply(eigen_samples_motnp_std, 2, mean) 
@@ -185,11 +203,38 @@ eigen_samples_motnp_sim <- MASS::mvrnorm(1e5, eigen_mu_motnp, eigen_cov_motnp)
 plot(density(eigen_samples_motnp_std[, 1]), lwd=2, main="Estimated standardised eigenvector centrality vs normal approximation", xlab="Logit edge weight")
 lines(density(eigen_samples_motnp_sim[, 1]), col=rgb(0, 0, 1, 0.5), lwd=2)
 
+# betweenness (remembering these are based on z-scores of normalised measures)
 btwn_samples_motnp_sim <- MASS::mvrnorm(1e5, btwn_mu_motnp, btwn_cov_motnp)
-plot(density(btwn_samples_motnp_std[, 1]), lwd=2, main="Estimated standardised betweenness centrality vs normal approximation", xlab="Logit edge weight")
+plot(density(btwn_samples_motnp_std[, 1]), lwd = 2,
+     main="Estimated standardised betweenness centrality vs normal approximation", xlab = "Logit edge weight")
+lines(density(btwn_samples_motnp_sim[, 1]), col=rgb(0, 0, 1, 0.5), lwd=2)  # this doesn't look too bad...
+plot(density(btwn_samples_motnp_std[, 1]), lwd = 2, xlim = c(-2,6), ylim = c(0,5),
+     main="Estimated standardised betweenness centrality vs normal approximation", xlab = "Logit edge weight")
 lines(density(btwn_samples_motnp_sim[, 1]), col=rgb(0, 0, 1, 0.5), lwd=2)
+for( i in 2:ncol(btwn_samples_motnp_sim)){
+  lines(density(btwn_samples_motnp_std[, i]), col = rgb(0,0,0,0.2), lwd = 0.5)
+  lines(density(btwn_samples_motnp_sim[, i]), col = rgb(0,0,1,0.2), lwd = 0.5)
+}     # this DOES looks too bad! the black lines are the measured values, the blue lines are the simulated versions
 
-#### prior predictive checks (univariate Gaussian) ####
+# try again for betweenness using Dirichlet distribution instead of multi-normal -- HOW DO I CONVERT btwn_mu_motnp/btwn_cov_motnp TO SOMETHING THAT CAN FORM A VECTOR OF LENGTH 3?
+plot(density(btwn_samples_motnp[, 1]), las = 1, main="Estimated standardised betweenness centrality vs normal approximation", xlab="Logit edge weight", xlim = c(0,1))
+btwn_samples_motnp_sim <- LaplacesDemon::rdirichlet(length(btwn_mu_motnp)*1000, alpha = c(btwn_mu_motnp[1],btwn_cov_motnp[1,1], btwn_cov_motnp[1,1]))
+lines(density(btwn_samples_motnp_sim), col=rgb(0, 0, 1, 0.5), lwd=2) # this looks terrible, but might just be because I don't know how rdirichlet works
+
+#btwn_samples_motnp_sim <- array(NA, dim = c(num_nodes, num_nodes, 1000))
+#for( i in 1:num_nodes){
+#  for( j in 1:num_nodes){
+#  btwn_samples_motnp_sim[i,j,] <- LaplacesDemon::rdirichlet(1000, alpha = c(btwn_mu_motnp[i],btwn_cov_motnp[i,j],btwn_cov_motnp[i,j])) # doesnt work because some are -ve
+#  }
+#}
+
+btwn_samples_motnp_sim <- LaplacesDemon::rdirichlet(num_nodes, alpha = btwn_mu_motnp) # only works when using unstandardised values
+
+
+
+
+
+#### eigenvector prior predictive checks (univariate Gaussian) ####
 range(eigen_mu_motnp)
 age <- 1:60
 
@@ -214,7 +259,11 @@ for(i in 1:100){
         col = rgb(0,0,1,0.4))
 }
 
-# betweenness linear effect only
+#### betweenness prior predictive checks (univariate Gaussian) ####
+range(btwn_mu_motnp)
+age <- 1:60
+
+# betweenness linear effect only -- not normalised
 range(btwn_mu_motnp)
 plot(NULL, xlim = c(0,60), ylim = c(-1,6), las = 1, xlab = 'age', ylab = 'mean betweenness centrality (std)')
 abline(h = range(btwn_mu_motnp), lty = 2)
@@ -225,7 +274,7 @@ for(i in 1:100){
         col = rgb(0,0,1,0.4))
 }
 
-# betweenness allowing for extremes to be most/least central
+# betweenness allowing for extremes to be most/least central -- not normalised
 plot(NULL, xlim = c(0,60),  ylim = c(-1,6), las = 1, xlab = 'age', ylab = 'mean betweenness centrality (std)')
 abline(h = range(btwn_mu_motnp), lty = 2)
 for(i in 1:100){
@@ -236,8 +285,31 @@ for(i in 1:100){
         col = rgb(0,0,1,0.4))
 }
 
+# betweenness linear effect only -- normalised
+plot(NULL, xlim = c(0,60), ylim = c(-0.2,0.2), las = 1,
+     xlab = 'age', ylab = 'mean betweenness centrality (std)')
+abline(h = range(btwn_mu_motnp), lty = 2)
+for(i in 1:100){
+  intercept <- rnorm(1, 0.05, 0.02)
+  beta_age <- rnorm(1, 0, 0.002)
+  lines(x = age, y = intercept + beta_age*age,
+        col = rgb(0,0,1,0.4))
+}
+
+# betweenness allowing for extremes to be most/least central -- normalised
+plot(NULL, xlim = c(0,60), ylim = c(-0.3,0.3), las = 1,
+     xlab = 'age', ylab = 'mean betweenness centrality (std)')
+abline(h = range(btwn_mu_motnp), lty = 2)
+for(i in 1:100){
+  intercept <- rnorm(1, 0.05, 0.02)
+  beta_age <- rnorm(1, 0, 0.002)
+  beta_age2 <- rnorm(1, 0, 0.0001)
+  lines(x = age, y = intercept + beta_age*age + beta_age2*(age^2),
+        col = rgb(0,0,1,0.4))
+}
+
 #### load MOTNP ages ####
-true_ages <- readRDS('data_processed/motnp_ageestimates_mcmcoutput_22.07.13.rds')
+true_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds')
 
 colnames(true_ages) <- motnp_males$id # check this shouldn't be as.integer(as.factor(motnp_males$id)), but 90% sure this is correct -- goes into the model in order so should come out in same order?
 motnp_ap <- motnp_males[motnp_males$id %in% node_ages_motnp$id, ]
@@ -318,17 +390,47 @@ for(i in 1:num_nodes){
 # Calculate the 95% credible intervals of the model parameters
 round(summary(fit_nodal_eigen)$summary[1:4, c(1:4, 8)], 5) # basically no effect whatsoever (remembering this is in standard deviations on the outcome scale but years of age on the exponent)
 
-#### betweenness ~ age -- NEEDS A MULTIVARIATE POISSON OR SOMETHING -- THIS IS NOT A NORMALLY DISTRIBUTED VARIABLE ####
+#### betweenness ~ age -- SIMULATE FIRST TO TEST: USE A DIRICHLET DISTRIBUTION (MULTIVARIATE BETA) WITH NORMALIZED BETWEENNESS SCORES ####
+# work out what a dirichlet looks like -- order of alpha values doesn't matter, values do
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,1,1)))       # right skewed, fairly triangular
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(5,1,1)))       # gains weight to the right
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(0.2,1,1)))     # narrow left peak
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,5,1)))       # same as 5,1,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,0.2,1)))     # same as 0.2,1,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,1,5)))       # same as 5,1,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,1,0.2)))     # same as 0.2,1,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(5,0.2,1)))     # narrow left peak with weight on right
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(0.2,5,1)))     # same as 5,0.2,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,0.2,5)))     # same as 5,0.2,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(2,2,2)))       # right skewed normal
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(10,10,10)))    # almost normal, narrower
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(0.2,0.2,0.2))) # double peak, almost at 0 and 1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(5,0,0)))       # same no matter the number
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(0.01,1,1)))    # most density very close to zero
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,0.01,1)))    # same as 0.01,1,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(1,1,0.01)))    # same as 0.01,1,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(0.01,1,1)))    # same as 0.01,1,1
+rethinking::dens(LaplacesDemon::rdirichlet(10000, alpha = c(-2,-1,1)))     # can't include negatives
+
+plot(density(btwn_mu_motnp))
+
+# simulate from population similar to MOTNP
+sim <- rdirichlet(num_nodes, alpha = c(0.01,1,1))
+plot(density(sim))
+
+
+###
+#### run on MOTNP data ####
 model_data_motnp <- list(
   num_nodes = num_nodes,               # Number of dyads
   centrality_mu  = btwn_mu_motnp,      # Sample means of logit edge weights
   centrality_cov = btwn_cov_motnp,     # Sample covariance of logit edge weights
-  node_age = modeldata_ages,           # Age of individual -- are these in the wrong order? should be M1, M10, M100, M101?
-  node_age2 = modeldata_ages_sq        # Age squared for quadratic term
+  node_age = modeldata_ages#,           # Age of individual -- are these in the wrong order? should be M1, M10, M100, M101?
+  #node_age2 = modeldata_ages_sq        # Age squared for quadratic term
 )
 str(model_data_motnp)
 
-model_btwn_cent <- stan_model("models/nodal_regression/nodal_regression_hkm_distributionage_betweenness_22.07.13.stan")
+model_btwn_cent <- stan_model("models/nodal_regression_betweenness_agedistribution.stan")
 fit_nodal_btwn <- sampling(model_btwn_cent, data = model_data_motnp, cores = 1, chains = 1)
 
 ### check traceplot
