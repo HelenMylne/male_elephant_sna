@@ -339,7 +339,7 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
 
 #### save MPNP1 output ####
 colnames(true_ages) <- mpnp1_males$elephant_id
-saveRDS(true_ages, '../data_processed/mpnp1_bayesian_agedistribution.rds')
+saveRDS(true_ages, '../data_processed/mpnp1_ageestimates_mcmcoutput.rds')
 
 #### produce estimate distributions for MPNP2-5 ####
 time_diff <- periods[2]-periods[1]         # duration of time window in days
@@ -414,7 +414,7 @@ for(i in 1:nrow(mpnp2)){
 }
 
 # save output
-saveRDS(mpnp2, '../data_processed/mpnp2_bayesian_agedistribution.rds')
+saveRDS(mpnp2, '../data_processed/mpnp2_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, missing, missing_elephants, mpnp2_long, mpnp2_males, mpnp2, age_cat, i, j)
@@ -485,7 +485,7 @@ for(i in 1:nrow(mpnp3)){
 }
 
 # save output
-saveRDS(mpnp3, '../data_processed/mpnp3_bayesian_agedistribution.rds')
+saveRDS(mpnp3, '../data_processed/mpnp3_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, missing, missing_elephants, mpnp3_long, mpnp3_males, mpnp3, age_cat, i, j)
@@ -556,7 +556,7 @@ for(i in 1:nrow(mpnp4)){
 }
 
 # save output
-saveRDS(mpnp4, '../data_processed/mpnp4_bayesian_agedistribution.rds')
+saveRDS(mpnp4, '../data_processed/mpnp4_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, missing, missing_elephants, mpnp4_long, mpnp4_males, mpnp4, age_cat, i, j)
@@ -627,7 +627,7 @@ for(i in 1:nrow(mpnp5)){
 }
 
 # save output
-saveRDS(mpnp5, '../data_processed/mpnp5_bayesian_agedistribution.rds')
+saveRDS(mpnp5, '../data_processed/mpnp5_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, missing, missing_elephants, mpnp5_long, mpnp5_males, mpnp5, age_cat, i, j)
