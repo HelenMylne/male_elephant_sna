@@ -60,7 +60,7 @@ rm(binom)
 dev.off()
 ################ 2) Create data lists ################
 ### import data for aggregated model (binomial)
-counts_df <- read_delim('data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',')
+counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
 unique(counts_df$sex_1) # FALSE or NA
@@ -71,7 +71,6 @@ str(counts_df)  # sex_1 still comes up as logical, but now contains the right le
 
 # create variable for age difference
 unique(counts_df$age_category_1) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA 
-counts_df$age_category_1 <- ifelse(counts_df$age_category_1 == '1-2','0-3',counts_df$age_category_1)
 counts_df$age_cat_id_1 <- ifelse(counts_df$age_category_1 == '0-3', 1,
                                  ifelse(counts_df$age_category_1 == '3-4', 1,
                                         ifelse(counts_df$age_category_1 == '4-5', 1,
@@ -95,7 +94,6 @@ counts_df$age_class_1 <- ifelse(counts_df$age_cat_id_1 == 1, 'Calf',
                                        ifelse(counts_df$age_cat_id_1 > 4, 'Adult','Pubescent')))
 
 unique(counts_df$age_category_2) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA 
-counts_df$age_category_2 <- ifelse(counts_df$age_category_2 == '1-2','0-3',counts_df$age_category_2)
 counts_df$age_cat_id_2 <- ifelse(counts_df$age_category_2 == '0-3', 1,
                                  ifelse(counts_df$age_category_2 == '3-4', 1,
                                         ifelse(counts_df$age_category_2 == '4-5', 1,
@@ -128,7 +126,7 @@ counts_df$dem_class_2 <- ifelse(counts_df$age_class_2 == 'Adult', paste('A',coun
                                        ifelse(counts_df$age_class_2 == 'Juvenile', paste('J',counts_df$sex_2, sep = ''),
                                               paste('C',counts_df$sex_2, sep = ''))))
 
-### correct dem_type with new dem_class
+### combined dem_class of dyad
 counts_df$age_class_id_1 <- ifelse(counts_df$age_class_1 == 'Adult',4,
                                    ifelse(counts_df$age_class_1 == 'Pubescent',3,
                                           ifelse(counts_df$age_class_1 == 'Juvenile',2,1)))
@@ -136,20 +134,26 @@ counts_df$age_class_id_2 <- ifelse(counts_df$age_class_2 == 'Adult',4,
                                    ifelse(counts_df$age_class_2 == 'Pubescent',3,
                                           ifelse(counts_df$age_class_2 == 'Juvenile',2,1)))
 counts_df$dem_type <- ifelse(counts_df$age_class_id_1 > counts_df$age_class_id_2,
-                             paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'),
+                             paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'), # when 1 is older: dc1_dc2
                              ifelse(counts_df$age_class_id_1 < counts_df$age_class_id_2,
-                                    paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_'),
-                                    paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_')))
+                                    paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_'), # when 2 is older: dc2_dc1
+                                    ifelse(counts_df$sex_1 == 'F',                                  # when age1 = age2...
+                                           paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'), # ...when 1 is F: dc1_dc2
+                                           ifelse(counts_df$sex_2 == 'F',
+                                                  paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_'), # ...when 2 is F: dc2_dc1
+                                                  ifelse(counts_df$sex_1 == 'M', # ...when neither are F...
+                                                         paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'), # ...when 1 is M: dc1_dc2
+                                                         paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_')))))) # ...when 2 is M or both are U: dc2_dc1
 sort(unique(counts_df$dem_type))
 
 ### add column for age difference between dyad
 counts_df$age_diff <- abs(as.numeric(counts_df$age_cat_id_1) - as.numeric(counts_df$age_cat_id_2))
 
 ### add column for total number of sightings per pair
-counts_df$count_dyad <- (counts_df$count_1 + counts_df$count_2) - counts_df$all_events  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
+counts_df$count_dyad <- (counts_df$count_1 + counts_df$count_2) - counts_df$event_count  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
 
 ### add column for total number of sightings per pair where they were NOT together
-counts_df$apart <- counts_df$count_dyad - counts_df$all_events
+counts_df$apart <- counts_df$count_dyad - counts_df$event_count
 
 # reassign dyad numbers to remove gaps
 counts_df$node_1_nogaps <- as.integer(as.factor(counts_df$node_1))
@@ -326,7 +330,7 @@ rm(population, i, N)
 # Binomial model using a beta distribution where shape 1 = times together and shape 2 = times apart
 
 ### Compile Stan model
-mod_2.2 <- cmdstan_model("models/simpleBetaNet_HKM_2.2_22.02.03.stan")
+mod_2.2 <- cmdstan_model("models/simpleBetaNet.stan")
 mod_2.2
 
 ################ 5) Run model on simulated data ################
@@ -452,7 +456,7 @@ rm(draws_2.2_pi, draws1_2.2, draws1_2.2_pi, draws2_2.2, draws3_2.2, draws4_2.2, 
 ### create data list -- can contain no NA values in any column, even if column is not specified in model
 counts_ls <- list(
   n_dyads  = nrow(counts_df),          # total number of times one or other of the dyad was observed
-  together = counts_df$all_events,     # count number of sightings seen together
+  together = counts_df$event_count,     # count number of sightings seen together
   apart    = counts_df$apart)          # count number of sightings seen apart
 
 ### check model
@@ -491,7 +495,9 @@ draws3_motnp2.2 <- as.data.frame(output3$post_warmup_draws)
 draws4_motnp2.2 <- as.data.frame(output4$post_warmup_draws)
 draws_motnp2.2 <- rbind(draws1_motnp2.2, draws2_motnp2.2, draws3_motnp2.2, draws4_motnp2.2)
 rm(output1, output2, output3, output4)
+rm(draws1_motnp2.2, draws2_motnp2.2, draws3_motnp2.2, draws4_motnp2.2)
 
+counts_df$dyad <- paste(counts_df$id_1, counts_df$id_2, sep = '_')
 colnames(draws_motnp2.2)[2:106954] <- counts_df$dyad
 
 # Assign random set of columns to check
@@ -520,11 +526,10 @@ tidy_sierra$chain <- rep(1:4, each = length(tidy_sierra$dyad)/4)
 tidy_sierra$index <- rep(rep(1:1000, each = length(unique(tidy_sierra$dyad))),4)
 
 ### save data 
-write_csv(draws_motnp2.2, 'data_processed/motnp_bayesian_edgedistributions_a2.b2_22.03.03.csv')
-#write_csv(tidy_draws, 'data_processed/motnp_bayesian_edgedistributions_tidy_22.03.03.csv')
+saveRDS(draws_motnp2.2, '../data_processed/motnp_edgeweightestimates_mcmcoutput.rds')
 
 ################ 7) Summarise and plot edge weights ################
-# draws_motnp2.2 <- readRDS('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.rds') %>% 
+# draws_motnp2.2 <- readRDS('../data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
 #   data.matrix()
 ### build traceplots ####
 set.seed(1)
@@ -617,7 +622,7 @@ tidy_sierra$label <- factor(tidy_sierra$label, levels = c('U17 (own calf)',
     scale_x_continuous('MCMC chain position',  expand = c(0,0))+
     scale_y_continuous('edge weight estimate', expand = c(0.02,0))+
     labs(colour = 'Partner (relationship)'))
-ggsave(path = 'outputs/', filename = 'motnp_sierra_traceplot_2.2prior.pdf',
+ggsave(path = '../outputs/', filename = 'motnp_sierra_traceplot_2.2prior.pdf',
        plot = traceplot_sierra,
        width = 30, height = 24, units = 'cm')
 
@@ -631,7 +636,7 @@ ggsave(path = 'outputs/', filename = 'motnp_sierra_traceplot_2.2prior.pdf',
     theme(legend.text = element_text(size = 12),
           legend.title = element_text(size = 14))+
     labs(colour = 'Chain ID'))
-ggsave(path = 'outputs/', filename = 'motnp_sierra_chainmixing_2.2prior.pdf',
+ggsave(path = '../outputs/', filename = 'motnp_sierra_chainmixing_2.2prior.pdf',
        plot = traceplot_sierra,
        width = 30, height = 24, units = 'cm')
 
@@ -673,51 +678,6 @@ dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_F60')+1],col = 'purpl
 dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_U21')+1],col = 'blue')
 dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_F98')+1],col = 'red')
 
-# density plots -- only run if tidying data worked
-dens(tidy_sierra[tidy_sierra$id == 'M40',]$draw, xlab = 'edge weight estimation',       # all chains, plotted together
-     ylim = c(0,60), xlim = c(0,1), las = 1)                                 # non-herd member, adult male
-dens(tidy_sierra[tidy_sierra$id == 'M15',]$draw, add = T, col = 'tan')       # non-herd member, pubescent male
-dens(tidy_sierra[tidy_sierra$id == 'M26',]$draw, add = T, col = 'green')     # non-herd member, calf
-dens(tidy_sierra[tidy_sierra$id == 'F8',]$draw,  add = T, col = 'chocolate') # non-herd member, adult female
-dens(tidy_sierra[tidy_sierra$id == 'F98',]$draw, add = T, col = 'red')       # herd member
-dens(tidy_sierra[tidy_sierra$id == 'U17',]$draw, add = T, col = 'purple')    # calf
-dens(tidy_sierra[tidy_sierra$id == 'U21',]$draw, add = T, col = 'seagreen')  # sister
-dens(tidy_sierra[tidy_sierra$id == 'F60',]$draw, add = T, col = 'magenta')   # sister's calf
-text('M40', x = 0.15, y = 05, col = 'black')
-text('M15', x = 0.05, y = 55, col = 'tan')
-text('M26', x = 0.05, y = 22, col = 'green')
-text('F8' , x = 0.06, y = 18, col = 'chocolate')
-text('F98', x = 0.60, y = 08, col = 'red')
-text('U17', x = 0.95, y = 16, col = 'purple')
-text('U21', x = 0.80, y = 10, col = 'seagreen')
-text('F60', x = 0.86, y = 11, col = 'magenta')
-
-(sierra_density <-
-    ggplot(data = tidy_sierra[tidy_sierra$chain == 1], aes(x = draw, fill = ID))+       # only 1 chain
-    geom_density()+  # why different values to the rethinking::dens() version?
-    scale_fill_viridis_d(alpha = 0.4)+
-    scale_x_continuous('edge weight estimation', expand = c(0,0), limits = c(0,2.2))+
-    scale_y_continuous(expand = c(0,0), limits = c(0,55))+
-    theme_classic()+
-    theme(legend.position = c(0.5, 0.6)))
-ggsave(path = 'outputs/motnp_22.01.31/', filename = 'motnp_sierra_density.pdf',
-       plot = sierra_density,
-       width = 20, height = 24, units = 'cm')
-
-(sierra_density <-
-    ggplot(data = tidy_sierra, aes(x = draw, col = as.factor(chain)))+                 # all chains, plotted separately
-    geom_density()+ 
-    scale_fill_viridis_d(alpha = 0.2)+
-    scale_x_continuous('edge weight estimation', expand = c(0,0), limits = c(0,2.2))+
-    scale_y_continuous(expand = c(0,0), limits = c(0,55))+
-    theme_light()+
-    facet_wrap(. ~ ID)+
-    theme(legend.position = c(0.85, 0.15), legend.title = element_text(size = 14))+
-    labs(colour = 'Chain ID'))
-ggsave(path = 'outputs/motnp_22.02.01/', filename = 'motnp_sierra_density.pdf',
-       plot = sierra_density,
-       width = 20, height = 24, units = 'cm')
-
 ### summarise data ####
 # summarise -- look for any anomalies in draw values or chain variation
 summaries <- data.frame(dyad = colnames(draws_motnp2.2[,2:106954]),
@@ -754,7 +714,6 @@ lines(draws_motnp2.2$M131_M178, col = 'orange')          # looks pretty crazy! -
 summaries$min[which(summaries$dyad == 'M131_M178')]
 summaries$sd[which(summaries$dyad == 'M131_M178')]
 summaries$mean[which(summaries$dyad == 'M131_M178')]
-lines(draws_motnp2.2$F113_F117, col = 'purple')          # OK this one DOES look a bit crazy...
 
 # organise dem_class
 plot_data_motnp2.2 <- left_join(x = summaries, y = counts_df, by = 'dyad')
@@ -763,42 +722,8 @@ head(plot_data_motnp2.2)
 summary(plot_data_motnp2.2[plot_data_motnp2.2$dem_type == 'AM_AM' | plot_data_motnp2.2$dem_type == 'AM_PM' | plot_data_motnp2.2$dem_type == 'PM_PM',]$median)
 summary(plot_data_motnp2.2[plot_data_motnp2.2$dem_type == 'AM_AM' | plot_data_motnp2.2$dem_type == 'AM_PM' | plot_data_motnp2.2$dem_type == 'PM_PM',]$mean) ; sd(plot_data_motnp2.2[plot_data_motnp2.2$dem_type == 'AM_AM' | plot_data_motnp2.2$dem_type == 'AM_PM' | plot_data_motnp2.2$dem_type == 'PM_PM',]$mean)
 
-plot_data_motnp2.2$dem_class_1_cat <- as.integer(as.factor(plot_data_motnp2.2$dem_class_1))
-plot_data_motnp2.2$dem_class_2_cat <- as.integer(as.factor(plot_data_motnp2.2$dem_class_2))
-plot_data_motnp2.2$dem_type_short <- ifelse(plot_data_motnp2.2$dem_class_1_cat <= plot_data_motnp2.2$dem_class_2_cat,
-                                            paste(plot_data_motnp2.2$dem_class_1, plot_data_motnp2.2$dem_class_2, sep = '_'),
-                                            paste(plot_data_motnp2.2$dem_class_2, plot_data_motnp2.2$dem_class_1, sep = '_'))
-sort(unique(plot_data_motnp2.2$dem_type_short))
-types <- data.frame(all = sort(unique(plot_data_motnp2.2$dem_type_short)), type1 = NA, type2 = NA)
-types <- separate(types, col = all, into = c('type1', 'type2'), remove = F)
-types <- separate(types, type1, into = c('class1','sex1'), sep = 1, remove = F)
-types <- separate(types, type2, into = c('class2','sex2'), sep = 1, remove = F)
-head(types)
-types$join <- types$all
-types$join <- case_when(types$class1 == 'C' & types$class2 == 'C' ~ 'CC',
-                        types$class1 == 'J' & types$class2 == 'C' ~ 'JC',
-                        types$class1 == 'C' & types$class2 == 'J' ~ 'JC',
-                        types$class1 == 'J' & types$class2 == 'J' ~ 'JJ',
-                        types$class1 == 'C' & types$class2 == 'P' ~ paste(types$type2,'C',sep='_'),
-                        types$class1 == 'P' & types$class2 == 'C' ~ paste(types$type1,'C',sep='_'),
-                        types$class1 == 'C' & types$class2 == 'A' ~ paste(types$type2,'C',sep='_'),
-                        types$class1 == 'A' & types$class2 == 'C' ~ paste(types$type1,'C',sep='_'),
-                        types$class1 == 'J' & types$class2 == 'P' ~ paste(types$type2,'J',sep='_'),
-                        types$class1 == 'P' & types$class2 == 'J' ~ paste(types$type1,'J',sep='_'),
-                        types$class1 == 'J' & types$class2 == 'A' ~ paste(types$type2,'J',sep='_'),
-                        types$class1 == 'A' & types$class2 == 'J' ~ paste(types$type1,'J',sep='_'),
-                        TRUE ~ types$all)
-unique(types$join)
-types <- types[,c(1,8)]
-colnames(types)[1] <- 'dem_type_short'
-plot_data_motnp2.2 <- left_join(plot_data_motnp2.2, types, by = 'dem_type_short')
-plot_data_motnp2.2$join <- paste(plot_data_motnp2.2$join, ' ', sep = ' ')
-which(is.na(plot_data_motnp2.2$join))
-
-plot_males <- plot_data_motnp2.2[plot_data_motnp2.2$sex_type == 'M_M',]
-plot_males <- plot_males[plot_males$age_type == 'Adult_Adult' |
-                           plot_males$age_type == 'Adult_Pubescent' |
-                           plot_males$age_type == 'Pubescent_Pubescent',]
+plot_males <- plot_data_motnp2.2[plot_data_motnp2.2$dem_type == 'AM_AM' | plot_data_motnp2.2$dem_type == 'AM_PM' | plot_data_motnp2.2$dem_type == 'PM_PM',]
+plot_males <- plot_males[!is.na(plot_males$dyad),]
 
 plot_males$dyad[which(plot_males$sd == max(plot_males$sd))] # M131_M178
 which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == max(plot_males$sd))]) # 68220
@@ -809,10 +734,11 @@ lines(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$s
 
 plot(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == max(plot_males$sd))]) +1 ],
      ylim = c(0,1), las = 1, ylab = 'edge weight', col = rgb(0,1,0,0.3), pch = 16, cex = 0.5)
-points(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.6))]) +1 ],
+points(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.5))]) +1 ],
        col = rgb(1,0,0,0.3), pch = 16, cex = 0.5)
 points(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == min(plot_males$sd))]) +1 ],
        col = rgb(0,0,1,0.3), pch = 16, cex = 0.5)
+
 lines(x = c(-500,4500),
       y = c(max(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == max(plot_males$sd))]) +1 ]),
             max(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == max(plot_males$sd))]) +1 ])),
@@ -822,12 +748,12 @@ lines(x = c(-500,4500),
             min(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == max(plot_males$sd))]) +1 ])),
       col = rgb(0,1,0))
 lines(x = c(-500,4500),
-      y = c(max(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.6))]) +1 ]),
-            max(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.6))]) +1 ])),
+      y = c(max(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.5))]) +1 ]),
+            max(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.5))]) +1 ])),
       col = rgb(1,0,0))
 lines(x = c(-500,4500),
-      y = c(min(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.6))]) +1 ]),
-            min(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.6))]) +1 ])),
+      y = c(min(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.5))]) +1 ]),
+            min(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == quantile(plot_males$sd, 0.5))]) +1 ])),
       col = rgb(1,0,0))
 lines(x = c(-500,4500),
       y = c(max(draws_motnp2.2[,which(counts_df$dyad == plot_males$dyad[which(plot_males$sd == min(plot_males$sd))]) +1 ]),
@@ -904,41 +830,26 @@ lines(value_drawn ~ chain_position,
       data = density_plot[density_plot$position == 'min',],
       col = '#481567FF')
 
-
-
-# boxplot edge weights by demographic type of dyad -- all types
-colours <- c('magenta','purple','grey','grey','magenta','purple','grey','blue','purple','purple','purple','blue','purple','grey','grey','grey','grey','grey','magenta','purple','grey','purple','purple','blue','purple','grey','grey')
-(edge_vs_demtype_all <- 
-    ggplot(data = plot_data_motnp2.2, aes(y = mean, x = join))+
-    geom_boxplot(notch = T, outlier.shape = 4,
-                 fill = colours)+
-    theme_classic()+
-    labs(x = 'dyad demography (A/P/J/C = adult/pubescent/juvenile/calf, M/F/U = male/female/unknown',
-         y = 'mean edge weight')+
-    coord_flip())
-ggsave(path = 'outputs/motnp_22.03.03/', filename = 'motnp_all_edge_vs_demtype.pdf',
-       plot = edge_vs_demtype_all,
-       width = 20, height = 24, units = 'cm')  
-
 # boxplot edge weights by demographic type of dyad -- only adults/pubescents
 adults_motnp2.2 <- plot_data_motnp2.2[plot_data_motnp2.2$age_cat_id_1 > 2 & plot_data_motnp2.2$age_cat_id_2 > 2,]
 adults_motnp2.2 <- adults_motnp2.2[!is.na(adults_motnp2.2$dyad),]
 colours <- c('magenta','purple','magenta','purple','grey','blue','purple','blue','purple','magenta','purple','grey','blue','purple')
 (edge_vs_demtype <- 
-    ggplot(data = adults_motnp2.2, aes(y = mean, x = join))+
+    ggplot(data = adults_motnp2.2, aes(y = mean, x = dem_type))+
     geom_boxplot(notch = T, outlier.shape = 4,
                  fill = colours)+
     theme_classic()+
     labs(x = 'dyad demography (A/P = adult/pubescent, M/F/U = male/female/unknown',
          y = 'mean edge weight')+
     coord_flip())
-ggsave(path = 'outputs/motnp_22.03.03/', filename = 'motnp_adults_edge_vs_demtype.pdf',
+ggsave(path = '../outputs/', filename = 'motnp_adults_edge_vs_demtype.pdf',
        plot = edge_vs_demtype,
        width = 20, height = 24, units = 'cm')  
 
 # scatter plot of all adult edges by age difference
-adults_motnp2.2$sex_type_names <- ifelse(adults_motnp2.2$sex_type == 'F_F', 'female-female',
-                                         ifelse(adults_motnp2.2$sex_type == 'F_M', 'male-female', 'male-male'))
+adults_motnp2.2$sex_type <- paste0(adults_motnp2.2$sex_1, adults_motnp2.2$sex_2)
+adults_motnp2.2$sex_type_names <- ifelse(adults_motnp2.2$sex_type == 'FF', 'female-female',
+                                         ifelse(adults_motnp2.2$sex_type == 'FM', 'male-female', 'male-male'))
 (edge_vs_agediff <- 
     ggplot(adults_motnp2.2[adults_motnp2.2$sex_1 != 'U' & adults_motnp2.2$sex_2 != 'U',],
            aes(x = age_diff, y = mean, fill = sex_type))+
@@ -952,12 +863,11 @@ adults_motnp2.2$sex_type_names <- ifelse(adults_motnp2.2$sex_type == 'F_F', 'fem
     scale_y_continuous('mean edge weight',
                        expand = c(0.02,0),
                        limits = c(0,1)))
-ggsave(path = 'outputs/motnp_22.03.03/', filename = 'motnp_adults_edge_vs_agediff.pdf',
+ggsave(path = '../outputs/', filename = 'motnp_adults_edge_vs_agediff.pdf',
        plot = edge_vs_agediff,
        width = 30, height = 24, units = 'cm')
 
-rm(draws1_motnp2.2, draws2_motnp2.2, draws3_motnp2.2, draws4_motnp2.2)
-rm(edge_vs_agediff, edge_vs_demtype, edge_vs_demtype_all, plot_data_motnp2.2, types, colours, adults_motnp2.2)
+rm(edge_vs_agediff, edge_vs_demtype, edge_vs_demtype_all, plot_data_motnp2.2, types, colours, adults_motnp2.2, density_plot, g, tidy_sierra, traceplot_sierra, traceplot_sierra2, dyad_names)
 
 # values for reporting
 summary(summaries)
@@ -966,8 +876,7 @@ quantile(summaries$mean,   seq(0,1,length.out = 101))
 hist(summaries$median, breaks = 100, xlim = c(0,1), las = 1,
      xlab = 'median estimated dyad strength', main = '', col = 'skyblue')
 
-m_sum <- plot_data_motnp2.2[plot_data_motnp2.2$dem_type == 'AM_AM' | plot_data_motnp2.2$dem_type == 'AM_PM' | plot_data_motnp2.2$dem_type == 'PM_PM',]
-quantile(m_sum$median, seq(0,1,length.out = 101))
+quantile(plot_males$median, seq(0,1,length.out = 101))
 
 ################ 8) Create network plots ################
 head(summaries)
@@ -1057,6 +966,16 @@ nodes$dem_class <- ifelse(nodes$age_class == 'Adult', paste('A',nodes$sex, sep =
                                         paste('C',nodes$sex, sep = ''))))
 
 rm(ele_nodes)
+
+# convert to true age distributions
+ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds')
+males <- nodes$id[nodes$dem_class == 'AM' | nodes$dem_class == 'PM']
+ages <- as.data.frame(ages[, colnames(ages) %in% males])
+
+nodes$age_mean <- NA
+for(i in 1:nrow(nodes)){
+  nodes$age_mean[i] <- mean(ages[,i])
+}
 
 # create variables for different degrees of node connectedness
 nodes$degree_0.1 <- NA
@@ -1224,6 +1143,23 @@ plot(g_mid_m,
      vertex.color = ifelse(males$age_class == 'Adult','seagreen1', 'skyblue'),
      layout = coords_m, add = TRUE)
 
+plot(g_mid_m,
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = E(g_rng_m)$weight,
+     vertex.size = 7,
+     vertex.label = NA,
+     layout = coords_m)
+plot(g_mid_m,
+     edge.width = E(g_mid_m)$weight,
+     edge.color = 'black',
+     vertex.size = 7,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = males$age_mean,
+     layout = coords_m, add = TRUE)
+
 ### Only males degree > 0.3 ####
 males0.3 <- males[males$degree_0.3 > 0,]
 g_mid_m0.3 <- delete.vertices(graph = g_mid,
@@ -1276,7 +1212,7 @@ plot(g_mid_m0.3,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     vertex.color = males0.3$mean_age,
      layout = coords_m0.3, add = TRUE)
 
 plot(g_mid_m0.3,
@@ -1293,12 +1229,13 @@ plot(g_mid_m0.3,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     vertex.color = males0.3$mean_age,
      layout = coords_m0.3, add = TRUE)
 
 table(males0.3$count)
 sum(table(males0.3$count)[10:15])
 
+### M251, M64, M151, M19
 par(mai = c(0.8,0.8,0.1,0.1), mfrow = c(2,1), xpd = F)
 m251_m64 <- data.frame(draws = draws_motnp2.2[,which(dyad_names == 'M251_M64')],
                        chain = rep(1:4, each = 1000),
@@ -1369,8 +1306,6 @@ abline(h = median(m151_m19_m251_m64$draw[m151_m19_m251_m64$dyad == 'M19_M64']), 
 abline(h = median(m151_m19_m251_m64$draw[m151_m19_m251_m64$dyad == 'M151_M64']),  lty = 2, col = 'purple')
 abline(h = median(m151_m19_m251_m64$draw[m151_m19_m251_m64$dyad == 'M151_M251']), lty = 2, col = 'tan')
 abline(h = median(m151_m19_m251_m64$draw[m151_m19_m251_m64$dyad == 'M19_M251']),  lty = 2, col = 'seagreen')
-
-
 
 ### clear environment
 rm(coords, coords_0.3, coords_0.5, coords_m, coords_m0.3, dyad_row, edges, ele, ele_nodes, elephants, g_mid, g_mid_0.3, g_mid_0.5, g_mid_m, g_mid_m0.3, g_rng, g_rng_0.3, g_rng_0.5, g_rng_m, g_rng_m0.3, m38, m87, males, males0.3, rows, traceplot_sierra, traceplot_sierra2, i)
