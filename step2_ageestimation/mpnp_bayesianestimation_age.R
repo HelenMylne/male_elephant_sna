@@ -262,10 +262,12 @@ for(i in 1:nrow(mpnp1_long)){
 mpnp1_long$age_mid_round <- floor(mpnp1_long$age_mid)
 mpnp1_long <- mpnp1_long[mpnp1_long$age_mid_round < 10 , c(3,5,6,7,32:34)]
 
-#### create MPNP1 data list ####
+# create data frame of individuals
 mpnp1_males <- mpnp1_long %>%
   select(elephant_id, age_mid_round) %>% 
   distinct()
+
+#### create MPNP1 data list ####
 N_mpnp1 <- nrow(mpnp1_males)
 mpnp1_ls <- list(
   N = N_mpnp1,
@@ -344,7 +346,7 @@ saveRDS(true_ages, '../data_processed/mpnp1_ageestimates_mcmcoutput.rds')
 #### produce estimate distributions for MPNP2-5 ####
 time_diff <- periods[2]-periods[1]         # duration of time window in days
 time_diff <- as.numeric(time_diff)/365.25  # duration of time window in years
-mpnp1 <- as.data.frame(readRDS('../data_processed/mpnp1_bayesian_agedistribution.rds'))
+mpnp1 <- as.data.frame(readRDS('../data_processed/mpnp1_ageestimates_mcmcoutput.rds'))
 
 ## time window 2 ####
 mpnp2_long <- mpnp_long[mpnp_long$date >= periods[2] & mpnp_long$date < periods[3],]
@@ -402,22 +404,40 @@ estimated$shared_age <- estimated$elephant_id
 mpnp2_long <- rbind(estimated, missing)
 
 # create data distribution for all 
-colnames(mpnp1)                                                                           # check that mpnp1 data are named by the individual
-mpnp2_males <- mpnp2_long[, c('elephant_id','age_mid_round','shared_age')] %>% distinct() # identify all individuals (and age-mate where appropriate)
-mpnp2 <- mpnp1[,mpnp2_males$shared_age]                                                   # select mpnp1 columns matching mpnp2 age-mates
-nrow(mpnp2_males) ; ncol(mpnp2)                                                           # check correctly selected
+colnames(mpnp1)                              # check that mpnp1 data are named by the individual
+mpnp2_males <- mpnp2_long[, c('elephant_id','age_mid_round','shared_age')] %>% 
+  distinct()                                 # identify all individuals (and age-mates where appropriate)
+mpnp2 <- mpnp1[,mpnp2_males$shared_age]      # select mpnp1 columns matching mpnp2 age-mates
+nrow(mpnp2_males) ; ncol(mpnp2)              # check correctly selected
+colnames(mpnp2) <- mpnp2_males$elephant_id   # rename mpnp2 data to mpnp2 elephants not shared individuals
 
-for(i in 1:nrow(mpnp2)){
-  for(j in 1:ncol(mpnp2)){
-    mpnp2[i,j] <- mpnp2[i,j] + time_diff
+# for individuals seen in mpnp1 only, update distribution draws by time window length
+# mpnp2_test <- mpnp2
+#for(draw in 1:nrow(mpnp2_test)){
+#  for(individual in unique(estimated$elephant_id)){
+#    if(mpnp2_test[draw,individual] == 'estimated') {
+#      mpnp2_test[draw,individual] <- 'already_estimated'
+#      } else { mpnp2_test[draw,individual] <- 'estimated' }
+# } }
+# rm(mpnp2_test)
+for(draw in 1:nrow(mpnp2)){
+  for(individual in unique(estimated$elephant_id)){
+    mpnp2[draw,individual] <- mpnp2[draw,individual] + time_diff
   }
 }
+
+# check output
+mpnp2_males$mean_age <- NA
+for(i in 1:nrow(mpnp2_males)){
+  mpnp2_males$mean_age[i] <- mean(mpnp2[,mpnp2_males$elephant_id[i]])
+}
+hist(mpnp2_males$mean_age, breaks = 60)
 
 # save output
 saveRDS(mpnp2, '../data_processed/mpnp2_ageestimates_mcmcoutput.rds')
 
 # clean environment
-rm(estimated, missing, missing_elephants, mpnp2_long, mpnp2_males, mpnp2, age_cat, i, j)
+rm(estimated, missing, missing_elephants, age_cat, i, j)
 
 ## time window 3 ####
 mpnp3_long <- mpnp_long[mpnp_long$date >= periods[3] & mpnp_long$date < periods[4],]
@@ -440,9 +460,12 @@ mpnp3_long$age_mid_round <- floor(mpnp3_long$age_mid)
 mpnp3_long <- mpnp3_long[mpnp3_long$age_mid_round < 10 , c(3,5,6,7,32:34)]
 
 # identify individuals present in both
-length(unique(mpnp1_long$elephant_id)) ; length(unique(mpnp3_long$elephant_id))
-estimated <- mpnp3_long[mpnp3_long$elephant_id %in% mpnp1_long$elephant_id,]
-sort(unique(estimated$elephant_id))
+length(unique(mpnp1_long$elephant_id))
+length(unique(mpnp2_long$elephant_id))
+length(unique(mpnp3_long$elephant_id))
+estimated1 <- mpnp3_long[mpnp3_long$elephant_id %in% mpnp1_long$elephant_id,]
+estimated2 <- mpnp3_long[mpnp3_long$elephant_id %in% mpnp2_long$elephant_id,]
+estimated <- rbind(estimated1, estimated2) %>% distinct()
 missing <- anti_join(mpnp3_long, estimated)
 sort(unique(missing$elephant_id))
 
@@ -453,7 +476,7 @@ missing_elephants$shared_age <- NA
 for(age_cat in 4:8){
   missing_ids <- missing_elephants[missing_elephants$age_mid_round == age_cat,]  # select all elephants in age category i that have not had their age probability distribution estimated in first time window 
   missing_elephants <- anti_join(missing_elephants, missing_ids)           # remove these elephants from current list of elephants lacking an age probability distribution
-  age_mates <- mpnp1_males[mpnp1_males$age_mid_round == age_cat,]                # select males who WERE in age category i during first time window
+  age_mates <- mpnp1_males[mpnp1_males$age_mid_round == age_cat,]          # select males who WERE in age category i during first time window
   
   if(nrow(missing_ids) <= nrow(age_mates)){                                # where possible, draw a different random elephant for every missing individual from the pooled of males who shared that age distribution
     missing_ids$shared_age <- sample(x = age_mates$elephant_id, size = nrow(missing_ids), replace = F)
@@ -474,21 +497,51 @@ estimated$shared_age <- estimated$elephant_id
 mpnp3_long <- rbind(estimated, missing)
 
 # create data distribution for all 
-mpnp3_males <- mpnp3_long[, c('elephant_id','age_mid_round','shared_age')] %>% distinct() # identify all individuals (and age-mate where appropriate)
-mpnp3 <- mpnp1[,mpnp3_males$shared_age]                                                   # select mpnp1 columns matching mpnp3 age-mates
-nrow(mpnp3_males) ; ncol(mpnp3)                                                           # check correctly selected
+mpnp3_males <- mpnp3_long[, c('elephant_id','age_mid_round','shared_age')] %>% 
+  distinct()                                 # identify all individuals (and age-mates where appropriate)
+estimated1 <- estimated1[,c('elephant_id','age_mid_round')] %>% distinct()
+estimated2 <- estimated2[,c('elephant_id','age_mid_round')] %>% distinct()
+mpnp3_elephantsin1 <- mpnp1[,estimated1$elephant_id]      # select mpnp1 columns matching mpnp3 elephants
+mpnp3_elephantsin2 <- mpnp2[,estimated2$elephant_id]      # select mpnp2 columns matching mpnp3 elephants
 
-for(i in 1:nrow(mpnp3)){
-  for(j in 1:ncol(mpnp3)){
-    mpnp3[i,j] <- mpnp3[i,j] + time_diff
+# for individuals seen in mpnp1, update distribution draws by two lots of time window length
+for(draw in 1:nrow(mpnp3_elephantsin1)){
+  for(individual in unique(estimated1$elephant_id)){
+    mpnp3_elephantsin1[draw,individual] <- mpnp3_elephantsin1[draw,individual] + 2*time_diff
   }
 }
+
+# for individuals seen in mpnp2, update distribution draws by one time window length
+for(draw in 1:nrow(mpnp3_elephantsin2)){
+  for(individual in unique(estimated2$elephant_id)){
+    mpnp3_elephantsin2[draw,individual] <- mpnp3_elephantsin2[draw,individual] + time_diff
+  }
+}
+
+# for individuals seen in neither, select distribution from individual sharing an age category
+mpnp3_missing <- mpnp1[,missing_elephants$shared_age]
+colnames(mpnp3_missing) <- missing_elephants$elephant_id
+
+# combine together so there is only one column per elephant
+mpnp3 <- mpnp3_missing
+mpnp3_elephantsin2 <- mpnp3_elephantsin2[,which(colnames(mpnp3_elephantsin2) %in% colnames(mpnp3) == FALSE)]
+mpnp3 <- cbind(mpnp3, mpnp3_elephantsin2)
+mpnp3_elephantsin1 <- mpnp3_elephantsin1[,which(colnames(mpnp3_elephantsin1) %in% colnames(mpnp3) == FALSE)]
+mpnp3 <- cbind(mpnp3, mpnp3_elephantsin1)
+which(sort(colnames(mpnp3)) != sort(unique(mpnp3_males$elephant_id))) # all columns are present only once
+
+# check output
+mpnp3_males$mean_age <- NA
+for(i in 1:nrow(mpnp3_males)){
+  mpnp3_males$mean_age[i] <- mean(mpnp3[,mpnp3_males$elephant_id[i]])
+}
+hist(mpnp3_males$mean_age, breaks = 60)
 
 # save output
 saveRDS(mpnp3, '../data_processed/mpnp3_ageestimates_mcmcoutput.rds')
 
 # clean environment
-rm(estimated, missing, missing_elephants, mpnp3_long, mpnp3_males, mpnp3, age_cat, i, j)
+rm(estimated, estimated1, estimated2, missing, missing_elephants, mpnp3_elephantsin1, mpnp3_elephantsin2, mpnp3_missing, age_cat, i)
 
 ## time window 4 ####
 mpnp4_long <- mpnp_long[mpnp_long$date >= periods[4] & mpnp_long$date < periods[5],]
@@ -511,9 +564,14 @@ mpnp4_long$age_mid_round <- floor(mpnp4_long$age_mid)
 mpnp4_long <- mpnp4_long[mpnp4_long$age_mid_round < 10 , c(3,5,6,7,32:34)]
 
 # identify individuals present in both
-length(unique(mpnp1_long$elephant_id)) ; length(unique(mpnp4_long$elephant_id))
-estimated <- mpnp4_long[mpnp4_long$elephant_id %in% mpnp1_long$elephant_id,]
-sort(unique(estimated$elephant_id))
+length(unique(mpnp1_long$elephant_id))
+length(unique(mpnp2_long$elephant_id))
+length(unique(mpnp3_long$elephant_id))
+length(unique(mpnp4_long$elephant_id))
+estimated1 <- mpnp4_long[mpnp4_long$elephant_id %in% mpnp1_long$elephant_id,]
+estimated2 <- mpnp4_long[mpnp4_long$elephant_id %in% mpnp2_long$elephant_id,]
+estimated3 <- mpnp4_long[mpnp4_long$elephant_id %in% mpnp3_long$elephant_id,]
+estimated <- rbind(estimated1, estimated2, estimated3) %>% distinct()
 missing <- anti_join(mpnp4_long, estimated)
 sort(unique(missing$elephant_id))
 
@@ -524,7 +582,7 @@ missing_elephants$shared_age <- NA
 for(age_cat in 4:8){
   missing_ids <- missing_elephants[missing_elephants$age_mid_round == age_cat,]  # select all elephants in age category i that have not had their age probability distribution estimated in first time window 
   missing_elephants <- anti_join(missing_elephants, missing_ids)           # remove these elephants from current list of elephants lacking an age probability distribution
-  age_mates <- mpnp1_males[mpnp1_males$age_mid_round == age_cat,]                # select males who WERE in age category i during first time window
+  age_mates <- mpnp1_males[mpnp1_males$age_mid_round == age_cat,]          # select males who WERE in age category i during first time window
   
   if(nrow(missing_ids) <= nrow(age_mates)){                                # where possible, draw a different random elephant for every missing individual from the pooled of males who shared that age distribution
     missing_ids$shared_age <- sample(x = age_mates$elephant_id, size = nrow(missing_ids), replace = F)
@@ -540,26 +598,78 @@ table(missing_elephants$shared_age)
 # recombine data for second time window to include all elephants, present in MPNP1 or not
 missing <- left_join(missing, missing_elephants, by = c('elephant_id','age_mid_round'))
 head(missing)
-head(estimated)
 estimated$shared_age <- estimated$elephant_id
+head(estimated)
 mpnp4_long <- rbind(estimated, missing)
 
 # create data distribution for all 
-mpnp4_males <- mpnp4_long[, c('elephant_id','age_mid_round','shared_age')] %>% distinct() # identify all individuals (and age-mate where appropriate)
-mpnp4 <- mpnp1[,mpnp4_males$shared_age]                                                   # select mpnp1 columns matching mpnp4 age-mates
-nrow(mpnp4_males) ; ncol(mpnp4)                                                           # check correctly selected
+mpnp4_males <- mpnp4_long[, c('elephant_id','age_mid_round','shared_age')] %>% 
+  distinct()                                 # identify all individuals (and age-mates where appropriate)
+estimated1 <- estimated1[,c('elephant_id','age_mid_round')] %>% distinct()
+estimated2 <- estimated2[,c('elephant_id','age_mid_round')] %>% distinct()
+estimated3 <- estimated3[,c('elephant_id','age_mid_round')] %>% distinct()
+mpnp4_elephantsin1 <- mpnp1[,estimated1$elephant_id]      # select mpnp1 columns matching mpnp4 elephants
+mpnp4_elephantsin2 <- mpnp2[,estimated2$elephant_id]      # select mpnp2 columns matching mpnp4 elephants
+mpnp4_elephantsin3 <- mpnp3[,estimated3$elephant_id]      # select mpnp3 columns matching mpnp4 elephants
 
-for(i in 1:nrow(mpnp4)){
-  for(j in 1:ncol(mpnp4)){
-    mpnp4[i,j] <- mpnp4[i,j] + time_diff
+# for individuals seen in mpnp1, update distribution draws by two lots of time window length
+for(draw in 1:nrow(mpnp4_elephantsin1)){
+  for(individual in unique(estimated1$elephant_id)){
+    mpnp4_elephantsin1[draw,individual] <- mpnp4_elephantsin1[draw,individual] + 3*time_diff
   }
 }
+
+# for individuals seen in mpnp2, update distribution draws by one time window length
+for(draw in 1:nrow(mpnp4_elephantsin2)){
+  for(individual in unique(estimated2$elephant_id)){
+    mpnp4_elephantsin2[draw,individual] <- mpnp4_elephantsin2[draw,individual] + 2*time_diff
+  }
+}
+
+# for individuals seen in mpnp3, update distribution draws by one time window length
+for(draw in 1:nrow(mpnp4_elephantsin3)){
+  for(individual in unique(estimated3$elephant_id)){
+    mpnp4_elephantsin3[draw,individual] <- mpnp4_elephantsin3[draw,individual] + time_diff
+  }
+}
+
+# for individuals seen in none of the previous time windows, select distribution from individual sharing an age category
+mpnp4_missing <- mpnp1[,missing_elephants$shared_age]
+colnames(mpnp4_missing) <- missing_elephants$elephant_id
+
+# combine together so there is only one column per elephant
+mpnp4 <- mpnp4_missing
+
+sort(colnames(mpnp4))
+sort(colnames(mpnp4_elephantsin3[,which(colnames(mpnp4_elephantsin3) %in% colnames(mpnp4) == FALSE)]))
+mpnp4_elephantsin3 <- mpnp4_elephantsin3[,which(colnames(mpnp4_elephantsin3) %in% colnames(mpnp4) == FALSE)]
+mpnp4 <- cbind(mpnp4, mpnp4_elephantsin3)
+length(unique(colnames(mpnp4))) == ncol(mpnp4)
+
+sort(colnames(mpnp4))
+sort(colnames(mpnp4_elephantsin2[,which(colnames(mpnp4_elephantsin2) %in% colnames(mpnp4) == FALSE)]))
+mpnp4_elephantsin2 <- mpnp4_elephantsin2[,which(colnames(mpnp4_elephantsin2) %in% colnames(mpnp4) == FALSE)]
+mpnp4 <- cbind(mpnp4, mpnp4_elephantsin2)
+length(unique(colnames(mpnp4))) == ncol(mpnp4)
+
+sort(colnames(mpnp4))
+add_to_mpnp4 <- data.frame(B1093 = mpnp4_elephantsin1[,which(colnames(mpnp4_elephantsin1) %in% colnames(mpnp4) == FALSE)])
+mpnp4 <- cbind(mpnp4, add_to_mpnp4)
+length(unique(colnames(mpnp4))) == ncol(mpnp4)
+which(sort(colnames(mpnp4)) != sort(unique(mpnp4_males$elephant_id))) # all columns are present only once
+
+# check output
+mpnp4_males$mean_age <- NA
+for(i in 1:nrow(mpnp4_males)){
+  mpnp4_males$mean_age[i] <- mean(mpnp4[,mpnp4_males$elephant_id[i]])
+}
+hist(mpnp4_males$mean_age, breaks = 60)
 
 # save output
 saveRDS(mpnp4, '../data_processed/mpnp4_ageestimates_mcmcoutput.rds')
 
 # clean environment
-rm(estimated, missing, missing_elephants, mpnp4_long, mpnp4_males, mpnp4, age_cat, i, j)
+rm(estimated, missing, missing_elephants, age_cat, i, mpnp4_elephantsin1, mpnp4_elephantsin2, mpnp4_elephantsin3, estimated1, estimated2, estimated3, add_to_mpnp4, mpnp4_missing)
 
 ## time window 5 ####
 mpnp5_long <- mpnp_long[mpnp_long$date >= periods[5] & mpnp_long$date < periods[6],]
@@ -582,20 +692,27 @@ mpnp5_long$age_mid_round <- floor(mpnp5_long$age_mid)
 mpnp5_long <- mpnp5_long[mpnp5_long$age_mid_round < 10 , c(3,5,6,7,32:34)]
 
 # identify individuals present in both
-length(unique(mpnp1_long$elephant_id)) ; length(unique(mpnp5_long$elephant_id))
-estimated <- mpnp5_long[mpnp5_long$elephant_id %in% mpnp1_long$elephant_id,]
-sort(unique(estimated$elephant_id))
+length(unique(mpnp1_long$elephant_id))
+length(unique(mpnp2_long$elephant_id))
+length(unique(mpnp3_long$elephant_id))
+length(unique(mpnp4_long$elephant_id))
+length(unique(mpnp5_long$elephant_id))
+estimated1 <- mpnp5_long[mpnp5_long$elephant_id %in% mpnp1_long$elephant_id,]
+estimated2 <- mpnp5_long[mpnp5_long$elephant_id %in% mpnp2_long$elephant_id,]
+estimated3 <- mpnp5_long[mpnp5_long$elephant_id %in% mpnp3_long$elephant_id,]
+estimated4 <- mpnp5_long[mpnp5_long$elephant_id %in% mpnp4_long$elephant_id,]
+estimated <- rbind(estimated1, estimated2, estimated3, estimated4) %>% distinct()
 missing <- anti_join(mpnp5_long, estimated)
 sort(unique(missing$elephant_id))
 
 # create a variable that randomly selects another elephant from time window 1 which shares an age category
 missing_elephants <- missing[,c('elephant_id','age_mid_round')] %>% distinct()
-sort(unique(missing_elephants$age_mid_round)) # 4:7
+sort(unique(missing_elephants$age_mid_round)) # 4:6
 missing_elephants$shared_age <- NA
-for(age_cat in 4:7){
+for(age_cat in 4:6){
   missing_ids <- missing_elephants[missing_elephants$age_mid_round == age_cat,]  # select all elephants in age category i that have not had their age probability distribution estimated in first time window 
   missing_elephants <- anti_join(missing_elephants, missing_ids)           # remove these elephants from current list of elephants lacking an age probability distribution
-  age_mates <- mpnp1_males[mpnp1_males$age_mid_round == age_cat,]                # select males who WERE in age category i during first time window
+  age_mates <- mpnp1_males[mpnp1_males$age_mid_round == age_cat,]          # select males who WERE in age category i during first time window
   
   if(nrow(missing_ids) <= nrow(age_mates)){                                # where possible, draw a different random elephant for every missing individual from the pooled of males who shared that age distribution
     missing_ids$shared_age <- sample(x = age_mates$elephant_id, size = nrow(missing_ids), replace = F)
@@ -611,23 +728,88 @@ table(missing_elephants$shared_age)
 # recombine data for second time window to include all elephants, present in MPNP1 or not
 missing <- left_join(missing, missing_elephants, by = c('elephant_id','age_mid_round'))
 head(missing)
-head(estimated)
 estimated$shared_age <- estimated$elephant_id
+head(estimated)
 mpnp5_long <- rbind(estimated, missing)
 
 # create data distribution for all 
-mpnp5_males <- mpnp5_long[, c('elephant_id','age_mid_round','shared_age')] %>% distinct() # identify all individuals (and age-mate where appropriate)
-mpnp5 <- mpnp1[,mpnp5_males$shared_age]                                                   # select mpnp1 columns matching mpnp5 age-mates
-nrow(mpnp5_males) ; ncol(mpnp5)                                                           # check correctly selected
+mpnp5_males <- mpnp5_long[, c('elephant_id','age_mid_round','shared_age')] %>% 
+  distinct()                                 # identify all individuals (and age-mates where appropriate)
+estimated1 <- estimated1[,c('elephant_id','age_mid_round')] %>% distinct()
+estimated2 <- estimated2[,c('elephant_id','age_mid_round')] %>% distinct()
+estimated3 <- estimated3[,c('elephant_id','age_mid_round')] %>% distinct()
+estimated4 <- estimated4[,c('elephant_id','age_mid_round')] %>% distinct()
+mpnp5_elephantsin1 <- mpnp1[,estimated1$elephant_id]      # select mpnp1 columns matching mpnp5 elephants
+mpnp5_elephantsin2 <- mpnp2[,estimated2$elephant_id]      # select mpnp2 columns matching mpnp5 elephants
+mpnp5_elephantsin3 <- mpnp3[,estimated3$elephant_id]      # select mpnp3 columns matching mpnp5 elephants
+mpnp5_elephantsin4 <- mpnp4[,estimated4$elephant_id]      # select mpnp4 columns matching mpnp5 elephants
 
-for(i in 1:nrow(mpnp5)){
-  for(j in 1:ncol(mpnp5)){
-    mpnp5[i,j] <- mpnp5[i,j] + time_diff
+# for individuals seen in mpnp1, update distribution draws by four lots of time window length
+for(draw in 1:nrow(mpnp5_elephantsin1)){
+  for(individual in unique(estimated1$elephant_id)){
+    mpnp5_elephantsin1[draw,individual] <- mpnp5_elephantsin1[draw,individual] + 4*time_diff
   }
 }
+
+# for individuals seen in mpnp2, update distribution draws by three time window lengths
+for(draw in 1:nrow(mpnp5_elephantsin2)){
+  for(individual in unique(estimated2$elephant_id)){
+    mpnp5_elephantsin2[draw,individual] <- mpnp5_elephantsin2[draw,individual] + 3*time_diff
+  }
+}
+
+# for individuals seen in mpnp3, update distribution draws by two time window lengths
+for(draw in 1:nrow(mpnp5_elephantsin3)){
+  for(individual in unique(estimated3$elephant_id)){
+    mpnp5_elephantsin3[draw,individual] <- mpnp5_elephantsin3[draw,individual] + 2*time_diff
+  }
+}
+
+# for individuals seen in mpnp4, update distribution draws by one time window length
+for(draw in 1:nrow(mpnp5_elephantsin4)){
+  for(individual in unique(estimated4$elephant_id)){
+    mpnp5_elephantsin4[draw,individual] <- mpnp5_elephantsin4[draw,individual] + time_diff
+  }
+}
+
+# for individuals seen in none of the previous time windows, select distribution from individual sharing an age category
+mpnp5_missing <- mpnp1[,missing_elephants$shared_age]
+colnames(mpnp5_missing) <- missing_elephants$elephant_id
+
+# combine together so there is only one column per elephant
+mpnp5 <- mpnp5_missing
+
+sort(colnames(mpnp5))
+sort(colnames(mpnp5_elephantsin4[,which(colnames(mpnp5_elephantsin4) %in% colnames(mpnp5) == FALSE)]))
+mpnp5_elephantsin4 <- mpnp5_elephantsin4[,which(colnames(mpnp5_elephantsin4) %in% colnames(mpnp5) == FALSE)]
+mpnp5 <- cbind(mpnp5, mpnp5_elephantsin4)
+length(unique(colnames(mpnp5))) == ncol(mpnp5)
+
+sort(colnames(mpnp5))
+sort(colnames(mpnp5_elephantsin3[,which(colnames(mpnp5_elephantsin3) %in% colnames(mpnp5) == FALSE)]))
+mpnp5_elephantsin3 <- mpnp5_elephantsin3[,which(colnames(mpnp5_elephantsin3) %in% colnames(mpnp5) == FALSE)]
+mpnp5 <- cbind(mpnp5, mpnp5_elephantsin3)
+length(unique(colnames(mpnp5))) == ncol(mpnp5)
+
+sort(colnames(mpnp5))
+add_to_mpnp5 <- data.frame(B1444 = mpnp5_elephantsin2[,which(colnames(mpnp5_elephantsin2) %in% colnames(mpnp5) == FALSE)])
+mpnp5 <- cbind(mpnp5, add_to_mpnp5)
+length(unique(colnames(mpnp5))) == ncol(mpnp5)
+
+sort(colnames(mpnp5))
+sort(colnames(mpnp5_elephantsin1[,which(colnames(mpnp5_elephantsin1) %in% colnames(mpnp5) == FALSE)]))
+
+which(sort(colnames(mpnp5)) != sort(unique(mpnp5_males$elephant_id))) # all columns are present only once
+
+# check output
+mpnp5_males$mean_age <- NA
+for(i in 1:nrow(mpnp5_males)){
+  mpnp5_males$mean_age[i] <- mean(mpnp5[,mpnp5_males$elephant_id[i]])
+}
+hist(mpnp5_males$mean_age, breaks = 60)
 
 # save output
 saveRDS(mpnp5, '../data_processed/mpnp5_ageestimates_mcmcoutput.rds')
 
 # clean environment
-rm(estimated, missing, missing_elephants, mpnp5_long, mpnp5_males, mpnp5, age_cat, i, j)
+rm(estimated, missing, missing_elephants, age_cat, i, mpnp5_elephantsin1, mpnp5_elephantsin2, mpnp5_elephantsin3, mpnp5_elephantsin4, estimated1, estimated2, estimated3, estimated4, add_to_mpnp5, mpnp5_missing)
