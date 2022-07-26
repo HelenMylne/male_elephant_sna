@@ -25,7 +25,9 @@ model {
   centrality_mu ~ multi_normal(predictor, centrality_cov + diag_matrix(rep_vector(square(sigma), num_nodes)));
   intercept ~ normal(0, 1);
   beta_age ~ normal(0, 0.02);
-  beta_age2 ~ normal(0, 0.003);
+  beta_age2 ~ normal(0, 0.003); // are these too strong?
+  //beta_age ~ normal(0, 0.2);
+  //beta_age2 ~ normal(0, 0.03);
   sigma ~ normal(0, 1);
 }
 
