@@ -16,8 +16,7 @@ library(igraph)
 library(LaplacesDemon)
 
 #### load MOTNP nodes, edges and interactions data ####
-motnp_males <- read_csv('../data_processed/not yet assimilated into github version/motnp_elenodes_22.01.13.csv') %>% 
-  #filter(dem_class == 'AM' | dem_class == 'PM') %>% 
+motnp_males <- read_csv('../data_processed/motnp_elenodes.csv') %>% 
   filter(sex == 'M')
 unique(motnp_males$age_category)
 motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1, 
@@ -37,7 +36,7 @@ motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2,
                                                                     motnp_males$age_cat_id))))))
 
 ### import data for aggregated model (binomial)
-df_agg_motnp <- read_delim('../data_processed/not yet assimilated into github version/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv', delim = ',') %>% 
+df_agg_motnp <- read_delim('../data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') %>% 
   filter(dem_class_1 == 'AM' | dem_class_1 == 'PM') %>% 
   filter(dem_class_2 == 'AM' | dem_class_2 == 'PM')
 df_agg_motnp$sex_1 <- 'M'
@@ -46,8 +45,7 @@ df_agg_motnp$age_cat_id_1 <- ifelse(df_agg_motnp$age_category_1 == '9-10', 2,
                                            ifelse(df_agg_motnp$age_category_1 == '15-19', 4,
                                                   ifelse(df_agg_motnp$age_category_1 == '20-25', 5,
                                                          ifelse(df_agg_motnp$age_category_1 == '25-40', 6,
-                                                                ifelse(df_agg_motnp$age_category_1 == '40+', 7,
-                                                                       df_agg_motnp$age_category_1))))))
+                                                                ifelse(df_agg_motnp$age_category_1 == '40+', 7, 1))))))
 df_agg_motnp$age_class_1 <- ifelse(df_agg_motnp$age_cat_id_1 == 2, 'Juvenile',
                                    ifelse(df_agg_motnp$age_cat_id_1 > 4, 'Adult','Pubescent'))
 df_agg_motnp$age_cat_id_2 <- ifelse(df_agg_motnp$age_category_2 == '9-10', 2,
@@ -55,10 +53,12 @@ df_agg_motnp$age_cat_id_2 <- ifelse(df_agg_motnp$age_category_2 == '9-10', 2,
                                            ifelse(df_agg_motnp$age_category_2 == '15-19', 4,
                                                   ifelse(df_agg_motnp$age_category_2 == '20-25', 5,
                                                          ifelse(df_agg_motnp$age_category_2 == '25-40', 6,
-                                                                ifelse(df_agg_motnp$age_category_2 == '40+', 7,
-                                                                       df_agg_motnp$age_category_2))))))
+                                                                ifelse(df_agg_motnp$age_category_2 == '40+', 7, 1))))))
 df_agg_motnp$age_class_2 <- ifelse(df_agg_motnp$age_cat_id_2 == 2, 'Juvenile',
                                    ifelse(df_agg_motnp$age_cat_id_2 > 4, 'Adult','Pubescent'))
+table(df_agg_motnp$age_cat_id_1,df_agg_motnp$age_category_1)
+table(df_agg_motnp$age_cat_id_2,df_agg_motnp$age_category_2)
+
 df_agg_motnp$dem_class_1 <- ifelse(df_agg_motnp$age_class_1 == 'Adult', 'AM',
                                    ifelse(df_agg_motnp$age_class_1 == 'Pubescent', 'PM', 'JM'))
 df_agg_motnp$dem_class_2 <- ifelse(df_agg_motnp$age_class_2 == 'Adult', 'AM',
@@ -66,13 +66,14 @@ df_agg_motnp$dem_class_2 <- ifelse(df_agg_motnp$age_class_2 == 'Adult', 'AM',
 df_agg_motnp$dem_type <- ifelse(df_agg_motnp$age_cat_id_1 >= df_agg_motnp$age_cat_id_2,
                                 paste(df_agg_motnp$dem_class_1, df_agg_motnp$dem_class_2, sep = '_'),
                                 paste(df_agg_motnp$dem_class_2, df_agg_motnp$dem_class_1, sep = '_'))
-df_agg_motnp$count_dyad <- (df_agg_motnp$count_1 + df_agg_motnp$count_2) - df_agg_motnp$all_events  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
+df_agg_motnp$count_dyad <- (df_agg_motnp$count_1 + df_agg_motnp$count_2) - df_agg_motnp$event_count  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
 df_agg_motnp$node_1_nogaps <- as.integer(as.factor(df_agg_motnp$node_1))
 df_agg_motnp$node_2_nogaps <- as.integer(as.factor(df_agg_motnp$node_2))+1
+df_agg_motnp$dyad <- paste(df_agg_motnp$id_1, df_agg_motnp$id_2, sep = '_')
 df_agg_motnp$dyad_id_nogaps <- as.integer(as.factor(df_agg_motnp$dyad))
 
 ### load the edge weights
-motnp <- readRDS('../data_processed/not yet assimilated into github version/motnp_bayesian_edgedistributions_a2.b2_22.02.07.rds') %>% 
+motnp <- readRDS('../data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
   select(-`1.lp__`)
 motnp <- motnp[, which(colnames(motnp) %in% df_agg_motnp$dyad)]
 logit_edge_samples_motnp <- logit(motnp)
@@ -97,13 +98,13 @@ rm(dyad_row)
 # Calculate centrality and store posterior samples in a matrix
 eigen_samples_motnp <- matrix(0, num_samples, num_nodes)
 eigen_samples_motnp_std <- matrix(0, num_samples, num_nodes)
-btwn_samples_motnp <- matrix(0, num_samples, num_nodes)
-btwn_samples_motnp_std <- matrix(0, num_samples, num_nodes)
+#btwn_samples_motnp <- matrix(0, num_samples, num_nodes)
+#btwn_samples_motnp_std <- matrix(0, num_samples, num_nodes)
 for (i in 1:num_samples) {
   g <- graph_from_adjacency_matrix(adj_tensor[i, , ], mode="undirected", weighted=TRUE)
   eigen_samples_motnp[i, ] <- eigen_centrality(g)$vector
   eigen_samples_motnp_std[i, ] <- (eigen_samples_motnp[i, ] - mean(eigen_samples_motnp[i, ]))/sd(eigen_samples_motnp[i, ])
-  btwn_samples_motnp[i, ] <- betweenness(g, normalized = TRUE)
+#  btwn_samples_motnp[i, ] <- betweenness(g, normalized = TRUE)
   rm(g)
 }
 
@@ -142,7 +143,7 @@ df_long_motnp$node_id <- as.integer(df_long_motnp$node_id)
 df_long_motnp <- left_join(df_long_motnp, node_ages_motnp, by = 'node_id')
 
 ggplot(df_long_motnp, aes(x = eigenvector_centrality)) +
-  geom_density(aes(fill = age_cat_id), alpha=0.7, size=0.4) +
+  geom_density(aes(fill = as.factor(age_cat_id)), alpha=0.7, size=0.4) +
   labs(x="Eigenvector centrality (standardised)") + 
   theme_light() + 
   theme(axis.text.x = element_text(angle = 0, size=12, debug = FALSE),
@@ -315,7 +316,7 @@ colnames(true_ages) <- motnp_males$id # check this shouldn't be as.integer(as.fa
 motnp_ap <- motnp_males[motnp_males$id %in% node_ages_motnp$id, ]
 true_ages_ap <- true_ages[, colnames(true_ages) %in% node_ages_motnp$id]
 
-modeldata_ages <- as.matrix(true_ages_ap) %>% t()
+modeldata_ages <- as.matrix(true_ages_ap) %>% t() # WHY DID YOU TRANSPOSE??
 modeldata_ages_sq <- (modeldata_ages)^2
 
 #### eigenvector ~ age ####
@@ -328,7 +329,7 @@ model_data_motnp <- list(
 )
 str(model_data_motnp)
 
-model_eigen_cent <- stan_model("models/nodal_regression/nodal_regression_hkm_distributionage_22.07.11.stan")
+model_eigen_cent <- stan_model("models/nodal_regression_eigenvector_agedistribution.stan")
 fit_nodal_eigen <- sampling(model_eigen_cent, data = model_data_motnp, cores = 4, chains = 4)
 
 ### check traceplot
