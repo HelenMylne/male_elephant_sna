@@ -36,7 +36,7 @@ mod_2.2
 set.seed(12345)
 
 ################ Run model on real standardised data -- period 2 ################
-counts_df2 <- read_csv('data_processed/mpnp_period2_pairwiseevents_22.05.30.csv') %>% 
+counts_df2 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period2_pairwiseevents_22.05.30.csv') %>% 
   select(dyad, dyad_id, id_1, id_2, period, count_dyad, together, apart) %>% 
   distinct()
 counts_ls2 <- list(
@@ -80,7 +80,7 @@ draws_mpnp2 <- rbind(draws1_mpnp2, draws2_mpnp2, draws3_mpnp2, draws4_mpnp2)
 colnames(draws_mpnp2)[2:ncol(draws_mpnp2)] <- counts_df2$dyad
 
 ### save data 
-saveRDS(draws_mpnp2, 'data_processed/mpnp2_bayesian_edgedistributions_a2.b2_period2_22.05.30.rds')
+saveRDS(draws_mpnp2, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp2_bayesian_edgedistributions_a2.b2_period2_22.05.30.rds')
 rm(list = ls())
 
 # print progress stamp
@@ -89,14 +89,14 @@ print(paste0('Data writing for period 2 written at ', Sys.time()))
 
 ################ Plot model output -- period 2
 # create file of output graphs
-pdf('data_processed/mpnp_edgeweights_2.2_period2_22.06.30.pdf', width = 10, height = 10)
+pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_edgeweights_2.2_period2_22.06.30.pdf', width = 10, height = 10)
 
 ################ Read in data from model run ################
 ### elephant data
-counts_df2 <- read_csv('data_processed/mpnp_period2_pairwiseevents_22.05.30.csv')
+counts_df2 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period2_pairwiseevents_22.05.30.csv')
 
 ### model data
-draws_mpnp2 <- readRDS('data_processed/mpnp2_bayesian_edgedistributions_a2.b2_period2_22.05.30.rds')
+draws_mpnp2 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp2_bayesian_edgedistributions_a2.b2_period2_22.05.30.rds')
 
 # Assign random set of columns to check
 plot_cols <- sample(x = 2:ncol(draws_mpnp2), size = 30, replace = F)
@@ -379,7 +379,7 @@ rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
 print(paste0('Time period 2 completed at ', Sys.time()))
 
 # save summary data
-write_csv(dyad_period_weights, 'data_processed/mpnp_dyad_weightdistributions_2.2_period2_22.05.31.csv')
+write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period2_22.05.31.csv')
 
 # save graphs
 dev.off()

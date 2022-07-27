@@ -61,7 +61,7 @@ drawdag(binom, radius = 6, cex = 1.6)
 rm(binom)
 dev.off()
 ################ 2) Create data lists ################
-counts_df1 <- read_csv('../data_processed/not yet assimilated into github version/mpnp/mpnp_period1_pairwiseevents_22.05.30.csv')
+counts_df1 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/not yet assimilated into github version/mpnp/mpnp_period1_pairwiseevents_22.05.30.csv')
 str(counts_df1)
 
 ### create data list
@@ -119,7 +119,7 @@ colnames(draws_mpnp1)[2:ncol(draws_mpnp1)] <- counts_df1$dyad
 plot_cols <- sample(x = 2:ncol(draws_mpnp1), size = 30, replace = F)
 
 ### save data 
-saveRDS(draws_mpnp1, '../data_processed/mpnp1_edgeweightestimates_mcmcoutput.rds')
+saveRDS(draws_mpnp1, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_edgeweightestimates_mcmcoutput.rds')
 rm(draws1_mpnp1_1, draws2_mpnp1_1, draws3_mpnp1_1, draws4_mpnp1_1)
 
 ### build traceplots -- period 1 -- very wide ####
@@ -417,7 +417,7 @@ rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.2,
 
 
 # save summary data
-write_csv(dyad_period_weights, '../data_processed/mpnp1_dyad_weightdistributions.csv')
+write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_dyad_weightdistributions.csv')
 
 # save graphs
 dev.off()

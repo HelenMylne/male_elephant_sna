@@ -36,7 +36,7 @@ mod_2.2
 set.seed(12345)
 
 ################ Run model on real standardised data -- period 3 ################
-counts_df3 <- read_csv('data_processed/mpnp_period3_pairwiseevents_22.05.30.csv') %>% 
+counts_df3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents_22.05.30.csv') %>% 
   select(dyad, dyad_id, id_1, id_2, period, count_dyad, together, apart) %>% 
   distinct()
 counts_ls3 <- list(
@@ -80,7 +80,7 @@ draws_mpnp3 <- rbind(draws1_mpnp3, draws2_mpnp3, draws3_mpnp3, draws4_mpnp3)
 colnames(draws_mpnp3)[2:ncol(draws_mpnp3)] <- counts_df3$dyad
 
 ### save data 
-saveRDS(draws_mpnp3, 'data_processed/mpnp3_bayesian_edgedistributions_a2.b2_period3_22.05.30.rds')
+saveRDS(draws_mpnp3, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_bayesian_edgedistributions_a2.b2_period3_22.05.30.rds')
 rm(list = ls())
 
 # print progress stamp
@@ -88,16 +88,16 @@ print(paste0('Data writing for period 3 written at ', Sys.time()))
 
 ################ Plot model outputs -- period 3 ################
 ### elephant data
-counts_df3 <- read_csv('data_processed/mpnp_period3_pairwiseevents_22.05.30.csv')
+counts_df3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents_22.05.30.csv')
 
 ### model data
-draws_mpnp3 <- readRDS('data_processed/mpnp3_bayesian_edgedistributions_a2.b2_period3_22.05.30.rds')
+draws_mpnp3 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_bayesian_edgedistributions_a2.b2_period3_22.05.30.rds')
 
 # Assign random set of columns to check
 plot_cols <- sample(x = 2:ncol(draws_mpnp3), size = 30, replace = F)
 
 # create file of output graphs
-pdf('data_processed/mpnp_edgeweights_2.2_period3_22.06.30.pdf', width = 10, height = 10)
+pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_edgeweights_2.2_period3_22.06.30.pdf', width = 10, height = 10)
 
 ### build traceplots -- period 3 -- very wide ####
 plot(draws_mpnp3[,plot_cols[1]], type = 'l',
@@ -378,7 +378,7 @@ rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
 print(paste0('Time period 3 completed at ', Sys.time()))
 
 # save summary data
-write_csv(dyad_period_weights, 'data_processed/mpnp_dyad_weightdistributions_2.2_period3_22.05.31.csv')
+write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period3_22.05.31.csv')
 
 # save graphs
 dev.off()
