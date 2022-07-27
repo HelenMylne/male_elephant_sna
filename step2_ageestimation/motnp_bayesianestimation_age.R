@@ -20,7 +20,7 @@ library(LaplacesDemon)
 
 #### load model ####
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
-latent_age_ordinal_model <- cmdstan_model("models/age_estimation/motnp_elephant_latent_age_ordinal_regression_hkm_22.07.07.stan")
+latent_age_ordinal_model <- cmdstan_model("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/motnp_age_ordinal_regression.stan")
 
 #### simulate process of assigning age categories to elephants ####
 gompertz_bt <- function(a0, a1, c, b0, b1, age){
@@ -94,7 +94,7 @@ plot_data %>%
   xlab("Assigned age") + ylab("Modelled age")
 
 #### load MOTNP data ####
-motnp_males <- read_csv('data_processed/motnp_elenodes_22.01.13.csv') %>% 
+motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
   #filter(dem_class == 'AM' | dem_class == 'PM') %>% 
   filter(sex == 'M')
 unique(motnp_males$age_category)
@@ -185,10 +185,10 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
 
 ### save output
 colnames(true_ages) <- motnp_males$id
-saveRDS(true_ages, file = 'data_processed/motnp_ageestimates_mcmcoutput_22.07.13.rds')
+saveRDS(true_ages, file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
 
 #### recreate network plots with new ages ####
-draws_motnp2.2 <- readRDS('data_processed/motnp_bayesian_edgedistributions_a2.b2_22.02.07.rds') %>% 
+draws_motnp2.2 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
   data.matrix()
 summaries <- data.frame(dyad = colnames(draws_motnp2.2[,2:106954]),
                         min = rep(NA, ncol(draws_motnp2.2)-1),
@@ -207,7 +207,7 @@ for(i in 1:nrow(summaries)){
 par(mai = c(0.2,0.2,0.2,0.2))
 
 # create array of draws per dyad (distributions)
-counts_df <- read_csv('data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv')
+counts_df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
                          NROW(unique(counts_df$id_2))+1,
                          NROW(draws_motnp2.2)),
