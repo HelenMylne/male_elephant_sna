@@ -1,7 +1,7 @@
 # script to incorporate and correct data from Amboseli
-old <- readxl::read_xlsx('../data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% 
+old <- readxl::read_xlsx('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% 
   janitor::clean_names() # read in original data
-new <- readxl::read_xlsx('../data_raw/Raw_ATE_Corrections_Fishlock220622.xlsx', sheet = 2) %>% 
+new <- readxl::read_xlsx('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_Corrections_Fishlock220622.xlsx', sheet = 2) %>% 
   janitor::clean_names() # read in data with notes for what needs updating
 
 # create variable with unique value for every individual observation - will use to join changes to original
