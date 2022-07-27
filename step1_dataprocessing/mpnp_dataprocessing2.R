@@ -10,7 +10,6 @@ library(hms, lib.loc = 'packages/')         # library(hms)
 library(readxl, lib.loc = 'packages/')      # library(readxl)
 library(dplyr, lib.loc = 'packages/')       # library(dplyr)
 
-
 library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
 library(rethinking, lib.loc = 'packages/')  # library(rethinking)
 library(igraph, lib.loc = 'packages/')      # library(igraph)
@@ -102,7 +101,7 @@ rm(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az
 
 #### Recreate how data were produced to match up obs_id to actual encounters ####
 # sightings data
-s <- read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')
+s <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')
 str(s)
 colnames(s)[c(1:23,57)] <- s[2,c(1:23,57)]
 colnames(s)[24:56] <- c('CM','CF','CU','CM','CF','CU','JM','JF','JU','YPM','YPF','YPU','OPM','OPF','OPU',
@@ -112,7 +111,7 @@ s <- s[3:nrow(s),]
 s <- clean_names(s)
 
 # individual data
-efa <- read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
+efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
 str(efa)
 efa$time_cat <- hour(efa$Time)
 efa <- separate(efa, Time, into = c('wrong_date','time'), sep = ' ')
@@ -264,7 +263,7 @@ head(df_split)
 rm(events)
 
 ### add ID numbers
-eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long_22.03.08.csv') %>% 
+eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
   select(elephant) %>% 
   distinct()
 eles$node_1 <- as.integer(as.factor(eles$elephant))
@@ -307,7 +306,7 @@ data$dyad <- paste(data$id_1, data$id_2, sep = '_')
 data$dyad_id <- as.integer(as.factor(data$dyad))
 head(data, 20)
 
-efa <- read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% clean_names()
+efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% janitor::clean_names()
 efa$date <- as_date(efa$date)
 
 windows <- data.frame(period_start = seq(from = min(efa$date),
@@ -346,7 +345,7 @@ rm(data)
 
 #### add count data per elephant and remove sightings where elephant not seen at all in period ####
 # insert column for sighting period
-sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long_22.03.08.csv')
+sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
 sightings <- sightings[,c(3,4)]
 sightings$day <- as.numeric(sightings$date)
 sightings$day <- sightings$day - (min(sightings$day)-1)
@@ -495,7 +494,7 @@ data6_id <- data6 %>%
 
 #### add data about individual elephant ages ####
 # read in data
-eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long_22.03.08.csv') %>% 
+eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
   select(elephant, sex, age_range, date) %>% 
   distinct()
 
@@ -595,11 +594,12 @@ data4_id <- data4_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
 data5_id <- data5_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
 data6_id <- data6_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]
 
-write_csv(data1_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period1_pairwiseevents_22.05.30.csv')
-write_csv(data2_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period2_pairwiseevents_22.05.30.csv')
-write_csv(data3_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents_22.05.30.csv')
-write_csv(data4_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period4_pairwiseevents_22.05.30.csv')
-write_csv(data5_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period5_pairwiseevents_22.05.30.csv')
-write_csv(data6_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period6_pairwiseevents_22.05.30.csv')
+write_csv(data1_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period1_pairwiseevents.csv')
+write_csv(data2_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period2_pairwiseevents.csv')
+write_csv(data3_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents.csv')
+write_csv(data4_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period4_pairwiseevents.csv')
+write_csv(data5_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period5_pairwiseevents.csv')
 
-length(unique(data5_id$id_1))
+length(unique(data6_id$id_1)) # not usable data
+#write_csv(data6_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period6_pairwiseevents.csv')
+
