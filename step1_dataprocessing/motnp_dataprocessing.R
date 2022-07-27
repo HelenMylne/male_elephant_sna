@@ -24,7 +24,7 @@ library(spatsoc, lib.loc = 'packages')
 
 ################ 1) Create basic data frames from raw data ################
 #### Observation Sessions ####
-sessions <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 1) # read in raw data
+sessions <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 1) # read in raw data
 s <- sessions[,1:4]             # remove summary section
 s <- janitor::clean_names(s)    # convert names to snake case
 colnames(s)[4] <- 'mins'        # remove '4' from minutes name
@@ -44,15 +44,15 @@ days <- aggregate(s$mins, by = list(s$date), FUN = sum)
 colnames(days) <- c('date','mins')
 
 ### write to csv
-write_delim(days, '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_recording_days_testinggooogledrive.csv',  delim = ',', col_names = T)
-write_delim(s, '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_recording_sessions.csv', delim = ',', col_names = T)
+write_delim(days, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_recording_days_testinggooogledrive.csv',  delim = ',', col_names = T)
+write_delim(s, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_recording_sessions.csv', delim = ',', col_names = T)
 
 ### clear environment
 rm(days,s,sessions)
 
 #### IDs ####
 ### import data
-id.raw <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 2) # read in raw data
+id.raw <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 2) # read in raw data
 id <- id.raw[5:849,1:368]             # create a new data frame without top values or empty end columns
 id <- id[!is.na(id[,1]),]             # remove empty rows
 id <- id[!is.na(id[,5]),]             # remove unassigned numbers
@@ -101,7 +101,7 @@ id$weeks <- as.numeric(rowSums(id[31:108]))
 id$days <- as.numeric(rowSums(id[109:368]))
 
 ### load age data
-ages <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_raw/Raw_ALERT_ElephantAges_Saunders211019.xlsx", sheet = 1)  # read in age data
+ages <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantAges_Saunders211019.xlsx", sheet = 1)  # read in age data
 names <- colnames(ages) ; names[8] <- 'comments' ; colnames(ages) <- names                    # rename column 8
 ages <- ages[!is.na(ages$id_no),]      # remove empty rows -- 4 less ages than ids
 table(ages$age_category)               # Some values incorrectly saved as dates not categories
@@ -163,13 +163,13 @@ id <- id[id$id_no != 'F0157',] ; ages <- ages[ages$id_no != 'F0157',]
 id <- id[is.na(id$comments),]
 
 ### Write out processed data
-write_delim(id, "../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_id.csv", delim = ",", col_names = T)
+write_delim(id, "../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_id.csv", delim = ",", col_names = T)
 
 ### Clear Environment
 rm(ages, days.numbers, id, id.raw, names, nkash, days, i, months, weeks)
 #### Encounters ####
 ### import data
-encounters <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3) # read in raw data
+encounters <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3) # read in raw data
 e <- encounters[c(1:3,8:27)]    # only necessary columns
 
 ### rename columns
@@ -228,7 +228,7 @@ d$gps_s[672] <- d$gps_s[672]*10 # value was 175296 -- 1752960 puts it within clu
 d$gps_e[624] <- d$gps_e[624]+800000 # value started 17 rather than 25 (1745269), but then matched format of other east coordinates -- 2545269 puts it within cluster of all other points
 
 ### write initial csv -- to be overwritten later on following generation of long format data
-write_delim(d, '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
+write_delim(d, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
 
 ### clear environment, leave d for mapping
 rm(counts, e, plus, group.size, i, j)
@@ -287,7 +287,7 @@ rm(males, i)
 
 #### Convert sightings data to long format for analysis ####
 ### import encounter data
-d <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_encounters.csv')
+d <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_encounters.csv')
 for(j in 2:ncol(d)){
   for(i in 1:nrow(d)){
     d[i,j] <- ifelse(d[i,j] == 'NA',NA,d[i,j]) # convert character "NA" to actual NA
@@ -316,18 +316,18 @@ eles_long$elephant[which(eles_long$elephant == 'D128')] <- 'F128'  # row 2297
 eles_long$elephant[which(eles_long$elephant == 'N40')] <- 'M40'    # row 1859
 
 ### write to csv for use in plotting
-write_delim(eles_long, '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_eles_long.csv',col_names = T, delim = ',')
+write_delim(eles_long, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv',col_names = T, delim = ',')
 
 ### clear environment
 rm(d, typ1, typNA, first, eles_long, i, j)
 
 #### Create nodes data frame ####
 ### nodes data frame
-ele_nodes <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_id.csv', delim = ',')  # read in ID data
+ele_nodes <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_id.csv', delim = ',')  # read in ID data
 ele_nodes <- ele_nodes[,c(1:7,11:12)]                                         # select desired columns
 
 ### make long (zero-padded) label for each elephant in eles_long to match ele_nodes
-eles_long <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_eles_long.csv', delim = ',')  # read in individual sightings data
+eles_long <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv', delim = ',')  # read in individual sightings data
 eles_long$time <- as.numeric(eles_long$time)   # fix time variable
 eles_long$id_no <- eles_long$elephant          # add id_no variable to pad out
 eles_long <- separate(eles_long, id_no, into = c('sex','num'), sep = 1)  # separate id_no variable for padding
@@ -357,13 +357,13 @@ ele_nodes$dem_class <- paste0(ifelse(ele_nodes$age_class == 'Adult','A',
                               ele_nodes$sex)
 
 ### write CSV file
-write_delim(ele_nodes, path = '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_elenodes.csv', delim = ',', col_names = T)
+write_delim(ele_nodes, path = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv', delim = ',', col_names = T)
 
 ### clear environment
 rm(ele_nodes, eles_long, i)
 
 #### Correct herd type in encounter data ####
-d <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_encounters.csv')
+d <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_encounters.csv')
 for(j in 2:ncol(d)){
   for(i in 1:nrow(d)){
     d[i,j] <- ifelse(d[i,j] == 'NA',NA,d[i,j]) # convert character "NA" to actual NA
@@ -415,8 +415,8 @@ d$type[which(d$unique == 1006)] <- 'UK'  # a calf with a whole group of males --
 #View(d[c(50,88,276,277,628,736,1006),]) # still an issue with 50 -- 1 elephant, but 8 identified, suggests that these may have got scrambled together somehow, but nothing to be done about it
 
 bh <- d[d$type == 'BH',]
-eles_long <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_eles_long.csv')
-ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_elenodes.csv')
+eles_long <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv')
+ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv')
 eles_bh <- eles_long[eles_long$type == 'BH',]
 sort(unique(eles_bh$elephant)) # "M103" "M12"  "M120" "M126" "M137" "M139" "M148" "M160" "M164" "M174" "M176" "M179" "M180" "M182" "M187" "M189" "M19"  "M190" "M191" "M2"   "M203" "M204" "M206" "M215" "M217" "M225" "M23"  "M238" "M24"  "M240" "M245" "M248" "M249" "M26" "M6"   "M60"  "M69"  "M7"   "M71"  "M72"  "M84"  "M86"  "M87"  "M88"  "M9"   "M96"  "M97" 
 # check which of these are adult males and therefore shouldn't be in BH:
@@ -537,7 +537,7 @@ unique(d$type) # "MO" "BH" "MX" "UK"
 colnames(d)[14] <- 'herd_type'
 
 ### overwrite csv with corrected herd types
-write_delim(d, '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
+write_delim(d, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
 
 ### clear environment, leave d for mapping
 rm(bh, d, ele_nodes, eles_bh, eles_long, encounters, mo, i, j)
@@ -546,13 +546,13 @@ rm(bh, d, ele_nodes, eles_bh, eles_long, encounters, mo, i, j)
 #### Create dyadic data for all sightings ####
 ### import data
 # elephant encounters
-eles <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_eles_long.csv', delim = ',')
+eles <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv', delim = ',')
 eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_') # make single variable for unique locations
 eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]            # rearrange variables
 str(eles)
 
 # nodes
-nodes <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_elenodes.csv', delim = ',') # read in node data
+nodes <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv', delim = ',') # read in node data
 colnames(nodes)
 str(nodes)
 
@@ -604,7 +604,7 @@ for (obs_id in 1:nrow(gbi_matrix)) {              # run through every sighting i
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df # check structure of gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_bayesian_bernoullipairwiseevents.csv', delim = ',')
+write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_bernoullipairwiseevents.csv', delim = ',')
 # test <- read_delim('data_processed/motnp_bayesian_allpairwiseevents_22.01.13.csv', delim = ',')  # check that this has worked because you don't want to have to run it again!
 
 ### add elephant ID numbers to assigned index factors
@@ -697,4 +697,4 @@ length(which(is.na(dyads$id_pad_1)))                 # 0 entries where elephants
 length(which(is.na(dyads$id_pad_2)))                 # 0 entries where elephants have no information
 
 ### write csv
-readr::write_delim(dyads, '../../../../Google Drive/Shared drives/Helen PhD/Data/ALERT/data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') # write to file
+readr::write_delim(dyads, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') # write to file
