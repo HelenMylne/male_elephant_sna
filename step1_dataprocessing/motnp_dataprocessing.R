@@ -44,7 +44,6 @@ days <- aggregate(s$mins, by = list(s$date), FUN = sum)
 colnames(days) <- c('date','mins')
 
 ### write to csv
-write_delim(days, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_recording_days_testinggooogledrive.csv',  delim = ',', col_names = T)
 write_delim(s, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_recording_sessions.csv', delim = ',', col_names = T)
 
 ### clear environment
@@ -605,7 +604,7 @@ for (obs_id in 1:nrow(gbi_matrix)) {              # run through every sighting i
 }
 gbi_df # check structure of gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_bernoullipairwiseevents.csv', delim = ',')
-# test <- read_delim('data_processed/motnp_bayesian_allpairwiseevents_22.01.13.csv', delim = ',')  # check that this has worked because you don't want to have to run it again!
+# test <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_bernoullipairwiseevents.csv', delim = ',')  # check that this has worked because you don't want to have to run it again!
 
 ### add elephant ID numbers to assigned index factors
 str(gbi_df)
