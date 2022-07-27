@@ -6,17 +6,26 @@
 # 5) use MOTNP age distributions to predict network centrality (third part of this script)
 
 #### load packages ####
-library(tidyverse)
-library(cmdstanr)
-library(ggdist)
-library(posterior)
-library(bayesplot)
-library(rstan)
-library(igraph)
-library(LaplacesDemon)
+#library(tidyverse)
+#library(cmdstanr)
+#library(ggdist)
+#library(posterior)
+#library(bayesplot)
+#library(rstan)
+#library(igraph)
+#library(LaplacesDemon)
+
+library(tidyverse, lib.loc = 'packages/')
+library(cmdstanr, lib.loc = 'packages/')
+library(ggdist, lib.loc = 'packages/')
+library(posterior, lib.loc = 'packages/')
+library(bayesplot, lib.loc = 'packages/')
+library(rstan, lib.loc = 'packages/')
+library(igraph, lib.loc = 'packages/')
+library(LaplacesDemon, lib.loc = 'packages/')
 
 #### load MOTNP nodes, edges and interactions data ####
-motnp_males <- read_csv('../data_processed/motnp_elenodes.csv') %>% 
+motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
   filter(sex == 'M')
 unique(motnp_males$age_category)
 motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1, 
@@ -36,7 +45,7 @@ motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2,
                                                                     motnp_males$age_cat_id))))))
 
 ### import data for aggregated model (binomial)
-df_agg_motnp <- read_delim('../data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') %>% 
+df_agg_motnp <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') %>% 
   filter(dem_class_1 == 'AM' | dem_class_1 == 'PM') %>% 
   filter(dem_class_2 == 'AM' | dem_class_2 == 'PM')
 df_agg_motnp$sex_1 <- 'M'
@@ -73,7 +82,7 @@ df_agg_motnp$dyad <- paste(df_agg_motnp$id_1, df_agg_motnp$id_2, sep = '_')
 df_agg_motnp$dyad_id_nogaps <- as.integer(as.factor(df_agg_motnp$dyad))
 
 ### load the edge weights
-motnp <- readRDS('../data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
+motnp <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
   select(-`1.lp__`)
 motnp <- motnp[, which(colnames(motnp) %in% df_agg_motnp$dyad)]
 logit_edge_samples_motnp <- logit(motnp)
@@ -310,7 +319,7 @@ for(i in 1:100){
 }
 
 #### load MOTNP ages ####
-true_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds')
+true_ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
 
 colnames(true_ages) <- motnp_males$id # check this shouldn't be as.integer(as.factor(motnp_males$id)), but 90% sure this is correct -- goes into the model in order so should come out in same order?
 motnp_ap <- motnp_males[motnp_males$id %in% node_ages_motnp$id, ]
@@ -329,7 +338,7 @@ model_data_motnp <- list(
 )
 str(model_data_motnp)
 
-model_eigen_cent <- stan_model("models/nodal_regression_eigenvector_agedistribution.stan")
+model_eigen_cent <- stan_model("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/nodal_regression_eigenvector_agedistribution.stan")
 fit_nodal_eigen <- sampling(model_eigen_cent, data = model_data_motnp, cores = 4, chains = 4)
 
 ### check traceplot
@@ -431,7 +440,7 @@ model_data_motnp <- list(
 )
 str(model_data_motnp)
 
-model_btwn_cent <- stan_model("models/nodal_regression_betweenness_agedistribution.stan")
+model_btwn_cent <- stan_model("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/nodal_regression_betweenness_agedistribution.stan")
 fit_nodal_btwn <- sampling(model_btwn_cent, data = model_data_motnp, cores = 1, chains = 1)
 
 ### check traceplot
