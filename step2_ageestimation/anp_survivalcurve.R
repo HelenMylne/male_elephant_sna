@@ -17,7 +17,7 @@ library(bayesplot)
 #library(data.table)
 
 #### read in Amboseli data ####
-sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_sightings_updated_22.06.22.csv')
+sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_sightings_updated.csv')
 sightings$year <- lubridate::year(sightings$obs_date)
 sightings <- sightings[,c('casename','year')]
 
@@ -250,7 +250,7 @@ data.frame(elephants_ls) %>%
     xlab("Assigned age") + ylab("Age")
 
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
-latent_age_ordinal_model <- cmdstan_model("models/age_estimation/elephant_latent_age_ordinal_regression_hkm_22.07.07.stan")
+latent_age_ordinal_model <- cmdstan_model("models/motnp_age_ordinal_regression.stan")
 
 #Fit model with cmdstanr
 age_estimation_fit <- latent_age_ordinal_model$sample(
@@ -317,7 +317,7 @@ data.frame(elephants_ls) %>%
   xlab("Assigned age") + ylab("Age")
 
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
-latent_age_ordinal_model <- cmdstan_model("models/age_estimation/elephant_latent_age_ordinal_regression_hkm_22.07.07.stan")
+latent_age_ordinal_model <- cmdstan_model("models/motnp_age_ordinal_regression.stan")
 
 #Fit model with cmdstanr
 age_estimation_fit <- latent_age_ordinal_model$sample(
@@ -347,7 +347,7 @@ plot_data %>%
   xlab("Assigned age") + ylab("Modelled age")
 
 #### run on MOTNP elephants -- THIS WORKS PERFECTLY ####
-motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes_22.01.13.csv') %>% 
+motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
   #filter(dem_class == 'AM' | dem_class == 'PM') %>% 
   filter(sex == 'M')
 unique(motnp_males$age_category)
@@ -376,7 +376,7 @@ hist(motnp_ls$age_category_index)
 #hist(elephants_ls$age_category_index)
 
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
-latent_age_ordinal_model <- cmdstan_model("models/age_estimation/elephant_latent_age_ordinal_regression_hkm_22.07.07.stan")
+latent_age_ordinal_model <- cmdstan_model("models/motnp_age_ordinal_regression.stan")
 
 #Fit model with cmdstanr
 age_motnp_fit <- latent_age_ordinal_model$sample(

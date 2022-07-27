@@ -20,7 +20,7 @@ library(LaplacesDemon)
 
 #### load model ####
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
-latent_age_ordinal_model <- cmdstan_model("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/motnp_age_ordinal_regression.stan")
+latent_age_ordinal_model <- cmdstan_model("models/motnp_age_ordinal_regression.stan")
 
 #### simulate process of assigning age categories to elephants ####
 gompertz_bt <- function(a0, a1, c, b0, b1, age){

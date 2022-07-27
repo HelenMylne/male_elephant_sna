@@ -27,6 +27,7 @@ pdf('mpnp_age_ouputs.pdf', width = 20, height = 10)
 #### load model -- adapted from MOTNP to use MPNP thresholds ####
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
 latent_age_ordinal_model <- cmdstan_model("models/mpnp_age_ordinal_regression.stan")
+
 # Age_Range_ID
 # 1	>1
 # 2	1-4
