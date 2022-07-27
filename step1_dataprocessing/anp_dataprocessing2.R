@@ -256,7 +256,7 @@ data <- data[,c(8,7,1:5,9,6,10,17,11,18,12,19,13,20,14,21,15,22,16,23)]
 head(data)
 
 ### write to file ####
-readr::write_delim(data, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_pairwiseevents_22.03.28.csv', delim = ',')
+readr::write_delim(data, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_pairwiseevents.csv', delim = ',')
 
 ## clean environment
 rm(list = ls())
@@ -457,7 +457,7 @@ counts_df_non0$age_start_2 <- round(as.numeric(as.character((counts_df_non0$peri
 counts_df_non0$age_diff <- abs(counts_df_non0$age_start_1 - counts_df_non0$age_start_2)
 
 # write new data frame to file including counts
-write_csv(counts_df_non0, path = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_pairwiseevents_22.04.06.csv')
+write_csv(counts_df_non0, path = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_pairwiseevents.csv')
 
 ## clean environment
 rm(list = ls())
