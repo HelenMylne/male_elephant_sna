@@ -7,13 +7,21 @@
 
 #### Set up ####
 # load packages
-library(tidyverse)
-library(dplyr)
-library(rstan)
-library(rethinking)
-library(igraph)
-library(dagitty)
-library(cmdstanr)
+#library(tidyverse)
+#library(dplyr)
+#library(rstan)
+#library(rethinking)
+#library(igraph)
+#library(dagitty)
+#library(cmdstanr)
+
+library(tidyverse, lib.loc = 'packages/')
+library(dplyr, lib.loc = 'packages/')
+library(rstan, lib.loc = 'packages/')
+library(rethinking, lib.loc = 'packages/')
+library(igraph, lib.loc = 'packages/')
+library(dagitty, lib.loc = 'packages/')
+library(cmdstanr, lib.loc = 'packages/')
 
 # information
 sessionInfo()
@@ -60,7 +68,7 @@ rm(binom)
 dev.off()
 ################ 2) Create data lists ################
 ### import data for aggregated model (binomial)
-counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
+counts_df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
 unique(counts_df$sex_1) # FALSE or NA
@@ -330,7 +338,7 @@ rm(population, i, N)
 # Binomial model using a beta distribution where shape 1 = times together and shape 2 = times apart
 
 ### Compile Stan model
-mod_2.2 <- cmdstan_model("models/simpleBetaNet.stan")
+mod_2.2 <- cmdstan_model("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/simpleBetaNet.stan")
 mod_2.2
 
 ################ 5) Run model on simulated data ################
@@ -526,7 +534,7 @@ tidy_sierra$chain <- rep(1:4, each = length(tidy_sierra$dyad)/4)
 tidy_sierra$index <- rep(rep(1:1000, each = length(unique(tidy_sierra$dyad))),4)
 
 ### save data 
-saveRDS(draws_motnp2.2, '../data_processed/motnp_edgeweightestimates_mcmcoutput.rds')
+saveRDS(draws_motnp2.2, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds')
 
 ################ 7) Summarise and plot edge weights ################
 # draws_motnp2.2 <- readRDS('../data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
@@ -921,7 +929,7 @@ g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE
 g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
 
 # Generate nodes data for plotting characteristics
-ele_nodes <- read_csv('data_processed/motnp_elenodes_22.01.13.csv')
+ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv')
 nodes <- data.frame(id = sort(unique(ele_nodes$id)))
 nodes <- left_join(nodes, ele_nodes, by = 'id')
 nodes$sex       <- as.factor(nodes$sex)
@@ -968,13 +976,14 @@ nodes$dem_class <- ifelse(nodes$age_class == 'Adult', paste('A',nodes$sex, sep =
 rm(ele_nodes)
 
 # convert to true age distributions
-ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds')
+ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
 males <- nodes$id[nodes$dem_class == 'AM' | nodes$dem_class == 'PM']
 ages <- as.data.frame(ages[, colnames(ages) %in% males])
 
-nodes$age_mean <- NA
-for(i in 1:nrow(nodes)){
-  nodes$age_mean[i] <- mean(ages[,i])
+males <- nodes[nodes$dem_class == 'AM' | nodes$dem_class == 'PM',]
+males$age_mean <- NA
+for(i in 1:nrow(males)){
+  males$age_mean[i] <- mean(ages[,i])
 }
 
 # create variables for different degrees of node connectedness
@@ -1118,7 +1127,6 @@ plot(g_mid_0.3,
      layout = coords_0.3, add = TRUE)
 
 ### All males ####
-males <- nodes[nodes$dem_class == 'AM' | nodes$dem_class == 'PM',]
 g_mid_m <- delete.vertices(graph = g_mid,
                            v = nodes$id[which(nodes$dem_class != 'AM' &
                                                 nodes$dem_class != 'PM')])
