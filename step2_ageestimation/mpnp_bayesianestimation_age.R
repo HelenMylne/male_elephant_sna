@@ -225,7 +225,7 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
 print('simulation without young males complete')
 
 #### load MPNP data ####
-mpnp_long <- readxl::read_excel('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>%
+mpnp_long <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>%
   janitor::clean_names()
 
 # identify period 1 only
@@ -341,12 +341,12 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
 
 #### save MPNP1 output ####
 colnames(true_ages) <- mpnp1_males$elephant_id
-saveRDS(true_ages, '../data_processed/mpnp1_ageestimates_mcmcoutput.rds')
+saveRDS(true_ages, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_ageestimates_mcmcoutput.rds')
 
 #### produce estimate distributions for MPNP2-5 ####
 time_diff <- periods[2]-periods[1]         # duration of time window in days
 time_diff <- as.numeric(time_diff)/365.25  # duration of time window in years
-mpnp1 <- as.data.frame(readRDS('../data_processed/mpnp1_ageestimates_mcmcoutput.rds'))
+mpnp1 <- as.data.frame(readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_ageestimates_mcmcoutput.rds'))
 
 ## time window 2 ####
 mpnp2_long <- mpnp_long[mpnp_long$date >= periods[2] & mpnp_long$date < periods[3],]
@@ -434,7 +434,7 @@ for(i in 1:nrow(mpnp2_males)){
 hist(mpnp2_males$mean_age, breaks = 60)
 
 # save output
-saveRDS(mpnp2, '../data_processed/mpnp2_ageestimates_mcmcoutput.rds')
+saveRDS(mpnp2, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp2_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, missing, missing_elephants, age_cat, i, j)
@@ -538,7 +538,7 @@ for(i in 1:nrow(mpnp3_males)){
 hist(mpnp3_males$mean_age, breaks = 60)
 
 # save output
-saveRDS(mpnp3, '../data_processed/mpnp3_ageestimates_mcmcoutput.rds')
+saveRDS(mpnp3, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, estimated1, estimated2, missing, missing_elephants, mpnp3_elephantsin1, mpnp3_elephantsin2, mpnp3_missing, age_cat, i)
@@ -666,7 +666,7 @@ for(i in 1:nrow(mpnp4_males)){
 hist(mpnp4_males$mean_age, breaks = 60)
 
 # save output
-saveRDS(mpnp4, '../data_processed/mpnp4_ageestimates_mcmcoutput.rds')
+saveRDS(mpnp4, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp4_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, missing, missing_elephants, age_cat, i, mpnp4_elephantsin1, mpnp4_elephantsin2, mpnp4_elephantsin3, estimated1, estimated2, estimated3, add_to_mpnp4, mpnp4_missing)
@@ -809,7 +809,7 @@ for(i in 1:nrow(mpnp5_males)){
 hist(mpnp5_males$mean_age, breaks = 60)
 
 # save output
-saveRDS(mpnp5, '../data_processed/mpnp5_ageestimates_mcmcoutput.rds')
+saveRDS(mpnp5, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_ageestimates_mcmcoutput.rds')
 
 # clean environment
 rm(estimated, missing, missing_elephants, age_cat, i, mpnp5_elephantsin1, mpnp5_elephantsin2, mpnp5_elephantsin3, mpnp5_elephantsin4, estimated1, estimated2, estimated3, estimated4, add_to_mpnp5, mpnp5_missing)

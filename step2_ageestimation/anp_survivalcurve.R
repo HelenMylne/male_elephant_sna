@@ -17,11 +17,11 @@ library(bayesplot)
 #library(data.table)
 
 #### read in Amboseli data ####
-sightings <- read_csv('data_processed/anp_sightings_updated_22.06.22.csv')
+sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_sightings_updated_22.06.22.csv')
 sightings$year <- lubridate::year(sightings$obs_date)
 sightings <- sightings[,c('casename','year')]
 
-males <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% 
+males <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% 
   janitor::clean_names() %>% 
   select(casename, byr, dyr)
 str(males)
@@ -347,7 +347,7 @@ plot_data %>%
   xlab("Assigned age") + ylab("Modelled age")
 
 #### run on MOTNP elephants -- THIS WORKS PERFECTLY ####
-motnp_males <- read_csv('data_processed/motnp_elenodes_22.01.13.csv') %>% 
+motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes_22.01.13.csv') %>% 
   #filter(dem_class == 'AM' | dem_class == 'PM') %>% 
   filter(sex == 'M')
 unique(motnp_males$age_category)
