@@ -1,3 +1,7 @@
+# information: script to incorporate additional changes made by Vicki Fishlock to ANP data into original sightings
+
+library(tidyverse)
+
 # script to incorporate and correct data from Amboseli
 old <- readxl::read_xlsx('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% 
   janitor::clean_names() # read in original data
@@ -59,5 +63,5 @@ sort(unique(updated$casename[updated$obs_id == '36407'])) # all others are below
 updated$obs_id <- ifelse(updated$obs_id == '36407' & as.numeric(updated$casename) > 228,
                          '18084', updated$obs_id)
 
-write_csv(updated, 'data_processed/anp_sightings_updated_22.06.22.csv')
+write_csv(updated, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_sightings_updated.csv')
 
