@@ -18,7 +18,7 @@ library(asnipe)     # generating networks
 library(rethinking) # col.alpha
 library(igraph)     # plotting networks
 #### Observation Sessions ####
-sessions <- readxl::read_excel("data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 1)
+sessions <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 1)
 s <- sessions[,1:4]             # remove summary section
 s <- janitor::clean_names(s)    # convert names to snake case
 colnames(s)[4] <- 'mins'        # remove '4' from minutes name
@@ -38,15 +38,15 @@ days <- aggregate(s$mins, by = list(s$date), FUN = sum)
 colnames(days) <- c('date','mins')
 
 ### write to csv
-write_delim(days, 'data_processed/motnp_recording_days.csv',  delim = ';', col_names = T)
-write_delim(s, 'data_processed/motnp_recording_sessions.csv', delim = ';', col_names = T)
+write_delim(days, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_recording_days.csv',  delim = ';', col_names = T)
+write_delim(s, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_recording_sessions.csv', delim = ';', col_names = T)
 
 ### clear environment
 rm(days,s,sessions)
 
 #### IDs ####
 ### import data
-id.raw <- readxl::read_excel("data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 2)
+id.raw <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 2)
 id <- id.raw[5:849,1:368]             # create a new data frame without top values or empty end columns
 id <- id[!is.na(id[,1]),]             # remove empty rows
 id <- id[!is.na(id[,5]),]             # remove unassigned numbers
@@ -97,7 +97,7 @@ id$weeks <- as.numeric(rowSums(id[31:108]))
 id$days <- as.numeric(rowSums(id[109:368]))
 
 ### load age data
-ages <- readxl::read_excel("data_raw/Raw_ALERT_ElephantAges_Saunders211019.xlsx", sheet = 1)  # read in age data
+ages <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantAges_Saunders211019.xlsx", sheet = 1)  # read in age data
 names <- colnames(ages) ; names[8] <- 'comments' ; colnames(ages) <- names                    # rename column 8
 ages <- ages[!is.na(ages$id_no),]      # remove empty rows -- 4 less ages than ids
 table(ages$age_category)               # Some values incorrectly saved as dates not categories
@@ -159,13 +159,13 @@ id <- merge(x = id, y = ages)             # 468 elephants
 id <- id[,c(1:5,369,6:10,370,11:368)]
 
 ### Write out processed data
-write_delim(id, "data_processed/motnp_id.csv", delim = ",", col_names = T)
+write_delim(id, "../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_id.csv", delim = ",", col_names = T)
 
 ### Clear Environment
 rm(ages, days.numbers, id, id.raw, names, nkash, days, i, months, weeks)
 #### Encounters ####
 ### import data
-encounters <- readxl::read_excel("data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3)
+encounters <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3)
 e <- encounters[c(1:3,8:27)]
 
 ### rename columns
@@ -233,7 +233,7 @@ d$gps_s[672] <- d$gps_s[672]*10 # value was 175296 -- 1752960 puts it within clu
 d$gps_e[624] <- d$gps_e[624]+800000 # value started 17 rather than 25 (1745269), but then matched format of other east coordinates -- 2545269 puts it within cluster of all other points
 
 ### write csv
-write_delim(d, 'data_processed/motnp_encounters_correctid.csv', na = 'NA', col_names = T, delim = ',')
+write_delim(d, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_encounters_correctid.csv', na = 'NA', col_names = T, delim = ',')
 
 ### clear environment, leave d for mapping
 rm(e, encounters, group.size, i, j)
@@ -295,7 +295,7 @@ rm(d, males, i)
 
 #### Create dyadic network ####
 ### first load data d (encounters)
-d <- read_csv('data_processed/motnp_encounters_correctid_22.01.06.csv')
+d <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_encounters_correctid.csv')
 for(j in 2:ncol(d)){
   for(i in 1:nrow(d)){
     d[i,j] <- ifelse(d[i,j] == 'NA',NA,d[i,j])
@@ -319,7 +319,7 @@ eles_long$elephant[which(eles_long$elephant == 'D128')] <- 'F128'  # row 2297
 eles_long$elephant[which(eles_long$elephant == 'N40')] <- 'M40'    # row 1859
 
 # write to csv for use in plotting
-write_delim(eles_long, 'data_processed/motnp_eles_long_correctid.csv',col_names = T, delim = ',')
+write_delim(eles_long, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long_correctid.csv',col_names = T, delim = ',')
 
 ### make data frame that matches required structure for asnipe::get_associations_points_tw()
 eles_asnipe <- eles_long[,c(1,3:5,14)]
@@ -375,7 +375,7 @@ for(i in 1:nrow(sna_no_duplicates)) {
   sna_no_duplicates$sri[i] <- sna$sri[match(x = sna_no_duplicates$dyad[i], table = sna$dyad)]
 }
 
-write_delim(sna_no_duplicates, "data_processed/motnp_dyads_noduplicates.csv",
+write_delim(sna_no_duplicates, "../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_dyads_noduplicates.csv",
             delim = ",", na = "", append = FALSE, col_names = T, quote_escape = "double")
 
 associations <- sna[sna$sri > 0,] # considering only dyads for which there was at least some association
@@ -391,11 +391,11 @@ par(mfrow = c(1,1))
 
 #### Create plotting data -- very slow so do not repeat once files are created ####
 ### notes data frame
-ele_nodes <- read_delim('data_processed/motnp_id.csv', delim = ',')
+ele_nodes <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_id.csv', delim = ',')
 ele_nodes <- ele_nodes[,c(1:7,11:12)]
 
 ### edges data frame
-ele_links <- read.csv("data_processed/motnp_dyads_noduplicates.csv", header=T, as.is=T)
+ele_links <- read.csv("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_dyads_noduplicates.csv", header=T, as.is=T)
 ele_links$type <- paste(ele_links$sex1,ele_links$sex2, sep = '')
 ele_links$type <- ifelse(ele_links$type == 'FM', 'MF',
                          ifelse(ele_links$type == 'FU','UF',
@@ -411,7 +411,7 @@ ele_links <- ele_links[,c(12,13,7,3:5,1,2,6)]
 colnames(ele_links)[4] <- 'weight'
 
 ### sightings per elephant
-eles_long <- read_delim('data_processed/motnp_eles_long_correctid.csv', delim = ',')
+eles_long <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long_correctid.csv', delim = ',')
 eles_long$time <- as.numeric(eles_long$time)
 eles_long$id_no <- eles_long$elephant
 eles_long <- separate(eles_long, id_no, into = c('sex','num'), sep = 1)
@@ -498,8 +498,8 @@ ele_links$dem_class2 <- paste(sep = '',
                               ele_links$sex2)
 
 ### write CSV files of both data frames so this section doesn't need to be run again
-write_delim(ele_links, path = 'data_processed/motnp_elelinks.csv', delim = ',', col_names = T)
-write_delim(ele_nodes, path = 'data_processed/motnp_elenodes.csv', delim = ',', col_names = T)
+write_delim(ele_links, path = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elelinks.csv', delim = ',', col_names = T)
+write_delim(ele_nodes, path = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv', delim = ',', col_names = T)
 
 ### clear environment
 rm(ele_links, ele_nodes, eles_long, i, j)
@@ -507,7 +507,7 @@ dev.off()
 
 #### Plotting Networks ####
 ### load data
-ele_links <- read_csv('data_processed/motnp_elelinks.csv')
+ele_links <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elelinks.csv')
 ele_links$age.dyad   <- as.factor(ele_links$age.dyad)
 ele_links$sex1       <- as.factor(ele_links$sex1)
 ele_links$sex2       <- as.factor(ele_links$sex2)
@@ -515,7 +515,7 @@ ele_links$dem_class1 <- as.factor(ele_links$dem_class1)
 ele_links$dem_class2 <- as.factor(ele_links$dem_class2)
 str(ele_links)
 
-ele_nodes <- read_csv('data_processed/motnp_elenodes.csv')
+ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv')
 ele_nodes$sex       <- as.factor(ele_nodes$sex)
 ele_nodes$age_class <- as.factor(ele_nodes$age_class)
 ele_nodes$dem_class <- as.factor(ele_nodes$dem_class)
