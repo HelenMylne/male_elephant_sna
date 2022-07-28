@@ -29,14 +29,14 @@ rstan::stan_version()
 set_cmdstan_path('/home/userfs/h/hkm513/.cmdstan/cmdstan-2.29.2')
 
 # load model
-mod_2.2 <- cmdstan_model("models/simpleBetaNet_HKM_2.2_22.02.03.stan")
+mod_2.2 <- cmdstan_model("models/simpleBetaNet.stan")
 mod_2.2
 
 # set seed
 set.seed(12345)
 
 ################ Run model on real standardised data -- period 3 ################
-counts_df3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents_22.05.30.csv') %>% 
+counts_df3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents.csv') %>% 
   select(dyad, dyad_id, id_1, id_2, period, count_dyad, together, apart) %>% 
   distinct()
 counts_ls3 <- list(
@@ -80,7 +80,7 @@ draws_mpnp3 <- rbind(draws1_mpnp3, draws2_mpnp3, draws3_mpnp3, draws4_mpnp3)
 colnames(draws_mpnp3)[2:ncol(draws_mpnp3)] <- counts_df3$dyad
 
 ### save data 
-saveRDS(draws_mpnp3, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_bayesian_edgedistributions_a2.b2_period3_22.05.30.rds')
+saveRDS(draws_mpnp3, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_edgeweightestimates_mcmcoutput.rds')
 rm(list = ls())
 
 # print progress stamp
@@ -88,16 +88,16 @@ print(paste0('Data writing for period 3 written at ', Sys.time()))
 
 ################ Plot model outputs -- period 3 ################
 ### elephant data
-counts_df3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents_22.05.30.csv')
+counts_df3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents.csv')
 
 ### model data
-draws_mpnp3 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_bayesian_edgedistributions_a2.b2_period3_22.05.30.rds')
+draws_mpnp3 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_edgeweightestimates_mcmcoutput.rds')
 
 # Assign random set of columns to check
 plot_cols <- sample(x = 2:ncol(draws_mpnp3), size = 30, replace = F)
 
 # create file of output graphs
-pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_edgeweights_2.2_period3_22.06.30.pdf', width = 10, height = 10)
+pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_networkplots.pdf', width = 10, height = 10)
 
 ### build traceplots -- period 3 -- very wide ####
 plot(draws_mpnp3[,plot_cols[1]], type = 'l',
@@ -218,6 +218,14 @@ for(i in 1:nrow(males3)){
   rm(male_id1, male_id2, male)
 }
 
+# convert to true age distributions
+ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_ageestimates_mcmcoutput.rds')
+ages <- as.data.frame(ages[, colnames(ages) %in% males3$id])
+
+males3$age_mean <- NA
+for(i in 1:nrow(males3)){
+  males3$age_mean[i] <- mean(ages[,i])
+}
 
 # create variables for different degrees of node connectedness
 males3$degree_0.1 <- NA
@@ -293,13 +301,31 @@ plot(g_mid,
      vertex.label.color = ifelse(males3$age_class == 10,'white','black'),
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
-     vertex.color= ifelse(males3$age_class == 7,'seagreen4',
-                          ifelse(males3$age_class == 6,'seagreen3',
-                                 ifelse(males3$age_class == 5,'seagreen2',
-                                        ifelse(males3$age_class == 4,'steelblue3',
-                                               ifelse(males3$age_class == 3,'steelblue1',
-                                                      ifelse(males3$age_class == 2,'yellow',
-                                                             'black')))))),
+     vertex.color = ifelse(males3$age_class == 7,'seagreen4',
+                           ifelse(males3$age_class == 6,'seagreen3',
+                                  ifelse(males3$age_class == 5,'seagreen2',
+                                         ifelse(males3$age_class == 4,'steelblue3',
+                                                ifelse(males3$age_class == 3,'steelblue1',
+                                                       ifelse(males3$age_class == 2,'yellow',
+                                                              'black')))))),
+     layout = coords, add = TRUE)
+
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     vertex.label = NA,
+     vertex.size = 5,
+     edge.color = ifelse(adj_mid < 0.2,'transparent','black'),
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = ifelse(adj_mid < 0.2,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 8,
+     vertex.label = males3$elephant,
+     vertex.label.dist = 0,
+     vertex.label.color = ifelse(males3$age_class == 10,'white','black'),
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color = males3$age_mean,
      layout = coords, add = TRUE)
 
 # print progress stamp
@@ -362,6 +388,24 @@ plot(g_mid_0.3,
                                                               'black')))))),
      layout = coords_0.3, add = TRUE)
 
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*10, 0),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*10, 0),
+     edge.color = 'black',
+     vertex.size = males3_0.3$count_period*8,
+     vertex.label = males3_0.3$id,
+     vertex.label.family = 'Helvetica',
+     vertex.label.color = ifelse(males3_0.3$age_class == 10,'white','black'),
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = males3_0.3$age_mean,
+     layout = coords_0.3, add = TRUE)
+
 # print progress stamp
 print(paste0('All network plots for period 3 completed at ', Sys.time()))
 
@@ -378,7 +422,7 @@ rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
 print(paste0('Time period 3 completed at ', Sys.time()))
 
 # save summary data
-write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period3_22.05.31.csv')
+write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_dyad_weightdistributions.csv')
 
 # save graphs
 dev.off()

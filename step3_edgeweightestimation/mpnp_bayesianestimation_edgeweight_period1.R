@@ -5,13 +5,17 @@
 
 #### Set up ####
 # load packages
-library(tidyverse)
-library(dplyr)
-#library(rstan)
-#library(rethinking)
-library(igraph)
-library(dagitty)
-library(cmdstanr)
+library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
+library(dplyr, lib.loc = 'packages/')       # library(dplyr)
+#library(rstan, lib.loc = 'packages/')      # library(rstan)
+library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
+library(rethinking, lib.loc = 'packages/')  # library(rethinking)
+library(igraph, lib.loc = 'packages/')      # library(igraph)
+library(dagitty, lib.loc = 'packages/')     # library(dagitty)
+library(janitor, lib.loc = 'packages/')     # library(janitor)
+library(lubridate, lib.loc = 'packages/')   # library(lubridate)
+library(hms, lib.loc = 'packages/')         # library(hms)
+library(readxl, lib.loc = 'packages/')      # library(readxl)
 
 # information
 sessionInfo()
@@ -61,7 +65,7 @@ drawdag(binom, radius = 6, cex = 1.6)
 rm(binom)
 dev.off()
 ################ 2) Create data lists ################
-counts_df1 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/not yet assimilated into github version/mpnp/mpnp_period1_pairwiseevents_22.05.30.csv')
+counts_df1 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period1_pairwiseevents.csv')
 str(counts_df1)
 
 ### create data list
@@ -118,9 +122,13 @@ colnames(draws_mpnp1)[2:ncol(draws_mpnp1)] <- counts_df1$dyad
 # Assign random set of columns to check
 plot_cols <- sample(x = 2:ncol(draws_mpnp1), size = 30, replace = F)
 
+# create file of output graphs
+pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_networkplots.pdf', width = 10, height = 10)
+
 ### save data 
 saveRDS(draws_mpnp1, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_edgeweightestimates_mcmcoutput.rds')
 rm(draws1_mpnp1_1, draws2_mpnp1_1, draws3_mpnp1_1, draws4_mpnp1_1)
+#draws_mpnp1 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_edgeweightestimates_mcmcoutput.rds')
 
 ### build traceplots -- period 1 -- very wide ####
 plot(draws_mpnp1[,plot_cols[1]], type = 'l',
@@ -265,6 +273,15 @@ for(i in 1:nrow(males1)){
   rm(male_id1, male_id2, male)
 }
 
+# convert to true age distributions
+ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_ageestimates_mcmcoutput.rds')
+ages <- as.data.frame(ages[, colnames(ages) %in% males1$id])
+
+males1$age_mean <- NA
+for(i in 1:nrow(males1)){
+  males1$age_mean[i] <- mean(ages[,i])
+}
+
 # create variables for different degrees of node connectedness
 males1$degree_0.1 <- NA
 males1$degree_0.2 <- NA
@@ -308,18 +325,18 @@ plot(g_mid,
      edge.width = E(g_mid)$weight*3,
      edge.color = 'black',
      vertex.size = 8,
-     vertex.label = males1$id,  # vertex.label = males1$elephant,
+     vertex.label = males1$id,
      vertex.label.dist = 0,
-     vertex.label.color = 'black', # vertex.label.color = ifelse(males1$age_class == 10,'white','black'),
+     vertex.label.color = ifelse(males1$age_class == 10,'white','black'),
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
-     vertex.color= ifelse(males1$age_class == 7,'seagreen4',
-                          ifelse(males1$age_class == 6,'seagreen3',
-                                 ifelse(males1$age_class == 5,'seagreen2',
-                                        ifelse(males1$age_class == 4,'steelblue3',
-                                               ifelse(males1$age_class == 3,'steelblue1',
-                                                      ifelse(males1$age_class == 2,'yellow',
-                                                             'black')))))),
+     vertex.color = ifelse(males1$age_class == 7,'seagreen4',
+                           ifelse(males1$age_class == 6,'seagreen3',
+                                  ifelse(males1$age_class == 5,'seagreen2',
+                                         ifelse(males1$age_class == 4,'steelblue3',
+                                                ifelse(males1$age_class == 3,'steelblue1',
+                                                       ifelse(males1$age_class == 2,'yellow',
+                                                              'black')))))),
      layout = coords, add = TRUE)
 
 plot(g_mid,
@@ -332,18 +349,36 @@ plot(g_mid,
      edge.width = E(g_mid)$weight*3,
      edge.color = ifelse(adj_mid < 0.2,'transparent','black'),
      vertex.size = 8,
-     vertex.label = males1$id, # vertex.label = males1$elephant,
+     vertex.label = males1$id,
      vertex.label.dist = 0,
-     vertex.label.color = 'black',  # vertex.label.color = ifelse(males1$age_class == 10,'white','black'),
+     vertex.label.color = ifelse(males1$age_class == 10,'white','black'),
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
-     vertex.color= ifelse(males1$age_class == 7,'seagreen4',
-                          ifelse(males1$age_class == 6,'seagreen3',
-                                 ifelse(males1$age_class == 5,'seagreen2',
-                                        ifelse(males1$age_class == 4,'steelblue3',
-                                               ifelse(males1$age_class == 3,'steelblue1',
-                                                      ifelse(males1$age_class == 2,'yellow',
-                                                             'black')))))),
+     vertex.color = ifelse(males1$age_class == 7,'seagreen4',
+                           ifelse(males1$age_class == 6,'seagreen3',
+                                  ifelse(males1$age_class == 5,'seagreen2',
+                                         ifelse(males1$age_class == 4,'steelblue3',
+                                                ifelse(males1$age_class == 3,'steelblue1',
+                                                       ifelse(males1$age_class == 2,'yellow',
+                                                              'black')))))),
+     layout = coords, add = TRUE)
+
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     edge.color = ifelse(adj_mid < 0.2,'transparent',rgb(0,0,0,0.25)),
+     vertex.label = NA,
+     vertex.size = 5,
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     edge.color = ifelse(adj_mid < 0.2,'transparent','black'),
+     vertex.size = 8,
+     vertex.label = males1$id,
+     vertex.label.dist = 0,
+     vertex.label.color = ifelse(males1$age_class == 10,'white','black'),
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color = males1$age_mean,
      layout = coords, add = TRUE)
 
 ### only elephants degree > 0.3 -- period 1 ####
@@ -364,7 +399,7 @@ plot(g_mid_0.3,
      edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*10, 0),
      edge.color = 'black',
      vertex.size = 6,
-     vertex.label = males1_0.3$elephant,
+     vertex.label = males1_0.3$id,
      vertex.label.color = ifelse(males1_0.3$age_class == 10,'white','black'),
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
@@ -403,18 +438,35 @@ plot(g_mid_0.3,
                                                               'black')))))),
      layout = coords_0.3, add = TRUE)
 
+plot(g_mid_0.3,
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_rng_0.3)$weight*10, 0),
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = ifelse(E(g_mid_0.3)$weight > 0.3, E(g_mid_0.3)$weight*10, 0),
+     edge.color = 'black',
+     vertex.size = males1_0.3$count_period*8,
+     vertex.label = males1_0.3$id,
+     vertex.label.family = 'Helvetica',
+     vertex.label.color = ifelse(males1_0.3$age_class == 10,'white','black'),
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = males1_0.3$age_mean,
+     layout = coords_0.3, add = TRUE)
+
 # print progress stamp
 print(paste0('All network plots for period 1 completed at ', Sys.time()))
 
 ### save summary data -- period 1 ####
 dyad_period_weights <- counts_df1
 summaries$period <- 1
-summaries <- summaries[,c(1,4:9)] # summaries <- summaries[,c(1,4:11)]
+summaries <- summaries[,c(1,4:11)]
 dyad_period_weights <- left_join(x = dyad_period_weights, y = summaries,
                                  by = c('dyad','period'))
 rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.2,
    counts_df1, draws_mpnp1, dyad_row, g_mid,g_mid_0.2, g_rng, g_rng_0.2, males1, plot_data_mpnp1, rows, summaries, adj_quantiles, adj_tensor, i, ids, ids1, N, plot_cols)
-
 
 # save summary data
 write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_dyad_weightdistributions.csv')

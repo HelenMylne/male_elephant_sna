@@ -29,7 +29,7 @@ rstan::stan_version()
 set_cmdstan_path('/home/userfs/h/hkm513/.cmdstan/cmdstan-2.29.2')
 
 # load model
-mod_2.2 <- cmdstan_model("models/simpleBetaNet_HKM_2.2_22.02.03.stan")
+mod_2.2 <- cmdstan_model("models/simpleBetaNet.stan")
 mod_2.2
 
 # set seed
@@ -37,7 +37,7 @@ set.seed(12345)
 
 ################ Run model on real standardised data -- period 5 ################
 ### create data list
-counts_df5 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period5_pairwiseevents_22.05.30.csv') %>% 
+counts_df5 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period5_pairwiseevents.csv') %>% 
   select(dyad, dyad_id, id_1, id_2, period, count_dyad, together, apart) %>% 
   distinct()
 counts_ls5 <- list(
@@ -82,7 +82,7 @@ draws_mpnp5 <- rbind(draws1_mpnp5_1, draws2_mpnp5_1, draws3_mpnp5_1, draws4_mpnp
 colnames(draws_mpnp5)[2:ncol(draws_mpnp5)] <- counts_df5$dyad
 
 ### save data 
-saveRDS(draws_mpnp5, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_bayesian_edgedistributions_a2.b2_period5_22.05.30.rds')
+saveRDS(draws_mpnp5, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_edgeweightestimates_mcmcoutput.rds')
 rm(list = ls())
 
 # print progress stamp
@@ -90,13 +90,13 @@ print(paste0('Data writing for period 5 written at ', Sys.time()))
 
 ################ Plot model outputs -- period 5 ################
 # create file of output graphs
-pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_edgeweights_2.2_period5_22.06.30.pdf', width = 10, height = 10)
+pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_networkplots.pdf', width = 10, height = 10)
 
 ### elephant data
-counts_df5 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period5_pairwiseevents_22.05.30.csv')
+counts_df5 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period5_pairwiseevents.csv')
 
 ### model data
-draws_mpnp5 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_bayesian_edgedistributions_a2.b2_period5_22.05.30.rds')
+draws_mpnp5 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_edgeweightestimates_mcmcoutput.rds')
 
 # Assign random set of columns to check
 plot_cols <- sample(x = 2:ncol(draws_mpnp5), size = 30, replace = F)
@@ -220,6 +220,14 @@ for(i in 1:nrow(males5)){
   rm(male_id1, male_id2, male)
 }
 
+# convert to true age distributions
+ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_ageestimates_mcmcoutput.rds')
+ages <- as.data.frame(ages[, colnames(ages) %in% males5$id])
+
+males5$age_mean <- NA
+for(i in 1:nrow(males5)){
+  males5$age_mean[i] <- mean(ages[,i])
+}
 
 # create variables for different degrees of node connectedness
 males5$degree_0.1 <- NA
@@ -271,13 +279,13 @@ plot(g_mid,
      vertex.label.color = ifelse(males5$age_class == 10,'white','black'),
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
-     vertex.color= ifelse(males5$age_class == 7,'seagreen4',
-                          ifelse(males5$age_class == 6,'seagreen3',
-                                 ifelse(males5$age_class == 5,'seagreen2',
-                                        ifelse(males5$age_class == 4,'steelblue3',
-                                               ifelse(males5$age_class == 3,'steelblue1',
-                                                      ifelse(males5$age_class == 2,'yellow',
-                                                             'black')))))),
+     vertex.color = ifelse(males5$age_class == 7,'seagreen4',
+                           ifelse(males5$age_class == 6,'seagreen3',
+                                  ifelse(males5$age_class == 5,'seagreen2',
+                                         ifelse(males5$age_class == 4,'steelblue3',
+                                                ifelse(males5$age_class == 3,'steelblue1',
+                                                       ifelse(males5$age_class == 2,'yellow',
+                                                              'black')))))),
      layout = coords, add = TRUE)
 
 plot(g_mid,
@@ -295,13 +303,38 @@ plot(g_mid,
      vertex.label.color = ifelse(males5$age_class == 10,'white','black'),
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
-     vertex.color= ifelse(males5$age_class == 7,'seagreen4',
-                          ifelse(males5$age_class == 6,'seagreen3',
-                                 ifelse(males5$age_class == 5,'seagreen2',
-                                        ifelse(males5$age_class == 4,'steelblue3',
-                                               ifelse(males5$age_class == 3,'steelblue1',
-                                                      ifelse(males5$age_class == 2,'yellow',
-                                                             'black')))))),
+     vertex.color = ifelse(males5$age_class == 7,'seagreen4',
+                           ifelse(males5$age_class == 6,'seagreen3',
+                                  ifelse(males5$age_class == 5,'seagreen2',
+                                         ifelse(males5$age_class == 4,'steelblue3',
+                                                ifelse(males5$age_class == 3,'steelblue1',
+                                                       ifelse(males5$age_class == 2,'yellow',
+                                                              'black')))))),
+     layout = coords, add = TRUE)
+
+plot(g_mid,
+     edge.width = E(g_mid)$weight*3,
+     vertex.label = NA,
+     vertex.size = 8,
+     vertex.color = 'transparent',
+     edge.color = ifelse(adj_mid < 0.2,'transparent','black'),
+     layout = coords)
+plot(g_mid,
+     edge.width = E(g_rng)$weight*3,
+     vertex.label.color = 'transparent',
+     edge.color = ifelse(adj_mid < 0.2,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 10,
+     layout = coords, add = TRUE)
+plot(g_mid,
+     edge.width = 0,
+     vertex.size = 10,
+     vertex.label = males5$elephant,
+     vertex.label.dist = 0,
+     vertex.label.color = 'white', #ifelse(males5$age_class == 10,'white','black'),
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color = rgb(1-(males5$age_mean)/100, 0 , (males5$age_mean)/100, 1),
+     vertex.color = rgb(0,0,1,(males5$age_mean)/100),
      layout = coords, add = TRUE)
 
 # print progress stamp
@@ -313,7 +346,7 @@ g_rng_0.3 <- delete.vertices(graph = g_rng, v = males5$id[which(males5$degree_0.
 
 males5_0.3 <- males5[males5$degree_0.3 > 0,]
 
-set.seed(3)
+set.seed(1)
 coords_0.3 <- layout_nicely(g_mid_0.3)
 plot(g_mid_0.3,
      edge.color = rgb(0,0,0,0.25),
@@ -364,6 +397,32 @@ plot(g_mid_0.3,
                                                               'black')))))),
      layout = coords_0.3, add = TRUE)
 
+plot(g_mid_0.3,
+     edge.width = E(g_mid_0.3)$weight*3,
+     vertex.label = NA,
+     vertex.size = 8,
+     vertex.color = 'transparent',
+     edge.color = ifelse(adj_mid < 0.2,'transparent','black'),
+     layout = coords_0.3)
+plot(g_mid_0.3,
+     edge.width = E(g_rng_0.3)$weight*3,
+     vertex.label.color = 'transparent',
+     edge.color = ifelse(adj_mid < 0.2,'transparent',rgb(0,0,0,0.25)),
+     vertex.size = 10,
+     layout = coords_0.3, add = TRUE)
+plot(g_mid_0.3,
+     edge.width = 0,
+     vertex.size = 10,
+     vertex.label = males5_0.3$elephant,
+     vertex.label.dist = 0,
+     vertex.label.color = 'white', #ifelse(males5_0.3$age_class == 10,'white','black'),
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.color = rgb(1-(males5_0.3$age_mean)/100, 0 , (males5_0.3$age_mean)/100, 1),
+     vertex.color = rgb(0,0,1,(males5_0.3$age_mean)/100),
+     layout = coords_0.3, add = TRUE)
+
+
 # print progress stamp
 print(paste0('All network plots for period 5 completed at ', Sys.time()))
 
@@ -380,18 +439,18 @@ rm(adj_lower, adj_mid, adj_range, adj_upper, coords, coords_0.3,
 print(paste0('Time period 5 completed at ', Sys.time()))
 
 # save summary data
-write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period5_22.05.31.csv')
+write_csv(dyad_period_weights, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_dyad_weightdistributions.csv')
 
 # save graphs
 dev.off()
 
 ################ combine data outputs from all MPNP models ####
-p1 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period1_22.05.31.csv')
-p2 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period2_22.05.31.csv')
-p3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period3_22.05.31.csv')
-p4 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period4_22.05.31.csv')
-p5 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_period5_22.05.31.csv')
+p1 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_dyad_weightdistributions.csv')
+p2 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp2_dyad_weightdistributions.csv')
+p3 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp3_dyad_weightdistributions.csv')
+p4 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp4_dyad_weightdistributions.csv')
+p5 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp5_dyad_weightdistributions.csv')
 
 ### combine
 all <- rbind(p1, p2, p3, p4, p5)
-write_csv(all, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_dyad_weightdistributions_2.2_allperiods_22.06.01.csv')
+write_csv(all, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnpall_dyad_weightdistributions.csv')

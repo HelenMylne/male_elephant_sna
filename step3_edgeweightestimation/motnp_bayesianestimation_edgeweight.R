@@ -338,7 +338,7 @@ rm(population, i, N)
 # Binomial model using a beta distribution where shape 1 = times together and shape 2 = times apart
 
 ### Compile Stan model
-mod_2.2 <- cmdstan_model("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/simpleBetaNet.stan")
+mod_2.2 <- cmdstan_model("models/simpleBetaNet.stan")
 mod_2.2
 
 ################ 5) Run model on simulated data ################
@@ -537,7 +537,7 @@ tidy_sierra$index <- rep(rep(1:1000, each = length(unique(tidy_sierra$dyad))),4)
 saveRDS(draws_motnp2.2, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds')
 
 ################ 7) Summarise and plot edge weights ################
-# draws_motnp2.2 <- readRDS('../data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
+# draws_motnp2.2 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
 #   data.matrix()
 ### build traceplots ####
 set.seed(1)
@@ -1220,7 +1220,7 @@ plot(g_mid_m0.3,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = males0.3$mean_age,
+     vertex.color = males0.3$age_mean,
      layout = coords_m0.3, add = TRUE)
 
 plot(g_mid_m0.3,
@@ -1237,7 +1237,7 @@ plot(g_mid_m0.3,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = males0.3$mean_age,
+     vertex.color = males0.3$age_mean,
      layout = coords_m0.3, add = TRUE)
 
 table(males0.3$count)
