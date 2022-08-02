@@ -3,4 +3,4 @@
 #library(tidyverse)
 print('tidyverse loaded')
 
-read.csv('data_processed/motnp_id.csv')
+(read.csv('data_processed/motnp_id.csv'))
