@@ -3,5 +3,5 @@
 #library(tidyverse)
 #print('tidyverse loaded')
 
-test_id <- read_csv('data_processed/motnp_id.csv')
+test_id <- read.csv('data_processed/motnp_id.csv')
 head(test_id)
