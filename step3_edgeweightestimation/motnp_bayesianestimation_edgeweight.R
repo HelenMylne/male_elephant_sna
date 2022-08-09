@@ -981,10 +981,40 @@ males <- nodes$id[nodes$dem_class == 'AM' | nodes$dem_class == 'PM']
 ages <- as.data.frame(ages[, colnames(ages) %in% males])
 
 males <- nodes[nodes$dem_class == 'AM' | nodes$dem_class == 'PM',]
+which(colnames(ages) != males$id)
 males$age_mean <- NA
 for(i in 1:nrow(males)){
-  males$age_mean[i] <- mean(ages[,i])
+  male <- ages[, males$id[i] ]
+  males$age_mean[i] <- mean(male)
 }
+
+# plot density for just males (need to reload draws_motnp2.2)
+par(mfrow = c(1,3))
+male_dyads <- counts_df[counts_df$dem_type == 'AM_AM' | counts_df$dem_type == 'AM_PM' |
+                          counts_df$dem_type == 'PM_PM',]
+male_dyads$dyad <- paste(male_dyads$id_1, male_dyads$id_2, sep = '_')
+adults <- male_dyads$dyad[which(male_dyads$dem_type == 'AM_AM')]
+mixed <- male_dyads$dyad[which(male_dyads$dem_type == 'AM_PM')]
+pubescents <- male_dyads$dyad[which(male_dyads$dem_type == 'PM_PM')]
+plot(NULL, xlim = c(0,1), ylim = c(0,30), las = 1,
+     xlab = 'estimated edge weight', ylab = 'density')
+for(i in adults){
+  lines(density(draws_motnp2.2[,i]), col = rgb(0,0,1,0.01))
+}
+mtext('Adult-Adult')
+plot(NULL, xlim = c(0,1), ylim = c(0,30), las = 1,
+     xlab = 'estimated edge weight', ylab = 'density')
+for(i in mixed){
+  lines(density(draws_motnp2.2[,i]), col = rgb(0.5,0,0.5,0.01))
+}
+mtext('Adult-Pubescent')
+plot(NULL, xlim = c(0,1), ylim = c(0,30), las = 1,
+     xlab = 'estimated edge weight', ylab = 'density')
+for(i in pubescents){
+  lines(density(draws_motnp2.2[,i]), col = rgb(1,0,0,0.01))
+}
+mtext('Pubescent-Pubescent')
+
 
 # create variables for different degrees of node connectedness
 nodes$degree_0.1 <- NA
@@ -1148,7 +1178,11 @@ plot(g_mid_m,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = ifelse(males$age_class == 'Adult','seagreen1', 'skyblue'),
+     vertex.color = ifelse(males$age_cat_id == '7','seagreen4',
+                           ifelse(males$age_cat_id == '6','seagreen3',
+                                  ifelse(males$age_cat_id == '5','seagreen1',
+                                         ifelse(males$age_cat_id == '4','steelblue3',
+                                                ifelse(males$age_cat_id == '3','skyblue1','yellow'))))),
      layout = coords_m, add = TRUE)
 
 plot(g_mid_m,
@@ -1165,7 +1199,55 @@ plot(g_mid_m,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = males$age_mean,
+     #vertex.color = males$age_mean,
+     vertex.color = ifelse(males$age_mean < 10,rgb(0.9,0.7,0,1), # orange
+                           ifelse(males$age_mean < 15, rgb(1,0.4,0.4,1), # red
+                                  ifelse(males$age_mean < 20,rgb(0.7,0.5,1,1),  # pale purple
+                                         ifelse(males$age_mean < 25,rgb(0.5,0.5,1,1),  # dark purple/blue
+                                                ifelse(males$age_mean < 40,rgb(0.6,0.8,1,1),  rgb(0.3,0.9,0.9,1)))))), # light blue, turquoise
+     layout = coords_m, add = TRUE)
+
+plot(g_mid_m,
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = E(g_rng_m)$weight,
+     vertex.size = 1,
+     vertex.label = NA,
+     layout = coords_m)
+plot(g_mid_m,
+     edge.width = E(g_mid_m)$weight,
+     edge.color = 'black',
+     vertex.size = males$count,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     #vertex.color = males$age_mean,
+     vertex.color = ifelse(males$age_mean < 10,rgb(0.9,0.7,0,1), # orange
+                           ifelse(males$age_mean < 15, rgb(1,0.4,0.4,1), # red
+                                  ifelse(males$age_mean < 20,rgb(0.7,0.5,1,1),  # pale purple
+                                         ifelse(males$age_mean < 25,rgb(0.5,0.5,1,1),  # dark purple/blue
+                                                ifelse(males$age_mean < 40,rgb(0.6,0.8,1,1),  rgb(0.3,0.9,0.9,1)))))), # light blue, turquoise
+     layout = coords_m, add = TRUE)
+
+plot(g_mid_m,
+     edge.color = rgb(0,0,0,0.25),
+     edge.width = ifelse(E(g_mid_m)$weight < 0.3, 0, E(g_rng_m)$weight),
+     vertex.size = 0.2,
+     vertex.label = NA,
+     layout = coords_m)
+plot(g_mid_m,
+     edge.width = ifelse(E(g_mid_m)$weight < 0.3, 0, E(g_mid_m)$weight),
+     edge.color = 'black',
+     vertex.size = males$count/2,
+     vertex.label.color = 'black',
+     vertex.label.family = 'Helvetica',
+     vertex.label.cex = 0.5,
+     vertex.label.dist = 0,
+     vertex.color = ifelse(males$age_mean < 10,rgb(0.9,0.7,0,1), # orange
+                           ifelse(males$age_mean < 15, rgb(1,0.4,0.4,1), # red
+                                  ifelse(males$age_mean < 20,rgb(0.7,0.5,1,1),  # pale purple
+                                         ifelse(males$age_mean < 25,rgb(0.5,0.5,1,1),  # dark purple/blue
+                                                ifelse(males$age_mean < 40,rgb(0.6,0.8,1,1),  rgb(0.3,0.9,0.9,1)))))), # light blue, turquoise
      layout = coords_m, add = TRUE)
 
 ### Only males degree > 0.3 ####
@@ -1183,7 +1265,7 @@ g_rng_m0.3 <- delete_vertices(graph = g_rng_m0.3, v = c('M7','M38','M66','M71','
 
 males0.3 <- males0.3[males0.3$id != 'M7' & males0.3$id != 'M38' & males0.3$id != 'M66' & males0.3$id != 'M71' & males0.3$id != 'M87' & males0.3$id != 'M95' & males0.3$id != 'M99' & males0.3$id != 'M117' & males0.3$id != 'M156' & males0.3$id != 'M170' & males0.3$id != 'M193' & males0.3$id != 'M219' & males0.3$id != 'M233' & males0.3$id != 'M240',]
                                                             
-set.seed(3)
+set.seed(6)
 coords_m0.3 <- layout_nicely(g_mid_m0.3)
 plot(g_mid_m0.3,
      edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
@@ -1220,7 +1302,11 @@ plot(g_mid_m0.3,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = males0.3$age_mean,
+     vertex.color = ifelse(males0.3$age_mean < 10,rgb(0.9,0.7,0,1), # orange
+                           ifelse(males0.3$age_mean < 15, rgb(1,0.4,0.4,1), # red
+                                  ifelse(males0.3$age_mean < 20,rgb(0.7,0.5,1,1),  # pale purple
+                                         ifelse(males0.3$age_mean < 25,rgb(0.5,0.5,1,1),  # dark purple/blue
+                                                ifelse(males0.3$age_mean < 40,rgb(0.6,0.8,1,1),  rgb(0.3,0.9,0.9,1)))))), # light blue, turquoise
      layout = coords_m0.3, add = TRUE)
 
 plot(g_mid_m0.3,
@@ -1237,8 +1323,15 @@ plot(g_mid_m0.3,
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
-     vertex.color = males0.3$age_mean,
+     vertex.color = ifelse(males0.3$age_mean < 10,rgb(0.9,0.7,0,1), # orange
+                           ifelse(males0.3$age_mean < 15, rgb(1,0.4,0.4,1), # red
+                                  ifelse(males0.3$age_mean < 20,rgb(0.7,0.5,1,1),  # pale purple
+                                         ifelse(males0.3$age_mean < 25,rgb(0.5,0.5,1,1),  # dark purple/blue
+                                                ifelse(males0.3$age_mean < 40,rgb(0.6,0.8,1,1),  rgb(0.3,0.9,0.9,1)))))), # light blue, turquoise
      layout = coords_m0.3, add = TRUE)
+
+
+
 
 table(males0.3$count)
 sum(table(males0.3$count)[10:15])
