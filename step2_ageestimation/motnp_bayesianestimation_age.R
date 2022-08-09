@@ -183,6 +183,23 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")
 
+df$age_cat_centre <- ifelse(df$age_cat == 1, (0+5)/2,
+                            ifelse(df$age_cat == 2, (5+10)/2,
+                                   ifelse(df$age_cat == 3, (10+15)/2,
+                                          ifelse(df$age_cat == 4, (15+20/2),
+                                                 ifelse(df$age_cat == 5, (20+25)/2,
+                                                        ifelse(df$age_cat == 6, (25+40)/2, 45))))))
+df %>% ggplot() +
+  geom_violin(aes(x = true_age, y = value, group = factor(age_cat)), fill = rgb(0,0,1,0.8))+
+  #geom_point(aes(x = true_age, y = value, group = factor(ID)), size = 2,col = 'blue', alpha = 0.1) +
+  #stat_halfeye() +
+  geom_vline(xintercept = 0, alpha = 0.6) +
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+  geom_hline(yintercept = 0, alpha = 0.6) +
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+  theme_bw() + 
+  xlab("Assigned age") + ylab("Modelled age")
+
 ### save output
 colnames(true_ages) <- motnp_males$id
 saveRDS(true_ages, file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
