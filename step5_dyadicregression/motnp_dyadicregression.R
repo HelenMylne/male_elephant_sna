@@ -37,6 +37,8 @@ str(edge_males)
 logit_edge_males <- car::logit(edge_males)
 rm(edge_samples)#, edge_males)
 
+print('data read in')
+
 #### define ages and age differences ####
 # old version using categories:
 #df_agg$age1 <- ifelse(df_agg$age_category_1 == '40+', 7,
@@ -75,22 +77,13 @@ for(i in 1:nrow(df_agg)) {
 }
 df_agg$mean_diff <- abs(df_agg$age_mean_1 - df_agg$age_mean_2)
 
-#### plot -- do not run unless necessary (takes a LOT of RAM and will usually need to kill all other processes) ####
-plot_df <- pivot_longer(edge_males, cols = everything(), names_to = 'dyad', values_to = 'draw_value')
-num_dyads <- length(unique(plot_df$dyad))
-plot_df$draw_id <- rep(1:4000, each = num_dyads)
-df_agg_short <- df_agg[,c(27,1:3,16:17,22:23,28:30)] # this still seems to have the mo_events/mx_events/bh_events columns so these values may change
-plot_df2 <- left_join(plot_df, df_agg_short, by = 'dyad')
+print('mean ages calculated')
 
-plot_df2$age_category_1 <- factor(plot_df2$age_category_1, levels = c("9-10","10-15","15-19","20-25","25-40","40+"))
-plot_df2$age_category_2 <- factor(plot_df2$age_category_2, levels = c("9-10","10-15","15-19","20-25","25-40","40+"))
 
-ggplot(plot_df2[plot_df2$draw_id < 1000,], aes(x = draw_value, group = dyad))+
-  geom_density(colour = rgb(0,0,1,0.1))+
-  facet_grid(age_category_1 ~ age_category_2)+
-  labs(x = 'edge weight')+
-  theme_light()+
-  theme(strip.background = element_rect(fill = rgb(0,0,1,0.6)))
+
+
+
+
 
 #### Defining the model ####
 # The dyadic regression model we’ll be using will predict the edge weight using a Gaussian family model where dyad type is the main effect, and multi-membership terms are included as random effects to account for non-independence between edges due to nodes. Since edge weights can co-vary, we need to model the joint posterior distributions over edge weights as the response variable in the regression model. This can be achieved by modelling the mean edge weights y_mu as a multivariate normal with a covariance matrix y_sigma calculated from the edge weight posterior. In Stan this looks like:
@@ -121,9 +114,9 @@ for( i in 1:100 ) curve(expr = a[i] + bA[i]*x, add = T, col = rgb(0,0,1,0.5),
 # load model:
 #model_dyadic_cat <- stan_model('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/dyadic_regression_agecategorical.stan')
 #model_dyadic_cat <- stan_model(source('https://raw.githubusercontent.com/HelenMylne/test/main/models/dyadic_regression_agecategorical.stan'))
-model_dyadic_cat <- stan_model('models/dyadic_regression_agecategorical.stan')
+model_dyadic_cat <- stan_model('../models/dyadic_regression_agecategorical.stan')
 #model_dyadic_cont <- stan_model('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/dyadic_regression.stan')
-model_dyadic_cont <- stan_model('models/dyadic_regression.stan')
+#model_dyadic_cont <- stan_model('models/dyadic_regression.stan')
 
 #### trim down data for debugging ####
 test_eles <- sample(x = df_agg$id_1, size = 30, replace = F)
