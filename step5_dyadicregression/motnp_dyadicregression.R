@@ -16,6 +16,7 @@ library(car)
 #### Read in data ####
 #df_agg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv')
 df_agg <- read_csv('data_processed/motnp_bayesian_binomialpairwiseevents.csv')
+str(df_agg)
 df_agg$dem_type <- ifelse(df_agg$dem_type == 'PM_AM', 'AM_PM', df_agg$dem_type)
 df_agg <- df_agg[df_agg$dem_type == 'AM_AM' | df_agg$dem_type == 'AM_PM' | df_agg$dem_type == 'PM_PM',]
 
