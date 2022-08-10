@@ -6,7 +6,7 @@
 library(tidyverse)
 library(rstan)
 library(car)
-library(rethinking)
+#library(rethinking)
 
 #library(tidyverse, lib.loc = 'packages/')
 #library(rstan, lib.loc = 'packages/')
