@@ -14,16 +14,20 @@ library(rethinking)
 #library(rethinking, lib.loc = 'packages/')
 
 #### Read in data ####
-df_agg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv')
+#df_agg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv')
+df_agg <- read_csv('data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 df_agg$dem_type <- ifelse(df_agg$dem_type == 'PM_AM', 'AM_PM', df_agg$dem_type)
 df_agg <- df_agg[df_agg$dem_type == 'AM_AM' | df_agg$dem_type == 'AM_PM' | df_agg$dem_type == 'PM_PM',]
 
-ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
+#ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
+ages <- readRDS('data_processed/motnp_ageestimates_mcmcoutput.rds')
 males <- unique(c(df_agg$id_1,df_agg$id_2))
 ages <- as.data.frame(ages[,males])
 rm(males)
 
-edge_samples <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
+#edge_samples <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
+#  select(-`1.lp__`)
+edge_samples <- readRDS('data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
   select(-`1.lp__`)
 edge_males <- edge_samples[, colnames(edge_samples) %in% df_agg$dyad]
 str(edge_males)
