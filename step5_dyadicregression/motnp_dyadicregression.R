@@ -21,23 +21,25 @@ df_agg <- df_agg[df_agg$dem_class_1 == 'AM' | df_agg$dem_class_1 == 'PM',]
 df_agg <- df_agg[df_agg$dem_class_2 == 'AM' | df_agg$dem_class_2 == 'PM',]
 df_agg$dem_type <- paste(df_agg$dem_class_1, df_agg$dem_class_2, sep = '_')
 #df_agg$dem_type <- ifelse(df_agg$dem_type == 'PM_AM', 'AM_PM', df_agg$dem_type)
+print('pairwise events data read in')
 
 #ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
 ages <- readRDS('data_processed/motnp_ageestimates_mcmcoutput.rds')
 males <- unique(c(df_agg$id_1,df_agg$id_2))
 ages <- as.data.frame(ages[,males])
 rm(males)
+print('age data read in')
 
 #edge_samples <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
 #  select(-`1.lp__`)
-edge_samples <- readRDS('data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
-  select(-`1.lp__`)
+edge_samples <- readRDS('data_processed/motnp_edgeweightestimates_mcmcoutput.rds')
+edge_samples <- edge_samples[,2:ncol(edge_samples)]
 edge_males <- edge_samples[, colnames(edge_samples) %in% df_agg$dyad]
 str(edge_males)
 logit_edge_males <- car::logit(edge_males)
 rm(edge_samples)#, edge_males)
 
-print('data read in')
+print('edge weight data read in')
 
 #### define ages and age differences ####
 # old version using categories:
@@ -99,17 +101,17 @@ print('mean ages calculated')
 # Hypothesis 3: Some combination of Hypotheses 1 and 2 is true. Effect of age difference will therefore have quite high variance and uncertainty, likely spanning 0 due to preferences in both directions.
 # Hypothesis 4: Young elephants will prefer to associate with other young elephants for sparring and because they may be more familiar with individuals closer in age through their maternal herds (esp. in MOTNP). Older males will show no preference as they are already established in the environment and may not require sparring partners. There will therefore be an interaction effect between average age of the dyad and the age difference between them.
 
-df_agg$age_diff_std <- standardize(df_agg$mean_diff)
+#df_agg$age_diff_std <- rethinking::standardize(df_agg$mean_diff)
 df_agg$E <- apply(logit_edge_males, 2, mean)
 a <- rnorm(100, 0.5, 0.2)
 bA <- rnorm(100, 0, 0.1)
 
 plot(NULL, las = 1,
-     xlim = c(min(df_agg$age_diff_std),max(df_agg$age_diff_std)), xlab = 'age category difference',
+     xlim = c(min(df_agg$age_diff),max(df_agg$age_diff)), xlab = 'age category difference',
      ylim = c(-0.5,1.5), ylab = 'edge weight')
 abline(h = c(0,1), lty = 2)
 for( i in 1:100 ) curve(expr = a[i] + bA[i]*x, add = T, col = rgb(0,0,1,0.5),
-                        from = min(df_agg$age_diff_std), to = max(df_agg$age_diff_std))
+                        from = min(df_agg$age_diff), to = max(df_agg$age_diff))
 
 # load model:
 #model_dyadic_cat <- stan_model('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/models/dyadic_regression_agecategorical.stan')
