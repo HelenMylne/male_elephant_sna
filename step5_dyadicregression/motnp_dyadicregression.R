@@ -17,9 +17,10 @@ library(car)
 #df_agg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv')
 df_agg <- read_csv('data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 str(df_agg)
-df_agg$dem_type <- paste(sort(df_agg$dem_class_1, df_agg$dem_class_2), sep = '_')
+df_agg <- df_agg[df_agg$dem_class_1 == 'AM' | df_agg$dem_class_1 == 'PM',]
+df_agg <- df_agg[df_agg$dem_class_2 == 'AM' | df_agg$dem_class_2 == 'PM',]
+df_agg$dem_type <- paste(df_agg$dem_class_1, df_agg$dem_class_2, sep = '_')
 #df_agg$dem_type <- ifelse(df_agg$dem_type == 'PM_AM', 'AM_PM', df_agg$dem_type)
-df_agg <- df_agg[df_agg$dem_type == 'AM_AM' | df_agg$dem_type == 'AM_PM' | df_agg$dem_type == 'PM_PM',]
 
 #ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
 ages <- readRDS('data_processed/motnp_ageestimates_mcmcoutput.rds')
