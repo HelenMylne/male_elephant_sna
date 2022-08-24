@@ -57,15 +57,16 @@ dev.off()
 ################ 2) Create data lists ################
 #### Sightings data frame ####
 # sightings data
-s <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')
+s <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')  # import data
 str(s)
-colnames(s)[c(1:23,57)] <- s[2,c(1:23,57)]
+colnames(s)[c(1:23,57)] <- s[2,c(1:23,57)]                     # set column names to values in second row of dataframe
 colnames(s)[24:56] <- c('CM','CF','CU','CM','CF','CU','JM','JF','JU','YPM','YPF','YPU','OPM','OPF','OPU',
                         'YAM','YAF','YAU','MAM','MAF','MAU','OAM','OAF','OAU','UM','UF','UU','SM','SF','SU',
-                        'AM','AF','AU')
-s <- s[3:nrow(s),]
-s <- janitor::clean_names(s)
+                        'AM','AF','AU')                        # set count column names to individual categories
+s <- s[3:nrow(s),]                                             # remove first two rows
+s <- janitor::clean_names(s)                                   # clean up
 
+# checking that all count columns within dataframe "s" are actually being used
 check_na <- data.frame(col = 24:56,del = NA)
 for(i in 1:nrow(check_na)) {
   check_na$del[i] <- nrow(s) - length(which(is.na(s[,i]) == 'FALSE'))
@@ -75,29 +76,29 @@ rm(check_na)
 # individual data
 efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
 str(efa)
-efa$time_cat <- lubridate::hour(efa$Time)
-efa <- separate(efa, Time, into = c('wrong_date','time'), sep = ' ')
-efa$time <- hms::as_hms(efa$time)
-efa <- efa[,c(1:5,7,33,8:32)]
-efa$Age_Range_ID <- as.factor(efa$Age_Range_ID)
-efa$Activity_ID <- as.factor(efa$Activity_ID)
-efa$Distance_To_Observer <- as.numeric(efa$Distance_To_Observer)
-efa$Physical_Condition_ID <- as.factor(efa$Physical_Condition_ID)
-efa <- efa[,c(1:15,18:27,31:32)]
-efa$Date <- lubridate::as_date(efa$Date)
-efa <- janitor::clean_names(efa)
+efa$time_cat <- lubridate::hour(efa$Time) # create variable which is just hour of the day
+efa <- separate(efa, Time, into = c('wrong_date','time'), sep = ' ') # time column registers right time but wrong date
+efa$time <- hms::as_hms(efa$time)                                    # extract time value only from time column
+efa <- efa[,c(1:5,7,33,8:32)]                                        # remove incorrect date column
+efa$Age_Range_ID <- as.factor(efa$Age_Range_ID)                      # make factor not character
+efa$Activity_ID <- as.factor(efa$Activity_ID)                        # make factor not character
+efa$Distance_To_Observer <- as.numeric(efa$Distance_To_Observer)     # make number not character
+efa$Physical_Condition_ID <- as.factor(efa$Physical_Condition_ID)    # make factor not character
+efa <- efa[,c(1:15,18:27,31:32)]                                     # rearrange
+efa$Date <- lubridate::as_date(efa$Date)                             # make date
+efa <- janitor::clean_names(efa)                                     # clean up
 
-## taking a look ####
+## taking a look -- this is just data exploration to check that I know what all of the columns are doing and get an overview of the data ####
 table(efa$elephant_id)
 hist(table(efa$elephant_sighting_id), breaks = 30, las = 1)
 length(which(table(efa$elephant_sighting_id) == 1)) # 2400 elephants seen singly
 length(which(table(efa$elephant_sighting_id) == 2)) # 1017 elephants seen as pairs
 
-table(efa$age_range_id)
+table(efa$age_range_id) # 2 = <5, 3 = 5-9, 4 = 10-15, 5 = 16-20, 6 = 21-25, 7 = 26-35, 8 = 36+, 10 = Unknown (most are 4-7)
 
 summary(efa$reaction_indices)
 efa$reaction_indices <- factor(efa$reaction_indices, levels = c(1:3))
-table(efa$reaction_indices)
+table(efa$reaction_indices) # none come towards the truck
 barplot(table(efa$reaction_indices), xlab = 'reaction index score', ylab = 'count',
         las = 1, ylim = c(0,500), xlim = c(0,4))
 abline(h = 0, lwd = 2) ; axis(2, at = seq(0,500,50), las = 1)
@@ -141,69 +142,60 @@ str(efa)
 #$ sex_id                    : num [1:13429] 1 1 1 1 1 1 1 1 1 1 ...
 #$ notes                     : chr [1:13429] "Collared elephant" NA NA NA ...
 
-efa_long <- data.frame(encounter = efa$elephant_sighting_id,
-                       date = efa$date,
-                       time = efa$time,
-                       gps_s = NA,
-                       gps_e = NA,
-                       total_elephants = NA,
-                       total_id = NA,
-                       perc_id = NA,
-                       type = ifelse(efa$sex_id == 1, 'MO', 'BH/MX'),
-                       elephant = ifelse(efa$elephant_id == '-', NA, efa$elephant_id),
-                       sex = ifelse(efa$sex_id == 1, 'M','F/U'),
-                       age_range = efa$age_range_id)
+efa_long <- data.frame(encounter = efa$elephant_sighting_id,   # create a new dataframe for one row per individual but with fewer columns and some extras for counts per sighting etc.
+                       date = efa$date, time = efa$time,       # time of sighting
+                       gps_s = NA, gps_e = NA,                 # location of sighting
+                       total_elephants = NA,                   # total number of individuals together
+                       total_id = NA, perc_id = NA,            # count number identified and calculate proportion of total
+                       type = ifelse(efa$sex_id == 1, 'MO', 'BH/MX'),  # herd type -- BH = Breeding herd, MO = male only, MX = Mixed (same codes as used for MOTNP)
+                       elephant = ifelse(efa$elephant_id == '-', NA, efa$elephant_id), # ID of elephant (dash = unidentified)
+                       sex = ifelse(efa$sex_id == 1, 'M','F/U'),       # M = Male, F = Female, U = Unknown
+                       age_range = efa$age_range_id)           # estimated age category at time of sighting
 
-for(i in 1:length(efa_long$total_elephants)) {
+for(i in 1:length(efa_long$total_elephants)) { # count total elephants in sighting
   efa_long$total_elephants[i] <- length(which(efa$elephant_sighting_id == efa_long$encounter[i]))
 }
 
 efa_id <- efa_long[!is.na(efa_long$elephant),]
-for(i in 1:length(efa_id$total_id)) {
+for(i in 1:length(efa_id$total_id)) {          # count total elephants identified per encounter
   efa_id$total_id[i] <- length(which(efa_id$encounter == efa_long$encounter[i]))
 }
 
-efa_id$perc_id <- 100*(efa_id$total_id/efa_id$total_elephants)
+efa_id$perc_id <- 100*(efa_id$total_id/efa_id$total_elephants) # calculate proportion of elephants identified from total
 
 colnames(s)[1] <- 'encounter'
 s$encounter <- as.numeric(s$encounter)
-efa_gps <- left_join(x = efa_id, y = s, by = 'encounter') # first few rows are blank because 2 datasets formed at slightly different times -- group sightings only goes as far as 29th January 2021, individual sightings go until 24th September 2021
-efa_gps <- efa_gps[,c(1,13,10,2,3,18,19,6:9,11,12)]
-colnames(efa_gps)[4] <- c('date')
+efa_gps <- left_join(x = efa_id, y = s, by = 'encounter') # join ID dataframe to sightings data so that all information incldued in single dataframe. first 100-ish rows are blank past column 12 because 2 datasets formed at slightly different times -- group sightings only goes as far as 29th January 2021, individual sightings go until 24th September 2021
+efa_gps <- efa_gps[,c(1,13,10,2,3,18,19,6:9,11,12)]       # remove unnecessary columns
+colnames(efa_gps)[4] <- c('date')                         # rename from "date.x"
 
-efa_gps$location <- paste(efa_gps$latitude, efa_gps$longitude, sep = '_')
+efa_gps$location <- paste(efa_gps$latitude, efa_gps$longitude, sep = '_')  # create combined location variable that joins both columns for unique place
 
-write_delim(efa_gps, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv', delim = ',')
+write_delim(efa_gps, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv', delim = ',') # write to file
 # efa_gps <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
 
 #### Nodes data frame ####
-ele_nodes <- data.frame(id_no = sort(unique(efa$elephant_id)),
+ele_nodes <- data.frame(id_no = sort(unique(efa$elephant_id)),   # create data frame for all information about an individual
                         age_class = NA,
                         age_category = NA,
                         sex = NA,
                         count = NA,
                         dem_class = NA)
 
-efa$age_range_id[range(which(efa$elephant_id == ele_nodes$id_no[2]))]                                   # 7 and 8, levels 2-10
-efa_age <- efa[c(2,3,8)]
-efa_age$age_range_id <- as.numeric(efa$age_range_id)
+efa$age_range_id[which(efa$elephant_id == ele_nodes$id_no[2])]  # 6, 7 & 8 + 1UK (10) -- possible age classes for ID B1000
+efa_age <- efa[,c(2,3,8)]                                       # sighting, individual and age estimate
+efa_age$age_range_id <- as.numeric(efa$age_range_id)            # make numeric
+table(efa$age_range_id) ; table(efa_age$age_range_id)           # has converted 10 to 1
+efa_age$age_range_id <- ifelse(efa_age$age_range_id == 1, 10, efa_age$age_range_id) # revert to value of 10 to avoid confusion
 str(efa_age)
-efa_age$age_range_id[range(which(efa_age$elephant_id == ele_nodes$id_no[2]))]                           # 7 and 8, no other levels
-ele_nodes$age_class[2] <- mean(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[2])])  # mean = 7.055556
-test <- efa[efa$elephant_id == 'B1000',] ; mean(as.numeric(test$age_range_id))                          # mean = 7.055556
+ele_nodes$age_class[2] <- floor(median(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[2] & 
+                                                              efa_age$age_range_id < 10)]))  # median age class for elephant B1000 = 8. If had been somewhere between two values (e.g. 7.5) then would round down (down because more likely to be younger than older due to survival probability)
 
-getmode <- function(v) {
-  uniqv <- unique(v)
-  uniqv[which.max(tabulate(match(v, uniqv)))]
-}
-
-ele_nodes$age_class[2] <- getmode(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[2])])
-test <- efa[efa$elephant_id == 'B1000',] ; getmode(as.numeric(test$age_range_id))
-
-ele_nodes <- ele_nodes[2:6646,]
+ele_nodes <- ele_nodes[2:6646,] # remove first row as doesn't appear to be an actual elephant
 
 for(i in 1:length(ele_nodes$age_class)) {
-  ele_nodes$age_class[i] <- getmode(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[i])])
+  ele_nodes$age_class[i] <- floor(median(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[i] & 
+                                                                      efa_age$age_range_id < 10)]))
   ele_nodes$sex[i] <- length(unique(efa$sex_id[which(efa$elephant_id == ele_nodes$id_no[i])]))
   ele_nodes$count[i] <- length(which(efa$elephant_id == ele_nodes$id_no[i]))
 }
@@ -211,22 +203,19 @@ check <- ele_nodes$id_no[which(ele_nodes$sex > 1)]
 for(i in 1:length(check)){
   print(efa$sex_id[which(efa$elephant_id == check[i])])
 } # for all warnings, the sex is 1 and NA -- NA is causing apparent presence of extra sex_id
-for(i in 1:length(ele_nodes$age_class)) {
-  ele_nodes$sex[i] <- unique(efa$sex_id[which(efa$elephant_id == ele_nodes$id_no[i])])
-}
-ele_nodes$sex <- ifelse(ele_nodes$sex == 1,'M','F')
+ele_nodes$sex <- 'M' # all are male
 
-ele_nodes$age_category <- ifelse(ele_nodes$age_class < 3, 'Calf',
+ele_nodes$age_category <- ifelse(ele_nodes$age_class < 3, 'Calf',    # create to match MOTNP categories for comparison
                                  ifelse(ele_nodes$age_class == 3, 'Juvenile',
                                         ifelse(ele_nodes$age_class > 3 & ele_nodes$age_class <= 5, 'Pubescent',
                                                ifelse(ele_nodes$age_class > 5 & ele_nodes$age_class <= 8, 'Adult', 'UNK'))))
-ele_nodes$age_class <- as.factor(ele_nodes$age_class)
+ele_nodes$age_class <- as.factor(ele_nodes$age_class)                # create factor for age_class
 
-ele_nodes$age <- ifelse(ele_nodes$age_category == 'Adult', 'A',
+ele_nodes$age <- ifelse(ele_nodes$age_category == 'Adult', 'A',      # extra column for symbol age not word
                         ifelse(ele_nodes$age_category == 'Pubescent', 'P',
                                ifelse(ele_nodes$age_category == 'Juvenile', 'J', 'C')))
-ele_nodes$dem_class <- paste(ele_nodes$age, ele_nodes$sex, sep = '')
-ele_nodes <- ele_nodes[c(1:6)]
+ele_nodes$dem_class <- paste(ele_nodes$age, ele_nodes$sex, sep = '') # column combining age and sex
+ele_nodes <- ele_nodes[,c(1:6)]                                      # remove age column
 
 write_delim(ele_nodes, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_elenodes.csv')
 # ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_elenodes.csv')
@@ -235,39 +224,38 @@ write_delim(ele_nodes, '../../../../Google Drive/Shared drives/Helen PhD/chapter
 rm(efa, efa_age, efa_id, efa_long, test, check, i)
 
 #### Mapping ####
-plot(efa_gps$longitude ~ efa_gps$latitude)
-efa_gps$longitude[which(efa_gps$longitude < 20)] <- NA
-efa_gps$longitude[which(efa_gps$longitude < 21)] # 20.512689999999
-efa_gps$longitude[which(efa_gps$latitude < -20)] # 24.750029999999999 24.707709999999999 24.707709999999999 24.768260000000001 24.764379999999999 24.765647999999999 24.528880000000001 24.528880000000001
-plot(efa_gps$longitude ~ efa_gps$latitude)
-plot(efa_gps$longitude ~ efa_gps$latitude, ylim = c(24.2,24.9), xlim = c(-20.8,-20.2),
-     pch = 19, col = rgb(0,0,1,0.05))
+plot(efa_gps$longitude ~ efa_gps$latitude, las = 1, xlab = 'latitude', ylab = 'longitude', pch = 19, col = rgb(0,0,1,0.1))
+efa_gps$longitude[which(efa_gps$longitude < 24)] <- NA  # anything below 24 degrees is too far west
+efa_gps$latitude[which(efa_gps$latitude < -20)]  <- NA  # anything closer to zero than -20 is too far north
+plot(efa_gps$longitude ~ efa_gps$latitude, ylim = c(24.2,24.9), xlim = c(-20.8,-20.2), # replot without weird datapoints
+     pch = 19, col = rgb(0,0,1,0.05), xlab = 'latitude', ylab = 'longitude', las = 1)
 
 #### create dyadic data frame ####
 ## create gbi_matrix ####
 ### create group-by-individual matrix
-eles_asnipe <- efa_gps[,c(4,5,3,14)]  # date, time, elephant, location
-eles_asnipe$Date <- as.integer(eles_asnipe$date)
-eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)         # start from 1, not 1st January 1970
+eles_asnipe <- efa_gps[,c(4,5,3,14)]                            # date, time, elephant, location
+eles_asnipe$Date <- as.integer(eles_asnipe$date)                # convert to integer
+eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)  # start from 1, not 1st January 1970
 eles_asnipe$Time <- hour(eles_asnipe$time)*60*60 + minute(eles_asnipe$time)*60 + second(eles_asnipe$time) # convert time values to seconds through day
 
-eles_asnipe <- eles_asnipe[,c(5,6,3,4)]
-colnames(eles_asnipe) <- c('Date','Time','ID','Location')
-eles_asnipe$ID <- as.character(eles_asnipe$ID)
+eles_asnipe <- eles_asnipe[,c(5,6,3,4)]                         # select desired variables
+colnames(eles_asnipe) <- c('Date','Time','ID','Location')       # rename for asnipe package
+eles_asnipe$ID <- as.character(eles_asnipe$ID)                  # create character variable
 str(eles_asnipe)
 
 # get_gbi generates a group by individual matrix. The function accepts a data.table with individual identifiers and a group column. The group by individual matrix can then be used to build a network using asnipe::get_network.
-eles_asnipe$d_pad <- str_pad(eles_asnipe$Date, 3, pad = '0')
-eles_asnipe$encounter <- paste(eles_asnipe$d_pad, eles_asnipe$Time, eles_asnipe$Location, sep = '_')
-eles_asnipe$group <- as.integer(as.factor(eles_asnipe$encounter))
-max(eles_asnipe$group) # 3765
-eles_asnipe <- eles_asnipe[,c(3,7)]
-eles_asnipe <- data.table::setDT(eles_asnipe)
-gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID')
+eles_asnipe$d_pad <- str_pad(eles_asnipe$Date, 3, pad = '0')    # ensure dates go in the right order even when as character
+eles_asnipe$encounter <- paste(eles_asnipe$d_pad, eles_asnipe$Time, eles_asnipe$Location, sep = '_') # unique value per sighting
+eles_asnipe$group <- as.integer(as.factor(eles_asnipe$encounter))  # unique count value per encounter
+max(eles_asnipe$group)                                             # 3765
+eles_asnipe <- eles_asnipe[,c(3,7)]                                # just the two values that we need (ID and group)
+eles_asnipe <- data.table::setDT(eles_asnipe)                      # convert to data table
+gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID') # create group-by-individual matrix
 
 ## convert gbi_matrix to series of dyadic data frames ####
 ### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md) -- NOTE: this step takes a long time to run, and the for loops get exponentially slower with more and more observations. Running it in chunks rather than all at once reduces how much it slows down.
-nrow(gbi_matrix) # 3765 -- run in 74 blocks of 50 sightings + 1 block of 65
+nrow(gbi_matrix) # 3765 -- run in 74 blocks of 50 sightings + 1 block of 65 (BUT ACTUALLY I RAN IT IN LARGER BLOCKS TO START WITH SO THE FIRST COUPLE WILL BE EXTREMELY SLOW)
+# 1-500 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1:250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
@@ -299,7 +287,6 @@ for (obs_id in 251:387) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -325,7 +312,6 @@ for (obs_id in 388:400) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -351,7 +337,6 @@ for (obs_id in 401:450) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -377,7 +362,6 @@ for (obs_id in 451:500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -398,12 +382,12 @@ for (obs_id in 451:500) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings451.500_22.03.08.csv', delim = ',')
 
+# 501-1000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 501:550) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -429,7 +413,6 @@ for (obs_id in 551:600) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -450,13 +433,11 @@ for (obs_id in 551:600) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings551.600_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 601:650) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -477,13 +458,11 @@ for (obs_id in 601:650) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings601.650_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 651:700) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -503,7 +482,6 @@ for (obs_id in 651:700) {
 }
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings651.700_22.03.08.csv', delim = ',')
-
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 701:750) {
@@ -536,7 +514,6 @@ for (obs_id in 751:800) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -562,7 +539,6 @@ for (obs_id in 801:850) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -583,13 +559,11 @@ for (obs_id in 801:850) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings801.850_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 851:900) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -610,13 +584,11 @@ for (obs_id in 851:900) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings851.900_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 901:950) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -637,13 +609,11 @@ for (obs_id in 901:950) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings901.950_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 951:1000) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -664,20 +634,12 @@ for (obs_id in 951:1000) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings951.1000_22.03.08.csv', delim = ',')
 
-
-
-
-
-
-
-
-
+# 1001-1500 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1001:1050) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -698,13 +660,11 @@ for (obs_id in 1001:1050) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1001.1050_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1051:1100) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -725,13 +685,11 @@ for (obs_id in 1051:1100) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1051.1100_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1101:1150) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -752,13 +710,11 @@ for (obs_id in 1101:1150) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1101.1150_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1151:1200) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -779,13 +735,11 @@ for (obs_id in 1151:1200) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1151.1200_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1201:1250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -811,7 +765,6 @@ for (obs_id in 1251:1300) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -837,7 +790,6 @@ for (obs_id in 1301:1350) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -858,13 +810,11 @@ for (obs_id in 1301:1350) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1301.1350_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1351:1400) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -885,13 +835,11 @@ for (obs_id in 1351:1400) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1351.1400_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1401:1450) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -917,7 +865,6 @@ for (obs_id in 1451:1500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -938,12 +885,12 @@ for (obs_id in 1451:1500) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1451.1500_22.03.08.csv', delim = ',')
 
+# 1501-2000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1501:1550) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -964,13 +911,11 @@ for (obs_id in 1501:1550) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1501.1550_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1551:1600) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -996,7 +941,6 @@ for (obs_id in 1601:1650) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1017,15 +961,11 @@ for (obs_id in 1601:1650) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1601.1650_22.03.08.csv', delim = ',')
 
-
-
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1651:1700) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1051,7 +991,6 @@ for (obs_id in 1701:1750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1072,13 +1011,11 @@ for (obs_id in 1701:1750) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1701.1750_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1751:1800) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1104,7 +1041,6 @@ for (obs_id in 1801:1850) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1130,7 +1066,6 @@ for (obs_id in 1851:1900) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1156,7 +1091,6 @@ for (obs_id in 1901:1950) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1177,13 +1111,11 @@ for (obs_id in 1901:1950) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1901.1950_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 1951:2000) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1204,18 +1136,12 @@ for (obs_id in 1951:2000) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1951.2000_22.03.08.csv', delim = ',')
 
-
-
-
-
-
-
+# 2001-2500 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 2001:2050) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1241,7 +1167,6 @@ for (obs_id in 2051:2100) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1262,13 +1187,11 @@ for (obs_id in 2051:2100) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2051.2100_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 2101:2150) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1294,7 +1217,6 @@ for (obs_id in 2151:2200) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1320,7 +1242,6 @@ for (obs_id in 2201:2250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1346,7 +1267,6 @@ for (obs_id in 2251:2300) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1372,7 +1292,6 @@ for (obs_id in 2301:2350) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1398,7 +1317,6 @@ for (obs_id in 2351:2400) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1424,7 +1342,6 @@ for (obs_id in 2401:2450) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1450,7 +1367,6 @@ for (obs_id in 2451:2500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1471,12 +1387,12 @@ for (obs_id in 2451:2500) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2451.2500_22.03.08.csv', delim = ',')
 
+# 2501-3000 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 2501:2550) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1502,7 +1418,6 @@ for (obs_id in 2551:2600) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1528,7 +1443,6 @@ for (obs_id in 2601:2650) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1554,7 +1468,6 @@ for (obs_id in 2651:2700) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1580,7 +1493,6 @@ for (obs_id in 2701:2750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1606,7 +1518,6 @@ for (obs_id in 2751:2800) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1632,7 +1543,6 @@ for (obs_id in 2801:2850) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1658,7 +1568,6 @@ for (obs_id in 2851:2900) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1684,7 +1593,6 @@ for (obs_id in 2901:2950) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1710,7 +1618,6 @@ for (obs_id in 2951:3000) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1731,16 +1638,12 @@ for (obs_id in 2951:3000) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2951.3000_22.03.08.csv', delim = ',')
 
-
-
-
-
+# 3001-3500 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3001:3050) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1761,13 +1664,11 @@ for (obs_id in 3001:3050) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3001.3050_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3051:3100) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1788,13 +1689,11 @@ for (obs_id in 3051:3100) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3051.3100_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3101:3150) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1815,13 +1714,11 @@ for (obs_id in 3101:3150) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3101.3150_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3151:3200) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1842,13 +1739,11 @@ for (obs_id in 3151:3200) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3151.3200_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3201:3250) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1874,7 +1769,6 @@ for (obs_id in 3251:3300) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1900,7 +1794,6 @@ for (obs_id in 3301:3350) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1921,13 +1814,11 @@ for (obs_id in 3301:3350) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3301.3350_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3351:3400) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1948,13 +1839,11 @@ for (obs_id in 3351:3400) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3351.3400_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3401:3450) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -1980,7 +1869,6 @@ for (obs_id in 3451:3500) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -2001,12 +1889,12 @@ for (obs_id in 3451:3500) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3451.3500_22.03.08.csv', delim = ',')
 
+# 3501-3765 ####
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3501:3550) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -2027,13 +1915,11 @@ for (obs_id in 3501:3550) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3501.3550_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3551:3600) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -2059,7 +1945,6 @@ for (obs_id in 3601:3650) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -2085,7 +1970,6 @@ for (obs_id in 3651:3700) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -2111,7 +1995,6 @@ for (obs_id in 3701:3750) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
@@ -2132,13 +2015,11 @@ for (obs_id in 3701:3750) {
 gbi_df
 write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3701.3750_22.03.08.csv', delim = ',')
 
-
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 3751:3765) {
   for (i in which(gbi_matrix[obs_id, ] == 1)) {
     for (j in 1:ncol(gbi_matrix)) {
       if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
         if (i < j) {
           node_1 <- i
           node_2 <- j
