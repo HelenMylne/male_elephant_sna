@@ -20,11 +20,11 @@ library(data.table)
 library(spatsoc)
 
 #### Import sightings data -- remove final two columns and convert two to character just to ensure exactly the same as previously when it was working, other than the 13 removed rows ####
-ate <- readxl::read_xlsx('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
+ate <- readxl::read_xlsx('Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
   janitor::clean_names()# %>% 
   #select(-obs_casename, -row_num)
 
-old <- readxl::read_xlsx('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/old_anp/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
+old <- readxl::read_xlsx('Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
 
 str(ate)
 str(old)
@@ -169,9 +169,9 @@ rm(ate_nums, date_row, test, gps, i, no_gps, test_nums)
 print(paste0('sightings data imported at ', Sys.time()))
 
 #### Import nodes data ####
-nodes_old <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/old_anp/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
+nodes_old <- readxl::read_excel('Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 
-nodes <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_LifeHistoryData_Fishlock220808.xlsx') %>% janitor::clean_names() %>% distinct()
+nodes <- readxl::read_excel('Raw_ATE_LifeHistoryData_Fishlock220808.xlsx') %>% janitor::clean_names() %>% distinct()
 
 colnames(nodes_old)
 colnames(nodes)
@@ -225,7 +225,7 @@ for (obs_id in 1:250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1.250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1.250.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 1-250 completed at ', Sys.time()))
@@ -254,7 +254,7 @@ for (obs_id in 251:500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings251.500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings251.500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 251-500 completed at ', Sys.time()))
@@ -283,7 +283,7 @@ for (obs_id in 501:750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings501.750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings501.750.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 501-750 completed at ', Sys.time()))
@@ -312,7 +312,7 @@ for (obs_id in 751:1000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings751.1000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings751.1000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 751-1000 completed at ', Sys.time()))
@@ -341,7 +341,7 @@ for (obs_id in 1001:1250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1001.1250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1001.1250.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 1001-1250 completed at ', Sys.time()))
@@ -370,7 +370,7 @@ for (obs_id in 1251:1500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1251.1500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1251.1500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 1251-1500 completed at ', Sys.time()))
@@ -399,7 +399,7 @@ for (obs_id in 1501:1750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1501.1750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1501.1750.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 1501-1750 completed at ', Sys.time()))
@@ -428,7 +428,7 @@ for (obs_id in 1751:2000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1751.2000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings1751.2000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 1751-2000 completed at ', Sys.time()))
@@ -457,7 +457,7 @@ for (obs_id in 2001:2250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2001.2250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2001.2250.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 2001-2250 completed at ', Sys.time()))
@@ -486,7 +486,7 @@ for (obs_id in 2251:2500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2251.2500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2251.2500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 2251-2500 completed at ', Sys.time()))
@@ -515,7 +515,7 @@ for (obs_id in 2501:2750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2501.2750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2501.2750.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 2501-2750 completed at ', Sys.time()))
@@ -544,7 +544,7 @@ for (obs_id in 2751:3000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2751.3000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2751.3000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 2751-3000 completed at ', Sys.time()))
@@ -573,7 +573,7 @@ for (obs_id in 3001:3250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3001.3250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3001.3250.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 3001-3250 completed at ', Sys.time()))
@@ -602,7 +602,7 @@ for (obs_id in 3251:3500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3251.3500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3251.3500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 3251-3500 completed at ', Sys.time()))
@@ -631,7 +631,7 @@ for (obs_id in 3501:3750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3501.3750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3501.3750.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 3501-3750 completed at ', Sys.time()))
@@ -660,7 +660,7 @@ for (obs_id in 3751:4000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3751.4000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings3751.4000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 3751-4000 completed at ', Sys.time()))
@@ -689,7 +689,7 @@ for (obs_id in 4001:4250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4001.4250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4001.4250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 4251:4500) {
@@ -714,7 +714,7 @@ for (obs_id in 4251:4500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4251.4500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4251.4500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 4001-4500 completed at ', Sys.time()))
@@ -743,7 +743,7 @@ for (obs_id in 4501:4750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4501.4750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4501.4750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 4751:5000) {
@@ -768,7 +768,7 @@ for (obs_id in 4751:5000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4751.5000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings4751.5000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 4501-5000 completed at ', Sys.time()))
@@ -797,7 +797,7 @@ for (obs_id in 5001:5250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5001.5250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5001.5250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 5251:5500) {
@@ -822,7 +822,7 @@ for (obs_id in 5251:5500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5251.5500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5251.5500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 5001-5500 completed at ', Sys.time()))
@@ -851,7 +851,7 @@ for (obs_id in 5501:5750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5501.5750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5501.5750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 5751:6000) {
@@ -876,7 +876,7 @@ for (obs_id in 5751:6000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5751.6000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings5751.6000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 5501-6000 completed at ', Sys.time()))
@@ -905,7 +905,7 @@ for (obs_id in 6001:6250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6001.6250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6001.6250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 6251:6500) {
@@ -930,7 +930,7 @@ for (obs_id in 6251:6500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6251.6500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6251.6500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 6001-6500 completed at ', Sys.time()))
@@ -959,7 +959,7 @@ for (obs_id in 6501:6750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6501.6750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6501.6750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 6751:7000) {
@@ -984,7 +984,7 @@ for (obs_id in 6751:7000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6751.7000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings6751.7000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 6501-7000 completed at ', Sys.time()))
@@ -1013,7 +1013,7 @@ for (obs_id in 7001:7250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7001.7250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7001.7250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 7251:7500) {
@@ -1038,7 +1038,7 @@ for (obs_id in 7251:7500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7251.7500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7251.7500.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 7001-7500 completed at ', Sys.time()))
@@ -1067,7 +1067,7 @@ for (obs_id in 7501:7750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7501.7750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7501.7750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 7751:8000) {
@@ -1092,7 +1092,7 @@ for (obs_id in 7751:8000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7751.8000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings7751.8000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 7501-8000 completed at ', Sys.time()))
@@ -1121,7 +1121,7 @@ for (obs_id in 8001:8250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8001.8250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8001.8250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 8251:8500) {
@@ -1146,7 +1146,7 @@ for (obs_id in 8251:8500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8251.8500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8251.8500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 8501:8750) {
@@ -1171,7 +1171,7 @@ for (obs_id in 8501:8750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8501.8750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8501.8750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 8751:9000) {
@@ -1196,7 +1196,7 @@ for (obs_id in 8751:9000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8751.9000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings8751.9000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 8001-9000 completed at ', Sys.time()))
@@ -1225,7 +1225,7 @@ for (obs_id in 9001:9250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9001.9250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9001.9250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 9251:9500) {
@@ -1250,7 +1250,7 @@ for (obs_id in 9251:9500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9251.9500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9251.9500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 9501:9750) {
@@ -1275,7 +1275,7 @@ for (obs_id in 9501:9750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9501.9750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9501.9750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 9751:10000) {
@@ -1300,7 +1300,7 @@ for (obs_id in 9751:10000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9751.10000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings9751.10000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 9001-10000 completed at ', Sys.time()))
@@ -1329,7 +1329,7 @@ for (obs_id in 10001:10250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10001.10250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10001.10250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 10251:10500) {
@@ -1354,7 +1354,7 @@ for (obs_id in 10251:10500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10251.10500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10251.10500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 10501:10750) {
@@ -1379,7 +1379,7 @@ for (obs_id in 10501:10750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10501.10750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10501.10750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 10751:11000) {
@@ -1404,7 +1404,7 @@ for (obs_id in 10751:11000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10751.11000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings10751.11000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 10001-11000 completed at ', Sys.time()))
@@ -1433,7 +1433,7 @@ for (obs_id in 11001:11250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11001.11250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11001.11250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 11251:11500) {
@@ -1458,7 +1458,7 @@ for (obs_id in 11251:11500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11251.11500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11251.11500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 11501:11750) {
@@ -1483,7 +1483,7 @@ for (obs_id in 11501:11750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11501.11750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11501.11750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 11751:12000) {
@@ -1508,7 +1508,7 @@ for (obs_id in 11751:12000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11751.12000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings11751.12000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 11001-12000 completed at ', Sys.time()))
@@ -1537,7 +1537,7 @@ for (obs_id in 12001:12250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12001.12250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12001.12250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 12251:12500) {
@@ -1562,7 +1562,7 @@ for (obs_id in 12251:12500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12251.12500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12251.12500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 12501:12750) {
@@ -1587,7 +1587,7 @@ for (obs_id in 12501:12750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12501.12750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12501.12750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 12751:13000) {
@@ -1612,7 +1612,7 @@ for (obs_id in 12751:13000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12751.13000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings12751.13000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 12001-13000 completed at ', Sys.time()))
@@ -1641,7 +1641,7 @@ for (obs_id in 13001:13250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13001.13250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13001.13250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 13251:13500) {
@@ -1666,7 +1666,7 @@ for (obs_id in 13251:13500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13251.13500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13251.13500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 13501:13750) {
@@ -1691,7 +1691,7 @@ for (obs_id in 13501:13750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13501.13750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13501.13750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 13751:14000) {
@@ -1716,7 +1716,7 @@ for (obs_id in 13751:14000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13751.14000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings13751.14000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 13001-14000 completed at ', Sys.time()))
@@ -1745,7 +1745,7 @@ for (obs_id in 14001:14250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14001.14250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14001.14250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 14251:14500) {
@@ -1770,7 +1770,7 @@ for (obs_id in 14251:14500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14251.14500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14251.14500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 14501:14750) {
@@ -1795,7 +1795,7 @@ for (obs_id in 14501:14750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14501.14750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14501.14750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 14751:15000) {
@@ -1820,7 +1820,7 @@ for (obs_id in 14751:15000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14751.15000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings14751.15000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 14001-15000 completed at ', Sys.time()))
@@ -1849,7 +1849,7 @@ for (obs_id in 15001:15250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15001.15250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15001.15250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 15251:15500) {
@@ -1874,7 +1874,7 @@ for (obs_id in 15251:15500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15251.15500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15251.15500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 15501:15750) {
@@ -1899,7 +1899,7 @@ for (obs_id in 15501:15750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15501.15750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15501.15750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 15751:16000) {
@@ -1924,7 +1924,7 @@ for (obs_id in 15751:16000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15751.16000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings15751.16000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 15001-16000 completed at ', Sys.time()))
@@ -1953,7 +1953,7 @@ for (obs_id in 16001:16250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16001.16250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16001.16250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 16251:16500) {
@@ -1978,7 +1978,7 @@ for (obs_id in 16251:16500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16251.16500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16251.16500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 16501:16750) {
@@ -2003,7 +2003,7 @@ for (obs_id in 16501:16750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16501.16750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16501.16750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 16751:17000) {
@@ -2028,7 +2028,7 @@ for (obs_id in 16751:17000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16751.17000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings16751.17000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 16001-17000 completed at ', Sys.time()))
@@ -2057,7 +2057,7 @@ for (obs_id in 17001:17250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17001.17250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17001.17250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 17251:17500) {
@@ -2082,7 +2082,7 @@ for (obs_id in 17251:17500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17251.17500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17251.17500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 17501:17750) {
@@ -2107,7 +2107,7 @@ for (obs_id in 17501:17750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17501.17750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17501.17750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 17751:18000) {
@@ -2132,7 +2132,7 @@ for (obs_id in 17751:18000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17751.18000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings17751.18000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 17001-18000 completed at ', Sys.time()))
@@ -2161,7 +2161,7 @@ for (obs_id in 18001:18250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18001.18250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18001.18250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 18251:18500) {
@@ -2186,7 +2186,7 @@ for (obs_id in 18251:18500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18251.18500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18251.18500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 18501:18750) {
@@ -2211,7 +2211,7 @@ for (obs_id in 18501:18750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18501.18750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18501.18750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 18751:19000) {
@@ -2236,7 +2236,7 @@ for (obs_id in 18751:19000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18751.19000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings18751.19000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 18001-19000 completed at ', Sys.time()))
@@ -2265,7 +2265,7 @@ for (obs_id in 19001:19250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19001.19250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19001.19250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 19251:19500) {
@@ -2290,7 +2290,7 @@ for (obs_id in 19251:19500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19251.19500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19251.19500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 19501:19750) {
@@ -2315,7 +2315,7 @@ for (obs_id in 19501:19750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19501.19750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19501.19750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 19751:20000) {
@@ -2340,7 +2340,7 @@ for (obs_id in 19751:20000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19751.20000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings19751.20000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 19001-20000 completed at ', Sys.time()))
@@ -2369,7 +2369,7 @@ for (obs_id in 20001:20250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20001.20250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20001.20250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 20251:20500) {
@@ -2394,7 +2394,7 @@ for (obs_id in 20251:20500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20251.20500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20251.20500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 20501:20750) {
@@ -2419,7 +2419,7 @@ for (obs_id in 20501:20750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20501.20750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20501.20750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 20751:21000) {
@@ -2444,7 +2444,7 @@ for (obs_id in 20751:21000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20751.21000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings20751.21000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 20001-21000 completed at ', Sys.time()))
@@ -2473,7 +2473,7 @@ for (obs_id in 21001:21250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21001.21250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21001.21250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 21251:21500) {
@@ -2498,7 +2498,7 @@ for (obs_id in 21251:21500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21251.21500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21251.21500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 21501:21750) {
@@ -2523,7 +2523,7 @@ for (obs_id in 21501:21750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21501.21750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21501.21750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 21751:22000) {
@@ -2548,7 +2548,7 @@ for (obs_id in 21751:22000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21751.22000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings21751.22000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 21001-22000 completed at ', Sys.time()))
@@ -2577,7 +2577,7 @@ for (obs_id in 22001:22250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22001.22250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22001.22250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 22251:22500) {
@@ -2602,7 +2602,7 @@ for (obs_id in 22251:22500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22251.22500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22251.22500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 22501:22750) {
@@ -2627,7 +2627,7 @@ for (obs_id in 22501:22750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22501.22750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22501.22750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 22751:23000) {
@@ -2652,7 +2652,7 @@ for (obs_id in 22751:23000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22751.23000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings22751.23000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 22001-23000 completed at ', Sys.time()))
@@ -2681,7 +2681,7 @@ for (obs_id in 23001:23250) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23001.23250.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23001.23250.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 23251:23500) {
@@ -2706,7 +2706,7 @@ for (obs_id in 23251:23500) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23251.23500.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23251.23500.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 23501:23750) {
@@ -2731,7 +2731,7 @@ for (obs_id in 23501:23750) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23501.23750.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23501.23750.csv', delim = ',')
 
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
 for (obs_id in 23751:24000) {
@@ -2756,7 +2756,7 @@ for (obs_id in 23751:24000) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23751.24000.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings23751.24000.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 23001-24000 completed at ', Sys.time()))
@@ -2786,7 +2786,7 @@ for (obs_id in 24001:nrow(gbi_matrix)) {
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_bayesian_allpairwiseevents_cleanedrawdata_sightings24001.24174.csv', delim = ',')
+write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings24001.24174.csv', delim = ',')
 
 ## progress report
 print(paste0('sightings 24001-end completed at ', Sys.time()))
