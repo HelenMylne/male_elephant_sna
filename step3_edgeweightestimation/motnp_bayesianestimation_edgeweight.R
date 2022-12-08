@@ -36,7 +36,7 @@ set_cmdstan_path('/Users/helen/.cmdstanr/cmdstan-2.28.2')
 # set seed
 set.seed(12345)
 
-################ 1) Draw DAGS ################
+#### 1) Draw DAGS ####
 # plot with full names
 binom <- dagitty::dagitty("dag{
                          age_dyad [exposure];
@@ -66,9 +66,10 @@ drawdag(binom, radius = 6, cex = 1.6)
 # clear environment and reset plot window
 rm(binom)
 dev.off()
-################ 2) Create data lists ################
+#### 2) Create data lists ####
 ### import data for aggregated model (binomial)
 counts_df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv')
+#counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
 unique(counts_df$sex_1) # FALSE or NA
@@ -172,7 +173,7 @@ counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
 #counts_df$sex_younger <- ifelse(counts_df$birth_1 < counts_df$birth_2, counts_df$sex_2, counts_df$sex_1)
 #counts_df$sex_diff <- ifelse(counts_df$sex_1 == counts_df$sex_2, 1, 2)
 
-################ 3) Create simulated data set ################
+#### 3) Create simulated data set ####
 ### Population
 # 120 individuals: 50 male (10 each of ages 3-7), 50 female (10 each of ages 3-7), 20 unknown (10 each of ages 1-2)
 # males no preference for any other individual -- edge weight 0.2
@@ -334,14 +335,14 @@ simdat_ls <- list(
 # clear environment
 rm(population, i, N)
 
-################ 4) Define likelihood distributions, model and parameters to estimate ################
+#### 4) Define likelihood distributions, model and parameters to estimate ####
 # Binomial model using a beta distribution where shape 1 = times together and shape 2 = times apart
 
 ### Compile Stan model
 mod_2.2 <- cmdstan_model("models/simpleBetaNet.stan")
 mod_2.2
 
-################ 5) Run model on simulated data ################
+#### 5) Run model on simulated data ####
 # create data list
 simdat_ls <- list(
   n_dyads  = nrow(dyads),        # Number of dyads
@@ -460,7 +461,7 @@ ggplot(data = plot_data_2.2, aes(x = pair_type, y = mean, fill = pair_type))+
 rm(draws_2.2_pi, draws1_2.2, draws1_2.2_pi, draws2_2.2, draws3_2.2, draws4_2.2, means_2.2, plot_data_2.2, draws_simdat_2.2, dyads, simdat_ls)
 
 
-################ 6) Run model on real standardised data ################
+#### 6) Run model on real standardised data ####
 ### create data list -- can contain no NA values in any column, even if column is not specified in model
 counts_ls <- list(
   n_dyads  = nrow(counts_df),          # total number of times one or other of the dyad was observed
@@ -536,7 +537,7 @@ tidy_sierra$index <- rep(rep(1:1000, each = length(unique(tidy_sierra$dyad))),4)
 ### save data 
 saveRDS(draws_motnp2.2, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds')
 
-################ 7) Summarise and plot edge weights ################
+#### 7) Summarise and plot edge weights ####
 # draws_motnp2.2 <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
 #   data.matrix()
 ### build traceplots ####
@@ -688,13 +689,13 @@ dens(add = T, draws_motnp2.2[,which(counts_df$dyad == 'F52_F98')+1],col = 'red')
 
 ### summarise data ####
 # summarise -- look for any anomalies in draw values or chain variation
-summaries <- data.frame(dyad = colnames(draws_motnp2.2[,2:106954]),
+summaries <- data.frame(dyad = colnames(draws_motnp2.2[,2:ncol(draws_motnp2.2)]),  # create empty summary data frame
                         min = rep(NA, ncol(draws_motnp2.2)-1),
                         max = rep(NA, ncol(draws_motnp2.2)-1),
                         mean = rep(NA, ncol(draws_motnp2.2)-1),
                         median = rep(NA, ncol(draws_motnp2.2)-1),
                         sd = rep(NA, ncol(draws_motnp2.2)-1))
-for(i in 1:nrow(summaries)){
+for(i in 1:nrow(summaries)){  # fill data frame with summary of each column of edge weight matrix
   summaries$min[i]    <- min(draws_motnp2.2[,i+1])
   summaries$max[i]    <- max(draws_motnp2.2[,i+1])
   summaries$mean[i]   <- mean(draws_motnp2.2[,i+1])
@@ -886,47 +887,50 @@ hist(summaries$median, breaks = 100, xlim = c(0,1), las = 1,
 
 quantile(plot_males$median, seq(0,1,length.out = 101))
 
-################ 8) Create network plots ################
+#### 8) Create network plots ####
 head(summaries)
 length(unique(plot_data_motnp2.2$id_1))+1 # number of individuals = 463
 
-par(mai = c(0.1,0.1,0.1,0.1))
+par(mai = c(0.1,0.1,0.1,0.1))  # set up plot window for maximum size without losing any off the side
 
 ### Create igraph object for all elephants ####
 # create array of draws per dyad (distributions)
-adj_tensor <- array(0, c(NROW(unique(counts_df$id_1))+1,
-                         NROW(unique(counts_df$id_2))+1,
-                         NROW(draws_motnp2.2)),
+adj_tensor <- array(0, c(NROW(unique(counts_df$id_1)) + 1,  # create empty array
+                         NROW(unique(counts_df$id_2)) + 1,  # each layer = all pairwise estimates drawn per chain position
+                         NROW(draws_motnp2.2)),             # layers = 1000 draws per chain
                     dimnames = list(c(unique(counts_df$id_1),'U9'),
                                     c('F1',unique(counts_df$id_2)),
                                     NULL))
-N <- nrow(counts_df)
-half_draws1 <- draws_motnp2.2[,2:54000]
-half_draws2 <- draws_motnp2.2[,54001:N+1]
+
+N_dyads <- nrow(counts_df)                                  # number of dyads
+half_draws1 <- draws_motnp2.2[,2:54000]                     # split in half to reduce pressure on computer systems
+half_draws2 <- draws_motnp2.2[,54001:N_dyads+1]
 rm(draws_motnp2.2)
 
-for (i in 1:53999) {            # can cope with jumps of 50000 dyads at a time
+for (i in 1:53999) {                                        # fill out 1st half of array
   dyad_row <- counts_df[i, ]
   adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- half_draws1[, i]
 }
 rm(half_draws1)
-for (i in 54001:N) {
+
+for (i in 54000:N) {                                        # fill out 2nd half of array
   dyad_row <- counts_df[i, ]
-  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- half_draws2[, i-54000]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- half_draws2[, i-53999]
 }
 rm(half_draws2)
 adj_tensor[,,1]
 
 # convert to array of medians and 95% credible intervals
 adj_quantiles <- apply(adj_tensor, c(1, 2), function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
-(adj_lower <- adj_quantiles[1, , ])
-(adj_mid   <- adj_quantiles[2, , ])
-(adj_upper <- adj_quantiles[3, , ])
-adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0
+(adj_lower <- adj_quantiles[1, , ])     # lower bound of 95% credibility
+(adj_mid   <- adj_quantiles[2, , ])     # median
+(adj_upper <- adj_quantiles[3, , ])     # upper bound of 95% credibility
+adj_range <- (adj_upper - adj_lower) ; adj_range[is.nan(adj_range)] <- 0   # range = upper - lower
+rm(adj_tensor, adj_quantiles, adj_lower, adj_upper, dyad_row)
 
 # Generate two igraph objects, one from the median and one from the standardised width.
-g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)
-g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)
+g_mid <- graph_from_adjacency_matrix(adj_mid,   mode="undirected", weighted=TRUE)  # median -- plot middle estimate
+g_rng <- graph_from_adjacency_matrix(adj_range, mode="undirected", weighted=TRUE)  # range -- plot uncertainty in estimate
 
 # Generate nodes data for plotting characteristics
 ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv')
@@ -1037,6 +1041,7 @@ which(nodes$degree_0.1 < nodes$degree_0.2)
 which(nodes$degree_0.2 < nodes$degree_0.3)
 which(nodes$degree_0.3 < nodes$degree_0.4)
 which(nodes$degree_0.4 < nodes$degree_0.5)
+##########################################################################################################
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
@@ -1174,6 +1179,7 @@ plot(g_mid_m,
      edge.width = E(g_mid_m)$weight,
      edge.color = 'black',
      vertex.size = 7,
+     #vertex.label = plot_males$id,
      vertex.label.color = 'black',
      vertex.label.family = 'Helvetica',
      vertex.label.cex = 0.5,
@@ -1263,6 +1269,7 @@ g_rng_m0.3 <- delete.vertices(graph = g_rng,
 g_mid_m0.3 <- delete_vertices(graph = g_mid_m0.3, v = c('M7','M38','M66','M71','M87','M95','M99','M117','M156','M170','M193','M219','M233','M240'))
 g_rng_m0.3 <- delete_vertices(graph = g_rng_m0.3, v = c('M7','M38','M66','M71','M87','M95','M99','M117','M156','M170','M193','M219','M233','M240'))
 
+
 males0.3 <- males0.3[males0.3$id != 'M7' & males0.3$id != 'M38' & males0.3$id != 'M66' & males0.3$id != 'M71' & males0.3$id != 'M87' & males0.3$id != 'M95' & males0.3$id != 'M99' & males0.3$id != 'M117' & males0.3$id != 'M156' & males0.3$id != 'M170' & males0.3$id != 'M193' & males0.3$id != 'M219' & males0.3$id != 'M233' & males0.3$id != 'M240',]
                                                             
 set.seed(6)
@@ -1284,18 +1291,19 @@ plot(g_mid_m0.3,
      vertex.label.cex = 0.5,
      vertex.label.dist = 0,
      vertex.color = ifelse(males0.3$age_class == 'Adult', 'seagreen1', 'skyblue'),
+     #vertex.color = males0.3$age_mean,
      layout = coords_m0.3, add = TRUE)
 
 plot(g_mid_m0.3,
      edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
-                         E(g_mid_m0.3)$weight,
-                         0),
+                         E(g_mid_m0.3)$weight, 0),
      edge.color = rgb(0,0,0,0.25),
      vertex.size = 1,
      vertex.label = NA,
      layout = coords_m0.3)
 plot(g_mid_m0.3,
-     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3, E(g_mid_m0.3)$weight, 0),
+     edge.width = ifelse(E(g_mid_m0.3)$weight > 0.3,
+                         E(g_mid_m0.3)$weight, 0),
      edge.color = 'black',
      vertex.size = males0.3$count,
      vertex.label.color = 'black',
@@ -1307,6 +1315,7 @@ plot(g_mid_m0.3,
                                   ifelse(males0.3$age_mean < 20,rgb(0.7,0.5,1,1),  # pale purple
                                          ifelse(males0.3$age_mean < 25,rgb(0.5,0.5,1,1),  # dark purple/blue
                                                 ifelse(males0.3$age_mean < 40,rgb(0.6,0.8,1,1),  rgb(0.3,0.9,0.9,1)))))), # light blue, turquoise
+     #vertex.color = males0.3$age_mean,
      layout = coords_m0.3, add = TRUE)
 
 plot(g_mid_m0.3,
@@ -1329,9 +1338,6 @@ plot(g_mid_m0.3,
                                          ifelse(males0.3$age_mean < 25,rgb(0.5,0.5,1,1),  # dark purple/blue
                                                 ifelse(males0.3$age_mean < 40,rgb(0.6,0.8,1,1),  rgb(0.3,0.9,0.9,1)))))), # light blue, turquoise
      layout = coords_m0.3, add = TRUE)
-
-
-
 
 table(males0.3$count)
 sum(table(males0.3$count)[10:15])
