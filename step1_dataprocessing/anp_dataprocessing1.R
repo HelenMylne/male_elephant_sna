@@ -20,11 +20,11 @@ library(data.table)
 library(spatsoc)
 
 #### Import sightings data -- remove final two columns and convert two to character just to ensure exactly the same as previously when it was working, other than the 13 removed rows ####
-ate <- readxl::read_xlsx('Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
+ate <- readxl::read_xlsx('../data_raw/Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
   janitor::clean_names()# %>% 
   #select(-obs_casename, -row_num)
 
-old <- readxl::read_xlsx('Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
+old <- readxl::read_xlsx('../data_raw/old_anp/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
 
 str(ate)
 str(old)
@@ -169,9 +169,9 @@ rm(ate_nums, date_row, test, gps, i, no_gps, test_nums)
 print(paste0('sightings data imported at ', Sys.time()))
 
 #### Import nodes data ####
-nodes_old <- readxl::read_excel('Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
+nodes_old <- readxl::read_excel('../data_raw/old_anp/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 
-nodes <- readxl::read_excel('Raw_ATE_LifeHistoryData_Fishlock220808.xlsx') %>% janitor::clean_names() %>% distinct()
+nodes <- readxl::read_excel('../data_raw/Raw_ATE_LifeHistoryData_Fishlock220808.xlsx') %>% janitor::clean_names() %>% distinct()
 
 colnames(nodes_old)
 colnames(nodes)
@@ -2790,3 +2790,183 @@ write_delim(gbi_df, 'anp_bayesian_allpairwiseevents_cleanedrawdata_sightings2400
 
 ## progress report
 print(paste0('sightings 24001-end completed at ', Sys.time()))
+
+#### rewrite code to do the whole thing as a single loop -- test version ####
+# create test data set
+ate_test <- ate[ate$obs_id < 100,]
+ate_test$observation_number <- as.integer(as.factor(ate_test$obs_id))
+matrix_test <- gbi_matrix[sort(unique(ate_test$observation_number)), unique(ate_test$id)]
+
+# create output data frame first
+nrows_test <- length(unique(ate_test$id)) * nrow(ate_test)
+gbi_test <- data.frame(node_1 = rep(NA, nrows_test),
+                       node_2 = rep(NA, nrows_test),
+                       social_event = rep(NA, nrows_test),
+                       obs_id = rep(NA, nrows_test))
+
+# run loop
+for (obs_id in 1:length(unique(ate_test$obs_id))) {
+  for (i in which(matrix_test[obs_id, ] == 1)) {
+    for (j in 1:ncol(matrix_test)) {
+      if (i != j) {
+        if (i < j) {
+          node_1 <- i
+          node_2 <- j
+        } else {
+          node_1 <- j
+          node_2 <- i
+        }
+        empty_row <- which(is.na(gbi_test$node_1) == TRUE)[1]
+        gbi_test[empty_row, ] <- list(node_1 = node_1,
+                                      node_2 = node_2,
+                                      social_event = ifelse(matrix_test[obs_id, i] == matrix_test[obs_id, j], 1, 0),
+                                      obs_id = obs_id)
+      }
+    }
+  }
+  if(obs_id %% 10 == 0) {print(obs_id)}
+  if(obs_id %% 10 == 0) {print(Sys.time())}
+}
+gbi_test
+
+# set the size of the blocks
+block_size <- 3
+
+# create a vector of numbers from 1 to the number of levels of the factor variable
+factor_levels <- 1:length(unique(ate_test$obs_id))
+
+# split the factor levels into blocks of the specified size
+factor_blocks <- split(factor_levels, ceiling(factor_levels / block_size))
+
+# create variable in ate_test that identifies which block number that observation falls into
+block_table <- data.frame(block1 = factor_blocks[[1]])
+for(i in 2:length(factor_blocks)){
+  if(nrow(block_table) == length(factor_blocks[[i]])){
+    block_table <- cbind(block_table, factor_blocks[[i]])
+    colnames(block_table)[i] <- as.character(i)
+  } else {
+    length_na <- nrow(block_table) - length(factor_blocks[[i]])
+    block_table <- cbind(block_table, c(factor_blocks[[i]], rep(NA, length_na)))
+    colnames(block_table)[i] <- as.character(i)
+  }
+}
+block_table <- pivot_longer(block_table, cols = everything(), names_to = 'block', values_to = 'observation_number')
+block_table$block <- ifelse(block_table$block == 'block1', '1', block_table$block)
+block_table$block <- as.numeric(block_table$block)
+block_table
+ate_test <- left_join(ate_test, block_table, by = "observation_number")
+
+# create empty data frame
+nrows_test <- (length(unique(ate_test$id))-1) * nrow(ate_test)
+gbi_test <- data.frame(node_1 = rep(NA, nrows_test),
+                       node_2 = rep(NA, nrows_test),
+                       social_event = rep(NA, nrows_test),
+                       obs_id = rep(NA, nrows_test),
+                       block = rep(NA, nrows_test))
+
+# loop through each block and extract the corresponding data
+for (block in sort(unique(ate_test$block))) {
+  block_data <- ate_test[ate_test$block %in% block,]
+  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
+    for (i in which(matrix_test[obs_id, ] == 1)) {
+      for (j in 1:ncol(matrix_test)) {
+        if (i != j) {
+          if (i < j) {
+            node_1 <- i
+            node_2 <- j
+            } else {
+            node_1 <- j
+            node_2 <- i
+          }
+          empty_row <- which(is.na(gbi_test$node_1) == TRUE)[1]
+          gbi_test[empty_row, ] <- list(node_1 = node_1,
+                                        node_2 = node_2,
+                                        social_event = ifelse(matrix_test[obs_id, i] == matrix_test[obs_id, j], 1, 0),
+                                        obs_id = obs_id,
+                                        block = block)
+        }
+      }
+    }
+    if(obs_id %% 10 == 0) {print(obs_id)}
+    if(obs_id %% 10 == 0) {print(Sys.time())}
+  }
+  print(block)
+  print(Sys.time())
+}
+gbi_test
+
+# clean environment
+rm(ate_test, block_data, block_table, factor_blocks, gbi_test, matrix_test, block, block_size, empty_row, factor_levels, i, j, length_na, node_1, node_2, nrows_test, obs_id)
+
+# create observation number variable in full data set
+ate$observation_number <- as.integer(as.factor(ate$obs_id))
+
+# set the size of the blocks
+block_size <- 50
+
+# create a vector of numbers from 1 to the number of levels of the factor variable
+factor_levels <- 1:length(unique(ate$obs_id))
+
+# split the factor levels into blocks of the specified size
+factor_blocks <- split(factor_levels, ceiling(factor_levels / block_size))
+
+# create variable in ate that identifies which block number that observation falls into
+block_table <- data.frame(block1 = factor_blocks[[1]])
+for(i in 2:length(factor_blocks)){
+  if(nrow(block_table) == length(factor_blocks[[i]])){
+    block_table <- cbind(block_table, factor_blocks[[i]])
+    colnames(block_table)[i] <- as.character(i)
+  } else {
+    length_na <- nrow(block_table) - length(factor_blocks[[i]])
+    block_table <- cbind(block_table, c(factor_blocks[[i]], rep(NA, length_na)))
+    colnames(block_table)[i] <- as.character(i)
+  }
+}
+block_table <- pivot_longer(block_table, cols = everything(), names_to = 'block', values_to = 'observation_number')
+block_table$block <- ifelse(block_table$block == 'block1', '1', block_table$block)
+block_table$block <- as.numeric(block_table$block)
+block_table
+ate <- left_join(ate, block_table, by = "observation_number")
+
+# create empty data frame
+nrows <- (length(unique(ate$id))-1) * nrow(ate)
+gbi_df <- data.frame(node_1 = rep(NA, nrows),
+                     node_2 = rep(NA, nrows),
+                     social_event = rep(NA, nrows),
+                     obs_id = rep(NA, nrows),
+                     block = rep(NA, nrows))
+
+# loop through each block and extract the corresponding data
+for (block in sort(unique(ate$block))) {
+  block_data <- ate[ate$block %in% block,]
+  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
+    for (i in which(gbi_matrix[obs_id, ] == 1)) {
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          if (i < j) {
+            node_1 <- i
+            node_2 <- j
+          } else {
+            node_1 <- j
+            node_2 <- i
+          }
+          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
+          gbi_df[empty_row, ] <- list(node_1 = node_1,
+                                      node_2 = node_2,
+                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
+                                      obs_id = obs_id,
+                                      block = block)
+        }
+      }
+    }
+    #if(obs_id %% 10 == 0) {print(obs_id)}
+    #if(obs_id %% 10 == 0) {print(Sys.time())}
+  }
+  print(obs_id)
+  print(block)
+  print(Sys.time())
+}
+gbi_df
+
+# remove 0 social events
+associations <- gbi_df[gbi_df$social_event == 1 & !is.na(gbi_df$node_1),]
