@@ -10,152 +10,78 @@ library(cmdstanr)
 library(lubridate)
 
 ### read in sightings data ####
-ate <- readxl::read_excel(path = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx', sheet = 1)
-ate <- janitor::clean_names(ate)
+# new data frame, sent August
+ate <- readxl::read_xlsx('../data_raw/Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
+  janitor::clean_names()
+
+# old data frame, sent February -- add location data
+old <- readxl::read_xlsx('../data_raw/old_anp/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
+locations <- old[,c('obs_id','casename','obs_num','utm_lat','utm_long','bull_q_r','obs_type')]
+ate <- left_join(ate, locations, by = c('obs_id','casename'))
+ate <- ate[,c('obs_id','casename','musth','obs_date','obs_time','obs_num','grid_code','utm_lat','utm_long','hab_code_1','hab_code_2','bull_q_r','obs_type','grp_q_c','grp_size','bull_q_c','num_bulls','bulls_1_2','bulls_3_5','musth_male','oestrus_fem','act_code')]
+colnames(ate)[c(6,8,9,12,13)] <- c("obs_num_old","utm_lat_old","utm_long_old","bull_q_r_old","obs_type_old")
+rm(locations,old)
+
+# add information
 ate$id <- paste('M',ate$casename, sep = '')
 ate$node_id <- as.integer(as.factor(ate$casename))
+ate$bull_q_c <- as.character(ate$bull_q_c)
+ate$grp_q_c <- as.character(ate$grp_q_c)
 ate$obs_date <- lubridate::as_date(ate$obs_date)
 ate <- separate(ate, obs_time, into = c('wrong_date','correct_time'), remove = F, sep = ' ')
 ate$correct_time_hms <- hms::as_hms(ate$correct_time)
 ate$corrected_time <- lubridate::hour(ate$correct_time_hms)*60*60 + lubridate::minute(ate$correct_time_hms) + lubridate::second(ate$correct_time_hms)
+
+# match up group numbers between old and new data frames
 lu <- function(x) { length(unique(x)) }
-ate_nums <- tapply(X = ate$obs_num, INDEX = ate$obs_date, FUN = lu )
-ate$obs_num <- ifelse(ate$obs_num == '0','00', ate$obs_num)
-ate$obs_num <- ifelse(ate$obs_num == '0a','0A', ate$obs_num)
-ate$obs_num <- ifelse(ate$obs_num == '0b','0B', ate$obs_num)
-ate$obs_num <- ifelse(ate$obs_num == '1','01', ate$obs_num)
-ate$obs_num_std <- NA
-for(i in 1:length(ate)){
+ate_nums <- tapply(X = ate$obs_num_old, INDEX = ate$obs_date, FUN = lu )
+ate$obs_num_old <- ifelse(ate$obs_num_old == '0','00', ate$obs_num_old)
+ate$obs_num_old <- ifelse(ate$obs_num_old == '0a','0A', ate$obs_num_old)
+ate$obs_num_old <- ifelse(ate$obs_num_old == '0b','0B', ate$obs_num_old)
+ate$obs_num_old <- ifelse(ate$obs_num_old == '1','01', ate$obs_num_old)
+ate$obs_num_old_std <- NA
+for(i in 1:nrow(ate)){
   date_row <- ate[ate$obs_date == ate$obs_date[i],]
-  date_row$obs_num_std <- as.integer(as.factor(sort(date_row$obs_num)))
-  ate$obs_num_std[i] <- date_row$obs_num_std[which(date_row$obs_id == ate$obs_id[i])[1]]
+  date_row$obs_num_old_std <- as.integer(as.factor(date_row$obs_num_old))
+  ate$obs_num_old_std[i] <- date_row$obs_num_old_std[which(date_row$obs_id == ate$obs_id[i])[1]]
 }
-ate <- ate[,c(1:3,25,26,4,27,28,8,29,9:24)]
+ate <- ate[,c(1:3,25:26,4,27:28,8,29,9:24)]
 head(ate)
 
-sightings <- ate[,c('obs_id','obs_date','correct_time_hms','obs_num_std','grid_code')] %>% distinct()
-sightings$obs_id_intfact <- as.integer(as.factor(sightings$obs_id))
-which(is.na(sightings$obs_num_std) == TRUE & sightings$obs_id_intfact == 2775) # 13
-which(is.na(sightings$obs_num_std) == TRUE & sightings$obs_id_intfact == 2776) # 14
-nrow(sightings) # 24176 = length(unique(sightings$obs_id))+2 -- remove duplicates in rows 13 and 14
-sightings <- sightings[c(1:12,15:24176),]
-
-eles <- ate[,c('id','node_id')]
-eles <- distinct(eles)
+eles <- ate[,c('id','node_id')] %>% distinct()
 
 ## clean environment
 rm(ate_nums, date_row, i)
 
-### read in processed data files ####
-aa <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings1.250.csv') %>% distinct()
-ab <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings251.500.csv') %>% distinct()
-ac <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings501.750.csv') %>% distinct()
-ad <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings751.999.csv') %>% distinct()
-ae <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings1000.2000.csv') %>% distinct()
-af <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings2001.2250.csv') %>% distinct()
-ag <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings2251.2500.csv') %>% distinct()
-ah <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings2501.2750.csv') %>% distinct()
-ai <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings2751.2999.csv') %>% distinct()
-aj <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings3000.csv') %>% distinct()
-ak <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings3001.3250.csv') %>% distinct()
-al <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings3251.3500.csv') %>% distinct()
-am <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings3501.3750.csv') %>% distinct()
-an <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings3751.4000.csv') %>% distinct()
-ao <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings4001.4250.csv') %>% distinct()
-ap <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings4251.4500.csv') %>% distinct()
-aq <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings4501.4750.csv') %>% distinct()
-ar <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings4751.5000.csv') %>% distinct()
-as <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings5001.5250.csv') %>% distinct()
-at <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings5251.5500.csv') %>% distinct()
-au <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings5501.5750.csv') %>% distinct()
-av <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings5751.6000.csv') %>% distinct()
-aw <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings6001.6250.csv') %>% distinct()
-ax <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings6251.6500.csv') %>% distinct()
-ay <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings6501.6750.csv') %>% distinct()
-az <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings6751.7000.csv') %>% distinct()
+## progress report
+print(paste0('sightings data imported at ', Sys.time()))
 
-ba <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings7001.7250.csv') %>% distinct()
-bb <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings7251.7500.csv') %>% distinct()
-bc <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings7501.7750.csv') %>% distinct()
-bd <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings7751.8000.csv') %>% distinct()
-be <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings8001.8250.csv') %>% distinct()
-bf <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings8251.8500.csv') %>% distinct()
-bg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings8501.8750.csv') %>% distinct()
-bh <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings8751.9000.csv') %>% distinct()
-bi <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings9001.9250.csv') %>% distinct()
-bj <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings9251.9500.csv') %>% distinct()
-bk <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings9501.9750.csv') %>% distinct()
-bl <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings9751.10000.csv') %>% distinct()
-bm <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings10001.10250.csv') %>% distinct()
-bn <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings10251.10500.csv') %>% distinct()
-bo <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings10501.10750.csv') %>% distinct()
-bp <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings10751.11000.csv') %>% distinct()
-bq <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings11001.11250.csv') %>% distinct()
-br <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings11251.11500.csv') %>% distinct()
-bs <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings11501.11750.csv') %>% distinct()
-bt <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings11751.12000.csv') %>% distinct()
-bu <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings12001.12250.csv') %>% distinct()
-bv <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings12251.12500.csv') %>% distinct()
-bw <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings12501.12750.csv') %>% distinct()
-bx <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings12751.13000.csv') %>% distinct()
-by <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings13001.13250.csv') %>% distinct()
-bz <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings13251.13500.csv') %>% distinct()
+#### Import nodes data ####
+nodes <- readxl::read_excel('../data_raw/Raw_ATE_LifeHistoryData_Fishlock220808.xlsx') %>%
+  janitor::clean_names() %>%
+  distinct()
+colnames(nodes)
 
-ca <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings13501.13750.csv') %>% distinct()
-cb <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings13751.14000.csv') %>% distinct()
-cc <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings14001.14250.csv') %>% distinct()
-cd <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings14251.14500.csv') %>% distinct()
-ce <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings14501.14750.csv') %>% distinct()
-cf <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings14751.15000.csv') %>% distinct()
-cg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings15001.15250.csv') %>% distinct()
-ch <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings15251.15500.csv') %>% distinct()
-ci <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings15501.15750.csv') %>% distinct()
-cj <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings15751.16000.csv') %>% distinct()
-ck <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings16001.16250.csv') %>% distinct()
-cl <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings16251.16500.csv') %>% distinct()
-cm <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings16501.16750.csv') %>% distinct()
-cn <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings16751.17000.csv') %>% distinct()
-co <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings17001.17250.csv') %>% distinct()
-cp <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings17251.17500.csv') %>% distinct()
-cq <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings17501.17750.csv') %>% distinct()
-cr <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings17751.18000.csv') %>% distinct()
-cs <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings18001.18250.csv') %>% distinct()
-ct <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings18251.18500.csv') %>% distinct()
-cu <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings18501.18750.csv') %>% distinct()
-cv <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings18751.19000.csv') %>% distinct()
-cw <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings19001.19250.csv') %>% distinct()
-cx <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings19251.19500.csv') %>% distinct()
-cy <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings19501.19750.csv') %>% distinct()
-cz <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings19751.20000.csv') %>% distinct()
+## make character string of ID number
+nodes$id <- paste('M', nodes$casename, sep = '')
 
-da <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings20001.20250.csv') %>% distinct()
-db <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings20251.20500.csv') %>% distinct()
-dc <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings20501.20750.csv') %>% distinct()
-dd <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings20751.21000.csv') %>% distinct()
-de <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings21001.21250.csv') %>% distinct()
-df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings21251.21500.csv') %>% distinct()
-dg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings21501.21750.csv') %>% distinct()
-dh <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings21751.22000.csv') %>% distinct()
-di <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings22001.22250.csv') %>% distinct()
-dj <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings22251.22500.csv') %>% distinct()
-dk <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings22501.22750.csv') %>% distinct()
-dl <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings22751.23000.csv') %>% distinct()
-dm <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings23001.23250.csv') %>% distinct()
-dn <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings23251.23500.csv') %>% distinct()
-do <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings23501.23750.csv') %>% distinct()
-dp <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings23751.24000.csv') %>% distinct()
-dq <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_pairwiseevents/anp_bayesian_allpairwiseevents_22.03.03_sightings24001.24174.csv') %>% distinct()
+## check ID numbers match in both data frames
+#nodes_id <- sort(unique(nodes$id))
+#ate_id <- sort(unique(ate$id))
+#length(nodes_id) ; length(ate_id) ## DO NOT MATCH, OR EVEN CLOSE!
 
-# merge 
-all <- rbind(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az,
-             ba,bb,bc,bd,be,bf,bg,bh,bi,bj,bk,bl,bm,bn,bo,bp,bq,br,bs,bt,bu,bv,bw,bx,by,bz,
-             ca,cb,cc,cd,ce,cf,cg,ch,ci,cj,ck,cl,cm,cn,co,cp,cq,cr,cs,ct,cu,cv,cw,cx,cy,cz,
-             da,db,dc,dd,de,df,dg,dh,di,dj,dk,dl,dm,dn,do,dp,dq)
+## progress report
+print(paste0('nodes data imported at ', Sys.time()))
 
-# clean environment
-rm(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az,ba,bb,bc,bd,be,bf,bg,bh,bi,bj,bk,bl,bm,bn,bo,bp,bq,br,bs,bt,bu,bv,bw,bx,by,bz,ca,cb,cc,cd,ce,cf,cg,ch,ci,cj,ck,cl,cm,cn,co,cp,cq,cr,cs,ct,cu,cv,cw,cx,cy,cz,da,db,dc,dd,de,df,dg,dh,di,dj,dk,dl,dm,dn,do,dp,dq)
+## read in processed data files
+all <- readRDS(file = '../data_processed/anp_bayesian_allpairwiseevents.RDS')
 
-### merge sightings information into dyad data #####
+## merge sightings information into dyad data
+sightings <- ate[,c('obs_id','obs_date','correct_time_hms','obs_num_old_std','grid_code')] %>% distinct()
+sightings$obs_id_intfact <- as.integer(as.factor(sightings$obs_id))
+nrow(sightings)              # 24386
+length(unique(ate$obs_id))   # 24386
+
 colnames(all)[4] <- 'obs_id_intfact'
 all <- left_join(x = all, y = sightings, by = 'obs_id_intfact') %>% distinct()
 rm(ate)
