@@ -238,7 +238,7 @@ gbi_df <- data.frame(node_1 = rep(NA, nrows),
                      obs_id = rep(NA, nrows),
                      block = rep(NA, nrows))
 
-# loop through each block and extract the corresponding data
+# loop through each block and extract the corresponding data - UNPARALLELISED VERSION ####
 for (block in sort(unique(ate$block))) {
   block_data <- ate[ate$block %in% block,]
   for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
@@ -269,6 +269,43 @@ for (block in sort(unique(ate$block))) {
   print(Sys.time())
 }
 gbi_df
+
+# loop through each block and extract the corresponding data - PARALLELISED VERSION ####
+# create a cluster object that specifies the number of cores that we want to use for parallel execution
+library(parallel)
+cl <- makeCluster(detectCores())
+
+# use the 'parLapply' function to parallelize the outermost loop (arguments: cluster object, list of values that we want to iterate over, function that we want to apply to each value in the list = body of the outermost loop)
+parLapply(cl, sort(unique(ate$block)), function(block) {
+  block_data <- ate[ate$block %in% block,]
+  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
+    for (i in which(gbi_matrix[obs_id, ] == 1)) {
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          if (i < j) {
+            node_1 <- i
+            node_2 <- j
+          } else {
+            node_1 <- j
+            node_2 <- i
+          }
+          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
+          gbi_df[empty_row, ] <- list(node_1 = node_1,
+                                      node_2 = node_2,
+                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
+                                      obs_id = obs_id,
+                                      block = block)
+        }
+      }
+    }
+  }
+  print(obs_id)
+  print(block)
+  print(Sys.time())
+})
+
+# Finally, we stop the cluster when we are done
+stopCluster(cl)
 
 # remove 0 social events
 associations <- gbi_df[gbi_df$social_event == 1 & !is.na(gbi_df$node_1),]
