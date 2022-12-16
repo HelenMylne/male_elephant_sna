@@ -20,7 +20,7 @@ rstan::stan_version()
 # set seed
 set.seed(12345)
 
-#### 2) Create data lists ####
+#### create data lists ####
 ### import data for aggregated model (binomial)
 #counts_df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
@@ -127,8 +127,8 @@ counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
 #counts_df$sex_younger <- ifelse(counts_df$birth_1 < counts_df$birth_2, counts_df$sex_2, counts_df$sex_1)
 #counts_df$sex_diff <- ifelse(counts_df$sex_1 == counts_df$sex_2, 1, 2)
 
-############### BRMS METHOD ######
-### test simulated data ####
+############### EDGE WEIGHT ESTIMATION ######
+#### test simulated data ####
 sim_data <- simulate_bison_model("binary", aggregated = TRUE)
 df <- sim_data$df_sim
 priors <- get_default_priors("binary")
@@ -151,22 +151,12 @@ fit_null <- bison_model(
   priors=priors
 )
 model_comparison(list(non_random_model=fit_edge, random_model=fit_null))
-df_dyadic <- df %>% distinct(node_1_id, node_2_id, age_diff)
-df_dyadic
-fit_dyadic <- bison_brm (
-  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff,
-  fit_edge,
-  df_dyadic,
-  num_draws=5, # Small sample size for demonstration purposes
-  refresh=0
-)
-summary(fit_dyadic)
+
 cv_samples <- extract_metric(fit_edge, "global_cv")
 head(cv_samples)
 plot(density(cv_samples))
-rm(cv_samples, fit_dyadic, fit_edge, fit_null, sim_data)
 
-### recreate data structure ####
+#### recreate data structure ####
 str(df)
 motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
@@ -179,6 +169,8 @@ counts_df <- counts_df %>%
 random_eles <- sample(counts_df$id_1, 10, replace = F)
 cdf_test <- counts_df[counts_df$id_1 %in% random_eles,]
 cdf_test <- cdf_test[cdf_test$id_2 %in% random_eles,]
+
+if(nrow(cdf_test) == 36) { print('redraw random eles') }
 
 cdf_test$age_1 <- NA
 cdf_test$age_2 <- NA
@@ -213,7 +205,7 @@ colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','age_d
 str(counts_df_model)
 str(df)
 
-### run edge weight model ####
+#### run edge weight model ####
 priors <- get_default_priors('binary')
 #priors$edge <- 'beta(2,2)'
 prior_check(priors, 'binary')
@@ -230,37 +222,130 @@ plot_predictions(fit_edge_test, num_draws=20, type="point")
 summary(fit_edge_test)
 plot_network(fit_edge_test, lwd=5)
 
-### nodal regression ####
+rm(fit_edge, fit_null, sim_data)
+
+#### run with shorter data ####
+counts_df_short <- counts_df_model[,1:4]
+fit_edge_short <- bison_model(
+  ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+  data = counts_df_short, 
+  model_type = "binary",
+  priors = priors
+)
+
+############### NODAL REGRESSION ######
+#### recreate data structure ####
 df_nodal <- distinct(counts_df_model[,c('node_1_id','age_1')])
 colnames(df_nodal) <- c('node_2_id', 'age_2')
 df_nodal <- rbind(df_nodal, counts_df_model[nrow(counts_df_model),c('node_2_id','age_2')])
 colnames(df_nodal) <- c('node', 'age')
 
+#### nodal regression ####
 fit_nodal <- bison_brm(
   bison(node_eigen(node)) ~ age,   # eigenvector centrality ~ age
-  fit_edge,                        # model to obtain edge weights -- do I need to have used this model format to make this work?
-  df_nodal,                        # data frame containing node information?
-  chains = 4
+  fit_edge_short,                   # model to obtain edge weights -- do I need to have used this model format to make this work?
+  #chains = 4,
+  df_nodal                         # data frame containing node information?
 )
 summary(fit_nodal)
 
+#### redo but with ages as posterior distribution ####
 df_nodal$id <- sort(random_eles)
 motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 motnp_ages <- motnp_ages[motnp_ages$id %in% random_eles,]
-motnp_ages$node <- as.factor(as.integer(as.factor(sort(motnp_ages$id))))
-
-for(i in 1:nrow(df_nodal)){
-  individual <- motnp_ages[df_nodal$id[i] == motnp_ages$id,]
-  individual <- individual[!is.na(individual$id),]
-  df_nodal$age[i] <- list(individual$age)
-  rm(individual)
-}
+motnp_ages$node <- as.factor(as.integer(as.factor(motnp_ages$id)))
 
 fit_nodal <- bison_brm(
   bison(node_eigen(node)) ~ age,   # eigenvector centrality ~ age
-  fit_edge,                        # model to obtain edge weights -- do I need to have used this model format to make this work?
-  motnp_ages,                      # data frame containing node information?
-  chains = 4
+  fit_edge_short,                   # model to obtain edge weights -- do I need to have used this model format to make this work?
+  #chains = 4,
+  motnp_ages                       # data frame containing node information?
 )
 summary(fit_nodal)
+
+fit_null <- bison_brm(
+  bison(node_eigen(node)) ~ 1,
+  fit_edge_test,
+  motnp_ages,
+  chains = 4
+)
+model_comparison(list(non_random_model = fit_nodal, random_model = fit_null))
+
+############### DYADIC REGRESSION ######
+#### test simulated data ####
+df_dyadic <- df %>% distinct(node_1_id, node_2_id, age_diff)
+df_dyadic
+
+fit_dyadic <- bison_brm (
+  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff,
+  fit_edge,
+  df_dyadic,
+  num_draws=5, # Small sample size for demonstration purposes
+  refresh=0
+)
+summary(fit_dyadic)
+rm(fit_dyadic)
+
+#### recreate data structure ####
+str(df_dyadic)
+counts_df_dyadic <- counts_df_model[,c('node_1_id','node_2_id', 'age_diff')]
+str(counts_df_dyadic)
+
+#### dyadic regression ####
+fit_dyadic <- bison_brm (
+  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff,
+  fit_edge,
+  counts_df_dyadic,
+  num_draws=5, # Small sample size for demonstration purposes
+  refresh=0
+)
+summary(fit_dyadic)
+
+#### redo but with ages as posterior distribution ####
+cdf_dyadic <- rbind(counts_df_short, counts_df_short, counts_df_short, counts_df_short, counts_df_short, # 10 draws per pair
+                    counts_df_short, counts_df_short, counts_df_short, counts_df_short, counts_df_short)
+cdf_dyadic <- rbind(cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic,                          # 100 draws
+                    cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic)
+cdf_dyadic <- rbind(cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic,                          # 1000 draws
+                    cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic)
+cdf_dyadic <- rbind(cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic,                                      # 8000 draws
+                    cdf_dyadic, cdf_dyadic, cdf_dyadic, cdf_dyadic)
+
+motnp_ages <- motnp_ages[motnp_ages$id %in% random_eles,]
+motnp_ages$node <- as.factor(as.integer(as.factor(motnp_ages$id)))
+
+cdf_dyadic$dyad <- paste0(cdf_dyadic$node_1_id, '_', cdf_dyadic$node_2_id)
+cdf_dyadic$age_1 <- NA ; cdf_dyadic$age_2 <- NA
+for(i in 1:length(unique(cdf_dyadic$dyad))){
+  if(is.na(cdf_dyadic$age_1)){
+    dyad <- cdf_dyadic[cdf_dyadic$dyad == cdf_dyadic$dyad[i],]
+    cdf_dyadic <- anti_join(cdf_dyadic, dyad)
+    id1 <- motnp_ages[motnp_ages$node == cdf_dyadic$node_1_id[i],]
+    id2 <- motnp_ages[motnp_ages$node == cdf_dyadic$node_2_id[i],]
+    dyad$age_1 <- id1$age
+    dyad$age_2 <- id2$age
+    cdf_dyadic <- rbind(cdf_dyadic, dyad)
+  }
+}
+cdf_dyadic$age_diff <- cdf_dyadic$age_1 - cdf_dyadic$age_2
+
+cdf_dyadic <- cdf_dyadic[,c('node_1_id','node_2_id','age_diff')]
+
+str(counts_df_dyadic)
+str(cdf_dyadic)
+
+fit_dyadic <- bison_brm (
+  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff,
+  fit_edge_short,
+  counts_df_dyadic,
+  num_draws=5, # Small sample size for demonstration purposes
+  refresh=0
+)
+summary(fit_dyadic)
+
+
+
+
+
+
