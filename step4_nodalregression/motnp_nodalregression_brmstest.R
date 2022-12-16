@@ -1,0 +1,266 @@
+#### Set up ####
+# load packages
+library(tidyverse)
+library(dplyr)
+library(rstan)
+library(rethinking)
+library(igraph)
+library(dagitty)
+library(cmdstanr)
+library(bisonR)
+
+# information
+sessionInfo()
+R.Version()
+rstan::stan_version()
+
+# set stan path
+#set_cmdstan_path('/Users/helen/.cmdstanr/cmdstan-2.28.2')
+
+# set seed
+set.seed(12345)
+
+#### 2) Create data lists ####
+### import data for aggregated model (binomial)
+#counts_df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv')
+counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
+
+# correct sex_1, which has loaded in as a logical vector not a character/factor
+unique(counts_df$sex_1) # FALSE or NA
+sex_1 <- data.frame(sex_1 = counts_df$id_1)
+sex_1 <- sex_1 %>% separate(sex_1, c("sex", "number"), sep = 1, remove = FALSE) ; unique(sex_1$sex) # F, M, U
+counts_df$sex_1 <- as.character(sex_1$sex) ; rm(sex_1)
+str(counts_df)  # sex_1 still comes up as logical, but now contains the right levels
+
+# create variable for age difference
+unique(counts_df$age_category_1) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA 
+counts_df$age_cat_id_1 <- ifelse(counts_df$age_category_1 == '0-3', 1,
+                                 ifelse(counts_df$age_category_1 == '3-4', 1,
+                                        ifelse(counts_df$age_category_1 == '4-5', 1,
+                                               ifelse(counts_df$age_category_1 == '5-6', 2,
+                                                      ifelse(counts_df$age_category_1 == '6-7', 2,
+                                                             ifelse(counts_df$age_category_1 == '7-8', 2,
+                                                                    ifelse(counts_df$age_category_1 == '8-9', 2,
+                                                                           ifelse(counts_df$age_category_1 == '9-10', 2,
+                                                                                  ifelse(counts_df$age_category_1 == '10-15', 3,
+                                                                                         ifelse(counts_df$age_category_1 == '15-19', 4,
+                                                                                                ifelse(counts_df$age_category_1 == '20-25', 5,
+                                                                                                       ifelse(counts_df$age_category_1 == '20-35', 5,
+                                                                                                              ifelse(counts_df$age_category_1 == '25-40', 6,
+                                                                                                                     ifelse(counts_df$age_category_1 == '35-50', 6,
+                                                                                                                            ifelse(counts_df$age_category_1 == '40+', 7,
+                                                                                                                                   ifelse(counts_df$age_category_1 == '50+', 7, counts_df$age_category_1))))))))))))))))
+counts_df$age_cat_id_1[which(is.na(counts_df$age_cat_id_1))] <- 1 # U8 doesn't have an age but not a problem -- won't be part of the main analysis. Is a calf so age_cat_id = 1
+
+counts_df$age_class_1 <- ifelse(counts_df$age_cat_id_1 == 1, 'Calf',
+                                ifelse(counts_df$age_cat_id_1 == 2, 'Juvenile',
+                                       ifelse(counts_df$age_cat_id_1 > 4, 'Adult','Pubescent')))
+
+unique(counts_df$age_category_2) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA 
+counts_df$age_cat_id_2 <- ifelse(counts_df$age_category_2 == '0-3', 1,
+                                 ifelse(counts_df$age_category_2 == '3-4', 1,
+                                        ifelse(counts_df$age_category_2 == '4-5', 1,
+                                               ifelse(counts_df$age_category_2 == '5-6', 2,
+                                                      ifelse(counts_df$age_category_2 == '6-7', 2,
+                                                             ifelse(counts_df$age_category_2 == '7-8', 2,
+                                                                    ifelse(counts_df$age_category_2 == '8-9', 2,
+                                                                           ifelse(counts_df$age_category_2 == '9-10', 2,
+                                                                                  ifelse(counts_df$age_category_2 == '10-15', 3,
+                                                                                         ifelse(counts_df$age_category_2 == '15-19', 4,
+                                                                                                ifelse(counts_df$age_category_2 == '20-25', 5,
+                                                                                                       ifelse(counts_df$age_category_2 == '20-35', 5,
+                                                                                                              ifelse(counts_df$age_category_2 == '25-40', 6,
+                                                                                                                     ifelse(counts_df$age_category_2 == '35-50', 6,
+                                                                                                                            ifelse(counts_df$age_category_2 == '40+', 7,
+                                                                                                                                   ifelse(counts_df$age_category_2 == '50+', 7, counts_df$age_category_2))))))))))))))))
+counts_df$age_cat_id_2[which(is.na(counts_df$age_cat_id_2))] <- 1   # U8 doesn't have an age but not a problem -- won't be part of the main analysis. Is a calf so age_cat_id = 1
+
+counts_df$age_class_2 <- ifelse(counts_df$age_cat_id_2 == 1, 'Calf',
+                                ifelse(counts_df$age_cat_id_2 == 2, 'Juvenile',
+                                       ifelse(counts_df$age_cat_id_2 > 4, 'Adult','Pubescent')))
+
+### correct dem_class with corrected age classes
+counts_df$dem_class_1 <- ifelse(counts_df$age_class_1 == 'Adult', paste('A',counts_df$sex_1, sep = ''),
+                                ifelse(counts_df$age_class_1 == 'Pubescent', paste('P',counts_df$sex_1, sep = ''),
+                                       ifelse(counts_df$age_class_1 == 'Juvenile', paste('J',counts_df$sex_1, sep = ''),
+                                              paste('C',counts_df$sex_1, sep = ''))))
+counts_df$dem_class_2 <- ifelse(counts_df$age_class_2 == 'Adult', paste('A',counts_df$sex_2, sep = ''),
+                                ifelse(counts_df$age_class_2 == 'Pubescent', paste('P',counts_df$sex_2, sep = ''),
+                                       ifelse(counts_df$age_class_2 == 'Juvenile', paste('J',counts_df$sex_2, sep = ''),
+                                              paste('C',counts_df$sex_2, sep = ''))))
+
+### combined dem_class of dyad
+counts_df$age_class_id_1 <- ifelse(counts_df$age_class_1 == 'Adult',4,
+                                   ifelse(counts_df$age_class_1 == 'Pubescent',3,
+                                          ifelse(counts_df$age_class_1 == 'Juvenile',2,1)))
+counts_df$age_class_id_2 <- ifelse(counts_df$age_class_2 == 'Adult',4,
+                                   ifelse(counts_df$age_class_2 == 'Pubescent',3,
+                                          ifelse(counts_df$age_class_2 == 'Juvenile',2,1)))
+counts_df$dem_type <- ifelse(counts_df$age_class_id_1 > counts_df$age_class_id_2,
+                             paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'), # when 1 is older: dc1_dc2
+                             ifelse(counts_df$age_class_id_1 < counts_df$age_class_id_2,
+                                    paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_'), # when 2 is older: dc2_dc1
+                                    ifelse(counts_df$sex_1 == 'F',                                  # when age1 = age2...
+                                           paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'), # ...when 1 is F: dc1_dc2
+                                           ifelse(counts_df$sex_2 == 'F',
+                                                  paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_'), # ...when 2 is F: dc2_dc1
+                                                  ifelse(counts_df$sex_1 == 'M', # ...when neither are F...
+                                                         paste(counts_df$dem_class_1, counts_df$dem_class_2, sep = '_'), # ...when 1 is M: dc1_dc2
+                                                         paste(counts_df$dem_class_2, counts_df$dem_class_1, sep = '_')))))) # ...when 2 is M or both are U: dc2_dc1
+sort(unique(counts_df$dem_type))
+
+### add column for age difference between dyad
+counts_df$age_diff <- abs(as.numeric(counts_df$age_cat_id_1) - as.numeric(counts_df$age_cat_id_2))
+
+### add column for total number of sightings per pair
+counts_df$count_dyad <- (counts_df$count_1 + counts_df$count_2) - counts_df$event_count  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
+
+### add column for total number of sightings per pair where they were NOT together
+counts_df$apart <- counts_df$count_dyad - counts_df$event_count
+
+# reassign dyad numbers to remove gaps
+counts_df$node_1_nogaps <- as.integer(as.factor(counts_df$node_1))
+counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
+
+# Create additional variables for sex of older, sex of younger and same sex
+#counts_df$sex_older <- ifelse(counts_df$birth_1 < counts_df$birth_2, counts_df$sex_1, counts_df$sex_2)
+#counts_df$sex_younger <- ifelse(counts_df$birth_1 < counts_df$birth_2, counts_df$sex_2, counts_df$sex_1)
+#counts_df$sex_diff <- ifelse(counts_df$sex_1 == counts_df$sex_2, 1, 2)
+
+############### BRMS METHOD ######
+### test simulated data ####
+sim_data <- simulate_bison_model("binary", aggregated = TRUE)
+df <- sim_data$df_sim
+priors <- get_default_priors("binary")
+prior_check(priors, "binary")
+fit_edge <- bison_model(
+  (event | duration) ~ dyad(node_1_id, node_2_id), 
+  data=df, 
+  model_type="binary",
+  priors=priors
+)
+plot_trace(fit_edge, par_ids=2)
+plot_predictions(fit_edge, num_draws=20, type="density")
+plot_predictions(fit_edge, num_draws=20, type="point")
+summary(fit_edge)
+plot_network(fit_edge, lwd=5)
+fit_null <- bison_model(
+  (event | duration) ~ 1, 
+  data=df, 
+  model_type="binary",
+  priors=priors
+)
+model_comparison(list(non_random_model=fit_edge, random_model=fit_null))
+df_dyadic <- df %>% distinct(node_1_id, node_2_id, age_diff)
+df_dyadic
+fit_dyadic <- bison_brm (
+  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff,
+  fit_edge,
+  df_dyadic,
+  num_draws=5, # Small sample size for demonstration purposes
+  refresh=0
+)
+summary(fit_dyadic)
+cv_samples <- extract_metric(fit_edge, "global_cv")
+head(cv_samples)
+plot(density(cv_samples))
+rm(cv_samples, fit_dyadic, fit_edge, fit_null, sim_data)
+
+### recreate data structure ####
+str(df)
+motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
+  pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
+#counts_df_males <- counts_df[counts_df$dem_type == 'AM_AM' | counts_df$dem_type == 'AM_PM' | counts_df$dem_type == 'PM_PM',]
+
+counts_df <- counts_df %>% 
+  filter(id_1 %in% unique(motnp_ages$id)) %>% 
+  filter(id_2 %in% unique(motnp_ages$id))
+
+random_eles <- sample(counts_df$id_1, 10, replace = F)
+cdf_test <- counts_df[counts_df$id_1 %in% random_eles,]
+cdf_test <- cdf_test[cdf_test$id_2 %in% random_eles,]
+
+cdf_test$age_1 <- NA
+cdf_test$age_2 <- NA
+cdf_test$age_difference <- NA
+#cdf_test$age_1 <- list(as.numeric(rep(NA, 8000)))
+#cdf_test$age_2 <- list(as.numeric(rep(NA, 8000)))
+#cdf_test$age_difference <- list(as.numeric(rep(NA, 8000)))
+for(i in 1:nrow(cdf_test)){
+  individual_age1 <- motnp_ages[cdf_test$id_1[i] == motnp_ages$id,]
+  individual_age1 <- individual_age1[!is.na(individual_age1$id),]
+  individual_age2 <- motnp_ages[cdf_test$id_2[i] == motnp_ages$id,]
+  individual_age2 <- individual_age2[!is.na(individual_age2$id),]
+  cdf_test$age_1[i] <- mean(individual_age1$age)
+  cdf_test$age_2[i] <- mean(individual_age2$age)
+  cdf_test$age_difference[i] <- cdf_test$age_1[i] - cdf_test$age_2[i]
+  #cdf_test$age_1[i] <- list(individual_age1$age)
+  #cdf_test$age_2[i] <- list(individual_age2$age)
+}
+#for(i in 1:nrow(cdf_test)){
+#  cdf_test$age_difference[i] <- list(abs(unlist(cdf_test$age_1[i]) - unlist(cdf_test$age_2[i])))
+#}
+rm(individual_age1, individual_age2)
+
+str(cdf_test)
+str(df)
+
+cdf_test$node_1_id <- factor(as.integer(as.factor(cdf_test$node_1)), levels = 1:10)
+cdf_test$node_2_id <- factor(as.integer(as.factor(cdf_test$node_2))+1, levels = 1:10)
+counts_df_model <- cdf_test[, c('node_1_id','node_2_id','event_count','count_dyad','age_difference','age_1','age_2')] %>% distinct() #,'location_id'
+colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','age_diff','age_1','age_2') #,'location'
+
+str(counts_df_model)
+str(df)
+
+### run edge weight model ####
+priors <- get_default_priors('binary')
+#priors$edge <- 'beta(2,2)'
+prior_check(priors, 'binary')
+
+fit_edge_test <- bison_model(
+  ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+  data = counts_df_model, 
+  model_type = "binary",
+  priors = priors
+)
+plot_trace(fit_edge_test, par_ids=2)
+plot_predictions(fit_edge_test, num_draws=20, type="density")
+plot_predictions(fit_edge_test, num_draws=20, type="point")
+summary(fit_edge_test)
+plot_network(fit_edge_test, lwd=5)
+
+### nodal regression ####
+df_nodal <- distinct(counts_df_model[,c('node_1_id','age_1')])
+colnames(df_nodal) <- c('node_2_id', 'age_2')
+df_nodal <- rbind(df_nodal, counts_df_model[nrow(counts_df_model),c('node_2_id','age_2')])
+colnames(df_nodal) <- c('node', 'age')
+
+fit_nodal <- bison_brm(
+  bison(node_eigen(node)) ~ age,   # eigenvector centrality ~ age
+  fit_edge,                        # model to obtain edge weights -- do I need to have used this model format to make this work?
+  df_nodal,                        # data frame containing node information?
+  chains = 4
+)
+summary(fit_nodal)
+
+df_nodal$id <- sort(random_eles)
+motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
+  pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
+motnp_ages <- motnp_ages[motnp_ages$id %in% random_eles,]
+motnp_ages$node <- as.factor(as.integer(as.factor(sort(motnp_ages$id))))
+
+for(i in 1:nrow(df_nodal)){
+  individual <- motnp_ages[df_nodal$id[i] == motnp_ages$id,]
+  individual <- individual[!is.na(individual$id),]
+  df_nodal$age[i] <- list(individual$age)
+  rm(individual)
+}
+
+fit_nodal <- bison_brm(
+  bison(node_eigen(node)) ~ age,   # eigenvector centrality ~ age
+  fit_edge,                        # model to obtain edge weights -- do I need to have used this model format to make this work?
+  motnp_ages,                      # data frame containing node information?
+  chains = 4
+)
+summary(fit_nodal)
