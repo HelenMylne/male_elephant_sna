@@ -122,11 +122,6 @@ counts_df$apart <- counts_df$count_dyad - counts_df$event_count
 counts_df$node_1_nogaps <- as.integer(as.factor(counts_df$node_1))
 counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
 
-# Create additional variables for sex of older, sex of younger and same sex
-#counts_df$sex_older <- ifelse(counts_df$birth_1 < counts_df$birth_2, counts_df$sex_1, counts_df$sex_2)
-#counts_df$sex_younger <- ifelse(counts_df$birth_1 < counts_df$birth_2, counts_df$sex_2, counts_df$sex_1)
-#counts_df$sex_diff <- ifelse(counts_df$sex_1 == counts_df$sex_2, 1, 2)
-
 ############### EDGE WEIGHT ESTIMATION ######
 #### test simulated data ####
 sim_data <- simulate_bison_model("binary", aggregated = TRUE)
@@ -224,7 +219,7 @@ plot_network(fit_edge_test, lwd=5)
 
 rm(fit_edge, fit_null, sim_data)
 
-#### run with shorter data ####
+#### run without unnecessary variables ####
 counts_df_short <- counts_df_model[,1:4]
 fit_edge_short <- bison_model(
   ( event | duration ) ~ dyad(node_1_id, node_2_id), 
@@ -348,4 +343,87 @@ summary(fit_dyadic)
 
 
 
+
+
+############### RERUN ALL BUT WITHOUT SUBSETTING DATA ######
+rm(list = ls()[which(ls() != 'counts_df')])
+#### edge weights ####
+motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
+  pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
+
+counts_df <- counts_df %>% 
+  filter(id_1 %in% unique(motnp_ages$id)) %>% 
+  filter(id_2 %in% unique(motnp_ages$id))
+
+counts_df$node_1_id <- factor(counts_df$node_1_nogaps, levels = 1:(max(counts_df$node_1_nogaps)+1))
+counts_df$node_2_id <- factor(counts_df$node_2_nogaps, levels = 1:(max(counts_df$node_1_nogaps)+1))
+counts_df_model <- counts_df[, c('node_1_id','node_2_id','event_count','count_dyad')] %>% distinct()
+colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
+
+priors <- get_default_priors('binary')
+prior_check(priors, 'binary')
+fit_edge_weights <- bison_model(
+  ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+  data = counts_df_model, 
+  model_type = "binary",
+  priors = priors
+)
+plot_trace(fit_edge_weights, par_ids  =2)
+plot_predictions(fit_edge_weights, num_draws = 20, type = "density")
+plot_predictions(fit_edge_weights, num_draws = 20, type = "point")
+summary(fit_edge_weights)
+plot_network(fit_edge_weights, lwd = 5)
+
+#### nodal regression ####
+df_nodal <- distinct(counts_df[,c('node_1_id','id_1')])
+colnames(df_nodal) <- c('node_2_id','id_2')
+df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_id','id_2')])
+colnames(df_nodal) <- c('node','id')
+
+motnp_ages <- left_join(motnp_ages, df_nodal, by = 'id')
+
+fit_nodal <- bison_brm(
+  bison(node_eigen(node)) ~ age,
+  fit_edge_weights,
+  #chains = 4,
+  motnp_ages
+)
+summary(fit_nodal)
+
+#### dyadic regression ####
+counts_df_dyadic <- counts_df[,c('dyad_id','node_1_id','node_2_id')]
+
+counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 10 draws each
+                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 100 draws
+                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 1000 draws
+                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic,                   # 8000 draws
+                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+
+counts_df_dyadic$age_1 <- NA ; counts_df_dyadic$age_2 <- NA
+for(i in 1:length(unique(counts_df_dyadic$dyad_id))){
+  if(is.na(counts_df_dyadic$age_1)){
+    dyad <- counts_df_dyadic[counts_df_dyadic$dyad_id == counts_df_dyadic$dyad_id[i],]
+    counts_df_dyadic <- anti_join(counts_df_dyadic, dyad)
+    id1 <- motnp_ages[motnp_ages$node == counts_df_dyadic$node_1_id[i],]
+    id2 <- motnp_ages[motnp_ages$node == counts_df_dyadic$node_2_id[i],]
+    dyad$age_1 <- id1$age
+    dyad$age_2 <- id2$age
+    counts_df_dyadic <- rbind(counts_df_dyadic, dyad)
+  }
+}
+counts_df_dyadic$age_diff <- counts_df_dyadic$age_1 - counts_df_dyadic$age_2
+
+counts_df_dyadic <- counts_df_dyadic[,c('node_1_id','node_2_id','age_diff')]
+
+fit_dyadic <- bison_brm (
+  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff,
+  fit_edge_short,
+  counts_df_dyadic,
+  num_draws=5, # Small sample size for demonstration purposes
+  refresh=0
+)
+summary(fit_dyadic)
 
