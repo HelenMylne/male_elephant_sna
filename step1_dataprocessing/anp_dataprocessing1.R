@@ -3,28 +3,28 @@
 # Data collected by Amboseli Trust for Elephants (ATE) 1972-2021
 # Data supplied by Vicki Fishlock, 24th February 2022
 #### Set up ####
-library(tidyverse, lib.loc = 'packages')
-library(lubridate, lib.loc = 'packages')
-library(janitor, lib.loc = 'packages')
-library(hms, lib.loc = 'packages')
-library(readxl, lib.loc = 'packages')
-library(data.table, lib.loc = 'packages')
-library(spatsoc, lib.loc = 'packages')
+#library(tidyverse, lib.loc = 'packages/')
+#library(lubridate, lib.loc = 'packages/')
+#library(janitor, lib.loc = 'packages/')
+#library(hms, lib.loc = 'packages/')
+#library(readxl, lib.loc = 'packages/')
+#library(data.table, lib.loc = 'packages/')
+#library(spatsoc, lib.loc = 'packages/')
 
-#library(tidyverse)
-#library(lubridate)
-#library(janitor)
-#library(hms)
-#library(readxl)
-#library(data.table)
-#library(spatsoc)
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(hms)
+library(readxl)
+library(data.table)
+library(spatsoc)
 
 #### Import sightings data -- remove final two columns and convert two to character just to ensure exactly the same as previously when it was working, other than the 13 removed rows ####
 ate <- readxl::read_xlsx('../data_raw/Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
   janitor::clean_names()# %>% 
   #select(-obs_casename, -row_num)
 
-old <- readxl::read_xlsx('../data_raw/old_anp/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
+old <- readxl::read_xlsx('../data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
 
 str(ate)
 str(old)
@@ -169,7 +169,7 @@ rm(ate_nums, date_row, test, gps, i, no_gps, test_nums)
 print(paste0('sightings data imported at ', Sys.time()))
 
 #### Import nodes data ####
-nodes_old <- readxl::read_excel('../data_raw/old_anp/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
+nodes_old <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 
 nodes <- readxl::read_excel('../data_raw/Raw_ATE_LifeHistoryData_Fishlock220808.xlsx') %>% janitor::clean_names() %>% distinct()
 
@@ -202,6 +202,10 @@ print(paste0('gbi_matrix created at ', Sys.time()))
 ### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md) -- NOTE: this step takes at least 2 weeks to run
 # create observation number variable in full data set
 ate$observation_number <- as.integer(as.factor(ate$obs_id))
+
+# create smaller test dataset
+random_eles <- sample(ate$id, 30, replace = F)
+ate_test <- ate[ate$id %in% random_eles,]
 
 # set the size of the blocks
 block_size <- 50
@@ -263,49 +267,44 @@ for (block in sort(unique(ate$block))) {
     }
     #if(obs_id %% 10 == 0) {print(obs_id)}
     #if(obs_id %% 10 == 0) {print(Sys.time())}
+    print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
   }
-  print(obs_id)
-  print(block)
-  print(Sys.time())
 }
 gbi_df
 
 # loop through each block and extract the corresponding data - PARALLELISED VERSION ####
 # create a cluster object that specifies the number of cores that we want to use for parallel execution
-#library(parallel)
-#cl <- makeCluster(detectCores())
+library(parallel)
+cl <- makeCluster(detectCores())
 
 # use the 'parLapply' function to parallelize the outermost loop (arguments: cluster object, list of values that we want to iterate over, function that we want to apply to each value in the list = body of the outermost loop)
-#parLapply(cl, sort(unique(ate$block)), function(block) {
-#  block_data <- ate[ate$block %in% block,]
-#  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
-#    for (i in which(gbi_matrix[obs_id, ] == 1)) {
-#      for (j in 1:ncol(gbi_matrix)) {
-#        if (i != j) {
-#          if (i < j) {
-#            node_1 <- i
-#            node_2 <- j
-#          } else {
-#            node_1 <- j
-#            node_2 <- i
-#          }
-#          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
-#          gbi_df[empty_row, ] <- list(node_1 = node_1,
-#                                      node_2 = node_2,
-#                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
-#                                      obs_id = obs_id,
-#                                      block = block)
-#        }
-#      }
-#    }
-#  }
-#  print(obs_id)
-#  print(block)
-#  print(Sys.time())
-#})
+parLapply(cl, sort(unique(ate$block)), function(block) {
+  block_data <- ate[ate$block %in% block,]
+  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
+    for (i in which(gbi_matrix[obs_id, ] == 1)) 
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          if (i < j) {
+            node_1 <- i
+            node_2 <- j
+          } else {
+            node_1 <- j
+            node_2 <- i
+          }
+          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
+          gbi_df[empty_row, ] <- list(node_1 = node_1,
+                                      node_2 = node_2,
+                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
+                                      obs_id = obs_id,
+                                      block = block)
+        }
+      }
+    print(paste0('obs_id ', obs_id, ' in block ', block, 'finished at time ', Sys.time()))
+    }
+})
 
 # Finally, we stop the cluster when we are done
-#stopCluster(cl)
+stopCluster(cl)
 
 # remove 0 social events
 associations <- gbi_df[gbi_df$social_event == 1 & !is.na(gbi_df$node_1),]
