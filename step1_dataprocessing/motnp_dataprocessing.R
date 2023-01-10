@@ -633,6 +633,9 @@ gbi_distinct$location_id <- as.integer(as.factor(gbi_distinct$location))    # cr
 gbi_distinct <- dplyr::distinct(gbi_distinct)                               # remove any duplicate sightings of same individual at same place and time
 head(gbi_distinct)
 
+write_delim(gbi_distinct, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_bernoullipairwiseevents_infoadded.csv', delim = ',')
+#write_delim(gbi_distinct, '../data_processed/motnp_bayesian_bernoullipairwiseevents_infoadded.csv', delim = ',')
+
 ### convert to Binomial model data format -- aggregate all sightings of each dyad together into a count
 df_agg <- gbi_distinct %>%
   group_by(id_1, id_2) %>%  # group by dyad pair
