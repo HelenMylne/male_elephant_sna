@@ -1,7 +1,7 @@
-# Amboseli data
 #### Information ####
 # Data collected by Amboseli Trust for Elephants (ATE) 1972-2021
 # Data supplied by Vicki Fishlock, 24th February 2022
+
 #### Set up ####
 #library(tidyverse, lib.loc = 'packages/')
 #library(lubridate, lib.loc = 'packages/')
@@ -19,18 +19,27 @@ library(readxl)
 library(data.table)
 library(spatsoc)
 
-#### Import sightings data -- remove final two columns and convert two to character just to ensure exactly the same as previously when it was working, other than the 13 removed rows ####
+#### Import sightings data ####
 ate <- readxl::read_xlsx('../data_raw/Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
   janitor::clean_names()# %>% 
   #select(-obs_casename, -row_num)
-
 old <- readxl::read_xlsx('../data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx') %>% janitor::clean_names()
 
 str(ate)
 str(old)
-
-which(ate$casename != ate$bull_id)
-
+## hab_code_1 = habitat code for most of the group: 0 = Not described, 01 = short grass plain, 02 = Consimilis tall grasslands, 03 = Acacia tortilis woodland, 04 =	Acacia xanthophloea woodland, 05 = Salvadora/sueda, 06 = Palm woodland, 07 = Swamp edge woodland, 08 = Swamp edge, 09 =	Swamp, A =	Bushed grassland, B =	Open bushland north, C = Open bushland south, D	= Dense bushland north, E =	Acacia nubica, F = Dense bushland south, U = Unknown
+## hab_code_2 = second habitat code if >1 category
+## bull_q_r = quality of recognition for males (3 = knew all, 2 = knew > half, 1 = knew < half, U = unknown, blanks relate to data edits I haven't completed in the base data)
+## obs_type = Group Type: B = male only, M = males and females, U = unknown
+## grp_q_c = Group Quality of count: 3 = exact, 2 = good estimate, 1 = estimate, 0 = no estimate
+## grp_size = N elephants encountered in group; -1 is missing data. Zeros are typos that I haven't had chance to correct at present
+## bull_q_c = Male Quality of count: 3 = exact, 2 = good estimate, 1 = estimate, 0 = no estimate
+## num_bulls = N independent males present. Zeros are typos I haven't had chance to correct at present
+## bulls_1_2 = Males aged 10-24, present/absent (1 = present,0 = absent, U = unknown)
+## bulls_3_5 = Males aged 25+, present/absent (1 = present,0 = absent, U = unknown)
+## musth_male = Musth male present/ absent (1 = present,0 = absent, U = unknown)
+## oestrus_fem = Oestrue female present/absent ((1 = present,0 = absent, U = unknown)
+## act_code = Group activiity: 00 = not specified, 01 = walking while feeding, 02 = feeding, 03 = resting, 04 =	comfort (dusting, mudwallowing etc), 05 =	interacting, 06 =	drinking, 07 = walking, 08 = standing vigilant, 09 = more than one activity
 ate$bull_q_c <- as.character(ate$bull_q_c)
 ate$grp_q_c <- as.character(ate$grp_q_c)
 
@@ -39,14 +48,12 @@ ate <- left_join(ate, locations, by = c('obs_id','casename'))
 
 ate <- ate[,c('obs_id','casename','musth','obs_date','obs_time','obs_num','grid_code','utm_lat','utm_long','hab_code_1','hab_code_2','bull_q_r','obs_type','grp_q_c','grp_size','bull_q_c','num_bulls','bulls_1_2','bulls_3_5','musth_male','oestrus_fem','act_code')]
 
-colnames(ate) == colnames(old)
 colnames(ate)[c(6,8,9,12,13)] <- c("obs_num_old","utm_lat_old","utm_long_old","bull_q_r_old","obs_type_old")
 
 rm(locations,old)
 
 ## casename = MaleID number -- make character string obvious so clearly different from node_id later on
 ate$id <- paste('M',ate$casename, sep = '')
-sort(unique(ate$id))
 ate$node_id <- as.integer(as.factor(ate$casename))
 
 ## obs_date = Date of observation -- convert to date value
@@ -54,7 +61,6 @@ ate$obs_date <- lubridate::as_date(ate$obs_date)
 
 ## obs_time = Time of observation -- convert to time value
 ate <- separate(ate, obs_time, into = c('wrong_date','correct_time'), remove = F, sep = ' ')
-#ate$correct_time <- lubridate::hour(ate$correct_time)*60*60 + lubridate::minute(ate$correct_time) + lubridate::second(ate$correct_time)
 ate$correct_time_hms <- hms::as_hms(ate$correct_time)
 ate$corrected_time <- lubridate::hour(ate$correct_time_hms)*60*60 + lubridate::minute(ate$correct_time_hms) + lubridate::second(ate$correct_time_hms)
 summary(ate$corrected_time)
@@ -66,26 +72,10 @@ lu <- function(x) { length(unique(x)) }
 ate_nums <- tapply(X = ate$obs_num_old, INDEX = ate$obs_date, FUN = lu )
 test_nums <- tapply(X = test$obs_num_old, INDEX = test$obs_date, FUN = lu )
 which(ate_nums != test_nums)
-ate_nums[1:50] ; test_nums[1:50]
 
-table(ate$obs_date[which(ate$obs_num_old == '0')])
-table(ate$obs_date[which(ate$obs_num_old == '00')])
 ate$obs_num_old <- ifelse(ate$obs_num_old == '0','00', ate$obs_num_old)
-table(ate$obs_num_old)
-
-table(ate$obs_date[which(ate$obs_num_old == '0a')])
-table(ate$obs_date[which(ate$obs_num_old == '0A')])
 ate$obs_num_old <- ifelse(ate$obs_num_old == '0a','0A', ate$obs_num_old)
-table(ate$obs_num_old)
-
-table(ate$obs_date[which(ate$obs_num_old == '0b')])
-table(ate$obs_date[which(ate$obs_num_old == '0B')])
 ate$obs_num_old <- ifelse(ate$obs_num_old == '0b','0B', ate$obs_num_old)
-table(ate$obs_num_old)
-
-table(test$obs_date[which(test$obs_num_old == '1')])
-table(test$obs_date[which(test$obs_num_old == '01')])
-unique(ate$obs_num_old[which(ate$obs_date == '2020-08-28')])
 ate$obs_num_old <- ifelse(ate$obs_num_old == '1','01', ate$obs_num_old)
 table(ate$obs_num_old)
 
@@ -99,11 +89,8 @@ for(i in 1:nrow(ate)){
 table(ate$obs_num_old_std)
 
 ## utm_lat and utm_long = There is no mask applied to GPS at the moment, so this needs checking for outliers and impossible values, as well as note that short values are possible -- try plotting and see where they are
-summary(ate$utm_lat_old)
-summary(ate$utm_long_old)
 no_gps <- unique(ate$obs_date[which(ate$utm_lat_old == 0)])
 gps <- unique(ate$obs_date[which(ate$utm_lat_old != 0)])
-min(gps)
 no_gps[4100:5023] # many that are after the start of using actual GPS
 
 which(ate$utm_lat_old == 0 & ate$utm_long_old != 0) # 0 have longitude value but no latitude
@@ -119,44 +106,6 @@ plot(utm_long_old ~ utm_lat_old, data = ate[ate$utm_lat_old != 0 & ate$utm_long_
 
 plot(utm_long_old ~ utm_lat_old, data = ate[ate$utm_lat_old != 0 & ate$utm_long_old != 0,],
      xlim = c(0,100000), ylim = c(0,400000)) # large mass of points but doesn't seem to be even an order of magnitude wrong to explain it
-
-## hab_code_1 = habitat code for most of the group: 0 = Not described, 01 = short grass plain, 02 = Consimilis tall grasslands, 03 = Acacia tortilis woodland, 04 =	Acacia xanthophloea woodland, 05 = Salvadora/sueda, 06 = Palm woodland, 07 = Swamp edge woodland, 08 = Swamp edge, 09 =	Swamp, A =	Bushed grassland, B =	Open bushland north, C = Open bushland south, D	= Dense bushland north, E =	Acacia nubica, F = Dense bushland south, U = Unknown
-## hab_code_2 = second habitat code if >1 category
-sort(unique(ate$hab_code_1))
-sort(unique(ate$hab_code_2))
-
-## bull_q_r = quality of recognition for males (3 = knew all, 2 = knew > half, 1 = knew < half, U = unknown, blanks relate to data edits I haven't completed in the base data)
-table(ate$bull_q_r_old)
-
-## obs_type = Group Type: B = male only, M = males and females, U = unknown
-table(ate$obs_type_old)
-
-## grp_q_c = Group Quality of count: 3 = exact, 2 = good estimate, 1 = estimate, 0 = no estimate
-table(ate$grp_q_c)
-
-## grp_size = N elephants encountered in group; -1 is missing data. Zeros are typos that I haven't had chance to correct at present
-table(ate$grp_size)
-
-## bull_q_c = Male Quality of count: 3 = exact, 2 = good estimate, 1 = estimate, 0 = no estimate
-table(ate$bull_q_c)
-
-## num_bulls = N independent males present. Zeros are typos I haven't had chance to correct at present
-table(ate$num_bulls)
-
-## bulls_1_2 = Males aged 10-24, present/absent (1 = present,0 = absent, U = unknown)
-table(ate$bulls_1_2)
-
-## bulls_3_5 = Males aged 25+, present/absent (1 = present,0 = absent, U = unknown)
-table(ate$bulls_3_5)
-
-## musth_male = Musth male present/ absent (1 = present,0 = absent, U = unknown)
-table(ate$musth_male)
-
-## oestrus_fem = Oestrue female present/absent ((1 = present,0 = absent, U = unknown)
-table(ate$oestrus_fem)
-
-## act_code = Group activiity: 00 = not specified, 01 = walking while feeding, 02 = feeding, 03 = resting, 04 =	comfort (dusting, mudwallowing etc), 05 =	interacting, 06 =	drinking, 07 = walking, 08 = standing vigilant, 09 = more than one activity
-table(ate$act_code)
 
 ## rearrange
 ate <- ate[,c(1:3,25,26,4,27,28,8,29,9:24)]
@@ -206,12 +155,13 @@ ate$observation_number <- as.integer(as.factor(ate$obs_id))
 # create smaller test dataset
 random_eles <- sample(ate$id, 30, replace = F)
 ate_test <- ate[ate$id %in% random_eles,]
+ate_test$observation_number <- as.integer(as.factor(ate_test$obs_id))
 
 # set the size of the blocks
-block_size <- 50
+block_size <- 5
 
 # create a vector of numbers from 1 to the number of levels of the factor variable
-factor_levels <- 1:length(unique(ate$obs_id))
+factor_levels <- 1:length(unique(ate_test$obs_id))
 
 # split the factor levels into blocks of the specified size
 factor_blocks <- split(factor_levels, ceiling(factor_levels / block_size))
@@ -232,16 +182,98 @@ block_table <- pivot_longer(block_table, cols = everything(), names_to = 'block'
 block_table$block <- ifelse(block_table$block == 'block1', '1', block_table$block)
 block_table$block <- as.numeric(block_table$block)
 block_table
-ate <- left_join(ate, block_table, by = "observation_number")
+ate_test <- left_join(ate_test, block_table, by = "observation_number")
 
 # create empty data frame
-nrows <- (length(unique(ate$id))-1) * nrow(ate)
+nrows <- (length(unique(ate_test$id))-1) * nrow(ate_test)
 gbi_df <- data.frame(node_1 = rep(NA, nrows),
                      node_2 = rep(NA, nrows),
                      social_event = rep(NA, nrows),
                      obs_id = rep(NA, nrows),
                      block = rep(NA, nrows))
 
+#### Dan code to run processing loop -- I think this is wrong as I don't think I need indices of min and max observations, but the actual values themselves ####
+# Load the parallel package
+library(parallel)
+
+# Create a cluster with 4 worker processes
+cl <- makeCluster(4)
+
+# Use apply to apply function to each element of sort(unique(ate$block))
+output <- apply(X = as.matrix(sort(unique(ate_test$block))), 1, function(block) { # this gives me dim(X)=0 and won't run -- convert to matrix?
+  block_data <- ate_test[ate_test$block %in% block,]
+  # Use which.min and which.max to get indices of min and max observation numbers
+  min_obs_id <- which.min(block_data$observation_number)
+  max_obs_id <- which.max(block_data$observation_number)
+  # Use mclapply to parallelize the loop
+  mclapply(min_obs_id:max_obs_id, function(obs_id) {
+    for (i in which(gbi_matrix[obs_id, ] == 1)) {
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          # Use ifelse to combine the two if statements
+          node_1 <- ifelse(i < j, i, j)
+          node_2 <- ifelse(i < j, j, i)
+          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
+          gbi_df[empty_row, ] <- list(node_1 = node_1,
+                                      node_2 = node_2,
+                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
+                                      obs_id = obs_id,
+                                      block = block)
+        }
+      }
+    }
+    print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
+  }, mc.cores = cl)
+  # Stop the cluster after the parallelization is finished
+  stopCluster(cl)
+})
+
+#### altered Dan code to run processing loop -- actually forming the cluster seems to be the problem, as mc.cores won't accept cl as a list but can't covert it to an integer, but unlisting it or just putting in 4 then creates an invalid connection ####
+# Load the parallel package
+library(parallel)
+
+# Create a cluster with 4 worker processes
+cl <- makeCluster(4)
+
+# Use apply to apply function to each element of sort(unique(ate$block))
+output <- apply(X = as.matrix(sort(unique(ate_test$block))), 1, function(block) {
+  block_data <- ate_test[ate_test$block %in% block,]
+  # Get min and max observation numbers -- run from first observation to last (don't want indices because ate dataframe is not arranged in order for some reason, so won't necessarily have first and last observations at start and end, so running first:last by indices can skip over some )
+  min_obs_id <- min(block_data$observation_number)
+  max_obs_id <- max(block_data$observation_number)
+  # Use mclapply to parallelize the loop
+  mclapply(min_obs_id:max_obs_id, function(obs_id, cl) {
+    for (i in which(gbi_matrix[obs_id, ] == 1)) {
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          # Use ifelse to combine the two if statements
+          node_1 <- ifelse(i < j, i, j)
+          node_2 <- ifelse(i < j, j, i)
+          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
+          gbi_df[empty_row, ] <- list(node_1 = node_1,
+                                      node_2 = node_2,
+                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
+                                      obs_id = obs_id,
+                                      block = block)
+        }
+      }
+    }
+    print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
+  }, mc.cores = 4)  # using cl here seems to have a problem because it wants an integer value and makeCluster() produces a list
+  # Stop the cluster after the parallelization is finished
+  stopCluster(cl)
+})
+
+# remove 0 social events
+associations <- gbi_df[gbi_df$social_event == 1 & !is.na(gbi_df$node_1),]
+
+# save outputs
+saveRDS(object = gbi_df, file = '../data_processed/anp_bayesian_allpairwiseevents.RDS')
+saveRDS(object = associations, file = '../data_processed/anp_bayesian_associatingpairwiseevents.RDS')
+
+
+
+######### old stuff ###########
 # loop through each block and extract the corresponding data - UNPARALLELISED VERSION ####
 for (block in sort(unique(ate$block))) {
   block_data <- ate[ate$block %in% block,]
@@ -300,15 +332,14 @@ parLapply(cl, sort(unique(ate$block)), function(block) {
         }
       }
     print(paste0('obs_id ', obs_id, ' in block ', block, 'finished at time ', Sys.time()))
-    }
+  }
 })
 
 # Finally, we stop the cluster when we are done
 stopCluster(cl)
 
-# remove 0 social events
-associations <- gbi_df[gbi_df$social_event == 1 & !is.na(gbi_df$node_1),]
 
-# save outputs
-saveRDS(object = gbi_df, file = '../data_processed/anp_bayesian_allpairwiseevents.RDS')
-saveRDS(object = associations, file = '../data_processed/anp_bayesian_associatingpairwiseevents.RDS')
+
+
+
+
