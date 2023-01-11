@@ -34,7 +34,6 @@ set.seed(12345)
 #counts_df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 
-
 # correct sex_1, which has loaded in as a logical vector not a character/factor
 unique(counts_df$sex_1) # FALSE or NA
 sex_1 <- data.frame(sex_1 = counts_df$id_1)
@@ -212,7 +211,7 @@ str(df)
 
 #### run edge weight model ####
 priors <- get_default_priors('binary')
-#priors$edge <- 'beta(2,2)'
+priors$edge <- 'normal(-1,2)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
 prior_check(priors, 'binary')
 
 fit_edge_test <- bison_model(
@@ -365,18 +364,167 @@ counts_df_model <- counts_df[, c('node_1_id','node_2_id','event_count','count_dy
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 priors <- get_default_priors('binary')
+priors$edge <- 'normal(-1, 2)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
+priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
 prior_check(priors, 'binary')
+
 fit_edge_weights <- bison_model(
   ( event | duration ) ~ dyad(node_1_id, node_2_id), 
   data = counts_df_model, 
   model_type = "binary",
+  mc_cores = 4,
   priors = priors
 )
-plot_trace(fit_edge_weights, par_ids  =2)
+plot_trace(fit_edge_weights, par_ids = 2)
 plot_predictions(fit_edge_weights, num_draws = 20, type = "density")
 plot_predictions(fit_edge_weights, num_draws = 20, type = "point")
-summary(fit_edge_weights)
-plot_network(fit_edge_weights, lwd = 5)
+
+fit_edge_weights$chain         # columns = dyads, rows = chain position --> all draws of edge weight (untransformed)
+fit_edge_weights$edge_samples  # columns = dyads, rows = chain position --> all draws of edge weight (appears identical to chain)
+which(fit_edge_weights$chain != fit_edge_weights$edge_samples) # they're the same
+fit_edge_weights$event_preds   # columns = dyads, rows = chain position --> all draws of number of times seen together (out of..?)
+
+edgelist <- get_edgelist(fit_edge_weights, ci = 0.9, transform = TRUE)
+summary(fit_edge_weights)  # THIS APPEARS TO BE CONFUSED ABOUT NUMBER OF NODES BUT IT'S NOT -- node_id values run 152-396 (151 females before males, 60ish unknowns after males)
+
+# save workspace image for reloading at a later date that doesn't require running model again
+save.image('motnp_bisonr_edgescalculated.RData')
+
+#### plot network ####
+load('motnp_bisonr_edgescalculated.RData')
+
+plot_network(fit_edge_weights, lwd = 2, ci = 0.9) # this is all of the options for arguments in plot_network() -- currently illegible as nodes are too large. can this be saved as an igraph object?
+
+plot_network
+#function (obj, ci = 0.9, lwd = 2) 
+#{
+#  edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
+#  net <- igraph::graph_from_edgelist(as.matrix(edgelist[, 1:2]), 
+#                                     directed = obj$directed)
+#  lb <- edgelist[, 3]
+#  ub <- edgelist[, 5]
+#  coords <- igraph::layout_nicely(net)
+#  igraph::plot.igraph(net, edge.width = lb * lwd, layout = coords, 
+#                      vertex.label.color = "white", vertex.color = bison_colors[1], 
+#                      edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0)
+#  igraph::plot.igraph(net, edge.width = ub * lwd, layout = coords, 
+#                      vertex.label.color = "white", vertex.color = bison_colors[1], 
+#                      edge.color = rgb(0, 0, 0, 0.3), edge.arrow.size = 0, 
+#                      add = TRUE)
+#  if (obj$directed) {
+#    igraph::plot.igraph(net, edge.width = lb * 0, layout = coords, 
+#                        vertex.label.color = "white", vertex.color = bison_colors[1], 
+#                        edge.color = rgb(0.5, 0.5, 0.5), add = TRUE)
+#  }
+#}
+
+plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
+                                    vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
+                                    vertex.color1 = 'transparent',
+                                    vertex.size1 = 1, edge.color1 = rgb(0, 0, 0, 1),
+                                    vertex.label.color2 = 'black', vertex.label.font2 = 'Helvetica', 
+                                    vertex.color2 = 'seagreen1',
+                                    vertex.size2 = 8, edge.color2 = rgb(0, 0, 0, 0.3))
+{
+  edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
+  net <- igraph::graph_from_edgelist(as.matrix(edgelist[, 1:2]), 
+                                     directed = obj$directed)
+  md <- edgelist[, 3]
+  ub <- edgelist[, 5]
+  coords <- igraph::layout_nicely(net)
+  igraph::plot.igraph(net, layout = coords,
+                      edge.width = ifelse(md < threshold, 0, md * lwd),
+                      vertex.label.color = vertex.label.color1, vertex.color = vertex.color1, vertex.size = vertex.size1,
+                      edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0)
+  igraph::plot.igraph(net, layout = coords,
+                      edge.width = ifelse(md < threshold, 0, ub * lwd),
+                      vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, vertex.size = vertex.size2,
+                      edge.color = edge.color1, edge.arrow.size = 0, 
+                      add = TRUE)
+  if (obj$directed) {
+    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, 
+                        vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, 
+                        edge.color = edge.color2, add = TRUE)
+  }
+}
+
+plot_network_threshold(fit_edge_weights, ci = 0.9, threshold = 0.3,
+                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+                       vertex.label.color2 = 'black',
+                       vertex.size2 = 7, edge.color2 = 'black')
+
+nodes <- data.frame(bull = sort(unique(motnp_ages$id)),
+                    age = NA,
+                    sightings = NA)
+for(i in 1:nrow(nodes)){
+  x <- motnp_ages[motnp_ages$id == nodes$bull[i],]
+  nodes$age[i] <- mean(x$age)
+  if(nodes$bull[i] != 'M99'){
+    y <- counts_df[counts_df$id_1 == nodes$bull[i], c('id_1','count_1')]
+    nodes$sightings[i] <- y[1,2]
+  }
+}
+nodes$sightings <- as.numeric(nodes$sightings)
+str(nodes)
+
+plot_network_threshold(fit_edge_weights)
+
+plot_network_threshold(fit_edge_weights, lwd = 2, ci = 0.9, threshold = 0.1,
+                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+                       vertex.size2 = 7, edge.color2 = 'black')
+
+plot_network_threshold(fit_edge_weights, lwd = 2, ci = 0.9, threshold = 0.1,
+                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
+
+plot_network_threshold(fit_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
+
+plot_network_threshold(fit_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
+
+
+plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
+                                     vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
+                                     vertex.color1 = 'transparent',
+                                     vertex.size1 = 1, edge.color1 = rgb(0, 0, 0, 1),
+                                     vertex.label.color2 = 'black', vertex.label.font2 = 'Helvetica', 
+                                     vertex.color2 = 'seagreen1',
+                                     vertex.size2 = 8, edge.color2 = rgb(0, 0, 0, 0.3))
+{
+  edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
+  threshold_edges <- edgelist[edgelist$median >= threshold,]
+  net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]))
+  md <- threshold_edges[, 3]
+  ub <- threshold_edges[, 5]
+  coords <- igraph::layout_nicely(net)
+  igraph::plot.igraph(net, layout = coords,
+                      vertex.label.color = vertex.label.color1, label.family = vertex.label.font1, 
+                      vertex.color = vertex.color1, vertex.size = vertex.size1,
+                      edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0, edge.width = md * lwd)
+  igraph::plot.igraph(net, layout = coords,
+                      vertex.label.color = vertex.label.color2, label.family = vertex.label.font2,
+                      vertex.color = vertex.color2, vertex.size = vertex.size2,
+                      edge.color = edge.color1, edge.arrow.size = 0, edge.width = ub * lwd,
+                      add = TRUE)
+  if (obj$directed) {
+    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, 
+                        vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, 
+                        edge.color = edge.color2, add = TRUE)
+  }
+}
+
+plot_network_threshold2(obj = fit_edge_weights, threshold = 0.2,
+                        vertex.color2 = nodes$age, vertex.size2 = 8)
+
+plot_network_threshold2(obj = fit_edge_weights, threshold = 0.2,
+                        vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
 
 #### nodal regression ####
 df_nodal <- distinct(counts_df[,c('node_1_id','id_1')])
@@ -431,86 +579,4 @@ fit_dyadic <- bison_brm (
 )
 summary(fit_dyadic)
 
-
-############### RERUN ALL BUT WITHOUT SUBSETTING DATA ######
-rm(list = ls()[which(ls() != 'counts_df')])
-#### edge weights ####
-motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
-  pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
-
-counts_df <- counts_df %>% 
-  filter(id_1 %in% unique(motnp_ages$id)) %>% 
-  filter(id_2 %in% unique(motnp_ages$id))
-
-counts_df$node_1_id <- factor(counts_df$node_1_nogaps, levels = 1:(max(counts_df$node_1_nogaps)+1))
-counts_df$node_2_id <- factor(counts_df$node_2_nogaps, levels = 1:(max(counts_df$node_1_nogaps)+1))
-counts_df_model <- counts_df[, c('node_1_id','node_2_id','event_count','count_dyad')] %>% distinct()
-colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
-
-priors <- get_default_priors('binary')
-prior_check(priors, 'binary')
-fit_edge_weights <- bison_model(
-  ( event | duration ) ~ dyad(node_1_id, node_2_id), 
-  data = counts_df_model, 
-  model_type = "binary",
-  priors = priors
-)
-plot_trace(fit_edge_weights, par_ids  =2)
-plot_predictions(fit_edge_weights, num_draws = 20, type = "density")
-plot_predictions(fit_edge_weights, num_draws = 20, type = "point")
-summary(fit_edge_weights)
-plot_network(fit_edge_weights, lwd = 5)
-
-#### nodal regression ####
-df_nodal <- distinct(counts_df[,c('node_1_id','id_1')])
-colnames(df_nodal) <- c('node_2_id','id_2')
-df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_id','id_2')])
-colnames(df_nodal) <- c('node','id')
-
-motnp_ages <- left_join(motnp_ages, df_nodal, by = 'id')
-
-fit_nodal <- bison_brm(
-  bison(node_eigen(node)) ~ age,
-  fit_edge_weights,
-  #chains = 4,
-  motnp_ages
-)
-summary(fit_nodal)
-
-#### dyadic regression ####
-counts_df_dyadic <- counts_df[,c('dyad_id','node_1_id','node_2_id')]
-
-counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 10 draws each
-                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
-counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 100 draws
-                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
-counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 1000 draws
-                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
-counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic,                   # 8000 draws
-                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
-
-counts_df_dyadic$age_1 <- NA ; counts_df_dyadic$age_2 <- NA
-for(i in 1:length(unique(counts_df_dyadic$dyad_id))){
-  if(is.na(counts_df_dyadic$age_1)){
-    dyad <- counts_df_dyadic[counts_df_dyadic$dyad_id == counts_df_dyadic$dyad_id[i],]
-    counts_df_dyadic <- anti_join(counts_df_dyadic, dyad)
-    id1 <- motnp_ages[motnp_ages$node == counts_df_dyadic$node_1_id[i],]
-    id2 <- motnp_ages[motnp_ages$node == counts_df_dyadic$node_2_id[i],]
-    dyad$age_1 <- id1$age
-    dyad$age_2 <- id2$age
-    counts_df_dyadic <- rbind(counts_df_dyadic, dyad)
-  }
-}
-counts_df_dyadic$age_diff <- counts_df_dyadic$age_1 - counts_df_dyadic$age_2
-
-counts_df_dyadic <- counts_df_dyadic[,c('node_1_id','node_2_id','age_diff')]
-
-fit_dyadic <- bison_brm (
-  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff,
-  fit_edge_short,
-  counts_df_dyadic,
-  num_draws=5, # Small sample size for demonstration purposes
-  refresh=0
-)
-summary(fit_dyadic)
 
