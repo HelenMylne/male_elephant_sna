@@ -3,13 +3,13 @@
 # Data supplied by Vicki Fishlock, 24th February 2022
 
 #### Set up ####
-#library(tidyverse, lib.loc = 'packages/')
-#library(lubridate, lib.loc = 'packages/')
-#library(janitor, lib.loc = 'packages/')
-#library(hms, lib.loc = 'packages/')
-#library(readxl, lib.loc = 'packages/')
-#library(data.table, lib.loc = 'packages/')
-#library(spatsoc, lib.loc = 'packages/')
+#library(tidyverse, lib.loc = '../packages/')
+#library(lubridate, lib.loc = '../packages/')
+#library(janitor, lib.loc = '../packages/')
+#library(hms, lib.loc = '../packages/')
+#library(readxl, lib.loc = '../packages/')
+#library(data.table, lib.loc = '../packages/')
+#library(spatsoc, lib.loc = '../packages/')
 
 library(tidyverse)
 library(lubridate)
@@ -148,20 +148,24 @@ gbi_matrix <- spatsoc::get_gbi(DT = ate_asnipe, group = 'group', id = 'ID')
 print(paste0('gbi_matrix created at ', Sys.time()))
 
 #### convert group-by-individual matrix to dyadic data frame of sightings ####
-### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md) -- NOTE: this step takes at least 2 weeks to run
+### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md)
 # create observation number variable in full data set
 ate$observation_number <- as.integer(as.factor(ate$obs_id))
 
+## save workspace image
+save.image('ate_dataprocessing1_preparallelisation.RData')
+load('ate_dataprocessing1_preparallelisation.RData')
+
 # create smaller test dataset
-random_eles <- sample(ate$id, 30, replace = F)
-ate_test <- ate[ate$id %in% random_eles,]
-ate_test$observation_number <- as.integer(as.factor(ate_test$obs_id))
+#random_eles <- sample(ate$id, 30, replace = F)
+#ate_test <- ate[ate$id %in% random_eles,]
+#ate_test$observation_number <- as.integer(as.factor(ate_test$obs_id))
 
 # set the size of the blocks
-block_size <- 5
+block_size <- 50
 
 # create a vector of numbers from 1 to the number of levels of the factor variable
-factor_levels <- 1:length(unique(ate_test$obs_id))
+factor_levels <- 1:length(unique(ate$obs_id))
 
 # split the factor levels into blocks of the specified size
 factor_blocks <- split(factor_levels, ceiling(factor_levels / block_size))
@@ -182,16 +186,157 @@ block_table <- pivot_longer(block_table, cols = everything(), names_to = 'block'
 block_table$block <- ifelse(block_table$block == 'block1', '1', block_table$block)
 block_table$block <- as.numeric(block_table$block)
 block_table
-ate_test <- left_join(ate_test, block_table, by = "observation_number")
+#ate_test <- left_join(ate_test, block_table, by = "observation_number")
+ate <- left_join(ate, block_table, by = "observation_number")
 
 # create empty data frame
-nrows <- (length(unique(ate_test$id))-1) * nrow(ate_test)
+nrows <- (length(unique(ate$id))-1) * nrow(ate)
 gbi_df <- data.frame(node_1 = rep(NA, nrows),
                      node_2 = rep(NA, nrows),
                      social_event = rep(NA, nrows),
                      obs_id = rep(NA, nrows),
                      block = rep(NA, nrows))
 
+# prepare for loop
+sorted_unique_blocks <- sort(unique(ate$block))
+num_unique_blocks <- length(sorted_unique_blocks)
+
+# load library, create cluster
+lapply(c("foreach", "doParallel"), require, character.only = TRUE)
+library(parallel)
+cl <- makeCluster(detectCores()) # can replace detectCores() with a number if known
+registerDoParallel(cl)
+
+# create empty data frame
+nrows <- (length(unique(ate$id))-1) * nrow(ate)
+gbi_df <- data.frame(node_1 = rep(NA, nrows),
+                     node_2 = rep(NA, nrows),
+                     social_event = rep(NA, nrows),
+                     obs_id = rep(NA, nrows),
+                     block = rep(NA, nrows))
+
+#### Function to be parallelised ####
+# option 1 ####
+process_blocks <- function(block_data){
+  num_rows <- max(block_data$observation_number) - min(block_data$observation_number)
+  # Pre-allocate list (might need to make dataframe)
+  rows <- list( node_1 = rep(NA, num_rows),
+                node_2 = rep(NA, num_rows),
+                social_event = rep(NA, num_rows),
+                obs_id = rep(NA, num_rows),
+                block = rep(NA, num_rows))
+  
+  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
+    row_index <- 1
+    for (i in which(gbi_matrix[obs_id, ] == 1)) {
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          node_1 <- ifelse(i < j, i, j)
+          node_2 <- ifelse(i < j, j, i)
+          
+          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
+          rows[row_index,] <- list(node_1 = node_1,
+                                   node_2 = node_2,
+                                   social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
+                                   obs_id = obs_id,
+                                   block = block)
+          print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
+        }
+      }
+    }
+    row_index <- row_index + 1
+  }
+  return(rows)
+}
+
+# option2 ####
+process_blocks <- function(block_data){
+  num_rows <- (length(unique(ate$id))-1) * nrow(block_data)
+  # Pre-allocate list (might need to make dataframe)
+  rows <- data.frame( node_1 = rep(NA, num_rows),
+                      node_2 = rep(NA, num_rows),
+                      social_event = rep(NA, num_rows),
+                      obs_id = rep(NA, num_rows),
+                      block = rep(NA, num_rows))
+  
+  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
+    for (i in which(gbi_matrix[obs_id, ] == 1)) {
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          node_1 <- ifelse(i < j, i, j)
+          node_2 <- ifelse(i < j, j, i)
+          
+          empty_row <- which(is.na(rows$node_1) == TRUE)[1]
+          rows[empty_row,] <- data.frame(node_1 = node_1,
+                                         node_2 = node_2,
+                                         social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
+                                         obs_id = obs_id,
+                                         block = block)
+        }
+      }
+    }
+  }
+  return(rows)
+  print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
+}
+
+#### run loop ####
+# option 1 ####
+foreach(block_id = 1:num_unique_blocks) %dopar% {
+  # break down data by block
+  block <- sorted_unique_blocks[block_id]
+  block_data <- ate[ate$block %in% block,]
+  # set up data frame to write into
+  nrows <- (length(unique(block_data$id))-1) * nrow(block_data)
+  gbi_df <- data.frame(node_1 = rep(NA, nrows),
+                       node_2 = rep(NA, nrows),
+                       social_event = rep(NA, nrows),
+                       obs_id = rep(NA, nrows),
+                       block = rep(NA, nrows))
+  # run process_blocks
+  gbi_df <- process_blocks(block_data)
+  # save output
+  saveRDS(gbi_df, paste0('../data_processed/anp_bayesian_allpairwiseevents_block',block,'.RDS'))
+  gbi_df
+}
+
+# option 2 ####
+gbi_df <- foreach(block_id = 1:num_unique_blocks, .packages = 'tidyverse') %dopar% {
+  # break down data by block
+  block <- sorted_unique_blocks[block_id]
+  block_data <- ate[ate$block %in% block,]
+  # run process_blocks
+  process_blocks(block_data)
+  saveRDS(x, paste0('../data_processed/anp_bayesian_allpairwiseevents_block',block,'.RDS'))
+  print(paste0('block ', block, ' finished at time ', Sys.time()))
+}
+save(gbi_df, file = 'anp_bayesian_allpairwiseevents_allblocks.RData')
+
+x <- readRDS('../data_processed/anp_bayesian_allpairwiseevents.RDS')
+table(x$obs_id)
+
+a <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block231.RDS')
+table(a$obs_id)
+
+b <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block1.RDS')
+table(b$obs_id)
+
+c <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block7.RDS')
+table(c$obs_id)
+
+d <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block11.RDS')
+table(d$obs_id)
+
+e <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block43.RDS')
+table(e$obs_id)
+
+f <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block112.RDS')
+table(f$obs_id)
+
+g <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block388.RDS')
+table(g$obs_id)
+
+######## old stuff #########
 #### Dan code to run processing loop -- I think this is wrong as I don't think I need indices of min and max observations, but the actual values themselves ####
 # Load the parallel package
 library(parallel)
@@ -273,7 +418,7 @@ saveRDS(object = associations, file = '../data_processed/anp_bayesian_associatin
 
 
 
-######### old stuff ###########
+######### old old stuff ###########
 # loop through each block and extract the corresponding data - UNPARALLELISED VERSION ####
 for (block in sort(unique(ate$block))) {
   block_data <- ate[ate$block %in% block,]
@@ -299,8 +444,8 @@ for (block in sort(unique(ate$block))) {
     }
     #if(obs_id %% 10 == 0) {print(obs_id)}
     #if(obs_id %% 10 == 0) {print(Sys.time())}
-    print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
   }
+  print(paste0('block ', block, ' finished at time ', Sys.time()))
 }
 gbi_df
 
@@ -337,9 +482,3 @@ parLapply(cl, sort(unique(ate$block)), function(block) {
 
 # Finally, we stop the cluster when we are done
 stopCluster(cl)
-
-
-
-
-
-
