@@ -1041,7 +1041,6 @@ which(nodes$degree_0.1 < nodes$degree_0.2)
 which(nodes$degree_0.2 < nodes$degree_0.3)
 which(nodes$degree_0.3 < nodes$degree_0.4)
 which(nodes$degree_0.4 < nodes$degree_0.5)
-##########################################################################################################
 
 # Plot whole network
 coords <- igraph::layout_nicely(g_mid)
