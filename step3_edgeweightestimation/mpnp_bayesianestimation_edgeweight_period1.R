@@ -7,9 +7,9 @@
 # load packages
 library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
 library(dplyr, lib.loc = 'packages/')       # library(dplyr)
-#library(rstan, lib.loc = 'packages/')      # library(rstan)
+library(rstan, lib.loc = 'packages/')       # library(rstan)
 library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
-library(rethinking, lib.loc = 'packages/')  # library(rethinking)
+library(bisonR, lib.loc = 'packages/')      # library(bisonR)
 library(igraph, lib.loc = 'packages/')      # library(igraph)
 library(dagitty, lib.loc = 'packages/')     # library(dagitty)
 library(janitor, lib.loc = 'packages/')     # library(janitor)
@@ -20,62 +20,182 @@ library(readxl, lib.loc = 'packages/')      # library(readxl)
 # information
 sessionInfo()
 R.Version()
-#rstan::stan_version()
+rstan::stan_version()
 #packageVersion('')
 #citation('')
-
-# set stan path
-set_cmdstan_path('/Users/helen/.cmdstanr/cmdstan-2.28.2')
-
-# load model
-mod_2.2 <- cmdstan_model("models/simpleBetaNet.stan")
-mod_2.2
 
 # set seed
 set.seed(12345)
 
-################ 1) Draw DAGS ################
-# plot with full names
-binom <- dagitty::dagitty("dag{
-                         age_dyad [exposure];
-                         sex_dyad [exposure];
-                         weight [outcome];
-                         relatedness_dyad [unobserved];
-                         age_dyad -> weight <- sex_dyad;
-                         weight <- relatedness_dyad;
-                         }")
-dagitty::coordinates(binom) <- list(x = c(age_dyad = 0, sex_dyad = 1, weight = 2, relatedness = 3),
-                                    y = c(age_dyad = 0, sex_dyad = 2, weight = 1, relatedness = 0))
-drawdag(binom)
+# create file of output graphs
+#pdf('../outputs/mpnp1_networkplots.pdf', width = 10, height = 10)
 
-# plot with letters
-binom <- dagitty::dagitty("dag{
-                         A [exposure];
-                         S [exposure];
-                         W [outcome];
-                         R [unobserved];
-                         A -> W <- S;
-                         W <- R;
-                         }")
-dagitty::coordinates(binom) <- list(x = c(A = 0.5, S = 1, W = 1.0, R = 1.5),
-                                    y = c(A = 0.5, S = 2, W = 1.2, R = 0.5))
-drawdag(binom, radius = 6, cex = 1.6)
-
-# clear environment and reset plot window
-rm(binom)
-dev.off()
-################ 2) Create data lists ################
-counts_df1 <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period1_pairwiseevents.csv')
+#### create data list ####
+counts_df1 <- read_csv('../data_processed/mpnp_period1_pairwiseevents.csv')
 str(counts_df1)
 
-### create data list
-counts_ls <- list(
-  n_dyads  = nrow(counts_df1),          # total number of times one or other of the dyad was observed
-  together = counts_df1$together,       # count number of sightings seen together
-  apart    = counts_df1$apart,          # count number of sightings seen apart
-  period   = counts_df1$period)         # which period it's within
+### load in ages 
+mpnp1_ages <- readRDS('../data_processed/mpnp1_ageestimates_mcmcoutput.rds') %>%
+  pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 
-################ Run model on real standardised data -- period 1 ################
+### filter counts data frame down to males only
+counts_df1 <- counts_df1 %>% 
+  filter(id_1 %in% unique(mpnp1_ages$id)) %>% 
+  filter(id_2 %in% unique(mpnp1_ages$id))
+
+# reassign dyad numbers to remove gaps
+counts_df1$node_1_males <- as.integer(as.factor(counts_df1$node_1))
+counts_df1$node_2_males <- as.integer(as.factor(counts_df1$node_2))+1
+
+### standardise dyad_id
+counts_df1$dyad_males <- as.integer(as.factor(counts_df1$dyad_id))
+
+#### edge weights ####
+### create data frame for edge weight model
+counts_df1_model <- counts_df1[, c('node_1_males','node_2_males','together','count_dyad')] %>% distinct()
+colnames(counts_df1_model) <- c('node_1_id','node_2_id','event','duration')
+
+### set priors
+priors <- get_default_priors('binary')
+priors$edge <- 'normal(-1, 2)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
+priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
+prior_check(priors, 'binary')
+
+### run edge weight model
+mpnp_edge_weights <- bison_model(
+  ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+  data = counts_df1_model, 
+  model_type = "binary",
+  #mc_cores = 4,
+  priors = priors
+)
+
+### run diagnostic plots
+plot_trace(mpnp_edge_weights, par_ids = 2)
+plot_predictions(mpnp_edge_weights, num_draws = 20, type = "density")
+plot_predictions(mpnp_edge_weights, num_draws = 20, type = "point")
+
+### extract edge weight summaries
+edgelist <- get_edgelist(mpnp_edge_weights, ci = 0.9, transform = TRUE)
+summary(mpnp_edge_weights)
+
+### save workspace image for reloading at a later date that doesn't require running model again
+save.image('mpnp_bisonr_edgescalculated.RData')
+
+#### non-random edge weights ####
+### load in workspace image with edge weights already calculated
+load('mpnp_bisonr_edgescalculated.RData')
+
+### run null model
+mpnp_edges_null <- bison_model(
+  (event | duration) ~ 1, 
+  data = counts_df1_model, 
+  model_type = "binary",
+  priors = priors
+)
+
+### compare null model with fitted model
+model_comparison(list(non_random_model = mpnp_edge_weights, random_model = mpnp_edges_null)) # NETWORK IS RANDOM
+# Method: stacking
+#                  weight
+# non_random_model 0.020
+# random_model     0.980
+# Warning message:  Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
+
+# save workspace image
+save.image('mpnp_bisonr_randomnetwork.RData')
+
+#### plot network ####
+### adapt bisonr plot_network function to give more flexibility over plotting options
+plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
+                                    vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
+                                    vertex.color1 = 'transparent',
+                                    vertex.size1 = 1, edge.color1 = rgb(0, 0, 0, 1),
+                                    vertex.label.color2 = 'black', vertex.label.font2 = 'Helvetica', 
+                                    vertex.color2 = 'seagreen1',
+                                    vertex.size2 = 8, edge.color2 = rgb(0, 0, 0, 0.3))
+{
+  edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
+  net <- igraph::graph_from_edgelist(as.matrix(edgelist[, 1:2]), 
+                                     directed = obj$directed)
+  md <- edgelist[, 3]
+  ub <- edgelist[, 5]
+  coords <- igraph::layout_nicely(net)
+  igraph::plot.igraph(net, layout = coords,
+                      edge.width = ifelse(md < threshold, 0, md * lwd),
+                      vertex.label.color = vertex.label.color1, vertex.color = vertex.color1, vertex.size = vertex.size1,
+                      edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0)
+  igraph::plot.igraph(net, layout = coords,
+                      edge.width = ifelse(md < threshold, 0, ub * lwd),
+                      vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, vertex.size = vertex.size2,
+                      edge.color = edge.color1, edge.arrow.size = 0, 
+                      add = TRUE)
+  if (obj$directed) {
+    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, 
+                        vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, 
+                        edge.color = edge.color2, add = TRUE)
+  }
+}
+
+### create nodes data frame
+nodes <- data.frame(bull = sort(unique(mpnp_ages$id)),
+                    age = NA,
+                    sightings = NA)
+for(i in 1:nrow(nodes)){
+  x <- mpnp_ages[mpnp_ages$id == nodes$bull[i],]
+  nodes$age[i] <- mean(x$age)
+  if(nodes$bull[i] != 'M99'){
+    y <- counts_df1[counts_df1$id_1 == nodes$bull[i], c('id_1','count_1')]
+    nodes$sightings[i] <- y[1,2]
+  }
+}
+nodes$sightings <- as.numeric(nodes$sightings)
+str(nodes)
+
+### plot network
+plot_network_threshold(mpnp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
+
+### adapt to remove unconnected nodes
+plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
+                                     vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
+                                     vertex.color1 = 'transparent',
+                                     vertex.size1 = 1, edge.color1 = rgb(0, 0, 0, 1),
+                                     vertex.label.color2 = 'black', vertex.label.font2 = 'Helvetica', 
+                                     vertex.color2 = 'seagreen1',
+                                     vertex.size2 = 8, edge.color2 = rgb(0, 0, 0, 0.3))
+{
+  edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
+  threshold_edges <- edgelist[edgelist$median >= threshold,]
+  net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]))
+  md <- threshold_edges[, 3]
+  ub <- threshold_edges[, 5]
+  coords <- igraph::layout_nicely(net)
+  igraph::plot.igraph(net, layout = coords,
+                      vertex.label.color = vertex.label.color1, label.family = vertex.label.font1, 
+                      vertex.color = vertex.color1, vertex.size = vertex.size1,
+                      edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0, edge.width = md * lwd)
+  igraph::plot.igraph(net, layout = coords,
+                      vertex.label.color = vertex.label.color2, label.family = vertex.label.font2,
+                      vertex.color = vertex.color2, vertex.size = vertex.size2,
+                      edge.color = edge.color1, edge.arrow.size = 0, edge.width = ub * lwd,
+                      add = TRUE)
+  if (obj$directed) {
+    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, 
+                        vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, 
+                        edge.color = edge.color2, add = TRUE)
+  }
+}
+
+### plot network
+plot_network_threshold2(obj = mpnp_edge_weights, threshold = 0.2,
+                        vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
+
+
+################ OLD METHOD ################
+### Run model on real standardised data -- period 1 ################
 ### Fit model
 weight_mpnp1_2.2_period1 <- mod_2.2$sample(
   data = counts_ls, 
@@ -121,9 +241,6 @@ colnames(draws_mpnp1)[2:ncol(draws_mpnp1)] <- counts_df1$dyad
 
 # Assign random set of columns to check
 plot_cols <- sample(x = 2:ncol(draws_mpnp1), size = 30, replace = F)
-
-# create file of output graphs
-pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_networkplots.pdf', width = 10, height = 10)
 
 ### save data 
 saveRDS(draws_mpnp1, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp1_edgeweightestimates_mcmcoutput.rds')
