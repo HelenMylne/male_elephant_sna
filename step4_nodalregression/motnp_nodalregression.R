@@ -14,6 +14,7 @@ library(bayesplot)
 library(rstan)
 library(igraph)
 library(LaplacesDemon)
+library(bisonR)
 
 #library(tidyverse, lib.loc = 'packages/')
 #library(cmdstanr, lib.loc = 'packages/')
@@ -23,6 +24,7 @@ library(LaplacesDemon)
 #library(rstan, lib.loc = 'packages/')
 #library(igraph, lib.loc = 'packages/')
 #library(LaplacesDemon, lib.loc = 'packages/')
+#library(bisonR, lib.loc = 'packages/')
 
 # define PDF output
 #pdf('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/outputs/motnp_nodalregression_plots.pdf')
@@ -31,8 +33,9 @@ library(LaplacesDemon)
 #### load MOTNP nodes, edges and interactions data ####
 motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
   filter(sex == 'M')
+#motnp_males <- read_csv('../data_processed/motnp_elenodes.csv') %>% filter(sex == 'M')
 unique(motnp_males$age_category)
-motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1, 
+motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1,     # standardise calf age categories
                                  ifelse(motnp_males$age_category == "3-4", 1,
                                         ifelse(motnp_males$age_category == "1-2", 1,
                                                ifelse(motnp_males$age_category == "7-8", 1,
@@ -40,7 +43,7 @@ motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1,
                                                              ifelse(motnp_males$age_category ==  "6-7", 1,
                                                                     ifelse(motnp_males$age_category == "8-9", 1, 
                                                                            ifelse(motnp_males$age_category == "5-6", 1, NA))))))))
-motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2,
+motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2,    # simplify older age categories
                                  ifelse(motnp_males$age_category == '10-15', 3,
                                         ifelse(motnp_males$age_category == '15-19', 4,
                                                ifelse(motnp_males$age_category == '20-25', 5,
@@ -52,44 +55,46 @@ motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2,
 df_agg_motnp <- read_delim('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') %>% 
   filter(dem_class_1 == 'AM' | dem_class_1 == 'PM') %>% 
   filter(dem_class_2 == 'AM' | dem_class_2 == 'PM')
-df_agg_motnp$sex_1 <- 'M'
-df_agg_motnp$age_cat_id_1 <- ifelse(df_agg_motnp$age_category_1 == '9-10', 2,
+#df_agg_motnp <- read_delim('../data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') %>% filter(dem_class_1 == 'AM' | dem_class_1 == 'PM') %>% filter(dem_class_2 == 'AM' | dem_class_2 == 'PM')
+df_agg_motnp$sex_1 <- 'M' # sort out weird formatting of sex1 variable
+df_agg_motnp$age_cat_id_1 <- ifelse(df_agg_motnp$age_category_1 == '9-10', 2,   # simplify age categories
                                     ifelse(df_agg_motnp$age_category_1 == '10-15', 3,
                                            ifelse(df_agg_motnp$age_category_1 == '15-19', 4,
                                                   ifelse(df_agg_motnp$age_category_1 == '20-25', 5,
                                                          ifelse(df_agg_motnp$age_category_1 == '25-40', 6,
                                                                 ifelse(df_agg_motnp$age_category_1 == '40+', 7, 1))))))
-df_agg_motnp$age_class_1 <- ifelse(df_agg_motnp$age_cat_id_1 == 2, 'Juvenile',
+df_agg_motnp$age_class_1 <- ifelse(df_agg_motnp$age_cat_id_1 == 2, 'Juvenile',  # simplify age classes
                                    ifelse(df_agg_motnp$age_cat_id_1 > 4, 'Adult','Pubescent'))
-df_agg_motnp$age_cat_id_2 <- ifelse(df_agg_motnp$age_category_2 == '9-10', 2,
+df_agg_motnp$age_cat_id_2 <- ifelse(df_agg_motnp$age_category_2 == '9-10', 2,   # simplify age categories
                                     ifelse(df_agg_motnp$age_category_2 == '10-15', 3,
                                            ifelse(df_agg_motnp$age_category_2 == '15-19', 4,
                                                   ifelse(df_agg_motnp$age_category_2 == '20-25', 5,
                                                          ifelse(df_agg_motnp$age_category_2 == '25-40', 6,
                                                                 ifelse(df_agg_motnp$age_category_2 == '40+', 7, 1))))))
-df_agg_motnp$age_class_2 <- ifelse(df_agg_motnp$age_cat_id_2 == 2, 'Juvenile',
+df_agg_motnp$age_class_2 <- ifelse(df_agg_motnp$age_cat_id_2 == 2, 'Juvenile',  # simplify age classes
                                    ifelse(df_agg_motnp$age_cat_id_2 > 4, 'Adult','Pubescent'))
-table(df_agg_motnp$age_cat_id_1,df_agg_motnp$age_category_1)
-table(df_agg_motnp$age_cat_id_2,df_agg_motnp$age_category_2)
+table(df_agg_motnp$age_cat_id_1,df_agg_motnp$age_category_1)   # check none have incorrect categories
+table(df_agg_motnp$age_cat_id_2,df_agg_motnp$age_category_2)   # check none have incorrect categories
 
-df_agg_motnp$dem_class_1 <- ifelse(df_agg_motnp$age_class_1 == 'Adult', 'AM',
+df_agg_motnp$dem_class_1 <- ifelse(df_agg_motnp$age_class_1 == 'Adult', 'AM',   # simplify age classes
                                    ifelse(df_agg_motnp$age_class_1 == 'Pubescent', 'PM', 'JM'))
-df_agg_motnp$dem_class_2 <- ifelse(df_agg_motnp$age_class_2 == 'Adult', 'AM',
+df_agg_motnp$dem_class_2 <- ifelse(df_agg_motnp$age_class_2 == 'Adult', 'AM',   # simplify age classes
                                    ifelse(df_agg_motnp$age_class_2 == 'Pubescent', 'PM', 'JM'))
-df_agg_motnp$dem_type <- ifelse(df_agg_motnp$age_cat_id_1 >= df_agg_motnp$age_cat_id_2,
+df_agg_motnp$dem_type <- ifelse(df_agg_motnp$age_cat_id_1 >= df_agg_motnp$age_cat_id_2,   # code and simplify dyad age combos
                                 paste(df_agg_motnp$dem_class_1, df_agg_motnp$dem_class_2, sep = '_'),
                                 paste(df_agg_motnp$dem_class_2, df_agg_motnp$dem_class_1, sep = '_'))
 df_agg_motnp$count_dyad <- (df_agg_motnp$count_1 + df_agg_motnp$count_2) - df_agg_motnp$event_count  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
-df_agg_motnp$node_1_nogaps <- as.integer(as.factor(df_agg_motnp$node_1))
-df_agg_motnp$node_2_nogaps <- as.integer(as.factor(df_agg_motnp$node_2))+1
-df_agg_motnp$dyad <- paste(df_agg_motnp$id_1, df_agg_motnp$id_2, sep = '_')
-df_agg_motnp$dyad_id_nogaps <- as.integer(as.factor(df_agg_motnp$dyad))
+df_agg_motnp$node_1_nogaps <- as.integer(as.factor(df_agg_motnp$node_1))     # all elephants count 1:max number
+df_agg_motnp$node_2_nogaps <- as.integer(as.factor(df_agg_motnp$node_2))+1   # all elephants count 1:max number, but start on 2 as elephant 1 in node2 = elephant 2 in node 1 (node1 elephant 1 never listed in node2)
+df_agg_motnp$dyad <- paste(df_agg_motnp$id_1, df_agg_motnp$id_2, sep = '_')  # combine IDs for a unique character per dyad
+df_agg_motnp$dyad_id_nogaps <- as.integer(as.factor(df_agg_motnp$dyad))      # convert character string to unique value per dyad
 
 ### load the edge weights
 motnp <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% 
   select(-`1.lp__`)
-motnp <- motnp[, which(colnames(motnp) %in% df_agg_motnp$dyad)]
-logit_edge_samples_motnp <- logit(motnp)
+#motnp <- readRDS('../data_processed/motnp_edgeweightestimates_mcmcoutput.rds') %>% select(-`1.lp__`)
+motnp <- motnp[, which(colnames(motnp) %in% df_agg_motnp$dyad)]  # remove dyads not comprised solely of adult/pubescent males
+logit_edge_samples_motnp <- logit(motnp)                         # logit transform edge weights
 
 #### calculate posterior centralities ####
 motnp <- as.matrix(logit_edge_samples_motnp)
@@ -750,3 +755,70 @@ round(summary(fit_nodal_btwn)$summary[1:4, c(1:4, 8)], 5) # basically no effect 
 
 # Calculate the 95% credible intervals of the model parameters
 #round(summary(fit_nodal_btwn)$summary[1:4, c(1:4, 8)], 5) # basically no effect whatsoever (remembering this is in standard deviations on the outcome scale but years of age on the exponent)
+
+
+
+
+####### BISON PACKAGE BRMS METHOD #####
+# load edge weight model and data frames
+load('motnp_bisonr_edgescalculated.RData')
+
+#### mean age estimate only, not full distribution ####
+df_nodal <- distinct(counts_df[,c('node_1_males','id_1')])
+colnames(df_nodal) <- c('node_2_males','id_2')
+df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_males','id_2')])
+colnames(df_nodal) <- c('node','id')
+
+motnp_ages <- left_join(motnp_ages, df_nodal, by = 'id')
+
+motnp_ages_mean <- df_nodal
+motnp_ages_mean$age <- NA
+for(i in 1:nrow(motnp_ages_mean)){
+  x <- motnp_ages[motnp_ages$id == motnp_ages_mean$id[i],]
+  motnp_ages_mean$age[i] <- mean(x$age)
+  rm(x)
+}
+
+motnp_nodal_mean <- bison_brm(
+  bison(node_eigen(node)) ~ age,
+  fit_edge_weights,
+  motnp_ages_mean,
+  chains = 4,
+  iter = 1000,
+  thin = 1
+)
+summary(motnp_nodal_mean) # FIT 100 IMPUTED MODELS, 4 CHAINS PER MODEL, EACH 1000 DRAWS LONG (+1000 DRAWS WARM UP). WARNING AT END OF MODEL RUN THAT CHAINS <3 DRAWS LONG
+
+# save workspace image for reloading at a later date that doesn't require running model again
+save.image('motnp_bisonr_nodalregression_meanage.RData')
+
+# remove nodal mean age
+rm(motnp_nodal_mean)
+
+#### nodal regression -- age distribution ####
+motnp_nodal <- bison_brm(
+  bison(node_eigen(node)) ~ age,
+  fit_edge_weights,
+  motnp_ages,
+  chains = 4
+)
+summary(motnp_nodal)
+
+save.image('motnp_bisonr_nodalregressionrun.RData')
+
+### compare to null model ####
+motnp_null <- bison_brm(
+  bison(node_eigen(node)) ~ 1,
+  fit_edge_test,
+  motnp_ages,
+  chains = 4
+)
+
+model_comparison(list(non_random_model = motnp_nodal, random_model = motnp_null))
+
+
+
+
+
+
+
