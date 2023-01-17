@@ -7,6 +7,8 @@ library(igraph)
 library(dagitty)
 library(cmdstanr)
 library(bisonR)
+library(brms)
+library(mclust)
 
 #library(tidyverse, lib.loc = '../packages/')
 #library(dplyr, lib.loc = '../packages/')
@@ -348,6 +350,257 @@ fit_dyadic <- bison_brm (
 )
 summary(fit_dyadic)
 
+############### NETWORK COMPLEXITY ###############
+# Edge mixture models can be used to detect different types of social connections by looking for clustering in edge weights. There are two key outputs from a bisonR edge mixture model: a posterior probability distribution over the number of components (clusters, interpreted associal connection types, from 1 to a maximum 𝐾, over the entire network), the probability that each dyad belongs to each possible component.
+
+# simulate data from a binary edge model with 2 underlying components (dyads belong to either cluster with equal probability):
+sim_data <- simulate_bison_model_mixture("binary", num_components = 2, component_weights = c(0.5, 0.5))
+df <- sim_data$df_sim
+head(df)
+#> # A tibble: 6 × 5
+#> # Groups:   node_1_id [1]
+#>   node_1_id node_2_id event duration age_diff
+#>   <fct>     <fct>     <dbl>    <dbl>    <dbl>
+#> 1 1         2             1       14        1
+#> 2 1         3             0       15        1
+#> 3 1         4             8       10        1
+#> 4 1         5            14       14        1
+#> 5 1         6             0        1        1
+#> 6 1         7            16       16        1
+Since the data are already aggregated (e.g. a single row for each dyad), we can use the binary conjugate model for speed:
+  
+  fit_edge <- bison_model(
+    (event | duration) ~ dyad(node_1_id, node_2_id), 
+    data=df, 
+    model_type="binary_conjugate"
+  )
+#> No priors set by user, using default priors instead. We recommend setting and checking priors explicitly for reliable inference.
+We won’t conduct the usual checks for the sake of this tutorial, but at this point we’d recommend conducting diagnostic checks to ensure model fit. Once the model has fit well, we can use the bison_mixture() function to fit the edge mixture model:
+  
+  # verbose=FALSE for tutorial purposes
+  fit_mixture <- bison_mixture(fit_edge, num_components=5, verbose=FALSE)
+summary(fit_mixture)
+#> === Fitted dyadic mixture model ===
+#> Maximum number of components: 
+#> Best model: 1 components
+#> Probability of best model: 94.1%
+#> === Component probabilities ===
+#>            1     2     3 4 5
+#> P(K=k) 0.941 0.052 0.007 0 0
+#> === Component means for best model (K = 1) ===
+#>              1
+#> mean 0.5252286
+#> === Edge component probabilities for best model (K = 1) ===
+#>         1
+#> 1 <-> 2 1
+#> 1 <-> 3 1
+#> 1 <-> 4 1
+#> 1 <-> 5 1
+#> 1 <-> 6 1
+#> 1 <-> 7 1
+#> ...
+There’s quite a bit going on in the summary, so let’s break it down. The top section shows the model that fits best and the probability assigned to that model. The second section shows the probabilities of the models corresponding to each number of components (𝐾=1,2,3,...). You’ll notice the model with the highest probability is the same as the best fitting model from the section above. The final section shows the edge-level probabilities of component membership for the corresponding dyad. This can be interpreted as the probability a dyad belongs to a given component/cluster/social connection type.
+
+The information shown in the summary above can also be accessed using the functions get_network_component_probabilities() and get_edge_component_probabilities(). These two functions make it possible to access the mixture model output programmatically for downstream analysis or plotting.
+
+To get network-level probabilities of the number of components, we can use get_network_component_probabilities() function:
+  
+  get_network_component_probabilities(fit_mixture)
+#>   num_components  probability
+#> 1              1 9.411516e-01
+#> 2              2 5.187969e-02
+#> 3              3 6.532973e-03
+#> 4              4 4.318312e-04
+#> 5              5 3.869330e-06
+To use probabilities over component membership for a given number of components, we can use the get_edge_component_probabilities() function, where 3 is the number of components we assume to exist in the network:
+  
+  get_edge_component_probabilities(fit_mixture, 3)
+#>     node_1 node_2 P(K = 1) P(K = 2) P(K = 3)
+#> 1        1      2    0.840    0.160    0.000
+#> 2        1      3    0.875    0.115    0.010
+#> 3        1      4    0.055    0.455    0.490
+#> 4        1      5    0.010    0.245    0.745
+#> 5        1      6    0.560    0.320    0.120
+#> 6        1      7    0.005    0.225    0.770
+#> 7        1      8    0.750    0.240    0.010
+#> 8        1      9    0.905    0.090    0.005
+#> 9        1     10    0.820    0.180    0.000
+#> 10       1     11    0.780    0.205    0.015
+#> 11       1     12    0.015    0.340    0.645
+#> 12       1     13    0.015    0.205    0.780
+#> 13       1     14    0.865    0.135    0.000
+#> 14       1     15    0.010    0.425    0.565
+#> 15       2      3    0.850    0.140    0.010
+#> 16       2      4    0.740    0.245    0.015
+#> 17       2      5    0.005    0.225    0.770
+#> 18       2      6    0.000    0.330    0.670
+#> 19       2      7    0.000    0.290    0.710
+#> 20       2      8    0.840    0.155    0.005
+#> 21       2      9    0.815    0.180    0.005
+#> 22       2     10    0.105    0.445    0.450
+#> 23       2     11    0.810    0.180    0.010
+#> 24       2     12    0.005    0.255    0.740
+#> 25       2     13    0.815    0.175    0.010
+#> 26       2     14    0.760    0.230    0.010
+#> 27       2     15    0.005    0.240    0.755
+#> 28       3      4    0.805    0.185    0.010
+#> 29       3      5    0.800    0.200    0.000
+#> 30       3      6    0.025    0.395    0.580
+#> 31       3      7    0.690    0.295    0.015
+#> 32       3      8    0.120    0.470    0.410
+#> 33       3      9    0.015    0.365    0.620
+#> 34       3     10    0.010    0.260    0.730
+#> 35       3     11    0.010    0.185    0.805
+#> 36       3     12    0.005    0.195    0.800
+#> 37       3     13    0.020    0.410    0.570
+#> 38       3     14    0.845    0.150    0.005
+#> 39       3     15    0.890    0.100    0.010
+#> 40       4      5    0.020    0.265    0.715
+#> 41       4      6    0.000    0.285    0.715
+#> 42       4      7    0.015    0.220    0.765
+#> 43       4      8    0.005    0.415    0.580
+#> 44       4      9    0.755    0.235    0.010
+#> 45       4     10    0.000    0.330    0.670
+#> 46       4     11    0.000    0.395    0.605
+#> 47       4     12    0.000    0.295    0.705
+#> 48       4     13    0.140    0.410    0.450
+#> 49       4     14    0.845    0.155    0.000
+#> 50       4     15    0.015    0.345    0.640
+#> 51       5      6    0.015    0.335    0.650
+#> 52       5      7    0.885    0.115    0.000
+#> 53       5      8    0.565    0.385    0.050
+#> 54       5      9    0.060    0.450    0.490
+#> 55       5     10    0.850    0.150    0.000
+#> 56       5     11    0.010    0.220    0.770
+#> 57       5     12    0.130    0.455    0.415
+#> 58       5     13    0.370    0.475    0.155
+#> 59       5     14    0.165    0.425    0.410
+#> 60       5     15    0.010    0.185    0.805
+#> 61       6      7    0.780    0.220    0.000
+#> 62       6      8    0.810    0.185    0.005
+#> 63       6      9    0.830    0.165    0.005
+#> 64       6     10    0.000    0.330    0.670
+#> 65       6     11    0.005    0.220    0.775
+#> 66       6     12    0.850    0.150    0.000
+#> 67       6     13    0.790    0.205    0.005
+#> 68       6     14    0.010    0.275    0.715
+#> 69       6     15    0.010    0.355    0.635
+#> 70       7      8    0.775    0.215    0.010
+#> 71       7      9    0.245    0.525    0.230
+#> 72       7     10    0.890    0.105    0.005
+#> 73       7     11    0.005    0.390    0.605
+#> 74       7     12    0.690    0.280    0.030
+#> 75       7     13    0.665    0.255    0.080
+#> 76       7     14    0.565    0.325    0.110
+#> 77       7     15    0.875    0.120    0.005
+#> 78       8      9    0.005    0.340    0.655
+#> 79       8     10    0.000    0.385    0.615
+#> 80       8     11    0.840    0.150    0.010
+#> 81       8     12    0.675    0.300    0.025
+#> 82       8     13    0.830    0.165    0.005
+#> 83       8     14    0.020    0.450    0.530
+#> 84       8     15    0.005    0.295    0.700
+#> 85       9     10    0.185    0.425    0.390
+#> 86       9     11    0.875    0.120    0.005
+#> 87       9     12    0.740    0.250    0.010
+#> 88       9     13    0.840    0.140    0.020
+#> 89       9     14    0.005    0.250    0.745
+#> 90       9     15    0.875    0.120    0.005
+#> 91      10     11    0.035    0.395    0.570
+#> 92      10     12    0.220    0.510    0.270
+#> 93      10     13    0.010    0.230    0.760
+#> 94      10     14    0.145    0.405    0.450
+#> 95      10     15    0.120    0.550    0.330
+#> 96      11     12    0.015    0.335    0.650
+#> 97      11     13    0.120    0.455    0.425
+#> 98      11     14    0.615    0.330    0.055
+#> 99      11     15    0.830    0.170    0.000
+#> 100     12     13    0.000    0.330    0.670
+#> 101     12     14    0.005    0.360    0.635
+#> 102     12     15    0.835    0.160    0.005
+#> 103     13     14    0.715    0.275    0.010
+#> 104     13     15    0.865    0.135    0.000
+#> 105     14     15    0.565    0.365    0.070
+It’s often useful to know where the mixture components are location, so we can get their posterior means using the get_component_means() function for a given number of components. Here we’ll calculate the posterior means of the components for the mixture model with 3 components:
+  
+  get_component_means(fit_mixture, 3)
+#>             50%         5%       95%
+#> K = 1 0.1045326 0.01339178 0.1966635
+#> K = 2 0.7640626 0.13868448 0.8916400
+#> K = 3 0.9176529 0.84222298 0.9981651
+Using components in downstream analysis
+Now say that we’re interested in the number of strong vs weak partners. Specifically we want to know if the strength of connections only to strong partners predicts a node-level trait. This is a non-standard analysis so will require some manual data wrangling to fit the right kind of model.
+
+For demonstration purposes, we’ll create a dataframe that might be used for this kind of analysis:
+  
+  df_nodal <- data.frame(node_id=as.factor(levels(df$node_1_id)), trait=rnorm(15))
+df_nodal
+#>    node_id       trait
+#> 1        1 -1.35866457
+#> 2        2  0.18107587
+#> 3        3 -0.71568046
+#> 4        4 -1.07174483
+#> 5        5  0.88888720
+#> 6        6 -0.57613074
+#> 7        7 -1.62117078
+#> 8        8  1.94552654
+#> 9        9 -0.73863301
+#> 10      10 -1.14172964
+#> 11      11  1.33588630
+#> 12      12  0.81998647
+#> 13      13 -0.57319856
+#> 14      14  0.01948893
+#> 15      15  1.31491191
+This dataframe will provide the information about traits that we need for the analysis. Next, we need to calculate strength using only individuals categorised as strong according to the mixture model. Since both component membership (strong or weak) and edge weights are probabilistic, we have to sample from both posteriors as we build a new posterior of mixture-based strength:
+  
+  # Set number of nodes and number of posterior samples
+  num_nodes <- fit_edge$num_nodes
+num_draws <- 5 # Keep short for demo purposes.
+
+# Create a list of igraph networks from edgemodel to represent network posterior
+nets <- bison_to_igraph(fit_edge, num_draws)
+
+# Create an empty matrix to hold strengths of top mixture component
+mix_strengths <- matrix(0, num_draws, num_nodes)
+
+# Create an empty list for imputed versions of the dataframe
+imputed_data <- list()
+
+# Loop through each posterior sample and calculate strength of top mixture.
+for (i in 1:num_draws) {
+  # Calculate edge components (1 if strong, 0 if weak)
+  edge_components <- 1 * (fit_mixture$edge_component_samples[i, 2, ] == 2)
+  
+  # If the edge is strong, don't change edge weight, but if it's weak then set to zero.
+  E(nets[[i]])$weight <- E(nets[[i]])$weight * edge_components
+  
+  # Change the metric values of the imputed data to be mixture-based strength
+  imputed_data[[i]] <- df_nodal
+  imputed_data[[i]]$mix_strength <- strength(nets[[i]])
+}
+imputed_data[[2]]
+#>    node_id       trait mix_strength
+#> 1        1 -1.35866457     5.781460
+#> 2        2  0.18107587     5.560490
+#> 3        3 -0.71568046     6.031965
+#> 4        4 -1.07174483     7.842593
+#> 5        5  0.88888720     8.071741
+#> 6        6 -0.57613074     7.619625
+#> 7        7 -1.62117078     4.545718
+#> 8        8  1.94552654     5.506187
+#> 9        9 -0.73863301     3.732620
+#> 10      10 -1.14172964     8.032430
+#> 11      11  1.33588630     6.719255
+#> 12      12  0.81998647     7.499526
+#> 13      13 -0.57319856     4.383482
+#> 14      14  0.01948893     6.334001
+#> 15      15  1.31491191     6.358431
+Now we have a set of imputed dataframes containing the posteriors of mixture-based node strength, we can fit the model using brm_multiple.
+
+fit_brm <- brm_multiple(trait ~ mix_strength, imputed_data, silent=2, refresh=0)
+summary(fit_brm)
+
+
 ############### RERUN ALL BUT WITHOUT SUBSETTING DATA ######
 rm(list = ls()[which(ls() != 'counts_df')])
 #### edge weights ####
@@ -358,9 +611,14 @@ counts_df <- counts_df %>%
   filter(id_1 %in% unique(motnp_ages$id)) %>% 
   filter(id_2 %in% unique(motnp_ages$id))
 
-counts_df$node_1_id <- factor(counts_df$node_1_nogaps, levels = 1:(max(counts_df$node_1_nogaps)+1))
-counts_df$node_2_id <- factor(counts_df$node_2_nogaps, levels = 1:(max(counts_df$node_1_nogaps)+1))
-counts_df_model <- counts_df[, c('node_1_id','node_2_id','event_count','count_dyad')] %>% distinct()
+#counts_df$node_1_id <- factor(counts_df$node_1_males, levels = 1:(max(counts_df$node_1_nogaps)+1))
+#counts_df$node_2_id <- factor(counts_df$node_2_males, levels = 1:(max(counts_df$node_1_nogaps)+1))
+#counts_df_model <- counts_df[, c('node_1_id','node_2_id','event_count','count_dyad')] %>% distinct()
+#colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
+
+counts_df$node_1_males <- as.integer(as.factor(counts_df$node_1_nogaps))
+counts_df$node_2_males <- as.integer(as.factor(counts_df$node_2_nogaps))+1
+counts_df_model <- counts_df[, c('node_1_males','node_2_males','event_count','count_dyad')] %>% distinct()
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 priors <- get_default_priors('binary')
@@ -372,7 +630,7 @@ fit_edge_weights <- bison_model(
   ( event | duration ) ~ dyad(node_1_id, node_2_id), 
   data = counts_df_model, 
   model_type = "binary",
-  mc_cores = 4,
+  #mc_cores = 4,
   priors = priors
 )
 plot_trace(fit_edge_weights, par_ids = 2)
@@ -526,21 +784,64 @@ plot_network_threshold2(obj = fit_edge_weights, threshold = 0.2,
 plot_network_threshold2(obj = fit_edge_weights, threshold = 0.2,
                         vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
 
-#### nodal regression ####
-df_nodal <- distinct(counts_df[,c('node_1_id','id_1')])
-colnames(df_nodal) <- c('node_2_id','id_2')
-df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_id','id_2')])
+#### non-random edge weights ####
+fit_edges_null <- bison_model(
+  (event | duration) ~ 1, 
+  data = counts_df_model, 
+  model_type = "binary",
+  priors = priors
+)
+
+model_comparison(list(non_random_model = fit_edge_weights, random_model = fit_edges_null)) # NETWORK IS RANDOM
+# Method: stacking
+#                  weight
+# non_random_model 0.020
+# random_model     0.980
+# Warning message:  Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
+
+# save workspace image
+save.image('motnp_bisonr_randomnetwork.RData')
+
+#### nodal regression -- mean age ####
+df_nodal <- distinct(counts_df[,c('node_1_males','id_1')])
+colnames(df_nodal) <- c('node_2_males','id_2')
+df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_males','id_2')])
 colnames(df_nodal) <- c('node','id')
 
 motnp_ages <- left_join(motnp_ages, df_nodal, by = 'id')
 
+motnp_ages_mean <- df_nodal
+motnp_ages_mean$age <- NA
+for(i in 1:nrow(motnp_ages_mean)){
+  x <- motnp_ages[motnp_ages$id == motnp_ages_mean$id[i],]
+  motnp_ages_mean$age[i] <- mean(x$age)
+  rm(x)
+}
+
+fit_nodal_mean <- bison_brm(
+  bison(node_eigen(node)) ~ age,
+  fit_edge_weights,
+  motnp_ages_mean,
+  chains = 4
+)
+summary(fit_nodal_mean)
+
+# save workspace image for reloading at a later date that doesn't require running model again
+save.image('motnp_bisonr_nodalregression_meanage.RData')
+
+# remove nodal mean age
+rm(fit_nodal_mean)
+
+#### nodal regression -- age distribution ####
 fit_nodal <- bison_brm(
   bison(node_eigen(node)) ~ age,
   fit_edge_weights,
-  #chains = 4,
-  motnp_ages
+  motnp_ages,
+  chains = 4
 )
 summary(fit_nodal)
+
+save.image('motnp_bisonr_nodalregressionrun.RData')
 
 #### dyadic regression ####
 counts_df_dyadic <- counts_df[,c('dyad_id','node_1_id','node_2_id')]
