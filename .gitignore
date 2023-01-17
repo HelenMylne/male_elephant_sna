@@ -4,6 +4,7 @@
 
 # Session Data files
 .RData
+motnp_bisonr_edgescalculated.RData
 
 # User-specific files
 .Ruserdata
