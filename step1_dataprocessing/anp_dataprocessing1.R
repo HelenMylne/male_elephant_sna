@@ -1,8 +1,8 @@
-#### Information ####
+#### information ####
 # Data collected by Amboseli Trust for Elephants (ATE) 1972-2021
 # Data supplied by Vicki Fishlock, 24th February 2022
 
-#### Set up ####
+#### set up ####
 #library(tidyverse, lib.loc = '../packages/')
 #library(lubridate, lib.loc = '../packages/')
 #library(janitor, lib.loc = '../packages/')
@@ -19,7 +19,7 @@ library(readxl)
 library(data.table)
 library(spatsoc)
 
-#### Import sightings data ####
+#### import sightings data ####
 ate <- readxl::read_xlsx('../data_raw/Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx') %>% 
   janitor::clean_names()# %>% 
   #select(-obs_casename, -row_num)
@@ -117,7 +117,7 @@ rm(ate_nums, date_row, test, gps, i, no_gps, test_nums)
 ## progress report
 print(paste0('sightings data imported at ', Sys.time()))
 
-#### Import nodes data ####
+#### import nodes data ####
 nodes_old <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 
 nodes <- readxl::read_excel('../data_raw/Raw_ATE_LifeHistoryData_Fishlock220808.xlsx') %>% janitor::clean_names() %>% distinct()
@@ -156,11 +156,6 @@ ate$observation_number <- as.integer(as.factor(ate$obs_id))
 save.image('ate_dataprocessing1_preparallelisation.RData')
 load('ate_dataprocessing1_preparallelisation.RData')
 
-# create smaller test dataset
-#random_eles <- sample(ate$id, 30, replace = F)
-#ate_test <- ate[ate$id %in% random_eles,]
-#ate_test$observation_number <- as.integer(as.factor(ate_test$obs_id))
-
 # set the size of the blocks
 block_size <- 50
 
@@ -186,6 +181,7 @@ block_table <- pivot_longer(block_table, cols = everything(), names_to = 'block'
 block_table$block <- ifelse(block_table$block == 'block1', '1', block_table$block)
 block_table$block <- as.numeric(block_table$block)
 block_table
+
 #ate_test <- left_join(ate_test, block_table, by = "observation_number")
 ate <- left_join(ate, block_table, by = "observation_number")
 
@@ -197,60 +193,15 @@ gbi_df <- data.frame(node_1 = rep(NA, nrows),
                      obs_id = rep(NA, nrows),
                      block = rep(NA, nrows))
 
-# prepare for loop
-sorted_unique_blocks <- sort(unique(ate$block))
-num_unique_blocks <- length(sorted_unique_blocks)
-
 # load library, create cluster
 lapply(c("foreach", "doParallel"), require, character.only = TRUE)
 library(parallel)
 cl <- makeCluster(detectCores()) # can replace detectCores() with a number if known
 registerDoParallel(cl)
 
-# create empty data frame
-nrows <- (length(unique(ate$id))-1) * nrow(ate)
-gbi_df <- data.frame(node_1 = rep(NA, nrows),
-                     node_2 = rep(NA, nrows),
-                     social_event = rep(NA, nrows),
-                     obs_id = rep(NA, nrows),
-                     block = rep(NA, nrows))
 
-#### Function to be parallelised ####
-# option 1 ####
-process_blocks <- function(block_data){
-  num_rows <- max(block_data$observation_number) - min(block_data$observation_number)
-  # Pre-allocate list (might need to make dataframe)
-  rows <- list( node_1 = rep(NA, num_rows),
-                node_2 = rep(NA, num_rows),
-                social_event = rep(NA, num_rows),
-                obs_id = rep(NA, num_rows),
-                block = rep(NA, num_rows))
-  
-  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
-    row_index <- 1
-    for (i in which(gbi_matrix[obs_id, ] == 1)) {
-      for (j in 1:ncol(gbi_matrix)) {
-        if (i != j) {
-          node_1 <- ifelse(i < j, i, j)
-          node_2 <- ifelse(i < j, j, i)
-          
-          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
-          rows[row_index,] <- list(node_1 = node_1,
-                                   node_2 = node_2,
-                                   social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
-                                   obs_id = obs_id,
-                                   block = block)
-          print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
-        }
-      }
-    }
-    row_index <- row_index + 1
-  }
-  return(rows)
-}
-
-# option2 ####
-process_blocks <- function(block_data){
+# Function to be parallelised
+process_blocks <- function(block_data) {
   num_rows <- (length(unique(ate$id))-1) * nrow(block_data)
   # Pre-allocate list (might need to make dataframe)
   rows <- data.frame( node_1 = rep(NA, num_rows),
@@ -260,6 +211,7 @@ process_blocks <- function(block_data){
                       block = rep(NA, num_rows))
   
   for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
+    #row_index <- 1
     for (i in which(gbi_matrix[obs_id, ] == 1)) {
       for (j in 1:ncol(gbi_matrix)) {
         if (i != j) {
@@ -267,21 +219,26 @@ process_blocks <- function(block_data){
           node_2 <- ifelse(i < j, j, i)
           
           empty_row <- which(is.na(rows$node_1) == TRUE)[1]
-          rows[empty_row,] <- data.frame(node_1 = node_1,
-                                         node_2 = node_2,
-                                         social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
-                                         obs_id = obs_id,
-                                         block = block)
+          rows[empty_row, 1] <- node_1
+          rows[empty_row, 2] <- node_2
+          rows[empty_row, 3] <- ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0)
+          rows[empty_row, 4] <- obs_id
+          rows[empty_row, 5] <- block
         }
       }
     }
+    #row_index <- row_index + 1
+    #if(obs_id %% 10 == 0) {print(obs_id)}
+    #if(obs_id %% 10 == 0) {print(Sys.time())}
+    #print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
   }
   return(rows)
-  print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
 }
 
 #### run loop ####
-# option 1 ####
+sorted_unique_blocks <- sort(unique(ate$block))
+num_unique_blocks <- length(sorted_unique_blocks)
+
 foreach(block_id = 1:num_unique_blocks) %dopar% {
   # break down data by block
   block <- sorted_unique_blocks[block_id]
@@ -295,190 +252,9 @@ foreach(block_id = 1:num_unique_blocks) %dopar% {
                        block = rep(NA, nrows))
   # run process_blocks
   gbi_df <- process_blocks(block_data)
+  process_blocks(block_data)
   # save output
   saveRDS(gbi_df, paste0('../data_processed/anp_bayesian_allpairwiseevents_block',block,'.RDS'))
+  print(paste0('block ', block, ' finished at ', Sys.time()))
   gbi_df
 }
-
-# option 2 ####
-gbi_df <- foreach(block_id = 1:num_unique_blocks, .packages = 'tidyverse') %dopar% {
-  # break down data by block
-  block <- sorted_unique_blocks[block_id]
-  block_data <- ate[ate$block %in% block,]
-  # run process_blocks
-  process_blocks(block_data)
-  saveRDS(x, paste0('../data_processed/anp_bayesian_allpairwiseevents_block',block,'.RDS'))
-  print(paste0('block ', block, ' finished at time ', Sys.time()))
-}
-save(gbi_df, file = 'anp_bayesian_allpairwiseevents_allblocks.RData')
-
-x <- readRDS('../data_processed/anp_bayesian_allpairwiseevents.RDS')
-table(x$obs_id)
-
-a <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block231.RDS')
-table(a$obs_id)
-
-b <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block1.RDS')
-table(b$obs_id)
-
-c <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block7.RDS')
-table(c$obs_id)
-
-d <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block11.RDS')
-table(d$obs_id)
-
-e <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block43.RDS')
-table(e$obs_id)
-
-f <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block112.RDS')
-table(f$obs_id)
-
-g <- readRDS('../data_processed/anp_bayesian_allpairwiseevents_block388.RDS')
-table(g$obs_id)
-
-######## old stuff #########
-#### Dan code to run processing loop -- I think this is wrong as I don't think I need indices of min and max observations, but the actual values themselves ####
-# Load the parallel package
-library(parallel)
-
-# Create a cluster with 4 worker processes
-cl <- makeCluster(4)
-
-# Use apply to apply function to each element of sort(unique(ate$block))
-output <- apply(X = as.matrix(sort(unique(ate_test$block))), 1, function(block) { # this gives me dim(X)=0 and won't run -- convert to matrix?
-  block_data <- ate_test[ate_test$block %in% block,]
-  # Use which.min and which.max to get indices of min and max observation numbers
-  min_obs_id <- which.min(block_data$observation_number)
-  max_obs_id <- which.max(block_data$observation_number)
-  # Use mclapply to parallelize the loop
-  mclapply(min_obs_id:max_obs_id, function(obs_id) {
-    for (i in which(gbi_matrix[obs_id, ] == 1)) {
-      for (j in 1:ncol(gbi_matrix)) {
-        if (i != j) {
-          # Use ifelse to combine the two if statements
-          node_1 <- ifelse(i < j, i, j)
-          node_2 <- ifelse(i < j, j, i)
-          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
-          gbi_df[empty_row, ] <- list(node_1 = node_1,
-                                      node_2 = node_2,
-                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
-                                      obs_id = obs_id,
-                                      block = block)
-        }
-      }
-    }
-    print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
-  }, mc.cores = cl)
-  # Stop the cluster after the parallelization is finished
-  stopCluster(cl)
-})
-
-#### altered Dan code to run processing loop -- actually forming the cluster seems to be the problem, as mc.cores won't accept cl as a list but can't covert it to an integer, but unlisting it or just putting in 4 then creates an invalid connection ####
-# Load the parallel package
-library(parallel)
-
-# Create a cluster with 4 worker processes
-cl <- makeCluster(4)
-
-# Use apply to apply function to each element of sort(unique(ate$block))
-output <- apply(X = as.matrix(sort(unique(ate_test$block))), 1, function(block) {
-  block_data <- ate_test[ate_test$block %in% block,]
-  # Get min and max observation numbers -- run from first observation to last (don't want indices because ate dataframe is not arranged in order for some reason, so won't necessarily have first and last observations at start and end, so running first:last by indices can skip over some )
-  min_obs_id <- min(block_data$observation_number)
-  max_obs_id <- max(block_data$observation_number)
-  # Use mclapply to parallelize the loop
-  mclapply(min_obs_id:max_obs_id, function(obs_id, cl) {
-    for (i in which(gbi_matrix[obs_id, ] == 1)) {
-      for (j in 1:ncol(gbi_matrix)) {
-        if (i != j) {
-          # Use ifelse to combine the two if statements
-          node_1 <- ifelse(i < j, i, j)
-          node_2 <- ifelse(i < j, j, i)
-          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
-          gbi_df[empty_row, ] <- list(node_1 = node_1,
-                                      node_2 = node_2,
-                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
-                                      obs_id = obs_id,
-                                      block = block)
-        }
-      }
-    }
-    print(paste0('obs_id ', obs_id, ' in block ', block, ' finished at time ', Sys.time()))
-  }, mc.cores = 4)  # using cl here seems to have a problem because it wants an integer value and makeCluster() produces a list
-  # Stop the cluster after the parallelization is finished
-  stopCluster(cl)
-})
-
-# remove 0 social events
-associations <- gbi_df[gbi_df$social_event == 1 & !is.na(gbi_df$node_1),]
-
-# save outputs
-saveRDS(object = gbi_df, file = '../data_processed/anp_bayesian_allpairwiseevents.RDS')
-saveRDS(object = associations, file = '../data_processed/anp_bayesian_associatingpairwiseevents.RDS')
-
-
-
-######### old old stuff ###########
-# loop through each block and extract the corresponding data - UNPARALLELISED VERSION ####
-for (block in sort(unique(ate$block))) {
-  block_data <- ate[ate$block %in% block,]
-  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
-    for (i in which(gbi_matrix[obs_id, ] == 1)) {
-      for (j in 1:ncol(gbi_matrix)) {
-        if (i != j) {
-          if (i < j) {
-            node_1 <- i
-            node_2 <- j
-          } else {
-            node_1 <- j
-            node_2 <- i
-          }
-          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
-          gbi_df[empty_row, ] <- list(node_1 = node_1,
-                                      node_2 = node_2,
-                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
-                                      obs_id = obs_id,
-                                      block = block)
-        }
-      }
-    }
-    #if(obs_id %% 10 == 0) {print(obs_id)}
-    #if(obs_id %% 10 == 0) {print(Sys.time())}
-  }
-  print(paste0('block ', block, ' finished at time ', Sys.time()))
-}
-gbi_df
-
-# loop through each block and extract the corresponding data - PARALLELISED VERSION ####
-# create a cluster object that specifies the number of cores that we want to use for parallel execution
-library(parallel)
-cl <- makeCluster(detectCores())
-
-# use the 'parLapply' function to parallelize the outermost loop (arguments: cluster object, list of values that we want to iterate over, function that we want to apply to each value in the list = body of the outermost loop)
-parLapply(cl, sort(unique(ate$block)), function(block) {
-  block_data <- ate[ate$block %in% block,]
-  for (obs_id in min(block_data$observation_number):max(block_data$observation_number)) {
-    for (i in which(gbi_matrix[obs_id, ] == 1)) 
-      for (j in 1:ncol(gbi_matrix)) {
-        if (i != j) {
-          if (i < j) {
-            node_1 <- i
-            node_2 <- j
-          } else {
-            node_1 <- j
-            node_2 <- i
-          }
-          empty_row <- which(is.na(gbi_df$node_1) == TRUE)[1]
-          gbi_df[empty_row, ] <- list(node_1 = node_1,
-                                      node_2 = node_2,
-                                      social_event = ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0),
-                                      obs_id = obs_id,
-                                      block = block)
-        }
-      }
-    print(paste0('obs_id ', obs_id, ' in block ', block, 'finished at time ', Sys.time()))
-  }
-})
-
-# Finally, we stop the cluster when we are done
-stopCluster(cl)
