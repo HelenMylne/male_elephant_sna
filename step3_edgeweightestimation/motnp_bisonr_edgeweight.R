@@ -5,6 +5,8 @@ library(dplyr)
 library(rstan)
 library(cmdstanr)
 library(bisonR)
+library(asnipe)
+library(sna)
 
 # information
 sessionInfo()
@@ -133,6 +135,11 @@ counts_df <- counts_df %>%
   filter(age_cat_id_1 > 3) %>% 
   filter(age_cat_id_2 > 3)
 
+### remove dead males
+counts_df <- counts_df %>% 
+  filter(name_1 != 'Richard' & name_2 != 'Richard') %>% 
+  filter(name_1 != 'Gabriel' & name_2 != 'Gabriel')
+
 ### create nodes id variable which is 1:max(id) as currently covers all elephants, not just males
 counts_df$node_1_males <- as.integer(as.factor(counts_df$node_1_nogaps))
 counts_df$node_2_males <- as.integer(as.factor(counts_df$node_2_nogaps))+1
@@ -146,16 +153,18 @@ counts_df_model <- counts_df[, c('node_1_males','node_2_males','event_count','co
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### set priors
-priors <- get_default_priors('binary')
-priors$edge <- 'normal(-1, 2)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
-priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
-prior_check(priors, 'binary')
+priors <- get_default_priors('binary_conjugate')
+priors$edge <- 'beta(2,2)'
+#priors$edge <- 'normal(-1, 2)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
+#priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
+prior_check(priors, 'binary_conjugate')
 
 ### run edge weight model
 motnp_edge_weights <- bison_model(
   ( event | duration ) ~ dyad(node_1_id, node_2_id), 
   data = counts_df_model, 
-  model_type = "binary",
+  model_type = "binary_conjugate",
+  #partial_pooling = TRUE,
   #mc_cores = 4,
   priors = priors
 )
@@ -167,6 +176,7 @@ plot_predictions(motnp_edge_weights, num_draws = 20, type = "point")
 
 ### extract edge weight summaries
 edgelist <- get_edgelist(motnp_edge_weights, ci = 0.9, transform = TRUE)
+plot(density(edgelist$median))
 summary(motnp_edge_weights)
 
 ### save workspace image for reloading at a later date that doesn't require running model again
@@ -180,7 +190,7 @@ load('motnp_bisonr_edgescalculated.RData')
 motnp_edges_null <- bison_model(
   (event | duration) ~ 1, 
   data = counts_df_model, 
-  model_type = "binary",
+  model_type = "binary_conjugate",
   priors = priors
 )
 
@@ -282,4 +292,176 @@ plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
 ### plot network
 plot_network_threshold2(obj = motnp_edge_weights, threshold = 0.2,
                         vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
+
+
+#### check model output ####
+### load in workspace image with edge weights already calculated
+load('motnp_bisonr_edgescalculated.RData')
+
+### compare edge weight distributions to simple SRI ####
+head(edgelist)
+colnames(edgelist)[1:2] <- colnames(counts_df_model)[1:2]
+edgelist$node_1_id <- as.integer(edgelist$node_1_id) ; edgelist$node_2_id <- as.integer(edgelist$node_2_id)
+summary <- left_join(edgelist, counts_df_model, by = c('node_1_id','node_2_id'))
+summary$sri <- summary$event / (summary$duration)
+
+plot(density(summary$sri))
+lines(density(summary$median), col = 'blue')
+lines(density(summary$`5%`), col = 'red')
+lines(density(summary$`95%`), col = 'green')
+
+plot(density(summary$sri[which(summary$duration >= 8)]), xlim = c(0,1))
+lines(density(summary$median[which(summary$duration >= 8)]), col = 'blue')
+lines(density(summary$`5%`[which(summary$duration >= 8)]), col = 'red')
+lines(density(summary$`95%`[which(summary$duration >= 8)]), col = 'green')
+
+plot(density(summary$sri[which(summary$duration >= 12)]), xlim = c(0,1))
+lines(density(summary$median[which(summary$duration >= 12)]), col = 'blue')
+lines(density(summary$`5%`[which(summary$duration >= 12)]), col = 'red')
+lines(density(summary$`95%`[which(summary$duration >= 12)]), col = 'green')
+
+certain_sri <- summary[summary$sri == 1,]
+plot(density(certain_sri$sri), xlim = c(0,1))
+lines(density(certain_sri$median), col = 'blue') # just above 0.5
+lines(density(certain_sri$`5%`), col = 'red')    # very low 
+lines(density(certain_sri$`95%`), col = 'green') # very high -- overall just very high uncertainty
+
+# try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
+dyads <- counts_df[,c('dyad_id','node_1_males','node_2_males')]
+colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
+dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))
+length(which(is.na(dyads$duration) == TRUE))
+
+draws <- as.data.frame(motnp_edge_weights$chain) %>% pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
+draws$dyad_id <- rep(counts_df$dyad_id, 4000) ## IS THIS RIGHT??
+draws$weight <- gtools::inv.logit(draws$edge)
+draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
+draws <- left_join(draws, dyads, by = 'dyad_id')
+draws$sri <- draws$event / draws$duration
+
+set.seed(15)
+subset_draws <- draws[draws$dyad_id %in% sample(draws$dyad_id, 150, replace = F),]
+subset_draws$median <- NA
+for(i in 1:nrow(subset_draws)){
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
+}
+head(subset_draws)
+which(is.na(subset_draws$median) == TRUE)[1]
+
+ggplot(data = subset_draws, mapping = aes(x = weight))+
+  geom_density(colour = 'blue')+
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_model_vs_sri.csv')
+
+subset_draws <- draws[draws$sri > 0.2,]
+subset_draws$median <- NA
+for(i in 1:nrow(subset_draws)){
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
+}
+head(subset_draws)
+which(is.na(subset_draws$median) == TRUE)[1]
+
+ggplot(data = subset_draws, mapping = aes(x = weight))+
+  geom_density(colour = 'blue')+
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15)+
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+
+ggplot(data = subset_draws, mapping = aes(x = weight))+
+  geom_density(colour = 'blue')+
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_model_vs_sri.csv')
+
+# clean environment
+rm(draws, dyads, priors, subset_draws, x)
+
+### coefficient of variation of edge weights (aka social differentation) ####
+global_cv <- extract_metric(motnp_edge_weights, "global_cv")
+head(global_cv)
+hist(global_cv)
+
+# create gbi_matrix
+eles <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv', delim = ',')
+eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_') # make single variable for unique locations
+eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]            # rearrange variables
+nodes <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv', delim = ',') # read in node data
+colnames(nodes)
+str(nodes)
+eles_asnipe <- eles[,c(3,4,2,5)]                                       # date, time, elephant, location
+eles_asnipe$Date <- as.integer(eles_asnipe$date)                       # make date numeric
+eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)         # start from 1, not 1st January 1970
+eles_asnipe$Time <- ifelse(eles_asnipe$time > 1, NA, eles_asnipe$time) # time = proportion of day so anything >1 has to be wrong
+eles_asnipe$Time <- eles_asnipe$Time*(24*60*60)                        # convert time values to seconds through day
+which(is.na(eles_asnipe$Time))                                         # 161 698 1122 1469 1770
+eles_asnipe[c(161,698,1122,1469,1770),]                                # all 1 sighting of B7+M44
+eles_asnipe <- eles_asnipe[,c(5,6,3,4)]                                # create data frame to produce gbi matrix from
+colnames(eles_asnipe) <- c('Date','Time','ID','Location')              # rename variables for get_gbi
+eles_asnipe$ID <- as.character(eles_asnipe$ID)                         # correct data type
+str(eles_asnipe)
+eles_asnipe$d_pad <- str_pad(eles_asnipe$Date, 3, pad = '0')  # 0-pad dates
+eles_asnipe$encounter <- paste(eles_asnipe$d_pad, eles_asnipe$Time, eles_asnipe$Location, sep = '_') # unique value for each sighting
+eles_asnipe$group <- as.integer(as.factor(eles_asnipe$encounter)) # unique factor for every sighting
+max(eles_asnipe$group)                         # 574 -- agrees with number of different sightings for which elephants were identified
+eles_dt <- eles_asnipe[,c(3,7)]                # create data table for gbi matrix
+eles_dt <- data.table::setDT(eles_dt)          # create data table for gbi matrix
+gbi_matrix <- spatsoc::get_gbi(DT = eles_dt, group = 'group', id = 'ID')  # create gbi matrix
+
+# obtain 100,000 random permutations of network and compare distribution to global_cv
+N <- 100000                                                                     # number of permutations
+random_networks <- asnipe::network_permutation(association_data = gbi_matrix,          # permute network
+                                               #association_matrix = gbi_matrix,
+                                               permutations = N)
+cv_random_networks <- rep(0,N)                                                  # generate empty vector to fill with cv values
+for (i in c(1:N)) {
+  net_rand <- random_networks[i,,]
+  cv_random_networks[i] <- extract_metric(net_rand,'global_cv')
+}
+
+cv_random_nodes <- rep(0,N)
+for (i in c(1:N)) {
+  net_rand <- sna::rmperm(network)
+  cv_random_nodes[i] <- extract_metric(net_rand,'global_cv')
+}
+
+ggplot()+
+  geom_histogram(mapping = aes(xintercept = global_cv))+
+  geom_density(mapping = aes(x = cv_random_networks), colour = 'blue')+
+  geom_density(mapping = aes(x = cv_random_nodes), colour = 'red')
+  
+### standard deviation edge weight
+edge_weight <- extract_metric(motnp_edge_weights, "edge_weight")
+head(edge_weight)
+summary$std <- NA
+for(i in 1:nrow(summary)){
+  summary$std[i] <- sd(edge_weight[,i])
+}
+hist(summary$std)
+
+hist(summary$std/summary$median)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
