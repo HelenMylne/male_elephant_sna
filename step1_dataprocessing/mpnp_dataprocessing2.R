@@ -16,92 +16,22 @@ library(igraph, lib.loc = 'packages/')      # library(igraph)
 
 ########## Create initial data ###########
 #### read in processed data files ####
-aa <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1.250_22.03.10.csv') %>% distinct()
-ab <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings251.387_22.03.08.csv') %>% distinct()
-ac <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings388.400_22.03.08.csv') %>% distinct()
-ad <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings401.450_22.03.08.csv') %>% distinct()
-ae <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings451.500_22.03.08.csv') %>% distinct()
-af <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings501.550_22.03.08.csv') %>% distinct()
-ag <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings551.600_22.03.08.csv') %>% distinct()
-ah <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings601.650_22.03.08.csv') %>% distinct()
-ai <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings651.700_22.03.08.csv') %>% distinct()
-aj <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings701.750_22.03.08.csv') %>% distinct()
-ak <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings751.800_22.03.08.csv') %>% distinct()
-al <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings801.850_22.03.08.csv') %>% distinct()
-am <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings851.900_22.03.08.csv') %>% distinct()
-an <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings901.950_22.03.08.csv') %>% distinct()
-ao <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings951.1000_22.03.08.csv') %>% distinct()
-ap <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1001.1050_22.03.08.csv') %>% distinct()
-aq <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1051.1100_22.03.08.csv') %>% distinct()
-ar <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1101.1150_22.03.08.csv') %>% distinct()
-as <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1151.1200_22.03.08.csv') %>% distinct()
-at <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1201.1250_22.03.08.csv') %>% distinct()
-au <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1251.1300_22.03.08.csv') %>% distinct()
-av <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1301.1350_22.03.08.csv') %>% distinct()
-aw <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1351.1400_22.03.08.csv') %>% distinct()
-ax <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1401.1450_22.03.08.csv') %>% distinct()
-ay <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1451.1500_22.03.08.csv') %>% distinct()
-az <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1501.1550_22.03.08.csv') %>% distinct()
-
-ba <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1551.1600_22.03.08.csv') %>% distinct()
-bb <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1601.1650_22.03.08.csv') %>% distinct()
-bc <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1651.1700_22.03.08.csv') %>% distinct()
-bd <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1701.1750_22.03.08.csv') %>% distinct()
-be <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1751.1800_22.03.08.csv') %>% distinct()
-bf <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1801.1850_22.03.08.csv') %>% distinct()
-bg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1851.1900_22.03.08.csv') %>% distinct()
-bh <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1901.1950_22.03.08.csv') %>% distinct()
-bi <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1951.2000_22.03.08.csv') %>% distinct()
-bj <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2001.2050_22.03.08.csv') %>% distinct()
-bk <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2051.2100_22.03.08.csv') %>% distinct()
-bl <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2101.2150_22.03.08.csv') %>% distinct()
-bm <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2151.2200_22.03.08.csv') %>% distinct()
-bn <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2201.2250_22.03.08.csv') %>% distinct()
-bo <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2251.2300_22.03.08.csv') %>% distinct()
-bp <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2301.2350_22.03.08.csv') %>% distinct()
-bq <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2351.2400_22.03.08.csv') %>% distinct()
-br <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2401.2450_22.03.08.csv') %>% distinct()
-bs <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2451.2500_22.03.08.csv') %>% distinct()
-bt <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2501.2550_22.03.08.csv') %>% distinct()
-bu <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2551.2600_22.03.08.csv') %>% distinct()
-bv <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2601.2650_22.03.08.csv') %>% distinct()
-bw <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2651.2700_22.03.08.csv') %>% distinct()
-bx <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2701.2750_22.03.08.csv') %>% distinct()
-by <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2751.2800_22.03.08.csv') %>% distinct()
-bz <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2801.2850_22.03.08.csv') %>% distinct()
-
-ca <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2851.2900_22.03.08.csv') %>% distinct()
-cb <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2901.2950_22.03.08.csv') %>% distinct()
-cc <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2951.3000_22.03.08.csv') %>% distinct()
-cd <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3001.3050_22.03.08.csv') %>% distinct()
-ce <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3051.3100_22.03.08.csv') %>% distinct()
-cf <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3101.3150_22.03.08.csv') %>% distinct()
-cg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3151.3200_22.03.08.csv') %>% distinct()
-ch <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3201.3250_22.03.08.csv') %>% distinct()
-ci <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3251.3300_22.03.08.csv') %>% distinct()
-cj <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3301.3350_22.03.08.csv') %>% distinct()
-ck <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3351.3400_22.03.08.csv') %>% distinct()
-cl <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3401.3450_22.03.08.csv') %>% distinct()
-cm <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3451.3500_22.03.08.csv') %>% distinct()
-cn <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3501.3550_22.03.08.csv') %>% distinct()
-co <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3551.3600_22.03.08.csv') %>% distinct()
-cp <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3601.3650_22.03.08.csv') %>% distinct()
-cq <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3651.3700_22.03.08.csv') %>% distinct()
-cr <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3701.3750_22.03.08.csv') %>% distinct()
-cs <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3751.3765_22.03.08.csv') %>% distinct()
-
-# merge
-all <- rbind(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az,
-             ba,bb,bc,bd,be,bf,bg,bh,bi,bj,bk,bl,bm,bn,bo,bp,bq,br,bs,bt,bu,bv,bw,bx,by,bz,
-             ca,cb,cc,cd,ce,cf,cg,ch,ci,cj,ck,cl,cm,cn,co,cp,cq,cr,cs)
+data_files <- lapply(Sys.glob("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/*.csv"), read.csv)
+all <- as.data.frame(data_files[1])
+for(i in 2:length(data_files)){
+  new_data <- as.data.frame(data_files[i])
+  all <- rbind(all, new_data)
+  rm(new_data)
+}
 length(unique(all$obs_id))          # 3765 -- this was the correct number as produced in the GBI matrix
 
 # clean environment
-rm(aa,ab,ac,ad,ae,af,ag,ah,ai,aj,ak,al,am,an,ao,ap,aq,ar,as,at,au,av,aw,ax,ay,az,ba,bb,bc,bd,be,bf,bg,bh,bi,bj,bk,bl,bm,bn,bo,bp,bq,br,bs,bt,bu,bv,bw,bx,by,bz,ca,cb,cc,cd,ce,cf,cg,ch,ci,cj,ck,cl,cm,cn,co,cp,cq,cr,cs)
+#rm(data_files)
 
-#### Recreate how data were produced to match up obs_id to actual encounters ####
+#### recreate how data were produced to match up obs_id to actual encounters ####
 # sightings data
-s <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')  # import data
+#s <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')  # import data
+s <- readxl::read_excel('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')  # import data
 str(s)
 colnames(s)[c(1:23,57)] <- s[2,c(1:23,57)]                     # set column names to values in second row of dataframe
 colnames(s)[24:56] <- c('CM','CF','CU','CM','CF','CU','JM','JF','JU','YPM','YPF','YPU','OPM','OPF','OPU',
@@ -111,7 +41,8 @@ s <- s[3:nrow(s),]                                             # remove first tw
 s <- janitor::clean_names(s)                                   # clean up
 
 # individual data
-efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')  # read in
+#efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')  # read in
+efa <- readxl::read_excel('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')  # read in
 efa$time_cat <- hour(efa$Time)                                 # identify time category throughout the day
 efa <- separate(efa, Time, into = c('wrong_date','time'), sep = ' ')  # remove wrong date in time column
 efa$time <- as_hms(efa$time)                                   # set true time
@@ -137,7 +68,8 @@ for(i in 1:length(efa_id$total_id)) {          # count total elephants identifie
 }
 efa_id$perc_id <- 100*(efa_id$total_id/efa_id$total_elephants) # calculate proportion of elephants identified from total
 
-efa_gps <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
+#efa_gps <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
+efa_gps <- read_csv('../data_processed/mpnp_eles_long.csv')
 
 length(unique(efa_long$encounter)) # 5162
 length(unique(efa_id$encounter))   # 3736
@@ -213,12 +145,13 @@ rm(observations)
 all$dyad <- paste(all$node_1, all$node_2, sep = '_')              # create unique value per dyad
 all$dyad_id <- as.integer(as.factor(all$dyad))                    # convert to integer
 all$location_id <- as.integer(as.factor(all$location))            # create integer value for GPS locations
+all <- all %>% distinct()                                         # remove duplicates wherever there is an event
 head(all)                                                         # check structure
 
-max(all$date) - min(all$date) # 3430 days. Time period for ALERT data = 581 days --> split into 6 time windows (7 boundaries)
-periods <- seq(from = min(all$date), to = max(all$date), length.out = 7) # create date sequence split into chunks of similar length to MOTNP dataset
-periods[7] <- periods[7]+1 # set to be one higher than the final higher otherwise it takes the last date and creates a whole new period
-events <- all[all$social_event == 1,] ; events <- events[!is.na(events$node_1),] # cuts down to 55490933 dyad pairs from 13043 -- assigning to time window doesn't take forever
+max(all$date) - min(all$date) # 3430 days. Time period for ALERT data = 504 days --> split into 7 time windows (8 boundaries)
+periods <- seq(from = min(all$date), to = max(all$date), length.out = 8) # create date sequence split into chunks of similar length to MOTNP dataset
+periods[8] <- periods[8]+1 # set to be one higher than the final higher otherwise it takes the last date and creates a whole new period
+events <- all[all$social_event == 1,] ; events <- events[!is.na(events$node_1),] # cuts down to 26086 pairs from 55503976 dyad pairs -- assigning to time window doesn't take forever
 events$period <- NA          # create new variable for ID of time window
 for(i in 1:nrow(events)){    # fill time window variable
   events$period[i] <- which(periods <= events$date[i])[length(which(periods <= events$date[i]))] # fill cell with last value in vector
@@ -227,11 +160,11 @@ for(i in 1:nrow(events)){    # fill time window variable
 range(events$obs_id)    # check output
 table(events$period)    # check output
 
-periods ; events[c(sample(x = 1:nrow(events), size = 20, replace = F)),] # visual check that periods have come out right
+periods ; View(events[c(sample(x = 1:nrow(events), size = 20, replace = F)),]) # visual check that periods have come out right
 
 # check elephants all match up
 length(unique(all$node_1)) ; length(unique(all$node_2))         # check contain the same number of elephants
-length(unique(events$node_1)) ; length(unique(events$node_2))   # check contain the same number of elephants
+length(unique(events$node_1)) ; length(unique(events$node_2))   # check contain the same number of elephants -- don't need to
 #rm(all)
 
 #### convert to Binomial model data format ####
@@ -243,7 +176,10 @@ head(df_split)                                  # check output
 rm(events)
 
 ### add ID numbers
-eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
+#eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
+#  select(elephant) %>%                                              # take only elephant ID column
+#  distinct()                                                        # select unique values only
+eles <- read_csv('../data_processed/mpnp_eles_long.csv') %>% 
   select(elephant) %>%                                              # take only elephant ID column
   distinct()                                                        # select unique values only
 eles$node_1 <- as.integer(as.factor(eles$elephant))                 # create integer variable
@@ -252,6 +188,7 @@ df <- left_join(df_split, eles, by = 'node_1') %>% distinct()       # add node I
 colnames(eles) <- c('id_2','node_2')                                # rename variables
 df <- left_join(df, eles, by = 'node_2') %>% distinct()             # add node ID to data frame about elephant 2
 head(df) ; tail(df)                                                 # check output
+table(df$event_count)                                               # seems sensible
 rm(df_split)
 
 df$dyad <- paste(df$id_1, df$id_2, sep = '_')  # unique value for every dyad
@@ -289,9 +226,9 @@ head(data, 20)                                                        # check st
 efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% janitor::clean_names()  # read in data
 efa$date <- as_date(efa$date)  # obtain date values
 
-windows <- data.frame(period_start = seq(from = min(efa$date), to = max(efa$date), length.out = 7)[1:6],
-                      period = 1:6,
-                      period_days = periods[1:6])  # identify time windows
+windows <- data.frame(period_start = seq(from = min(efa$date), to = max(efa$date), length.out = 8)[1:7],
+                      period = 1:7,
+                      period_days = periods[1:7])  # identify time windows
 
 ## check all time windows same length
 windows$period_start[1]+windows$period_days[2]-windows$period_days[1]
@@ -299,6 +236,7 @@ windows$period_start[2]+windows$period_days[3]-windows$period_days[2]
 windows$period_start[3]+windows$period_days[4]-windows$period_days[3]
 windows$period_start[4]+windows$period_days[5]-windows$period_days[4]
 windows$period_start[5]+windows$period_days[6]-windows$period_days[5]
+windows$period_start[6]+windows$period_days[7]-windows$period_days[6]
 
 data <- left_join(x = data, y = windows, by = 'period')  # merge time window ID with event data
 head(data)
@@ -320,6 +258,7 @@ mpnp3 <- data[data$period == 3,]  # 3rd time window
 mpnp4 <- data[data$period == 4,]  # 4th time window
 mpnp5 <- data[data$period == 5,]  # 5th time window
 mpnp6 <- data[data$period == 6,]  # 6th time window
+mpnp7 <- data[data$period == 7,]  # 6th time window
 rm(data)
 
 #### add count data per elephant and remove sightings where elephant not seen at all in period ####
@@ -337,8 +276,8 @@ for(i in 1:nrow(sightings)){
 periods ; sightings[sample(1:nrow(sightings),20),]         # visual check that individual dates match time windows
 
 # create data frame of counts per dyad per time window
-counts <- data.frame(id = rep(unique(sightings$elephant), 6),
-                     period = rep(1:6, each = length(unique(sightings$elephant))),
+counts <- data.frame(id = rep(unique(sightings$elephant), 7),
+                     period = rep(1:7, each = length(unique(sightings$elephant))),
                      count_all = NA,
                      count_period = NA)
 for(i in 1:nrow(counts)){
@@ -360,6 +299,7 @@ data3 <- left_join(x = mpnp3, y = counts, by = c('id_1','period')) ; rm(mpnp3)  
 data4 <- left_join(x = mpnp4, y = counts, by = c('id_1','period')) ; rm(mpnp4)  # add id1 count data for 4th time window
 data5 <- left_join(x = mpnp5, y = counts, by = c('id_1','period')) ; rm(mpnp5)  # add id1 count data for 5th time window
 data6 <- left_join(x = mpnp6, y = counts, by = c('id_1','period')) ; rm(mpnp6)  # add id1 count data for 6th time window
+data7 <- left_join(x = mpnp7, y = counts, by = c('id_1','period')) ; rm(mpnp7)  # add id1 count data for 7th time window
 
 data1 <- data1[data1$count_period > 0,]   # remove all dyads id1 was never seen in 1st time window
 data2 <- data2[data2$count_period > 0,]   # remove all dyads id1 was never seen in 2nd time window
@@ -367,6 +307,7 @@ data3 <- data3[data3$count_period > 0,]   # remove all dyads id1 was never seen 
 data4 <- data4[data4$count_period > 0,]   # remove all dyads id1 was never seen in 4th time window
 data5 <- data5[data5$count_period > 0,]   # remove all dyads id1 was never seen in 5th time window
 data6 <- data6[data6$count_period > 0,]   # remove all dyads id1 was never seen in 6th time window
+data7 <- data7[data7$count_period > 0,]   # remove all dyads id1 was never seen in 7th time window
 
 colnames(data1)[11:12] <- c('count_all_1','count_period_1')                     # rename post merging
 colnames(data2)[11:12] <- c('count_all_1','count_period_1')                     # rename post merging
@@ -374,6 +315,7 @@ colnames(data3)[11:12] <- c('count_all_1','count_period_1')                     
 colnames(data4)[11:12] <- c('count_all_1','count_period_1')                     # rename post merging
 colnames(data5)[11:12] <- c('count_all_1','count_period_1')                     # rename post merging
 colnames(data6)[11:12] <- c('count_all_1','count_period_1')                     # rename post merging
+colnames(data7)[11:12] <- c('count_all_1','count_period_1')                     # rename post merging
 
 colnames(counts)[1] <- 'id_2'                                                   # rename ID column for merging
 data1 <- left_join(x = data1, y = counts, by = c('id_2','period'))              # add id2 count data for 1st time window
@@ -382,6 +324,7 @@ data3 <- left_join(x = data3, y = counts, by = c('id_2','period'))              
 data4 <- left_join(x = data4, y = counts, by = c('id_2','period'))              # add id2 count data for 4th time window
 data5 <- left_join(x = data5, y = counts, by = c('id_2','period'))              # add id2 count data for 5th time window
 data6 <- left_join(x = data6, y = counts, by = c('id_2','period'))              # add id2 count data for 6th time window
+data7 <- left_join(x = data7, y = counts, by = c('id_2','period'))              # add id2 count data for 7th time window
 
 data1 <- data1[data1$count_period > 0,]   # remove all dyads id2 was never seen in 1st time window
 data2 <- data2[data2$count_period > 0,]   # remove all dyads id2 was never seen in 2nd time window
@@ -389,6 +332,7 @@ data3 <- data3[data3$count_period > 0,]   # remove all dyads id2 was never seen 
 data4 <- data4[data4$count_period > 0,]   # remove all dyads id2 was never seen in 4th time window
 data5 <- data5[data5$count_period > 0,]   # remove all dyads id2 was never seen in 5th time window
 data6 <- data6[data6$count_period > 0,]   # remove all dyads id2 was never seen in 6th time window
+data7 <- data7[data7$count_period > 0,]   # remove all dyads id2 was never seen in 7th time window
 
 colnames(data1)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
 colnames(data2)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
@@ -396,6 +340,7 @@ colnames(data3)[13:14] <- c('count_all_2','count_period_2')                     
 colnames(data4)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
 colnames(data5)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
 colnames(data6)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
+colnames(data7)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
 
 rm(counts,sightings)
 
@@ -417,13 +362,17 @@ table(data5$count_period_2)  # check id2 counts for 5th time window
 table(data6$count_period_1)  # check id1 counts for 6th time window
 table(data6$count_period_2)  # check id2 counts for 6th time window
 
+table(data7$count_period_1)  # check id1 counts for 6th time window
+table(data7$count_period_2)  # check id2 counts for 6th time window
+
 ## check ID types -- B numbers are identified, T numbers are yet to be identified, F number is a female
 unique(data1$id_1) # 695 B numbers,    1 F number
-unique(data2$id_1) # 554 B numbers,  716 T numbers
-unique(data3$id_1) # 150 B numbers, 2684 T numbers
-unique(data4$id_1) # 111 B numbers, 1204 T numbers
-unique(data5$id_1) #  29 B numbers,  338 T numbers
-unique(data6$id_1) #   2 B numbers,  493 T numbers
+unique(data2$id_1) # 
+unique(data3$id_1) # 
+unique(data4$id_1) # 
+unique(data5$id_1) # 
+unique(data6$id_1) # 
+unique(data7$id_1) # 
 
 ## remove unidentified elephants
 data1_id <- data1 %>%
@@ -462,6 +411,13 @@ data5_id <- data5 %>%
   filter(BT == 'B') %>%                                               # select only identified (B) numbers
   select(-BT, -num)                                                   # remove split variables
 data6_id <- data6 %>%
+  separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>%   # split ID1 number into B/T/F and number 
+  filter(BT == 'B') %>%                                               # select only identified (B) numbers
+  select(-BT, -num) %>%                                               # remove split variables
+  separate(id_2, into = c('BT','num'), sep = 1, remove = FALSE) %>%   # split ID1 number into B/T/F and number
+  filter(BT == 'B') %>%                                               # select only identified (B) numbers
+  select(-BT, -num)                                                   # remove split variables
+data7_id <- data7 %>%
   separate(id_1, into = c('BT','num'), sep = 1, remove = FALSE) %>%   # split ID1 number into B/T/F and number 
   filter(BT == 'B') %>%                                               # select only identified (B) numbers
   select(-BT, -num) %>%                                               # remove split variables
@@ -520,6 +476,7 @@ data3_id <- left_join(x = data3_id, y = eles, by = c('id_1','period'))  # add ID
 data4_id <- left_join(x = data4_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 4th time window
 data5_id <- left_join(x = data5_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 5th time window
 data6_id <- left_join(x = data6_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 6th time window
+data7_id <- left_join(x = data7_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 7th time window
 
 colnames(eles)[c(1,3:6)] <- c('id_2','age_min_2','age_max_2','age_range_2','age_median_2') # rename variables for merging
 data1_id <- left_join(x = data1_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 1st time window
@@ -528,6 +485,7 @@ data3_id <- left_join(x = data3_id, y = eles, by = c('id_2','period'))  # add ID
 data4_id <- left_join(x = data4_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 4th time window
 data5_id <- left_join(x = data5_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 5th time window
 data6_id <- left_join(x = data6_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 6th time window
+data7_id <- left_join(x = data7_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 7th time window
 
 rm(eles, individual)
 
@@ -568,6 +526,12 @@ colnames(data6_id)[6] <- 'together'                                        # ren
 table(data6_id$together)                                                   # check values
 table(data6_id$apart)                                                      # check values
 
+data7_id$count_dyad <- (data7_id$count_period_1 + data7_id$count_period_2) - data7_id$event_count   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
+data7_id$apart <- data7_id$count_dyad - data7_id$event_count               # seen apart = total sightings - seen together
+colnames(data7_id)[7] <- 'together'                                        # rename variable
+table(data7_id$together)                                                   # check values
+table(data7_id$apart)                                                      # check values
+
 ## save data #####
 data1_id <- data1_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 1st time window
 data2_id <- data2_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 2nd time window
@@ -575,13 +539,17 @@ data3_id <- data3_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # sel
 data4_id <- data4_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 4th time window
 data5_id <- data5_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 5th time window
 data6_id <- data6_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 6th time window
+data7_id <- data7_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 6th time window
 
 # write data files
-write_csv(data1_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period1_pairwiseevents.csv')
-write_csv(data2_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period2_pairwiseevents.csv')
-write_csv(data3_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period3_pairwiseevents.csv')
-write_csv(data4_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period4_pairwiseevents.csv')
-write_csv(data5_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period5_pairwiseevents.csv')
+write_csv(data1_id,'../data_processed/mpnp_period1_pairwiseevents.csv')
+write_csv(data2_id,'../data_processed/mpnp_period2_pairwiseevents.csv')
+write_csv(data3_id,'../data_processed/mpnp_period3_pairwiseevents.csv')
+write_csv(data4_id,'../data_processed/mpnp_period4_pairwiseevents.csv')
+write_csv(data5_id,'../data_processed/mpnp_period5_pairwiseevents.csv')
 
 length(unique(data6_id$id_1))   # not usable data -- too few identified individuals
 #write_csv(data6_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period6_pairwiseevents.csv')
+
+length(unique(data7_id$id_1))   # not usable data -- too few identified individuals
+#write_csv(data7_id,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period7_pairwiseevents.csv')
