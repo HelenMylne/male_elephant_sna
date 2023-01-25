@@ -3,20 +3,21 @@
 # Data collected by Elephants for Africa (EfA) 2012-2021
 # Data supplied by Dr Kate Evans
 #### Set up ####
-library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
-library(janitor, lib.loc = 'packages/')     # library(janitor)
-library(lubridate, lib.loc = 'packages/')   # library(lubridate)
-library(hms, lib.loc = 'packages/')         # library(hms)
-library(readxl, lib.loc = 'packages/')      # library(readxl)
-library(dplyr, lib.loc = 'packages/')       # library(dplyr)
+library(tidyverse, lib.loc = '../packages/')   # library(tidyverse)
+library(janitor, lib.loc = '../packages/')     # library(janitor)
+library(hms, lib.loc = '../packages/')         # library(hms)
+library(dplyr, lib.loc = '../packages/')       # library(dplyr)
+library(lubridate, lib.loc = '../packages/')   # library(lubridate)
+library(readxl, lib.loc = '../packages/')      # library(readxl)
 
-library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
-library(rethinking, lib.loc = 'packages/')  # library(rethinking)
-library(igraph, lib.loc = 'packages/')      # library(igraph)
+#library(cmdstanr, lib.loc = '../packages/')    # library(cmdstanr)
+#set_cmdstan_path('../packages/')
+#library(rethinking, lib.loc = '../packages/')  # library(rethinking)
+#library(igraph, lib.loc = '../packages/')      # library(igraph)
 
 ########## Create initial data ###########
 #### read in processed data files ####
-data_files <- lapply(Sys.glob("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/*.csv"), read.csv)
+data_files <- lapply(Sys.glob("../data_processed/mpnp_pairwiseevents/*.csv"), read.csv)
 all <- as.data.frame(data_files[1])
 for(i in 2:length(data_files)){
   new_data <- as.data.frame(data_files[i])
@@ -26,7 +27,7 @@ for(i in 2:length(data_files)){
 length(unique(all$obs_id))          # 3765 -- this was the correct number as produced in the GBI matrix
 
 # clean environment
-#rm(data_files)
+rm(data_files) ; gc()
 
 #### recreate how data were produced to match up obs_id to actual encounters ####
 # sightings data
@@ -81,16 +82,18 @@ efa_gps$latitude[which(efa_gps$latitude < -20)]  <- NA  # anything closer to zer
 
 ### create group-by-individual matrix
 eles_asnipe <- efa_gps[,c(1,4,5,3,14)]                              # encounter, date, time, elephant, location
+eles_asnipe$date <- as.Date(eles_asnipe$date, '%d/%m/%Y')
 eles_asnipe$Date <- as.integer(eles_asnipe$date)                    # convert to integer
-eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)      # start from 1, not 1st January 1970
+eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date, na.rm = T)      # start from 1, not 1st January 1970
 eles_asnipe$Time <- hour(eles_asnipe$time)*60*60 + minute(eles_asnipe$time)*60 + second(eles_asnipe$time) # convert time values to seconds through day
 
 eles_asnipe <- eles_asnipe[,c('encounter','Date','Time','elephant','location')] # select desired columns
 colnames(eles_asnipe)[4] <- 'ID'                                    # rename
 eles_asnipe$ID <- as.character(eles_asnipe$ID)                      # make ID a character variable
 eles_asnipe$d_pad <- str_pad(eles_asnipe$Date, 3, pad = '0')        # pad out date
-eles_asnipe$group <- with(eles_asnipe, paste(Date, Time, location, sep = '_')) # create unique variable per sighting
+eles_asnipe$group <- paste(eles_asnipe$Date, eles_asnipe$Time, eles_asnipe$location, sep = '_') # create unique variable per sighting
 eles_asnipe$group_id <- as.integer(as.factor(eles_asnipe$group))    # unique value per sighting
+eles_asnipe <- eles_asnipe[eles_asnipe$group != 'NA_NA_NA_NA',]
 length(unique(eles_asnipe$encounter))                               # 3736
 length(unique(eles_asnipe$group))                                   # 3765
 
@@ -103,7 +106,7 @@ obs_id <- rownames(gbi_matrix)   # create new variable for sighting ID
 asnipe <- unique(sort(as.integer(as.factor(eles_asnipe$group)))) ; which(obs_id != asnipe) # check if any groups don't match -- both 1:3765 
 
 ## clean up
-rm(efa, efa_gps, efa_id, efa_long, eles_asnipe2, gbi_matrix, s, asnipe, i, obs_id)
+rm(efa, efa_gps, efa_id, efa_long, eles_asnipe2, gbi_matrix, s, asnipe, i, obs_id) ; gc()
 
 #### create new variable to match up obs_id to groups ####
 ### SO: Create a new variable using eles_asnipe group -- do a for loop that adds 1 to the value every time a group changes and retains it whenever it is the same -- this will create a variable which is unique for 3765 encounters but which goes in the same order as the obs_id
@@ -133,13 +136,13 @@ summary(eles_asnipe3$group_id_new)          # min = 1, max = 3765 -- this has wo
 observations <- eles_asnipe3[,c('Date','Time','location','group_id_new')] %>% distinct() # 3765 observations
 
 ## SO... to identify which sightings in main data frame are actually represented in binomial data (all): merge 'observations' data with Binomial social interactions
-rm(eles_asnipe, eles_asnipe3, N)
+rm(eles_asnipe, eles_asnipe3, N) ; gc()
 
 #### merge sightings information into dyad data #####
 colnames(observations) <- c('date', 'time', 'location', 'obs_id') # rename columns
 all <- left_join(x = all, y = observations, by = 'obs_id')        # merge sightings info per dyad
 head(all,10) ; tail(all,10)                                       # check structure
-rm(observations)
+rm(observations) ; gc()
 
 #### convert to Bernoulli model data format -- can't actually use Bernoulli as would require too much computing power ####
 all$dyad <- paste(all$node_1, all$node_2, sep = '_')              # create unique value per dyad
@@ -165,7 +168,6 @@ periods ; View(events[c(sample(x = 1:nrow(events), size = 20, replace = F)),]) #
 # check elephants all match up
 length(unique(all$node_1)) ; length(unique(all$node_2))         # check contain the same number of elephants
 length(unique(events$node_1)) ; length(unique(events$node_2))   # check contain the same number of elephants -- don't need to
-#rm(all)
 
 #### convert to Binomial model data format ####
 df_split <- events %>%
@@ -173,7 +175,7 @@ df_split <- events %>%
   summarise(event_count = sum(social_event),    # convert to a count of sightings
             dyad_id = cur_group_id())
 head(df_split)                                  # check output
-rm(events)
+rm(events) ; gc()
 
 ### add ID numbers
 #eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
@@ -189,7 +191,7 @@ colnames(eles) <- c('id_2','node_2')                                # rename var
 df <- left_join(df, eles, by = 'node_2') %>% distinct()             # add node ID to data frame about elephant 2
 head(df) ; tail(df)                                                 # check output
 table(df$event_count)                                               # seems sensible
-rm(df_split)
+rm(df_split) ; gc()
 
 df$dyad <- paste(df$id_1, df$id_2, sep = '_')  # unique value for every dyad
 df$dyad_id_period <- df$dyad_id                # every dyad has it's own ID number, including if same dyad in a different time window
@@ -204,7 +206,7 @@ dyads <- left_join(dyads, eles, by = 'id_1')    # merge elephant information int
 colnames(eles) <- c('id_2','node_2')            # rename variables for merging
 dyads <- left_join(dyads, eles, by = 'id_2')    # merge elephant information into dyad data frame
 dyads <- dyads[dyads$node_1 < dyads$node_2,]    # remove any rows where id1 = id2 and duplicates (id2_id1)
-rm(all, eles, i)
+rm(all, eles, i) ; gc()
 
 dyads <- data.frame(id_1 = rep(dyads$id_1, length(unique(df$period))),        # reform data frame to the structure desired
                     id_2 = rep(dyads$id_2, length(unique(df$period))),
@@ -223,7 +225,8 @@ data$dyad <- paste(data$id_1, data$id_2, sep = '_')                   # create c
 data$dyad_id <- as.integer(as.factor(data$dyad))                      # create numeric variable with unique value per dyad
 head(data, 20)                                                        # check structure
 
-efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% janitor::clean_names()  # read in data
+#efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% janitor::clean_names()  # read in data
+efa <- readxl::read_excel('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% janitor::clean_names()  # read in data
 efa$date <- as_date(efa$date)  # obtain date values
 
 windows <- data.frame(period_start = seq(from = min(efa$date), to = max(efa$date), length.out = 8)[1:7],
@@ -241,14 +244,14 @@ windows$period_start[6]+windows$period_days[7]-windows$period_days[6]
 data <- left_join(x = data, y = windows, by = 'period')  # merge time window ID with event data
 head(data)
 
-#### write to file ####
-write_delim(data, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_bayesian_pairwiseevents_22.05.30.csv', delim = ',')
-
 ## clean environment
-rm(df, dyads, efa)
+rm(df, dyads, efa, periods, windows) ; gc()
+
+#### write to file ####
+saveRDS(data, '../data_processed/mpnp_bayesian_pairwiseevents.RDS')
 
 ########## add additional information and remove impossible sightings ##########
-#data <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_bayesian_pairwiseevents_22.05.30.csv')
+#data <- readRDS('../data_processed/mpnp_bayesian_pairwiseevents.RDS')
 
 #### break down into periods so easier to manipulate ####
 table(data$period)
@@ -258,22 +261,27 @@ mpnp3 <- data[data$period == 3,]  # 3rd time window
 mpnp4 <- data[data$period == 4,]  # 4th time window
 mpnp5 <- data[data$period == 5,]  # 5th time window
 mpnp6 <- data[data$period == 6,]  # 6th time window
-mpnp7 <- data[data$period == 7,]  # 6th time window
-rm(data)
+mpnp7 <- data[data$period == 7,]  # 7th time window
+rm(data) ; gc()
 
 #### add count data per elephant and remove sightings where elephant not seen at all in period ####
 # insert column for sighting period
-sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
-sightings <- sightings[,c(3,4)]                            # select only elephant ID and date columns
+#sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
+sightings <- read_csv('../data_processed/mpnp_eles_long.csv')
+sightings <- sightings[!is.na(sightings$elephant),c(3,4)]                            # select only elephant ID and date columns
+sightings$date <- as.Date(sightings$date, '%d/%m/%Y')                # numeric date
 sightings$day <- as.numeric(sightings$date)                # numeric date
 sightings$day <- sightings$day - (min(sightings$day)-1)    # convert date to start at 1 on first day of study
 summary(sightings$day)
+
+periods <- seq(from = min(sightings$day), to = max(sightings$day), length.out = 8) # create date sequence split into chunks of similar length to MOTNP dataset
+periods[8] <- periods[8]+1 # set to be one higher than the final higher otherwise it takes the last date and creates a whole new period
 
 sightings$period <- NA                                     # create new variable for the time window
 for(i in 1:nrow(sightings)){
   sightings$period[i] <- which(periods <= sightings$day[i])[length(which(periods <= sightings$day[i]))] # set time window value as last value in vector
 }
-periods ; sightings[sample(1:nrow(sightings),20),]         # visual check that individual dates match time windows
+periods ; View(sightings[sample(1:nrow(sightings),20),])         # visual check that individual dates match time windows
 
 # create data frame of counts per dyad per time window
 counts <- data.frame(id = rep(unique(sightings$elephant), 7),
@@ -286,7 +294,7 @@ for(i in 1:nrow(counts)){
   counts$count_period[i] <- nrow(individual[individual$period == counts$period[i],])  # count sighitngs within time window = number of rows where time window matches
   if(i %% 1000 == 0) {print(i)}
 }
-rm(individual, i)
+rm(individual, i) ; gc()
 
 summary(counts$count_all)      # check output
 summary(counts$count_period)   # check output
@@ -300,6 +308,7 @@ data4 <- left_join(x = mpnp4, y = counts, by = c('id_1','period')) ; rm(mpnp4)  
 data5 <- left_join(x = mpnp5, y = counts, by = c('id_1','period')) ; rm(mpnp5)  # add id1 count data for 5th time window
 data6 <- left_join(x = mpnp6, y = counts, by = c('id_1','period')) ; rm(mpnp6)  # add id1 count data for 6th time window
 data7 <- left_join(x = mpnp7, y = counts, by = c('id_1','period')) ; rm(mpnp7)  # add id1 count data for 7th time window
+gc()
 
 data1 <- data1[data1$count_period > 0,]   # remove all dyads id1 was never seen in 1st time window
 data2 <- data2[data2$count_period > 0,]   # remove all dyads id1 was never seen in 2nd time window
@@ -342,7 +351,7 @@ colnames(data5)[13:14] <- c('count_all_2','count_period_2')                     
 colnames(data6)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
 colnames(data7)[13:14] <- c('count_all_2','count_period_2')                     # rename post merging
 
-rm(counts,sightings)
+rm(counts,sightings) ; gc()
 
 table(data1$count_period_1)  # check id1 counts for 1st time window
 table(data1$count_period_2)  # check id2 counts for 1st time window
@@ -362,17 +371,80 @@ table(data5$count_period_2)  # check id2 counts for 5th time window
 table(data6$count_period_1)  # check id1 counts for 6th time window
 table(data6$count_period_2)  # check id2 counts for 6th time window
 
-table(data7$count_period_1)  # check id1 counts for 6th time window
-table(data7$count_period_2)  # check id2 counts for 6th time window
+table(data7$count_period_1)  # check id1 counts for 7th time window
+table(data7$count_period_2)  # check id2 counts for 7th time window
+
+## standardise ID -- B and b for same individual
+#standard_b <- function(dataframe){
+#  dataframe <- separate(dataframe, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+#  dataframe$letter <- ifelse(dataframe$letter == 'b', 'B', dataframe$letter)
+#  unique(dataframe$letter)
+#  dataframe$id_1 <- paste0(dataframe$letter, dataframe$number)
+#}
+data1 <- separate(data1, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+data1$letter <- ifelse(data1$letter == 'b', 'B', data1$letter)
+data1$id_1 <- paste0(data1$letter, data1$number)
+data1 <- separate(data1, col = 'id_2', into = c('letter','number'), remove = TRUE, sep = 1)
+data1$letter <- ifelse(data1$letter == 'b', 'B', data1$letter)
+data1$id_2 <- paste0(data1$letter, data1$number)
+data1 <- data1[,c(1,4:16)]
+
+data2 <- separate(data2, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+data2$letter <- ifelse(data2$letter == 'b', 'B', data2$letter)
+data2$id_1 <- paste0(data2$letter, data2$number)
+data2 <- separate(data2, col = 'id_2', into = c('letter','number'), remove = TRUE, sep = 1)
+data2$letter <- ifelse(data2$letter == 'b', 'B', data2$letter)
+data2$id_2 <- paste0(data2$letter, data2$number)
+data2 <- data2[,c(15,16,1,2,5:14)]
+
+data3 <- separate(data3, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+data3$letter <- ifelse(data3$letter == 'b', 'B', data3$letter)
+data3$id_1 <- paste0(data3$letter, data3$number)
+data3 <- separate(data3, col = 'id_2', into = c('letter','number'), remove = TRUE, sep = 1)
+data3$letter <- ifelse(data3$letter == 'b', 'B', data3$letter)
+data3$id_2 <- paste0(data3$letter, data3$number)
+data3 <- data3[,c(15,16,1,2,5:14)]
+
+data4 <- separate(data4, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+data4$letter <- ifelse(data4$letter == 'b', 'B', data4$letter)
+data4$id_1 <- paste0(data4$letter, data4$number)
+data4 <- separate(data4, col = 'id_2', into = c('letter','number'), remove = TRUE, sep = 1)
+data4$letter <- ifelse(data4$letter == 'b', 'B', data4$letter)
+data4$id_2 <- paste0(data4$letter, data4$number)
+data4 <- data4[,c(15,16,1,2,5:14)]
+
+data5 <- separate(data5, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+data5$letter <- ifelse(data5$letter == 'b', 'B', data5$letter)
+data5$id_1 <- paste0(data5$letter, data5$number)
+data5 <- separate(data5, col = 'id_2', into = c('letter','number'), remove = TRUE, sep = 1)
+data5$letter <- ifelse(data5$letter == 'b', 'B', data5$letter)
+data5$id_2 <- paste0(data5$letter, data5$number)
+data5 <- data5[,c(15,16,1,2,5:14)]
+
+data6 <- separate(data6, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+data6$letter <- ifelse(data6$letter == 'b', 'B', data6$letter)
+data6$id_1 <- paste0(data6$letter, data6$number)
+data6 <- separate(data6, col = 'id_2', into = c('letter','number'), remove = TRUE, sep = 1)
+data6$letter <- ifelse(data6$letter == 'b', 'B', data6$letter)
+data6$id_2 <- paste0(data6$letter, data6$number)
+data6 <- data6[,c(15,16,1,2,5:14)]
+
+data7 <- separate(data7, col = 'id_1', into = c('letter','number'), remove = TRUE, sep = 1)
+data7$letter <- ifelse(data7$letter == 'b', 'B', data7$letter)
+data7$id_1 <- paste0(data7$letter, data7$number)
+data7 <- separate(data7, col = 'id_2', into = c('letter','number'), remove = TRUE, sep = 1)
+data7$letter <- ifelse(data7$letter == 'b', 'B', data7$letter)
+data7$id_2 <- paste0(data7$letter, data7$number)
+data7 <- data7[,c(15,16,1,2,5:14)]
 
 ## check ID types -- B numbers are identified, T numbers are yet to be identified, F number is a female
-unique(data1$id_1) # 695 B numbers,    1 F number
-unique(data2$id_1) # 
-unique(data3$id_1) # 
-unique(data4$id_1) # 
-unique(data5$id_1) # 
-unique(data6$id_1) # 
-unique(data7$id_1) # 
+unique(data1$id_1) # 638 B numbers,    1 F number
+unique(data2$id_1) # 550 B numbers,  195 T numbers
+unique(data3$id_1) # 181 B numbers, 2401 T numbers
+unique(data4$id_1) # 115 B numbers, 1450 T numbers
+unique(data5$id_1) #  64 B numbers,  733 T numbers
+unique(data6$id_1) #  15 B numbers,  199 T numbers
+unique(data7$id_1) #   2 B numbers,  464 T numbers
 
 ## remove unidentified elephants
 data1_id <- data1 %>%
@@ -425,20 +497,29 @@ data7_id <- data7 %>%
   filter(BT == 'B') %>%                                               # select only identified (B) numbers
   select(-BT, -num)                                                   # remove split variables
 
-#rm(data1, data2, data3, data4, data5, data6)
+#rm(data1, data2, data3, data4, data5, data6, data7) ; gc()
 
 #### add data about individual elephant ages ####
 # read in data
-eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
+#eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
+#  select(elephant, sex, age_range, date) %>%   # read in age data, remove unnecessary variables
+#  distinct()                                   # select unique rows (NOTE -- this is NOT just 1 row per elephant as some have been estimated to be in multiple age categories within a time window)
+eles <- read_csv('../data_processed/mpnp_eles_long.csv') %>% 
   select(elephant, sex, age_range, date) %>%   # read in age data, remove unnecessary variables
   distinct()                                   # select unique rows (NOTE -- this is NOT just 1 row per elephant as some have been estimated to be in multiple age categories within a time window)
+eles$date <- as.Date(eles$date, '%d/%m/%Y')
+eles <- eles[!is.na(eles$elephant),]
 
 # identify period of each sighting
+windows <- data.frame(period_start = seq(from = data1_id$period_start[1], to = data7_id$period_start[1],
+                                         length.out = 7),
+                      period = 1:7,
+                      period_days = periods[1:7])  # identify time windows
 eles$period <- NA                                      # create new variable for time window per elephant sighting
 for(i in 1:nrow(eles)){
   eles$period[i] <- which(windows$period_start <= eles$date[i])[length(which(windows$period_start <= eles$date[i]))] # set time window ID as last value in vector
 }
-windows$period_start ; eles[sample(1:nrow(eles),20),]  # visual check of window against date
+windows$period_start ; View(eles[sample(1:nrow(eles),20),])  # visual check of window against date
 
 eles <- eles %>% separate(elephant, into = c('BT','id_number'), sep = 1, remove = FALSE) %>% # split ID to B/T/F and number
   filter(BT == 'B') %>%                                                                      # remove unidentified elephants
@@ -487,7 +568,7 @@ data5_id <- left_join(x = data5_id, y = eles, by = c('id_2','period'))  # add ID
 data6_id <- left_join(x = data6_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 6th time window
 data7_id <- left_join(x = data7_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 7th time window
 
-rm(eles, individual)
+rm(eles, individual) ; gc()
 
 ### add variable for sightings apart ####
 data1_id$count_dyad <- (data1_id$count_period_1 + data1_id$count_period_2) - data1_id$event_count   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
@@ -539,7 +620,7 @@ data3_id <- data3_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # sel
 data4_id <- data4_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 4th time window
 data5_id <- data5_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 5th time window
 data6_id <- data6_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 6th time window
-data7_id <- data7_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 6th time window
+data7_id <- data7_id[,c(8,7,1:5,9,6,24,12,14,23,15,19,16,20,17,21,18,22)]  # select only necessary variables for 7th time window
 
 # write data files
 write_csv(data1_id,'../data_processed/mpnp_period1_pairwiseevents.csv')
