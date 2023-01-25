@@ -28,7 +28,7 @@ counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.c
 unique(counts_df$sex_1) # FALSE or NA
 sex_1 <- data.frame(sex_1 = counts_df$id_1)
 sex_1 <- sex_1 %>% separate(sex_1, c("sex", "number"), sep = 1, remove = FALSE) ; unique(sex_1$sex) # F, M, U
-counts_df$sex_1 <- as.character(sex_1$sex) ; rm(sex_1)
+counts_df$sex_1 <- as.character(sex_1$sex) ; rm(sex_1) ; gc()
 str(counts_df)  # sex_1 still comes up as logical, but now contains the right levels
 
 # create variable for age difference
@@ -122,7 +122,7 @@ counts_df$node_1_nogaps <- as.integer(as.factor(counts_df$node_1))
 counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
 
 ### remove all except counts data frame
-#rm(list = ls()[which(ls() != 'counts_df')])
+#rm(list = ls()[which(ls() != 'counts_df')]) ; gc()
 
 ### load in ages 
 motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
@@ -193,8 +193,20 @@ motnp_edges_null <- bison_model(
   priors = priors
 )
 
-### compare null model with fitted model
+### compare null model with fitted model -- bisonR model stacking
 model_comparison(list(non_random_model = motnp_edge_weights, random_model = motnp_edges_null)) # NETWORK IS RANDOM
+
+### compare null model with fitted model -- Jordan pseudo model averaging
+model_averaging <- function(models) {
+  loos <- lapply(models, function(model) loo::loo(model$log_lik, r_eff=NA))
+  
+  results_matrix <- loo::loo_model_weights(loos, method="pseudobma")
+  if (!is.null(names(models))) {
+    names(results_matrix) <- names(models)
+  }
+  results_matrix
+}
+model_averaging(models = list(non_random_model = motnp_edge_weights, random_model = motnp_edges_null))
 
 # save workspace image
 save.image('motnp_bisonr_edgescalculated_binary_nonzerocentred.RData')
@@ -375,7 +387,7 @@ ggplot(data = subset_draws, mapping = aes(x = weight))+
 write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binarymodel_vs_sri_nonzerocentredi.csv')
 
 # clean environment
-rm(draws, dyads, priors, subset_draws, x)
+rm(draws, dyads, priors, subset_draws, x) ; gc()
 
 # coefficient of variation of edge weights (aka social differentiation) ####
 global_cv_binary_non0 <- extract_metric(motnp_edge_weights, "global_cv_binary_non0")
@@ -463,7 +475,7 @@ priors$edge <- 'beta(2,2)'
 prior_check(priors, 'binary_conjugate')
 
 ### run edge weight model
-motnp_edge_weights <- bison_model(
+motnp_edge_weights_conj <- bison_model(
   ( event | duration ) ~ dyad(node_1_id, node_2_id), 
   data = counts_df_model, 
   model_type = "binary_conjugate",
@@ -473,24 +485,24 @@ motnp_edge_weights <- bison_model(
 )
 
 ### run diagnostic plots
-plot_trace(motnp_edge_weights, par_ids = 2)
-plot_predictions(motnp_edge_weights, num_draws = 20, type = "density")
-plot_predictions(motnp_edge_weights, num_draws = 20, type = "point")
+plot_trace(motnp_edge_weights_conj, par_ids = 2)
+plot_predictions(motnp_edge_weights_conj, num_draws = 20, type = "density")
+plot_predictions(motnp_edge_weights_conj, num_draws = 20, type = "point")
 
 ### extract edge weight summaries
-edgelist <- get_edgelist(motnp_edge_weights, ci = 0.9, transform = TRUE)
+edgelist <- get_edgelist(motnp_edge_weights_conj, ci = 0.9, transform = TRUE)
 plot(density(edgelist$median))
-summary(motnp_edge_weights)
+summary(motnp_edge_weights_conj)
 
 ### save workspace image for reloading at a later date that doesn't require running model again
-save.image('motnp_bisonr_edgescalculated.RData')
+save.image('motnp_bisonr_edgescalculated_binaryconjugated.RData')
 
 ## non-random edge weights ####
 ### load in workspace image with edge weights already calculated
 #load('motnp_bisonr_edgescalculated.RData')
 
-### run null model
-motnp_edges_null <- bison_model(
+### run null model -- this doesn't work
+motnp_edges_null_conj <- bison_model(
   (event | duration) ~ 1, 
   data = counts_df_model, 
   model_type = "binary_conjugate",
@@ -498,28 +510,23 @@ motnp_edges_null <- bison_model(
 )
 
 ### compare null model with fitted model
-model_comparison(list(non_random_model = motnp_edge_weights, random_model = motnp_edges_null)) # NETWORK IS RANDOM
-# Method: stacking
-#                  weight
-# non_random_model 0.020
-# random_model     0.980
-# Warning message:  Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
+model_comparison(list(non_random_model = motnp_edge_weights_conj, random_model = motnp_edges_null_conj)) # NETWORK IS RANDOM
 
 # save workspace image
-save.image('motnp_bisonr_randomnetwork.RData')
+save.image('motnp_bisonr_randomnetwork_binaryconjugate.RData')
 
 ## plot network ####
-plot_network_threshold(motnp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+plot_network_threshold(motnp_edge_weights_conj, lwd = 2, ci = 0.9, threshold = 0.2,
                        vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
                        vertex.label.color2 = 'black', vertex.color2 = nodes$age,
                        vertex.size2 = nodes$sightings, edge.color2 = 'black')
 
-plot_network_threshold2(obj = motnp_edge_weights, threshold = 0.2,
+plot_network_threshold2(obj = motnp_edge_weights_conj, threshold = 0.2,
                         vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
 
 ## check model output ####
 ### load in workspace image with edge weights already calculated
-#load('motnp_bisonr_edgescalculated.RData')
+#load('motnp_bisonr_edgescalculated_binaryconjugated.RData')
 
 # compare edge weight distributions to simple SRI ####
 head(edgelist)
@@ -555,7 +562,8 @@ colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
 dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))
 length(which(is.na(dyads$duration) == TRUE))
 
-draws <- as.data.frame(motnp_edge_weights$chain) %>% pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
+draws <- as.data.frame(motnp_edge_weights_conj$chain) %>% 
+  pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
 draws$dyad_id <- rep(counts_df$dyad_id, 4000) ## IS THIS RIGHT??
 draws$weight <- gtools::inv.logit(draws$edge)
 draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
@@ -604,7 +612,7 @@ ggplot(data = subset_draws, mapping = aes(x = weight))+
 write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binaryconjugatemodel_vs_sri_nonzerocentred.csv')
 
 # clean environment
-rm(draws, dyads, priors, subset_draws, x)
+rm(draws, dyads, priors, subset_draws, x) ; gc()
 
 # coefficient of variation of edge weights (aka social differentiation) ####
 global_cv_binaryconj_non0 <- extract_metric(motnp_edge_weights, "global_cv_binaryconj_non0")
@@ -691,7 +699,7 @@ priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero cen
 prior_check(priors, 'binary')
 
 ### run edge weight model
-motnp_edge_weights <- bison_model(
+motnp_edge_weights_0cent <- bison_model(
   ( event | duration ) ~ dyad(node_1_id, node_2_id), 
   data = counts_df_model, 
   model_type = "binary",
@@ -702,18 +710,18 @@ motnp_edge_weights <- bison_model(
 )
 
 ### run diagnostic plots
-plot_trace(motnp_edge_weights, par_ids = 2)
-plot_predictions(motnp_edge_weights, num_draws = 20, type = "density")
-plot_predictions(motnp_edge_weights, num_draws = 20, type = "point")
+plot_trace(motnp_edge_weights_0cent, par_ids = 2)
+plot_predictions(motnp_edge_weights_0cent, num_draws = 20, type = "density")
+plot_predictions(motnp_edge_weights_0cent, num_draws = 20, type = "point")
 
 ### extract edge weight summaries
-edgelist <- get_edgelist(motnp_edge_weights, ci = 0.9, transform = TRUE)
+edgelist <- get_edgelist(motnp_edge_weights_0cent, ci = 0.9, transform = TRUE)
 plot(density(edgelist$median))
-summary(motnp_edge_weights)
+summary(motnp_edge_weights_0cent)
 
 ## non-random edge weights ####
 ### run null model
-motnp_edges_null <- bison_model(
+motnp_edges_null_0cent <- bison_model(
   (event | duration) ~ 1, 
   data = counts_df_model, 
   model_type = "binary",
@@ -722,18 +730,39 @@ motnp_edges_null <- bison_model(
 )
 
 ### compare null model with fitted model
-model_comparison(list(non_random_model = motnp_edge_weights, random_model = motnp_edges_null)) # NETWORK IS RANDOM
+model_comparison(list(non_random_model = motnp_edge_weights_0cent, random_model = motnp_edges_null_0cent)) # NETWORK IS RANDOM
+# Method: stacking
+#                 weight
+#non_random_model 0.000 
+#random_model     1.000 
+
+### compare null model with fitted model -- Jordan pseudo model averaging
+model_averaging <- function(models) {
+  loos <- lapply(models, function(model) loo::loo(model$log_lik, r_eff=NA))
+  
+  results_matrix <- loo::loo_model_weights(loos, method="pseudobma")
+  if (!is.null(names(models))) {
+    names(results_matrix) <- names(models)
+  }
+  results_matrix
+}
+model_averaging(models = list(non_random_model = motnp_edge_weights_0cent, random_model = motnp_edges_null_0cent))
+# Method: pseudo-BMA+ with Bayesian bootstrap
+#                 weight
+#non_random_model 0.000 
+#random_model     1.000 
+
 
 # save workspace image
 save.image('motnp_bisonr_edgescalculated_binary_zerocentred.RData')
 
 ## plot network ####
-plot_network_threshold(motnp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+plot_network_threshold(motnp_edge_weights_0cent, lwd = 2, ci = 0.9, threshold = 0.2,
                        vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
                        vertex.label.color2 = 'black', vertex.color2 = nodes$age,
                        vertex.size2 = nodes$sightings, edge.color2 = 'black')
 
-plot_network_threshold2(obj = motnp_edge_weights, threshold = 0.2,
+plot_network_threshold2(obj = motnp_edge_weights_0cent, threshold = 0.2,
                         vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
 
 ## check model output ####
@@ -774,7 +803,8 @@ colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
 dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))
 length(which(is.na(dyads$duration) == TRUE))
 
-draws <- as.data.frame(motnp_edge_weights$chain) %>% pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
+draws <- as.data.frame(motnp_edge_weights_0cent$chain) %>%
+  pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
 draws$dyad_id <- rep(counts_df$dyad_id, 4000) ## IS THIS RIGHT??
 draws$weight <- gtools::inv.logit(draws$edge)
 draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
@@ -823,7 +853,7 @@ ggplot(data = subset_draws, mapping = aes(x = weight))+
 write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binarymodel_vs_sri_zerocentred.csv')
 
 # clean environment
-rm(draws, dyads, priors, subset_draws, x)
+rm(draws, dyads, priors, subset_draws, x) ; gc()
 
 # coefficient of variation of edge weights (aka social differentiation) ####
 global_cv_binary_0cent <- extract_metric(motnp_edge_weights, "global_cv_binary_0cent")
