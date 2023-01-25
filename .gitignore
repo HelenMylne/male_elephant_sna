@@ -35,3 +35,6 @@ vignettes/*.pdf
 .DS_Store
 # R markdown files -- currently don't need them
 .Rmd
+motnp_bisonr_randomnetwork_binaryconjugate.RData
+motnp_bisonr_edgescalculated_binaryconjugated.RData
+motnp_bisonr_edgescalculated_binary_zerocentred.RData
