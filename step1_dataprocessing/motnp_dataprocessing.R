@@ -14,13 +14,13 @@
 #library(zoo)        # sort date columns out
 #library(asnipe)     # generating networks
 
-library(tidyverse, lib.loc = 'packages')
-library(lubridate, lib.loc = 'packages')
-library(janitor, lib.loc = 'packages')
-library(hms, lib.loc = 'packages')
-library(readxl, lib.loc = 'packages')
-library(data.table, lib.loc = 'packages')
-library(spatsoc, lib.loc = 'packages')
+library(tidyverse, lib.loc = '../packages')
+library(lubridate, lib.loc = '../packages')
+library(janitor, lib.loc = '../packages')
+library(hms, lib.loc = '../packages')
+library(readxl, lib.loc = '../packages')
+library(data.table, lib.loc = '../packages')
+library(spatsoc, lib.loc = '../packages')
 
 ################ 1) Create basic data frames from raw data ################
 #### Observation Sessions ####
@@ -51,7 +51,8 @@ rm(days,s,sessions)
 
 #### IDs ####
 ### import data
-id.raw <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 2) # read in raw data
+#id.raw <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 2) # read in raw data
+id.raw <- readxl::read_excel("../data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 2) # read in raw data
 id <- id.raw[5:849,1:368]             # create a new data frame without top values or empty end columns
 id <- id[!is.na(id[,1]),]             # remove empty rows
 id <- id[!is.na(id[,5]),]             # remove unassigned numbers
@@ -168,7 +169,8 @@ write_delim(id, "../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/d
 rm(ages, days.numbers, id, id.raw, names, nkash, days, i, months, weeks)
 #### Encounters ####
 ### import data
-encounters <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3) # read in raw data
+#encounters <- readxl::read_excel("../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3) # read in raw data
+encounters <- readxl::read_excel("../data_raw/Raw_ALERT_ElephantDatabase_Youldon210811.xlsx", sheet = 3) # read in raw data
 e <- encounters[c(1:3,8:27)]    # only necessary columns
 
 ### rename columns
@@ -303,12 +305,23 @@ first <- first[,c(1,3:14,28:103)]     # remove columns counting number of each d
 first$encounter <- 1:nrow(first) ; first <- first[,c(90,1:89)]   # index variable of sightings
 first$date <- lubridate::as_date(first$date)                     # put date column into correct format
 length(unique(first$encounter))       # 1078 separate encounters
+max(first$date) - min(first$date)     # 561 days
 str(first)
 
 ### make long, so every row is a sighting of an individual elephant
 eles_long <- gather(data = first, key = number, value = elephant, e1:e76, factor_key = TRUE)
+max(eles_long$date) - min(eles_long$date) # 561 days
+eles_na <- eles_long[is.na(eles_long$elephant),] # filter out rows with no identified elephant
 eles_long <- eles_long[!is.na(eles_long$elephant),] # filter out rows with no identified elephant
-length(unique(eles_long$encounter))   # 574 -- number of independent sightings containing identified individuals
+max(eles_long$date) - min(eles_long$date) # 504 days -- last 2 months no elephants identified
+length(unique(eles_long$encounter))       # 574 -- number of independent sightings containing identified individuals
+
+min(eles_na$date)
+max(eles_na$date)
+min(eles_long$date)
+max(eles_long$date)
+
+sightings_na <- encounters[encounters$Date > '2017-10-05',]
 
 ### 2 incorrectly labelled elephants: no such code as N or D so N40 and D128 must be wrong. On keyboard, N next to M and D next to F --> assume that D128=F128 and N40=M40 (M40 one of the most commonly observed elephants).
 eles_long$elephant[which(eles_long$elephant == 'D128')] <- 'F128'  # row 2297
@@ -332,7 +345,7 @@ eles_long$id_no <- eles_long$elephant          # add id_no variable to pad out
 eles_long <- separate(eles_long, id_no, into = c('sex','num'), sep = 1)  # separate id_no variable for padding
 eles_long$num <- sprintf("%04d", as.integer(eles_long$num))              # pad out
 eles_long$id_no <- paste(eles_long$sex, eles_long$num, sep='')           # recombine
-eles_long <- eles_long[,c(1:8,10,13,14,16,17,19)] # remove unneccsary columns
+eles_long <- eles_long[,c(1:8,10,13,14,16,17,19)] # remove unneccesary columns
 
 ### make short (unpadded) label for each elephant in ele_nodes to match eles_long
 ele_nodes$id  <- ele_nodes$id_no                                          # create variable
@@ -542,7 +555,6 @@ write_delim(d, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/da
 rm(bh, d, ele_nodes, eles_bh, eles_long, encounters, mo, i, j)
 
 ################ 2) Create dyadic data frame of sightings -- very slow (~ 48 hours to run) ################
-#### Create dyadic data for all sightings ####
 ### import data
 # elephant encounters
 eles <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv', delim = ',')
