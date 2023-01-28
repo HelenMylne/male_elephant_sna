@@ -762,12 +762,12 @@ for (i in c(1:N)) {
 }
 
 ggplot()+
-  geom_histogram(mapping = aes(xintercept = global_cv_binary_non0))+
+  geom_histogram(mapping = aes(xintercept = global_cv_strongprior))+
   geom_density(mapping = aes(x = cv_random_networks), colour = 'blue')+
   geom_density(mapping = aes(x = cv_random_nodes), colour = 'red')
 
-write_csv(cv_random_networks, 'motnp_networkpermutations_cv_strongprior.csv')
-write_csv(cv_random_nodes,    'motnp_nodepermutations_cv_strongprior.csv')
+write_csv(cv_random_networks, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')
+write_csv(cv_random_nodes,    '../data_processed/motnp_nodepermutations_cv_strongprior.csv')
 
 ### standard deviation edge weight
 edge_weight <- extract_metric(motnp_edge_weights_strongpriors, "edge_weight")
@@ -783,19 +783,19 @@ hist(summary$std/summary$median)
 ### save pdf
 dev.off()
 
-#### edge weights -- STILL TO DO: INCLUDE FEMALES, WEAK PRIORS ####
+#### edge weights -- include females, weak priors ####
 ## add pdf output file
 pdf(file = '../outputs/motnp_bisonr_edgeweight_femalesonly.pdf')
 
 ### create data frame for edge weight model
-#females_df_model <- females_df[, c('node_1','node_2','event_count','count_dyad')] %>% distinct()
-#colnames(females_df_model) <- c('node_1_id','node_2_id','event','duration')
+females_df_model <- females_df[, c('node_1','node_2','event_count','count_dyad')] %>% distinct()
+colnames(females_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### females_df_model still too large for vector memory of laptop: on laptop run with no adult males
-females_only <- anti_join(females_df, counts_df)
-rm(counts_df, females_df, females_df_model, motnp_ages) ; gc()
-females_only_model <- females_only[, c('node_1','node_2','event_count','count_dyad')] %>% distinct()
-colnames(females_only_model) <- c('node_1_id','node_2_id','event','duration')
+#females_only <- anti_join(females_df, counts_df)
+#rm(counts_df, females_df, females_df_model, motnp_ages) ; gc()
+#females_only_model <- females_only[, c('node_1','node_2','event_count','count_dyad')] %>% distinct()
+#colnames(females_only_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### set priors
 priors <- get_default_priors('binary')
@@ -1084,12 +1084,12 @@ for (i in c(1:N)) {
 }
 
 ggplot()+
-  geom_histogram(mapping = aes(xintercept = global_cv_binary_non0))+
+  geom_histogram(mapping = aes(xintercept = global_cv_femalesincluded))+
   geom_density(mapping = aes(x = cv_random_networks), colour = 'blue')+
   geom_density(mapping = aes(x = cv_random_nodes), colour = 'red')
 
-write_csv(cv_random_networks, 'motnp_networkpermutations_cv_femalesincluded.csv')
-write_csv(cv_random_nodes,    'motnp_nodepermutations_cv_femalesincluded.csv')
+write_csv(cv_random_networks, '../data_processed/motnp_networkpermutations_cv_femalesincluded.csv')
+write_csv(cv_random_nodes,    '../data_processed/motnp_nodepermutations_cv_femalesincluded.csv')
 
 ### standard deviation edge weight
 edge_weight <- extract_metric(motnp_edge_weights_females, "edge_weight")
