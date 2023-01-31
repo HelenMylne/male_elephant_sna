@@ -7,6 +7,7 @@ library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
 library(bisonR, lib.loc = '../packages/')    # library(bisonR)
 library(asnipe, lib.loc = '../packages/')    # library(asnipe)
 library(sna, lib.loc = '../packages/')       # library(sna)
+library(raster, lib.loc = '../packages/')    # library(raster)
 
 # information
 sessionInfo()
@@ -437,17 +438,17 @@ random_networks <- asnipe::network_permutation(association_data = gbi_matrix,   
 cv_random_networks <- rep(0,N)                                                  # generate empty vector to fill with cv values
 for (i in c(1:N)) {
   net_rand <- random_networks[i,,]
-  cv_random_networks[i] <- extract_metric(net_rand,'global_cv')
+  cv_random_networks[i] <- raster::cv(net_rand)
 }
 
 cv_random_nodes <- rep(0,N)
 for (i in c(1:N)) {
-  net_rand <- sna::rmperm(network)
-  cv_random_nodes[i] <- extract_metric(net_rand,'global_cv')
+  net_rand <- sna::rmperm(gbi_test)
+  cv_random_nodes[i] <- raster::cv(net_rand)
 }
 
 ggplot()+
-  geom_histogram(mapping = aes(xintercept = global_cv_binary_non0))+
+  geom_histogram(mapping = aes(x = global_cv_weakprior))+
   geom_density(mapping = aes(x = cv_random_networks), colour = 'blue')+
   geom_density(mapping = aes(x = cv_random_nodes), colour = 'red')
 
@@ -752,13 +753,13 @@ random_networks <- asnipe::network_permutation(association_data = gbi_matrix,   
 cv_random_networks <- rep(0,N)                                                  # generate empty vector to fill with cv values
 for (i in c(1:N)) {
   net_rand <- random_networks[i,,]
-  cv_random_networks[i] <- extract_metric(net_rand,'global_cv')
+  cv_random_networks[i] <- raster::cv(net_rand)
 }
 
 cv_random_nodes <- rep(0,N)
 for (i in c(1:N)) {
-  net_rand <- sna::rmperm(network)
-  cv_random_nodes[i] <- extract_metric(net_rand,'global_cv')
+  net_rand <- sna::rmperm(gbi_test)
+  cv_random_nodes[i] <- raster::cv(net_rand)
 }
 
 ggplot()+
@@ -1074,13 +1075,13 @@ random_networks <- asnipe::network_permutation(association_data = gbi_matrix,   
 cv_random_networks <- rep(0,N)                                                  # generate empty vector to fill with cv values
 for (i in c(1:N)) {
   net_rand <- random_networks[i,,]
-  cv_random_networks[i] <- extract_metric(net_rand,'global_cv')
+  cv_random_networks[i] <- raster::cv(net_rand)
 }
 
 cv_random_nodes <- rep(0,N)
 for (i in c(1:N)) {
-  net_rand <- sna::rmperm(network)
-  cv_random_nodes[i] <- extract_metric(net_rand,'global_cv')
+  net_rand <- sna::rmperm(gbi_test)
+  cv_random_nodes[i] <- raster::cv(net_rand)
 }
 
 ggplot()+
