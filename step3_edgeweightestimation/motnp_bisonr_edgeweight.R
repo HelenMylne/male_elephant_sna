@@ -1,8 +1,8 @@
 #### set up ####
 # load packages
-library(tidyverse, lib.loc = '../packages/') # library(tidyverse)
+library(tidyverse) #, lib.loc = '../packages/') # library(tidyverse)
 library(dplyr, lib.loc = '../packages/')     # library(dplyr)
-library(rstan, lib.loc = '../packages/')     # library(rstan)
+#library(rstan, lib.loc = '../packages/')     # library(rstan)
 library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
 library(bisonR, lib.loc = '../packages/')    # library(bisonR)
 library(asnipe, lib.loc = '../packages/')    # library(asnipe)
@@ -22,7 +22,6 @@ set.seed(12345)
 
 #### create data lists ####
 ### import data for aggregated model (binomial)
-#counts_df <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
@@ -129,7 +128,7 @@ counts_df$node_2_nogaps <- as.integer(as.factor(counts_df$node_2))+1
 motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 
-### remove dead individuals
+### remove dead individuals (also removes all unknown sex calves)
 counts_df <- counts_df %>% 
   filter(name_1 != 'Richard' & name_2 != 'Richard') %>% 
   filter(name_1 != 'Gabriel' & name_2 != 'Gabriel') %>% 
@@ -152,6 +151,9 @@ counts_df$node_2_males <- as.integer(as.factor(counts_df$node_2_nogaps))+1
 
 ### standardise dyad_id for males only
 counts_df$dyad_males <- as.integer(as.factor(counts_df$dyad_id))
+
+### add time marker
+print(paste0('data read in at ', Sys.time()))
 
 #### edge weights -- original: males only, weak priors ####
 # add pdf output file
@@ -176,6 +178,9 @@ motnp_edge_weights <- bison_model(
   #mc_cores = 4,
   priors = priors
 )
+
+### add time marker
+print(paste0('basic model completed at ', Sys.time()))
 
 ### run diagnostic plots
 plot_trace(motnp_edge_weights, par_ids = 2)
@@ -211,8 +216,11 @@ model_averaging <- function(models) {
 }
 model_averaging(models = list(non_random_model = motnp_edge_weights, random_model = motnp_edges_null))
 
-# save workspace image
+### save workspace image
 save.image('motnp_bisonr_edgescalculated_weakprior.RData')
+
+### add time marker
+print(paste0('null model fitted and compared at ', Sys.time()))
 
 ## plot network ####
 ### adapt bisonR plot_network function to give more flexibility over plotting options
@@ -302,6 +310,8 @@ plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
 plot_network_threshold2(obj = motnp_edge_weights, threshold = 0.2,
                         vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
 
+### add time marker
+print(paste0('networks plotted at ', Sys.time()))
 
 ## check model output ####
 ### load in workspace image with edge weights already calculated
@@ -404,11 +414,9 @@ hist(global_cv_weakprior)
 
 # create gbi_matrix
 eles <- read_csv(file = '../data_processed/motnp_eles_long.csv')
-#eles <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv', delim = ',')
 eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_')              # make single variable for unique locations
 eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]                         # rearrange variables
 nodes_data <- read_csv(file = '../data_processed/motnp_elenodes.csv' ) # read in node data
-#nodes_data <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv', delim = ',') # read in node data
 colnames(nodes_data)
 str(nodes_data)
 eles_asnipe <- eles[,c(3,4,2,5)]                                       # date, time, elephant, location
@@ -430,44 +438,60 @@ eles_dt <- eles_asnipe[,c(3,7)]                # create data table for gbi matri
 eles_dt <- data.table::setDT(eles_dt)          # create data table for gbi matrix
 gbi_matrix <- spatsoc::get_gbi(DT = eles_dt, group = 'group', id = 'ID')  # create gbi matrix
 
-# obtain 100,000 random permutations of network and compare distribution to global_cv_binary_non0
-N <- 100000                                                                     # number of permutations
+### subset gbi_matrix to only contain males
+gbi_matrix <- gbi_matrix[, colnames(gbi_matrix) %in% sort(unique(motnp_ages$id))]
+gbi_matrix <- gbi_matrix[rowSums(gbi_matrix) > 0,] # remove sightings without adult males
+
+### obtain 10,000 random network and node permutations and compare distribution to global_cv
+N <- 10000                                                                      # number of permutations
 random_networks <- asnipe::network_permutation(association_data = gbi_matrix,   # permute network
                                                #association_matrix = gbi_matrix,
                                                permutations = N)
+print('random networks generated')
+
 cv_random_networks <- rep(0,N)                                                  # generate empty vector to fill with cv values
 for (i in c(1:N)) {
   net_rand <- random_networks[i,,]
   cv_random_networks[i] <- raster::cv(net_rand)
+  if(i %% 1000 == 0) {print(i)}
 }
+print(paste0('network permutations completed at ', Sys.time()))
 
 cv_random_nodes <- rep(0,N)
 for (i in c(1:N)) {
-  net_rand <- sna::rmperm(gbi_test)
+  net_rand <- sna::rmperm(gbi_matrix)
   cv_random_nodes[i] <- raster::cv(net_rand)
+  if(i %% 1000 == 0) {print(i)}
 }
+print(paste0('node permutations completed at ', Sys.time()))
 
 ggplot()+
   geom_histogram(mapping = aes(x = global_cv_weakprior))+
   geom_density(mapping = aes(x = cv_random_networks), colour = 'blue')+
   geom_density(mapping = aes(x = cv_random_nodes), colour = 'red')
 
-write_csv(cv_random_networks, 'motnp_networkpermutations_cv_weakprior.csv')
-write_csv(cv_random_nodes,    'motnp_nodepermutations_cv_weakprior.csv')
-  
-### standard deviation edge weight
-edge_weight <- extract_metric(motnp_edge_weights, "edge_weight")
-head(edge_weight)
-summary$std <- NA
-for(i in 1:nrow(summary)){
-  summary$std[i] <- sd(edge_weight[,i])
-}
-hist(summary$std)
+### write out outputs for future reference
+cv_random_networks <- as.data.frame(cv_random_networks)
+write_csv(cv_random_networks, '../data_processed/motnp_networkpermutations_cv_weakprior.csv')
+cv_random_nodes <- as.data.frame(cv_random_nodes)
+write_csv(cv_random_nodes,    '../data_processed/motnp_nodepermutations_cv_weakprior.csv')
 
-hist(summary$std/summary$median)
+### standard deviation edge weight
+#edge_weight <- extract_metric(motnp_edge_weights, "edge_weight")
+#head(edge_weight)
+#summary$std <- NA
+#for(i in 1:nrow(summary)){
+#  summary$std[i] <- sd(edge_weight[,i])
+#}
+#hist(summary$std)
+#
+#hist(summary$std/summary$median)
 
 ### save pdf
 dev.off()
+
+### add time marker
+print(paste0('original weak-priored model completed at ', Sys.time()))
 
 #### edge weights -- stronger priors, males only ####
 # add pdf output file
@@ -503,6 +527,9 @@ edgelist <- get_edgelist(motnp_edge_weights_strongpriors, ci = 0.9, transform = 
 plot(density(edgelist$median))
 summary(motnp_edge_weights_strongpriors)
 
+### add time marker
+print(paste0('strong-priored model completed at ', Sys.time()))
+
 ## non-random edge weights ####
 ### run null model
 motnp_edges_null_strongpriors <- bison_model(
@@ -529,6 +556,9 @@ model_averaging(models = list(non_random_model = motnp_edge_weights_strongpriors
 
 # save workspace image
 save.image('motnp_bisonr_edgescalculated_strongprior.RData')
+
+### add time marker
+print(paste0('random network comparison completed at ', Sys.time()))
 
 ## plot network ####
 ### adapt bisonR plot_network function to give more flexibility over plotting options
@@ -619,6 +649,9 @@ plot_network_threshold2(obj = motnp_edge_weights_strongpriors, threshold = 0.2,
                         vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
 
 
+### add time marker
+print(paste0('network plots completed at ', Sys.time()))
+
 ## check model output ####
 ### load in workspace image with edge weights already calculated
 #load('motnp_bisonr_edgescalculated_strongprior.RData')
@@ -707,6 +740,7 @@ write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sr
 
 # clean environment
 rm(draws, dyads, priors, subset_draws, x) ; gc()
+dev.off()
 
 ## coefficient of variation of edge weights (aka social differentiation) ####
 # add pdf output file
@@ -719,11 +753,9 @@ hist(global_cv_strongprior)
 
 # create gbi_matrix
 eles <- read_csv(file = '../data_processed/motnp_eles_long.csv')
-#eles <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv', delim = ',')
 eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_')              # make single variable for unique locations
 eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]                         # rearrange variables
 nodes_data <- read_csv(file = '../data_processed/motnp_elenodes.csv' ) # read in node data
-#nodes_data <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv', delim = ',') # read in node data
 colnames(nodes_data)
 str(nodes_data)
 eles_asnipe <- eles[,c(3,4,2,5)]                                       # date, time, elephant, location
@@ -745,8 +777,14 @@ eles_dt <- eles_asnipe[,c(3,7)]                # create data table for gbi matri
 eles_dt <- data.table::setDT(eles_dt)          # create data table for gbi matrix
 gbi_matrix <- spatsoc::get_gbi(DT = eles_dt, group = 'group', id = 'ID')  # create gbi matrix
 
-# obtain 100,000 random permutations of network and compare distribution to global_cv_binary_non0
-N <- 100000                                                                     # number of permutations
+### subset gbi_matrix to only contain males
+gbi_matrix <- gbi_matrix[, colnames(gbi_matrix) %in% sort(unique(motnp_ages$id))]
+gbi_matrix <- gbi_matrix[rowSums(gbi_matrix) > 0,] # remove sightings without adult males
+dim(gbi_matrix)
+length(unique(motnp_ages$id))
+
+# obtain 10,000 random permutations of network and compare distribution to global_cv
+N <- 10000                                                                      # number of permutations
 random_networks <- asnipe::network_permutation(association_data = gbi_matrix,   # permute network
                                                #association_matrix = gbi_matrix,
                                                permutations = N)
@@ -754,49 +792,64 @@ cv_random_networks <- rep(0,N)                                                  
 for (i in c(1:N)) {
   net_rand <- random_networks[i,,]
   cv_random_networks[i] <- raster::cv(net_rand)
+  if(i %% 1000 == 0) {print(i)}
 }
+
+### add time marker
+print(paste0('network permutations completed at ', Sys.time()))
 
 cv_random_nodes <- rep(0,N)
 for (i in c(1:N)) {
-  net_rand <- sna::rmperm(gbi_test)
+  net_rand <- sna::rmperm(gbi_matrix)
   cv_random_nodes[i] <- raster::cv(net_rand)
+  if(i %% 1000 == 0) {print(i)}
 }
 
 ggplot()+
-  geom_histogram(mapping = aes(xintercept = global_cv_strongprior))+
+  geom_histogram(mapping = aes(x = global_cv_strongprior))+
   geom_density(mapping = aes(x = cv_random_networks), colour = 'blue')+
   geom_density(mapping = aes(x = cv_random_nodes), colour = 'red')
 
+cv_random_networks <- as.data.frame(cv_random_networks)
 write_csv(cv_random_networks, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')
+cv_random_nodes <- as.data.frame(cv_random_nodes)
 write_csv(cv_random_nodes,    '../data_processed/motnp_nodepermutations_cv_strongprior.csv')
 
-### standard deviation edge weight
-edge_weight <- extract_metric(motnp_edge_weights_strongpriors, "edge_weight")
-head(edge_weight)
-summary$std <- NA
-for(i in 1:nrow(summary)){
-  summary$std[i] <- sd(edge_weight[,i])
-}
-hist(summary$std)
+### add time marker
+print(paste0('node permutations completed at ', Sys.time()))
 
-hist(summary$std/summary$median)
+### standard deviation edge weight
+#edge_weight <- extract_metric(motnp_edge_weights_strongpriors, "edge_weight")
+#head(edge_weight)
+#summary$std <- NA
+#for(i in 1:nrow(summary)){
+#  summary$std[i] <- sd(edge_weight[,i])
+#}
+#hist(summary$std)
+
+#hist(summary$std/summary$median)
 
 ### save pdf
 dev.off()
+
+### add time marker
+print(paste0('strong-priored model completed at ', Sys.time()))
 
 #### edge weights -- include females, weak priors ####
 ## add pdf output file
 pdf(file = '../outputs/motnp_bisonr_edgeweight_femalesonly.pdf')
 
 ### create data frame for edge weight model
-females_df_model <- females_df[, c('node_1','node_2','event_count','count_dyad')] %>% distinct()
-colnames(females_df_model) <- c('node_1_id','node_2_id','event','duration')
-
-### females_df_model still too large for vector memory of laptop: on laptop run with no adult males
-#females_only <- anti_join(females_df, counts_df)
-#rm(counts_df, females_df, females_df_model, motnp_ages) ; gc()
-#females_only_model <- females_only[, c('node_1','node_2','event_count','count_dyad')] %>% distinct()
-#colnames(females_only_model) <- c('node_1_id','node_2_id','event','duration')
+motnp_ages <- motnp_ages[ ! motnp_ages$id %in% unique(females_df$id_1[females_df$age_cat_id_1 < 3]), ]
+motnp_ages <- motnp_ages[ ! motnp_ages$id %in% females_df$id_2[females_df$age_class_2 < 3], ]
+females_only <- females_df %>% 
+  filter( ! id_1 %in% unique(motnp_ages$id)) %>% 
+  filter( ! id_2 %in% unique(motnp_ages$id))
+unique(females_only$dem_class_1)
+unique(females_only$dem_class_2)
+rm(counts_df, females_df, motnp_ages) ; gc()
+females_only_model <- females_only[, c('node_1','node_2','event_count','count_dyad')] %>% distinct()
+colnames(females_only_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### set priors
 priors <- get_default_priors('binary')
@@ -824,11 +877,14 @@ edgelist <- get_edgelist(motnp_edge_weights_females, ci = 0.9, transform = TRUE)
 plot(density(edgelist$median))
 summary(motnp_edge_weights_females)
 
+### add time marker
+print(paste0('female-inclusive model completed at ', Sys.time()))
+
 ## non-random edge weights ####
 ### run null model
 motnp_edges_null <- bison_model(
   (event | duration) ~ 1, 
-  data = females_df_model, 
+  data = females_only_model, 
   model_type = "binary",
   priors = priors
 )
@@ -848,10 +904,17 @@ model_averaging <- function(models) {
 }
 model_averaging(models = list(non_random_model = motnp_edge_weights_females, random_model = motnp_edges_null))
 
-# save workspace image
-save.image('motnp_bisonr_edgescalculated_femalesincluded.RData')
+### save workspace image
+save.image('motnp_bisonr_edgescalculated_femalesonly.RData')
+dev.off()
+
+### add time marker
+print(paste0('random null model comparison completed at ', Sys.time()))
 
 ## plot network ####
+### set up pdf
+pdf(file = '../outputs/motnp_bisonr_edgeweight_femalesonly_networkplots_randomnesschecks.pdf')
+
 ### adapt bisonR plot_network function to give more flexibility over plotting options
 plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
                                     vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
@@ -884,19 +947,11 @@ plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
 }
 
 ### create nodes data frame
-nodes <- data.frame(ele = sort(unique(females_df$id)),
-                    age = NA,
-                    sightings = NA)
-for(i in 1:nrow(nodes)){
-  x <- motnp_ages[motnp_ages$id == nodes$bull[i],]
-  nodes$age[i] <- mean(x$age)
-  if(nodes$bull[i] != 'M99'){
-    y <- females_df[females_df$id_1 == nodes$bull[i], c('id_1','count_1')]
-    nodes$sightings[i] <- y[1,2]
-  }
-}
-nodes$sightings <- as.numeric(nodes$sightings)
-str(nodes)
+nodes <- data.frame(id_1 = sort(unique(c(females_only$id_1, females_only$id_2))))
+nodes <- left_join(nodes, females_only[,c('id_1','age_category_1','count_1')]) %>% distinct()
+nodes[nodes$id_1 == 'M89',] <- distinct(females_only[females_only$id_2 == 'M89',c('id_2','age_category_2','count_2')])
+colnames(nodes) <- c('id','age','sightings')
+nodes$age <- as.factor(as.integer(as.factor(nodes$age)))
 
 ### plot network
 plot_network_threshold(motnp_edge_weights_females, lwd = 2, ci = 0.9, threshold = 0.2,
@@ -939,16 +994,18 @@ plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
 plot_network_threshold2(obj = motnp_edge_weights_females, threshold = 0.2,
                         vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
 
+### add time marker
+print(paste0('network plots completed at ', Sys.time()))
 
 ## check model output ####
 ### load in workspace image with edge weights already calculated
-#load('motnp_bisonr_edgescalculated_femalesincluded.RData')
+#load('motnp_bisonr_edgescalculated_femalesonly.RData')
 
 ## compare edge weight distributions to simple SRI ####
 head(edgelist)
-colnames(edgelist)[1:2] <- colnames(females_df_model)[1:2]
+colnames(edgelist)[1:2] <- colnames(females_only_model)[1:2]
 edgelist$node_1_id <- as.integer(edgelist$node_1_id) ; edgelist$node_2_id <- as.integer(edgelist$node_2_id)
-summary <- left_join(edgelist, females_df_model, by = c('node_1_id','node_2_id'))
+summary <- left_join(edgelist, females_only_model, by = c('node_1_id','node_2_id'))
 summary$sri <- summary$event / (summary$duration)
 
 plot(density(summary$sri), main = 'SRI vs model output: all dyads')
@@ -973,15 +1030,15 @@ lines(density(certain_sri$`5%`), col = 'red')    # very low
 lines(density(certain_sri$`95%`), col = 'green') # very high -- overall just very high uncertainty
 
 # try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
-dyads <- females_df[,c('dyad_id','node_1_males','node_2_males')]
+dyads <- females_only[,c('dyad_id','node_1','node_2')]
 colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
-dyads <- left_join(dyads, females_df_model, by = c('node_1_id','node_2_id'))
+dyads <- left_join(dyads, females_only_model, by = c('node_1_id','node_2_id'))
 length(which(is.na(dyads$duration) == TRUE))
 
 draws <- as.data.frame(motnp_edge_weights_females$chain) %>% pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
-draws$dyad_id <- rep(females_df$dyad_id, 4000) ## IS THIS RIGHT??
+draws$dyad_id <- rep(females_only$dyad_id, 4000) ## IS THIS RIGHT??
 draws$weight <- gtools::inv.logit(draws$edge)
-draws$draw <- rep(1:4000,  each = nrow(females_df_model))
+draws$draw <- rep(1:4000,  each = nrow(females_only_model))
 draws <- left_join(draws, dyads, by = 'dyad_id')
 draws$sri <- draws$event / draws$duration
 
@@ -1001,7 +1058,7 @@ ggplot(data = subset_draws, mapping = aes(x = weight))+
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
   geom_vline(mapping = aes(xintercept = sri), colour = 'red')
 
-write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_femalesincluded.csv')
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_femalesonly.csv')
 
 subset_draws <- draws[draws$sri > 0.2,]
 subset_draws$median <- NA
@@ -1014,17 +1071,17 @@ which(is.na(subset_draws$median) == TRUE)[1]
 
 ggplot(data = subset_draws, mapping = aes(x = weight))+
   geom_density(colour = 'blue')+
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15)+
+  facet_wrap(. ~ dyad_id, ncol = 15)+
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
   geom_vline(mapping = aes(xintercept = sri), colour = 'red')
 
 ggplot(data = subset_draws, mapping = aes(x = weight))+
   geom_density(colour = 'blue')+
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+
+  facet_wrap(. ~ dyad_id, ncol = 15, scales = 'free_y')+
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
   geom_vline(mapping = aes(xintercept = sri), colour = 'red')
 
-write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_femalesincluded.csv')
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_femalesonly.csv')
 
 # clean environment
 dev.off()
@@ -1032,20 +1089,18 @@ rm(draws, dyads, priors, subset_draws, x) ; gc()
 
 ## coefficient of variation of edge weights (aka social differentiation) ####
 # add pdf output file
-pdf(file = '../outputs/motnp_bisonr_edgeweight_femalesincluded_cv.pdf')
+pdf(file = '../outputs/motnp_bisonr_edgeweight_femalesonly_cv.pdf')
 
 # extract cv for model
-global_cv_femalesincluded <- extract_metric(motnp_edge_weights_females, "global_cv")
-head(global_cv_femalesincluded)
-hist(global_cv_femalesincluded)
+global_cv_femalesonly <- extract_metric(motnp_edge_weights_females, "global_cv")
+head(global_cv_femalesonly)
+hist(global_cv_femalesonly)
 
 # create gbi_matrix
 eles <- read_csv(file = '../data_processed/motnp_eles_long.csv')
-#eles <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_eles_long.csv', delim = ',')
 eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_')              # make single variable for unique locations
 eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]                         # rearrange variables
 nodes_data <- read_csv(file = '../data_processed/motnp_elenodes.csv' ) # read in node data
-#nodes_data <- read_delim(file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv', delim = ',') # read in node data
 colnames(nodes_data)
 str(nodes_data)
 eles_asnipe <- eles[,c(3,4,2,5)]                                       # date, time, elephant, location
@@ -1067,8 +1122,12 @@ eles_dt <- eles_asnipe[,c(3,7)]                # create data table for gbi matri
 eles_dt <- data.table::setDT(eles_dt)          # create data table for gbi matrix
 gbi_matrix <- spatsoc::get_gbi(DT = eles_dt, group = 'group', id = 'ID')  # create gbi matrix
 
-# obtain 100,000 random permutations of network and compare distribution to global_cv_binary_non0
-N <- 100000                                                                     # number of permutations
+### subset gbi_matrix to only contain females
+gbi_matrix <- gbi_matrix[, colnames(gbi_matrix) %in% sort(unique(c(females_only$id_1, females_only$id_2)))]
+gbi_matrix <- gbi_matrix[rowSums(gbi_matrix) > 0,] # remove male-only sightings
+
+# obtain 10,000 random permutations of network and compare distribution to global_cv
+N <- 10000                                                                      # number of permutations
 random_networks <- asnipe::network_permutation(association_data = gbi_matrix,   # permute network
                                                #association_matrix = gbi_matrix,
                                                permutations = N)
@@ -1076,33 +1135,39 @@ cv_random_networks <- rep(0,N)                                                  
 for (i in c(1:N)) {
   net_rand <- random_networks[i,,]
   cv_random_networks[i] <- raster::cv(net_rand)
+  if(i %% 1000 == 0) {print(i)}
 }
 
 cv_random_nodes <- rep(0,N)
 for (i in c(1:N)) {
-  net_rand <- sna::rmperm(gbi_test)
+  net_rand <- sna::rmperm(gbi_matrix)
   cv_random_nodes[i] <- raster::cv(net_rand)
+  if(i %% 1000 == 0) {print(i)}
 }
 
 ggplot()+
-  geom_histogram(mapping = aes(xintercept = global_cv_femalesincluded))+
+  geom_histogram(mapping = aes(x = global_cv_femalesonly))+
   geom_density(mapping = aes(x = cv_random_networks), colour = 'blue')+
   geom_density(mapping = aes(x = cv_random_nodes), colour = 'red')
 
-write_csv(cv_random_networks, '../data_processed/motnp_networkpermutations_cv_femalesincluded.csv')
-write_csv(cv_random_nodes,    '../data_processed/motnp_nodepermutations_cv_femalesincluded.csv')
+cv_random_networks <- as.data.frame(cv_random_networks)
+write_csv(cv_random_networks, '../data_processed/motnp_networkpermutations_cv_femalesonly.csv')
+cv_random_nodes <- as.data.frame(cv_random_nodes)
+write_csv(cv_random_nodes,    '../data_processed/motnp_nodepermutations_cv_femalesonly.csv')
 
 ### standard deviation edge weight
-edge_weight <- extract_metric(motnp_edge_weights_females, "edge_weight")
-head(edge_weight)
-summary$std <- NA
-for(i in 1:nrow(summary)){
-  summary$std[i] <- sd(edge_weight[,i])
-}
-hist(summary$std)
+#edge_weight <- extract_metric(motnp_edge_weights_females, "edge_weight")
+#head(edge_weight)
+#summary$std <- NA
+#for(i in 1:nrow(summary)){
+#  summary$std[i] <- sd(edge_weight[,i])
+#}
+#hist(summary$std)
 
-hist(summary$std/summary$median)
+#hist(summary$std/summary$median)
 
 ### save pdf
 dev.off()
 
+### add time marker
+print(paste0('female-inclusive model completed at ', Sys.time()))
