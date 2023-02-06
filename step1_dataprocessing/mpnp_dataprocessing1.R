@@ -1,63 +1,25 @@
-### Bayesian analysis of EfA data ####
+### Bayesian analysis of EFA data ####
 # Script to process association data from Makgadikgadi Pans National Park, Botswana.
 # Data collected: 1st November 2019 to 5th August 2021
 # Collected by: Elephants for Africa (Dr Kate Evans)
 # Data supplied by: EfA and Dr Kate Evans, 19th October 2021
 
-### Set up ####
+### set up ####
 # load packages
 library(tidyverse)
 library(dplyr)
-library(dagitty)
 library(lubridate)
-
-# information
-sessionInfo()
-R.Version()
-rstan::stan_version()
-#packageVersion('')
-#citation('')
-
-# set stan path
-set_cmdstan_path('/Users/helen/.cmdstanr/cmdstan-2.28.2')
+library(janitor)
+library(hms)
+library(readxl)
 
 # set seed
 set.seed(12345)
 
-################ 1) Draw DAGS ################
-# plot with full names
-binom <- dagitty::dagitty("dag{
-                         age_dyad [exposure];
-                         sex_dyad [exposure];
-                         weight [outcome];
-                         relatedness_dyad [unobserved];
-                         age_dyad -> weight <- sex_dyad;
-                         weight <- relatedness_dyad;
-                         }")
-dagitty::coordinates(binom) <- list(x = c(age_dyad = 0, sex_dyad = 1, weight = 2, relatedness = 3),
-                                    y = c(age_dyad = 0, sex_dyad = 2, weight = 1, relatedness = 0))
-drawdag(binom)
-
-# plot with letters
-binom <- dagitty::dagitty("dag{
-                         A [exposure];
-                         S [exposure];
-                         W [outcome];
-                         R [unobserved];
-                         A -> W <- S;
-                         W <- R;
-                         }")
-dagitty::coordinates(binom) <- list(x = c(A = 0.5, S = 1, W = 1.0, R = 1.5),
-                                    y = c(A = 0.5, S = 2, W = 1.2, R = 0.5))
-drawdag(binom, radius = 6, cex = 1.6)
-
-# clear environment and reset plot window
-rm(binom)
-dev.off()
-################ 2) Create data lists ################
-#### Sightings data frame ####
+#### sightings data frame ####
 # sightings data
-s <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')  # import data
+#s <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')  # import data
+s <- readxl::read_excel('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211214.xlsx')  # import data
 str(s)
 colnames(s)[c(1:23,57)] <- s[2,c(1:23,57)]                     # set column names to values in second row of dataframe
 colnames(s)[24:56] <- c('CM','CF','CU','CM','CF','CU','JM','JF','JU','YPM','YPF','YPU','OPM','OPF','OPU',
@@ -74,7 +36,8 @@ for(i in 1:nrow(check_na)) {
 rm(check_na)
 
 # individual data
-efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
+#efa <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
+efa <- readxl::read_excel('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx')
 str(efa)
 efa$time_cat <- lubridate::hour(efa$Time) # create variable which is just hour of the day
 efa <- separate(efa, Time, into = c('wrong_date','time'), sep = ' ') # time column registers right time but wrong date
@@ -87,6 +50,11 @@ efa$Physical_Condition_ID <- as.factor(efa$Physical_Condition_ID)    # make fact
 efa <- efa[,c(1:15,18:27,31:32)]                                     # rearrange
 efa$Date <- lubridate::as_date(efa$Date)                             # make date
 efa <- janitor::clean_names(efa)                                     # clean up
+
+# correct IDs
+efa <- efa %>% separate(col = elephant_id, into = c('letter','number'), sep = 1, remove = F)
+unique(efa$letter)
+efa$elephant_id <- ifelse(efa$letter == 'b', paste0('B',efa$number), efa$elephant_id)
 
 ## taking a look -- this is just data exploration to check that I know what all of the columns are doing and get an overview of the data ####
 table(efa$elephant_id)
@@ -142,52 +110,81 @@ str(efa)
 #$ sex_id                    : num [1:13429] 1 1 1 1 1 1 1 1 1 1 ...
 #$ notes                     : chr [1:13429] "Collared elephant" NA NA NA ...
 
+# add additional encounter numbers for those that are missing
+efa$encounter <- paste(efa$elephant_sighting_id, efa$date, efa$time, sep = '_')
+for(i in 1:nrow(efa)){
+  if(is.na(efa$elephant_sighting_id[i]) == TRUE){
+    x <- efa[efa$encounter == efa$encounter[i],]
+    if(nrow(x) == 1){
+      efa$elephant_sighting_id[i] <- max(efa$elephant_sighting_id, na.rm = TRUE)+1
+    }
+    else{
+      if(length(which(is.na(x$elephant_sighting_id) == FALSE)) > 0 ){
+        sighting_id <- x$elephant_sighting_id[which(is.na(x$elephant_sighting_id) == FALSE)[1]]
+        efa$elephant_sighting_id[which(efa$encounter == efa$encounter[i])] <- sighting_id
+      } else{
+        sighting_id <- max(efa$elephant_sighting_id, na.rm = TRUE)+1
+        efa$elephant_sighting_id[which(efa$encounter == efa$encounter[i])] <- sighting_id
+      }
+    }
+  }
+}
+
+# trim down unnecessary columns and calculate proportions of identified individuals
 efa_long <- data.frame(encounter = efa$elephant_sighting_id,   # create a new dataframe for one row per individual but with fewer columns and some extras for counts per sighting etc.
                        date = efa$date, time = efa$time,       # time of sighting
                        gps_s = NA, gps_e = NA,                 # location of sighting
                        total_elephants = NA,                   # total number of individuals together
                        total_id = NA, perc_id = NA,            # count number identified and calculate proportion of total
-                       type = ifelse(efa$sex_id == 1, 'MO', 'BH/MX'),  # herd type -- BH = Breeding herd, MO = male only, MX = Mixed (same codes as used for MOTNP)
-                       elephant = ifelse(efa$elephant_id == '-', NA, efa$elephant_id), # ID of elephant (dash = unidentified)
-                       sex = ifelse(efa$sex_id == 1, 'M','F/U'),       # M = Male, F = Female, U = Unknown
+                       elephant = efa$elephant_id,             # ID of elephant (dash/T = unidentified)
+                       letter = efa$letter,                    # so can filter out un-ID'd
                        age_range = efa$age_range_id)           # estimated age category at time of sighting
 
-for(i in 1:length(efa_long$total_elephants)) { # count total elephants in sighting
-  efa_long$total_elephants[i] <- length(which(efa$elephant_sighting_id == efa_long$encounter[i]))
+for(i in sort(unique(efa_long$encounter))) {
+  encounter <- efa_long[efa_long$encounter == i,]
+  efa_long$total_elephants[efa_long$encounter == i] <- nrow(encounter)                  # total eles
+  efa_long$total_id[efa_long$encounter == i] <- length(which(encounter$letter == 'B'))  # total identified
 }
+rm(encounter, x, i) ; gc()
+efa_long$perc_id <- 100*(efa_long$total_id/efa_long$total_elephants) # calculate proportion of elephants identified from total
+summary(efa_long$perc_id)
 
-efa_id <- efa_long[!is.na(efa_long$elephant),]
-for(i in 1:length(efa_id$total_id)) {          # count total elephants identified per encounter
-  efa_id$total_id[i] <- length(which(efa_id$encounter == efa_long$encounter[i]))
-}
+# remove unidentified individuals
+efa_long <- efa_long %>% filter(elephant != '-') %>% 
+  filter(letter != 'T') %>% filter(letter != 'F')
+colnames(efa_long)
+efa_long <- efa_long[,c(1,9,2:8,11)]
 
-efa_id$perc_id <- 100*(efa_id$total_id/efa_id$total_elephants) # calculate proportion of elephants identified from total
-
+# add gps data
 colnames(s)[1] <- 'encounter'
 s$encounter <- as.numeric(s$encounter)
-efa_gps <- left_join(x = efa_id, y = s, by = 'encounter') # join ID dataframe to sightings data so that all information incldued in single dataframe. first 100-ish rows are blank past column 12 because 2 datasets formed at slightly different times -- group sightings only goes as far as 29th January 2021, individual sightings go until 24th September 2021
-efa_gps <- efa_gps[,c(1,13,10,2,3,18,19,6:9,11,12)]       # remove unnecessary columns
-colnames(efa_gps)[4] <- c('date')                         # rename from "date.x"
-
+efa_gps <- left_join(x = efa_long, y = s, by = 'encounter') # join ID dataframe to sightings data so that all information included in single dataframe. first 100-ish rows are blank past column 12 because 2 datasets formed at slightly different times -- group sightings only goes as far as 29th January 2021, individual sightings go until 24th September 2021
+which(as.numeric(efa_gps$number_of_elephants) != efa_gps$total_elephants) # many -- go with total_elephants as based on input data
+efa_gps <- efa_gps[,c(1:11,16:17)]       # remove unnecessary columns
+colnames(efa_gps)[3] <- c('date')        # rename from "date.x"
 efa_gps$location <- paste(efa_gps$latitude, efa_gps$longitude, sep = '_')  # create combined location variable that joins both columns for unique place
 
-write_delim(efa_gps, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv', delim = ',') # write to file
-# efa_gps <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
+# save data
+write_delim(efa_gps, '../data_processed/mpnp_eles_long_Jan23check.csv', delim = ',') # write to file
+# efa <- read_csv('../data_processed/mpnp_eles_long_Jan23check.csv')
+efa <- efa_gps
+rm(efa_gps, efa_long, s, sighting_id) ; gc()
 
-#### Nodes data frame ####
-ele_nodes <- data.frame(id_no = sort(unique(efa$elephant_id)),   # create data frame for all information about an individual
+### nodes data frame ####
+ele_nodes <- data.frame(id_no = sort(unique(efa$elephant)),   # create data frame for all information about an individual
                         age_class = NA,
                         age_category = NA,
-                        sex = NA,
                         count = NA,
                         dem_class = NA)
 
-efa$age_range_id[which(efa$elephant_id == ele_nodes$id_no[2])]  # 6, 7 & 8 + 1UK (10) -- possible age classes for ID B1000
-efa_age <- efa[,c(2,3,8)]                                       # sighting, individual and age estimate
-efa_age$age_range_id <- as.numeric(efa$age_range_id)            # make numeric
-table(efa$age_range_id) ; table(efa_age$age_range_id)           # has converted 10 to 1
-efa_age$age_range_id <- ifelse(efa_age$age_range_id == 1, 10, efa_age$age_range_id) # revert to value of 10 to avoid confusion
+efa$age_range[which(efa$elephant == ele_nodes$id_no[1])]  # 6, 7 & 8 + 1UK (10) -- possible age classes for ID B1000
+efa_age <- efa[,c(1,2,10)]                                # sighting, individual and age estimate
+efa_age$age_range <- as.numeric(efa$age_range)            # make numeric
+table(efa$age_range) ; table(efa_age$age_range)           # has converted 10 to 1
+efa_age$age_range <- ifelse(efa_age$age_range == 1, 10, efa_age$age_range) # revert to value of 10 to avoid confusion
 str(efa_age)
+
+##### IGNORE ALL OF THIS BIT FOR NOW -- MOVE THIS TO AFTER BREAKING DOWN INTO TIME WINDOWS -- SHOULDN'T BE MEDIAN FOR ALL OF IT ########
 ele_nodes$age_class[2] <- floor(median(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[2] & 
                                                               efa_age$age_range_id < 10)]))  # median age class for elephant B1000 = 8. If had been somewhere between two values (e.g. 7.5) then would round down (down because more likely to be younger than older due to survival probability)
 
@@ -223,1819 +220,153 @@ write_delim(ele_nodes, '../../../../Google Drive/Shared drives/Helen PhD/chapter
 ### clean environment
 rm(efa, efa_age, efa_id, efa_long, test, check, i)
 
-#### Mapping ####
-plot(efa_gps$longitude ~ efa_gps$latitude, las = 1, xlab = 'latitude', ylab = 'longitude', pch = 19, col = rgb(0,0,1,0.1))
-efa_gps$longitude[which(efa_gps$longitude < 24)] <- NA  # anything below 24 degrees is too far west
-efa_gps$latitude[which(efa_gps$latitude < -20)]  <- NA  # anything closer to zero than -20 is too far north
-plot(efa_gps$longitude ~ efa_gps$latitude, ylim = c(24.2,24.9), xlim = c(-20.8,-20.2), # replot without weird datapoints
+### mapping ####
+plot(efa$longitude ~ efa$latitude, las = 1, xlab = 'latitude', ylab = 'longitude', pch = 19, col = rgb(0,0,1,0.1))
+efa$longitude[which(efa$longitude < 24)] <- NA  # anything below 24 degrees is too far west
+efa$latitude[which(efa$latitude < -20)]  <- NA  # anything closer to zero than -20 is too far north
+plot(efa$longitude ~ efa$latitude, ylim = c(24.2,24.9), xlim = c(-20.8,-20.2), # replot without weird datapoints
      pch = 19, col = rgb(0,0,1,0.05), xlab = 'latitude', ylab = 'longitude', las = 1)
 
 #### create dyadic data frame ####
 ## create gbi_matrix ####
 ### create group-by-individual matrix
-eles_asnipe <- efa_gps[,c(4,5,3,14)]                            # date, time, elephant, location
+eles_asnipe <- efa[,c(3,4,2,14)]                                # date, time, elephant, location
 eles_asnipe$Date <- as.integer(eles_asnipe$date)                # convert to integer
 eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)  # start from 1, not 1st January 1970
 eles_asnipe$Time <- hour(eles_asnipe$time)*60*60 + minute(eles_asnipe$time)*60 + second(eles_asnipe$time) # convert time values to seconds through day
-
 eles_asnipe <- eles_asnipe[,c(5,6,3,4)]                         # select desired variables
 colnames(eles_asnipe) <- c('Date','Time','ID','Location')       # rename for asnipe package
-eles_asnipe$ID <- as.character(eles_asnipe$ID)                  # create character variable
 str(eles_asnipe)
 
 # get_gbi generates a group by individual matrix. The function accepts a data.table with individual identifiers and a group column. The group by individual matrix can then be used to build a network using asnipe::get_network.
-eles_asnipe$d_pad <- str_pad(eles_asnipe$Date, 3, pad = '0')    # ensure dates go in the right order even when as character
+eles_asnipe$d_pad <- str_pad(eles_asnipe$Date, 4, pad = '0')    # ensure dates go in the right order even when as character
 eles_asnipe$encounter <- paste(eles_asnipe$d_pad, eles_asnipe$Time, eles_asnipe$Location, sep = '_') # unique value per sighting
-eles_asnipe$group <- as.integer(as.factor(eles_asnipe$encounter))  # unique count value per encounter
-max(eles_asnipe$group)                                             # 3765
-eles_asnipe <- eles_asnipe[,c(3,7)]                                # just the two values that we need (ID and group)
+eles_asnipe$observation <- as.integer(as.factor(eles_asnipe$encounter))  # unique count value per encounter
+max(eles_asnipe$observation)                                             # 1437 (3765 if un-ID'd included)
+eles_asnipe <- eles_asnipe[,c(3,7)]                                # ID and observation
 eles_asnipe <- data.table::setDT(eles_asnipe)                      # convert to data table
-gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID') # create group-by-individual matrix
+gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'observation', id = 'ID') # create group-by-individual matrix
 
 ## convert gbi_matrix to series of dyadic data frames ####
-### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md) -- NOTE: this step takes a long time to run, and the for loops get exponentially slower with more and more observations. Running it in chunks rather than all at once reduces how much it slows down.
-nrow(gbi_matrix) # 3765 -- run in 74 blocks of 50 sightings + 1 block of 65 (BUT ACTUALLY I RAN IT IN LARGER BLOCKS TO START WITH SO THE FIRST COUPLE WILL BE EXTREMELY SLOW)
-# 1-500 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1:250) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1.250_22.03.10.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 251:387) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-head(gbi_df)
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings251.387_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 388:400) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings388.400_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 401:450) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings401.450_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 451:500) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings451.500_22.03.08.csv', delim = ',')
-
-# 501-1000 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 501:550) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings501.550_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 551:600) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings551.600_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 601:650) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings601.650_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 651:700) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings651.700_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 701:750) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        # Hacky bit to make sure node_1 < node_2, not necessary but makes things a bit easier.
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings701.750_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 751:800) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings751.800_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 801:850) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings801.850_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 851:900) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings851.900_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 901:950) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings901.950_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 951:1000) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings951.1000_22.03.08.csv', delim = ',')
-
-# 1001-1500 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1001:1050) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1001.1050_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1051:1100) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1051.1100_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1101:1150) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1101.1150_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1151:1200) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1151.1200_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1201:1250) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1201.1250_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1251:1300) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1251.1300_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1301:1350) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1301.1350_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1351:1400) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1351.1400_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1401:1450) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1401.1450_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1451:1500) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1451.1500_22.03.08.csv', delim = ',')
-
-# 1501-2000 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1501:1550) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1501.1550_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1551:1600) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1551.1600_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1601:1650) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1601.1650_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1651:1700) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1651.1700_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1701:1750) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1701.1750_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1751:1800) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1751.1800_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1801:1850) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1801.1850_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1851:1900) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1851.1900_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1901:1950) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1901.1950_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 1951:2000) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings1951.2000_22.03.08.csv', delim = ',')
-
-# 2001-2500 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2001:2050) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2001.2050_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2051:2100) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2051.2100_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2101:2150) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2101.2150_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2151:2200) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2151.2200_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2201:2250) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2201.2250_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2251:2300) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2251.2300_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2301:2350) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2301.2350_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2351:2400) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2351.2400_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2401:2450) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2401.2450_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2451:2500) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2451.2500_22.03.08.csv', delim = ',')
-
-# 2501-3000 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2501:2550) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2501.2550_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2551:2600) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2551.2600_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2601:2650) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2601.2650_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2651:2700) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2651.2700_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2701:2750) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2701.2750_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2751:2800) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2751.2800_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2801:2850) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2801.2850_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2851:2900) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2851.2900_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2901:2950) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2901.2950_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 2951:3000) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings2951.3000_22.03.08.csv', delim = ',')
-
-# 3001-3500 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3001:3050) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3001.3050_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3051:3100) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3051.3100_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3101:3150) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3101.3150_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3151:3200) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3151.3200_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3201:3250) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3201.3250_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3251:3300) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3251.3300_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3301:3350) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3301.3350_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3351:3400) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3351.3400_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3401:3450) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3401.3450_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3451:3500) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3451.3500_22.03.08.csv', delim = ',')
-
-# 3501-3765 ####
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3501:3550) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3501.3550_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3551:3600) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3551.3600_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3601:3650) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3601.3650_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3651:3700) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3651.3700_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3701:3750) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 5 == 0) {print(obs_id)}
-  if(obs_id %% 5 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3701.3750_22.03.08.csv', delim = ',')
-
-gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric())
-for (obs_id in 3751:3765) {
-  for (i in which(gbi_matrix[obs_id, ] == 1)) {
-    for (j in 1:ncol(gbi_matrix)) {
-      if (i != j) {
-        if (i < j) {
-          node_1 <- i
-          node_2 <- j
-        } else {
-          node_1 <- j
-          node_2 <- i
-        }
-        gbi_df[nrow(gbi_df) + 1, ] <- list(node_1 = node_1,
-                                           node_2 = node_2,
-                                           social_event = (gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j]),
-                                           obs_id = obs_id)
-      }
-    }
-  }
-  if(obs_id %% 10 == 0) {print(obs_id)}
-  if(obs_id %% 10 == 0) {print(Sys.time())}
-}
-gbi_df
-write_delim(gbi_df, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_pairwiseevents/mpnp_bayesian_allpairwiseevents_sightings3751.3765_22.03.08.csv', delim = ',')
+nrow(gbi_matrix) # 1437
+
+# create observation number variable in full data set
+eles_asnipe$observation <- as.integer(as.factor(eles_asnipe$observation))
+
+# break down observations into blocks to run as parallel chunks
+block_size <- 50 # set the number of observations per block to run at once
+factor_levels <- 1:length(unique(eles_asnipe$observation)) # create a vector of numbers from 1 to the number of levels of the factor variable
+factor_blocks <- split(factor_levels, ceiling(factor_levels / block_size)) # split the factor levels into blocks of the specified size
+
+# create variable to identify which block number that observation falls into
+block_table <- data.frame(block1 = factor_blocks[[1]])
+for(i in 2:length(factor_blocks)){
+  if(nrow(block_table) == length(factor_blocks[[i]])){
+    block_table <- cbind(block_table, factor_blocks[[i]])
+    colnames(block_table)[i] <- as.character(i)
+  } else {
+    length_na <- nrow(block_table) - length(factor_blocks[[i]])
+    block_table <- cbind(block_table, c(factor_blocks[[i]], rep(NA, length_na)))
+    colnames(block_table)[i] <- as.character(i)
+  }
+}
+block_table <- pivot_longer(block_table, cols = everything(), names_to = 'block', values_to = 'observation')
+block_table$block <- ifelse(block_table$block == 'block1', '1', block_table$block)
+block_table$block <- as.numeric(block_table$block)
+block_table
+
+eles_asnipe <- left_join(eles_asnipe, block_table, by = "observation")
+
+# create empty data frame
+#nrows <- (length(unique(eles_asnipe$ID))-1) * nrow(eles_asnipe)
+#gbi_df <- data.frame(node_1 = rep(NA, nrows),
+#                     node_2 = rep(NA, nrows),
+#                     social_event = rep(NA, nrows),
+#                     obs_id = rep(NA, nrows),
+#                     block = rep(NA, nrows))
+
+# load library, create cluster
+lapply(c("foreach", "doParallel"), require, character.only = TRUE)
+library(parallel)
+cl <- makeCluster(detectCores()) # can replace detectCores() with a number if known
+registerDoParallel(cl)
+
+# Function to be parallelised
+process_blocks <- function(block_data) {
+  num_rows <- (length(unique(eles_asnipe$ID))-1) * nrow(block_data)
+  # Pre-allocate list (might need to make dataframe)
+  rows <- data.frame( node_1 = rep(NA, num_rows),
+                      node_2 = rep(NA, num_rows),
+                      id_1 = rep(NA, num_rows),
+                      id_2 = rep(NA, num_rows),
+                      social_event = rep(NA, num_rows),
+                      obs_id = rep(NA, num_rows),
+                      block = rep(NA, num_rows))
+  
+  for (obs_id in min(block_data$observation):max(block_data$observation)) {
+    #row_index <- 1
+    for (i in which(gbi_matrix[obs_id, ] == 1)) {
+      for (j in 1:ncol(gbi_matrix)) {
+        if (i != j) {
+          node_1 <- ifelse(i < j, i, j)
+          node_2 <- ifelse(i < j, j, i)
+          id_1 <- ifelse(i < j, colnames(gbi_matrix)[i], colnames(gbi_matrix)[j])
+          id_2 <- ifelse(i < j, colnames(gbi_matrix)[j], colnames(gbi_matrix)[i])
+          
+          empty_row <- which(is.na(rows$node_1) == TRUE)[1]
+          rows[empty_row, 1] <- node_1
+          rows[empty_row, 2] <- node_2
+          rows[empty_row, 3] <- id_1
+          rows[empty_row, 4] <- id_2
+          rows[empty_row, 5] <- ifelse(gbi_matrix[obs_id, i] == gbi_matrix[obs_id, j], 1, 0)
+          rows[empty_row, 6] <- obs_id
+          rows[empty_row, 7] <- block_id
+        }
+      }
+    }
+    #row_index <- row_index + 1
+    if(obs_id %% 10 == 0) {print(paste0('obs_id ', obs_id, ' in block ', block_id, ' finished at time ', Sys.time()))}
+  }
+  return(rows)
+}
+
+#### run loop ####
+sorted_unique_blocks <- sort(unique(as.numeric(eles_asnipe$block)))
+num_unique_blocks <- length(sorted_unique_blocks)
+
+eles_asnipe$block <- as.character(eles_asnipe$block)
+
+foreach(block_id = 1:num_unique_blocks) %dopar% {
+  # break down data by block
+  block_data <- eles_asnipe[eles_asnipe$block == block_id,]
+  # set up data frame to write into
+  #nrows <- (length(unique(block_data$ID))-1) * nrow(block_data)
+  #gbi_df <- data.frame(node_1 = rep(NA, nrows),
+  #                     node_2 = rep(NA, nrows),
+  #                     id_1 = rep(NA, nrows),
+  #                     id_2 = rep(NA, nrows),
+  #                     social_event = rep(NA, nrows),
+  #                     obs_id = rep(NA, nrows),
+  #                     block = rep(NA, nrows))
+  # run process_blocks
+  gbi_df <- process_blocks(block_data)
+  # trim down
+  #gbi_df <- distinct(gbi_df)
+  # save output
+  saveRDS(gbi_df, paste0('../data_processed/mpnp_bayesian_allpairwiseevents_block',block_id,'_Feb23check.RDS'))
+  #gbi_df
+}
+
+# run checks
+check <- readRDS('../data_processed/mpnp_bayesian_allpairwiseevents_block2_Feb23check.RDS') %>% 
+  distinct() %>% 
+  filter(is.na(node_1) == FALSE)
+check_matrix <- as.data.frame(gbi_matrix[51:100,])
+check_matrix$group_size <- rowSums(check_matrix)
+table(check_matrix$group_size)
+sum(check_matrix$group_size)
+sum(check$social_event)
+
+# visual check who is present in each block against listed social events
+for(i in 1:nrow(check_matrix)) {print(colnames(check_matrix)[which(check_matrix[i,] == 1)])}
+View(check)
