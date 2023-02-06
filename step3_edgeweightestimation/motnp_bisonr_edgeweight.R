@@ -502,7 +502,7 @@ print(paste0('network permutations for entire network completed at ', Sys.time()
 
 #cv_random_nodes <- rep(0,N)
 #for (i in c(1:N)) {
-#  net_rand <- sna::rmperm(gbi_matrix)
+#  net_rand <- sna::rmperm(gbi_matrix) --> TRY THIS AGAIN BUT RUN N TIMES IN ONE LOOP SO IT IS SEQUENTIALLY SWAPPING NODES RATHER THAN STARTING OVER EVERY TIME, AND THEN RUN LOOP AGAIN TO MEASURE CV
 #  cv_random_nodes[i] <- raster::cv(net_rand)
 #  if(i %% 1000 == 0) {print(i)}
 #}
