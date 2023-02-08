@@ -937,6 +937,213 @@ rm(list= ls()[!(ls() %in% c('motnp_edge_weights_strongpriors','motnp_edges_null_
 ### write over saved workspace image -- only keep the things you might need later that take a long time to run
 save.image('motnp_bisonr_edgescalculated_strongprior.RData')
 
+#### edge weights -- stronger priors, well sighted males only ####
+# add pdf output file
+pdf(file = '../outputs/motnp_bisonr_edgeweight_strongprior_mostsighted.pdf')
+
+### create data frame for edge weight model
+counts_df <- counts_df[counts_df$count_1 >= 10 & counts_df$count_2 >= 10,]
+counts_df$node_1_wellsighted <- as.integer(as.factor(counts_df$id_1))
+counts_df$node_2_wellsighted <- as.integer(as.factor(counts_df$id_2))+1
+counts_df_model <- counts_df[, c('node_1_wellsighted','node_2_wellsighted','event_count','count_dyad')] %>% distinct()
+colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
+
+### set priors
+priors <- get_default_priors('binary')
+priors$edge <- 'normal(-2.5, 1.5)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
+priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
+prior_check(priors, 'binary')
+
+### run edge weight model
+motnp_edge_weights_strongprior_mostsighted <- bison_model(
+  ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+  data = counts_df_model, 
+  model_type = "binary",
+  #partial_pooling = TRUE,
+  #mc_cores = 4,
+  priors = priors
+)
+
+### run diagnostic plots
+plot_trace(motnp_edge_weights_strongprior_mostsighted, par_ids = 2)
+plot_predictions(motnp_edge_weights_strongprior_mostsighted, num_draws = 20, type = "density")
+plot_predictions(motnp_edge_weights_strongprior_mostsighted, num_draws = 20, type = "point")
+
+### extract edge weight summaries
+edgelist <- get_edgelist(motnp_edge_weights_strongprior_mostsighted, ci = 0.9, transform = TRUE)
+plot(density(edgelist$median))
+
+### add time marker
+print(paste0('strong-priored model completed at ', Sys.time()))
+
+## non-random edge weights ####
+### run null model
+motnp_edges_null_strongprior_mostsighted <- bison_model(
+  (event | duration) ~ 1, 
+  data = counts_df_model, 
+  model_type = "binary",
+  priors = priors
+)
+
+### compare null model with fitted model -- bisonR model stacking
+model_comparison(list(non_random_model = motnp_edge_weights_strongprior_mostsighted, random_model = motnp_edges_null_strongprior_mostsighted))
+# Method: stacking
+#                weight
+#non_random_model 0.227 
+#random_model     0.773 
+#Warning message: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
+
+### compare null model with fitted model -- Jordan pseudo model averaging
+model_averaging <- function(models) {
+  loos <- lapply(models, function(model) loo::loo(model$log_lik, r_eff=NA))
+  
+  results_matrix <- loo::loo_model_weights(loos, method="pseudobma")
+  if (!is.null(names(models))) {
+    names(results_matrix) <- names(models)
+  }
+  results_matrix
+}
+model_averaging(models = list(non_random_model = motnp_edge_weights_strongprior_mostsighted, random_model = motnp_edges_null_strongprior_mostsighted)) # all weight still on random
+
+# save workspace image
+save.image('motnp_bisonr_edgescalculated_strongprior_mostsighted.RData')
+
+### add time marker
+print(paste0('random network comparison completed at ', Sys.time()))
+
+## compare edge weight distributions to simple SRI ####
+# load in workspace image with edge weights already calculated
+#load('motnp_bisonr_edgescalculated_strongprior_mostsighted.RData')
+
+### plot against SRI
+head(edgelist)
+colnames(edgelist)[1:2] <- colnames(counts_df_model)[1:2]
+edgelist$node_1_id <- as.integer(edgelist$node_1_id) ; edgelist$node_2_id <- as.integer(edgelist$node_2_id)
+summary <- left_join(edgelist, counts_df_model, by = c('node_1_id','node_2_id'))
+summary$sri <- summary$event / (summary$duration)
+
+par(mar = c(4,4,3,1))
+plot(density(summary$sri), las = 1, ylim = c(0,20),
+     main = 'SRI vs model output for individuals seen ≥10 times:\nblack=sri, blue=grand median')
+lines(density(summary$median), col = 'blue')
+
+# try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
+dyads <- counts_df[,c('dyad_id','node_1_wellsighted','node_2_wellsighted')]
+colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
+dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))
+length(which(is.na(dyads$duration) == TRUE))
+
+draws <- as.data.frame(motnp_edge_weights_strongprior_mostsighted$chain) %>% 
+  pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
+draws$dyad_id <- rep(counts_df$dyad_id, 4000) ## IS THIS RIGHT??
+draws$weight <- gtools::inv.logit(draws$edge)
+draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
+draws <- left_join(draws, dyads, by = 'dyad_id')
+draws$sri <- draws$event / draws$duration
+
+set.seed(15)
+subset_draws <- draws[draws$dyad_id %in% sample(draws$dyad_id, 64, replace = F),]
+subset_draws$median <- NA
+for(i in 1:nrow(subset_draws)){
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
+}
+head(subset_draws)
+which(is.na(subset_draws$median) == TRUE)[1]
+
+ggplot(data = subset_draws, mapping = aes(x = weight))+
+  geom_density(colour = 'blue')+
+  facet_wrap(. ~ dyad_id, #scales = 'free_y',
+             nrow = 8, ncol = 8)+
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_strongprior_mostsighted.csv')
+
+subset_draws <- draws[draws$sri > 0.15,]
+subset_draws$median <- NA
+for(i in 1:nrow(subset_draws)){
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
+}
+head(subset_draws)
+which(is.na(subset_draws$median) == TRUE)[1]
+
+ggplot(data = subset_draws, mapping = aes(x = weight))+
+  geom_density(colour = 'blue')+
+  facet_wrap(. ~ dyad_id, nrow = 7, ncol = 6)+
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.15_binary_vs_sri_strongprior_mostsighted.csv')
+
+# clean environment
+rm(draws, dyads, priors, subset_draws, x) ; gc()
+dev.off()
+
+## coefficient of variation of edge weights (aka social differentiation) ####
+# add pdf output file
+pdf(file = '../outputs/motnp_bisonr_edgeweight_strongprior_mostsighted_cv.pdf')
+
+# extract cv for model
+global_cv_strongprior_mostsighted <- extract_metric(motnp_edge_weights_strongprior_mostsighted, "global_cv")
+head(global_cv_strongprior_mostsighted)
+hist(global_cv_strongprior_mostsighted)
+
+### standard deviation edge weight
+#edge_weight <- extract_metric(motnp_edge_weights_strongprior_mostsighted, "edge_weight")
+#head(edge_weight)
+#summary$std <- NA
+#for(i in 1:nrow(summary)){
+#  summary$std[i] <- sd(edge_weight[,i])
+#}
+#hist(summary$std)
+
+#hist(summary$std/summary$median)
+
+### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2%
+counts_df_model <- counts_df[,c('node_1_males','node_2_males','event_count','count_dyad','id_1','id_2','dyad_males')]
+colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
+ms_chain <- as.data.frame(motnp_edge_weights_strongprior_mostsighted$chain)
+colnames(ms_chain) <- counts_df_model$dyad_id
+ms_chain <- pivot_longer(ms_chain, cols = everything(), names_to = 'dyad_id', values_to = 'draw')
+ms_chain$chain_position <- rep(1:length(unique(ms_chain$dyad_id)), each = 4000)
+ms_chain$draw <- LaplacesDemon::invlogit(ms_chain$draw)
+ms_chain$mean <- NA
+hist(ms_chain$draw)
+plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'distribution of edges for male network using strong prior', xlab = 'edge weight', ylab = 'density', las = 1)
+for(i in sort(unique(ms_chain$dyad_id))){
+  x <- ms_chain[ms_chain$dyad_id == i,]
+  ms_chain$mean <- ifelse(ms_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ms_chain$mean)
+  lines(density(x$draw), col = rgb(0,0,1,0.1))
+}
+lines(density(ms_chain$draw), lwd = 2)
+
+quantile(ms_chain$draw, 0.98)
+
+ms_edgelist <- bisonR::get_edgelist(motnp_edge_weights_strongprior_mostsighted)
+quantile(ms_edgelist$median, 0.98)
+
+counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
+quantile(counts_df_model$sri, 0.98)
+
+### save pdf
+dev.off()
+
+### add time marker
+print(paste0('strong-priored model completed at ', Sys.time()))
+
+## clean up ####
+rm(list= ls()[!(ls() %in% c('motnp_edge_weights_strongprior_mostsighted','motnp_edges_null_strongprior_mostsighted',
+                            'counts_df','counts_df_model',
+                            'gbi_males','m_mat',
+                            #'random_nodes',
+                            'random_networks'))])
+
+### write over saved workspace image -- only keep the things you might need later that take a long time to run
+save.image('motnp_bisonr_edgescalculated_strongprior_mostsighted.RData')
+
+
 #### edge weights -- just females, weak priors ####
 ## add pdf output file
 pdf(file = '../outputs/motnp_bisonr_edgeweight_femalesonly.pdf')
