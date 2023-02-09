@@ -184,42 +184,6 @@ table(efa$age_range) ; table(efa_age$age_range)           # has converted 10 to 
 efa_age$age_range <- ifelse(efa_age$age_range == 1, 10, efa_age$age_range) # revert to value of 10 to avoid confusion
 str(efa_age)
 
-##### IGNORE ALL OF THIS BIT FOR NOW -- MOVE THIS TO AFTER BREAKING DOWN INTO TIME WINDOWS -- SHOULDN'T BE MEDIAN FOR ALL OF IT ########
-ele_nodes$age_class[2] <- floor(median(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[2] & 
-                                                              efa_age$age_range_id < 10)]))  # median age class for elephant B1000 = 8. If had been somewhere between two values (e.g. 7.5) then would round down (down because more likely to be younger than older due to survival probability)
-
-ele_nodes <- ele_nodes[2:6646,] # remove first row as doesn't appear to be an actual elephant
-
-for(i in 1:length(ele_nodes$age_class)) {
-  ele_nodes$age_class[i] <- floor(median(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[i] & 
-                                                                      efa_age$age_range_id < 10)]))
-  ele_nodes$sex[i] <- length(unique(efa$sex_id[which(efa$elephant_id == ele_nodes$id_no[i])]))
-  ele_nodes$count[i] <- length(which(efa$elephant_id == ele_nodes$id_no[i]))
-}
-check <- ele_nodes$id_no[which(ele_nodes$sex > 1)]
-for(i in 1:length(check)){
-  print(efa$sex_id[which(efa$elephant_id == check[i])])
-} # for all warnings, the sex is 1 and NA -- NA is causing apparent presence of extra sex_id
-ele_nodes$sex <- 'M' # all are male
-
-ele_nodes$age_category <- ifelse(ele_nodes$age_class < 3, 'Calf',    # create to match MOTNP categories for comparison
-                                 ifelse(ele_nodes$age_class == 3, 'Juvenile',
-                                        ifelse(ele_nodes$age_class > 3 & ele_nodes$age_class <= 5, 'Pubescent',
-                                               ifelse(ele_nodes$age_class > 5 & ele_nodes$age_class <= 8, 'Adult', 'UNK'))))
-ele_nodes$age_class <- as.factor(ele_nodes$age_class)                # create factor for age_class
-
-ele_nodes$age <- ifelse(ele_nodes$age_category == 'Adult', 'A',      # extra column for symbol age not word
-                        ifelse(ele_nodes$age_category == 'Pubescent', 'P',
-                               ifelse(ele_nodes$age_category == 'Juvenile', 'J', 'C')))
-ele_nodes$dem_class <- paste(ele_nodes$age, ele_nodes$sex, sep = '') # column combining age and sex
-ele_nodes <- ele_nodes[,c(1:6)]                                      # remove age column
-
-write_delim(ele_nodes, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_elenodes.csv')
-# ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_elenodes.csv')
-
-### clean environment
-rm(efa, efa_age, efa_id, efa_long, test, check, i)
-
 ### mapping ####
 plot(efa$longitude ~ efa$latitude, las = 1, xlab = 'latitude', ylab = 'longitude', pch = 19, col = rgb(0,0,1,0.1))
 efa$longitude[which(efa$longitude < 24)] <- NA  # anything below 24 degrees is too far west
