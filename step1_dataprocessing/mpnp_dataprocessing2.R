@@ -289,10 +289,11 @@ saveRDS(data, '../data_processed/mpnp_bayesian_pairwiseevents.RDS')
 ## clean up
 rm(all, eles_asnipe_gbi) ; gc()
 
-########## add additional information and remove impossible sightings ##########
+########## Short time windows ##########
+#### add additional information and remove impossible sightings ##########
 #data <- readRDS('../data_processed/mpnp_bayesian_pairwiseevents.RDS')
 
-#### break down into periods so easier to manipulate ####
+#### break down into periods so easier to manipulate
 table(data$period)
 mpnp1 <- data[data$period == 1,]  # 1st time window
 mpnp2 <- data[data$period == 2,]  # 2nd time window
@@ -303,8 +304,7 @@ mpnp6 <- data[data$period == 6,]  # 6th time window
 #mpnp7 <- data[data$period == 7,]  # 7th time window
 rm(data) ; gc()
 
-#### add count data per elephant and remove sightings where elephant not seen at all in period ####
-# insert column for sighting period
+## insert column for sighting period
 #sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
 sightings <- read_csv('../data_processed/mpnp_eles_long_Jan23check.csv')
 sightings <- sightings[!is.na(sightings$elephant),c(2,3)]  # select only elephant ID and date columns
@@ -420,7 +420,7 @@ length(unique(data5$id_1))  # 62
 length(unique(data6$id_1))  # 16
 #length(unique(data7$id_1)) # 
 
-### add variable for sightings apart ####
+#### add variable for sightings apart ####
 data1$count_dyad <- (data1$count_period_1 + data1$count_period_2) - data1$event_count   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
 data1$apart <- data1$count_dyad - data1$event_count               # seen apart = total sightings - seen together
 colnames(data1)[6] <- 'together'                                        # rename variable
@@ -463,7 +463,7 @@ table(data6$apart)                                                      # check 
 #table(data7$together)                                                   # check values
 #table(data7$apart)                                                      # check values
 
-## save data #####
+#### save data #####
 data1 <- data1[,c(8,7,1:5,9,6,16,15,12,14)]  # select only necessary variables for 1st time window
 data2 <- data2[,c(8,7,1:5,9,6,16,15,12,14)]  # select only necessary variables for 2nd time window
 data3 <- data3[,c(8,7,1:5,9,6,16,15,12,14)]  # select only necessary variables for 3rd time window
@@ -484,6 +484,79 @@ length(unique(data6$id_1))   # not usable data -- too few identified individuals
 
 length(unique(data7$id_1))   # not usable data -- too few identified individuals
 #write_csv(data7,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period7_pairwiseevents.csv')
+
+# clean up
+rm(list=ls()[ls()!= 'windows']) ; gc()
+
+########## Long time window -- first 5 short windows (can't just combine as have removed all where one or another was absent, so total count will be wrong) ##########
+#### remove sightings outside long window ####
+data <- readRDS('../data_processed/mpnp_bayesian_pairwiseevents.RDS')
+
+nrow(data)/length(unique(data$period))
+cumsum(1:length(unique(data$id_1)))[length(unique(data$id_1))] == length(unique(data$dyad_id)) # correct number of IDs and dyads
+
+#### cut out last time window
+table(data$period)
+mpnp_long <- data[data$period < 6, c(1:4,6:8)] %>% distinct()
+rm(data) ; gc()
+
+## insert column for sighting period
+#sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
+sightings <- read_csv('../data_processed/mpnp_eles_long_Jan23check.csv')
+sightings <- sightings[!is.na(sightings$elephant),c(2,3)]  # select only elephant ID and date columns
+sightings$date <- as.Date(sightings$date, '%d/%m/%Y')      # numeric date
+sightings$day <- as.numeric(sightings$date)                # numeric date
+sightings$day <- sightings$day - (min(sightings$day)-1)    # convert date to start at 1 on first day of study
+summary(sightings$day)
+
+periods <- windows$period_days
+
+sightings$period <- NA                                     # create new variable for the time window
+for(i in 1:nrow(sightings)){
+  sightings$period[i] <- which(periods <= sightings$day[i])[length(which(periods <= sightings$day[i]))] # set time window value as last value in vector
+}
+periods ; View(sightings[sample(1:nrow(sightings),20),])         # visual check that individual dates match time windows
+
+# remove sightings after period 5
+sightings <- sightings[sightings$period < 6,]
+
+#### count elephant sightings within long window ####
+# create data frame of counts per dyad per time window
+counts <- data.frame(id = unique(sightings$elephant),
+                     count = NA)
+for(i in 1:nrow(counts)){
+  individual <- sightings[sightings$elephant == counts$id[i],]    # create data frame of all sightings per individual
+  counts$count[i] <- nrow(individual)                             # count all sightings = number of rows in produced data frame
+}
+rm(individual, i) ; gc()
+
+summary(counts$count)      # check output
+
+# join counts data frame with dyad data
+colnames(counts)[1] <- 'id_1'                                              # rename ID column for merging
+data <- left_join(x = mpnp_long, y = counts, by = 'id_1') ; rm(mpnp_long)  # add id1 count data
+colnames(data)[8] <- 'count_1'                                             # rename post merging
+colnames(counts)[1] <- 'id_2'                                              # rename ID column for merging
+data <- left_join(x = data, y = counts, by = 'id_2')                       # add id2 count data for 1st time window
+colnames(data)[9] <- 'count_2'                                             # rename post merging
+
+rm(counts,sightings) ; gc()
+
+table(data$count_1)  # check id1 counts for 1st time window
+table(data$count_2)  # check id2 counts for 1st time window
+
+#### add variable for sightings apart ####
+data$count_dyad <- (data$count_1 + data$count_2) - data$event_count   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
+data$apart <- data$count_dyad - data$event_count                      # seen apart = total sightings - seen together
+colnames(data)[5] <- 'together'                                       # rename variable
+table(data$together)                                                  # check values
+table(data$apart)                                                     # check values
+
+#### save data #####
+data <- data[,c(6,7,1:5,11,8:10)]  # rearrange
+
+# write data files
+write_csv(data,'../data_processed/mpnp_longtimewindow_pairwiseevents.csv')
 
 ############## RUN THROUGH AGE ESTIMATION SCRIPT AND SEE IF THE REST IS NEEDED ##########
 #### add data about individual elephant ages ####
