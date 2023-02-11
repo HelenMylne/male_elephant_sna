@@ -791,4 +791,115 @@ hist(mpnp5_males$mean_age, breaks = 60)
 saveRDS(mpnp5_ages, '../data_processed/mpnp5_ageestimates_mcmcoutput.rds')
 
 # clean environment
-rm(estimated, estimated1, estimated2, estimated3, missing, missing_elephants, mpnp5_elephantsin1, mpnp5_elephantsin2, mpnp5_elephantsin3, mpnp5_unestimated, mpnp5_males, age_cat, i) ; gc()
+rm(list = ls()[! ls() %in% c('latent_age_ordinal_model','mpnp_long', 'periods')]) ; gc()
+
+#### long time window ####
+## load MPNP data ####
+# remove period 6
+mpnp_long <- mpnp_long[mpnp_long$date < periods[6],]
+
+# read in age estimates
+ages <- readxl::read_xlsx('../data_raw/Raw_EfA_ElephantVisuals_IndividualsGroups_Evans211019.xlsx') %>% 
+  janitor::clean_names() %>% 
+  filter(elephant_id != '-') %>% 
+  separate(elephant_id, into = c('letter','number'), remove = F, sep = 1) %>% 
+  filter(letter != 'T') %>% filter(letter != 'F')
+ages$elephant_id <- paste0('B',ages$number)
+ages <- ages[,c(1:3,7:9)]
+
+# get range of ages
+ages$age_range_id <- as.numeric(ages$age_range_id)
+ages$age_mid <- NA
+for(i in 1:nrow(ages)){
+  ele <- ages[ages$elephant_id == ages$elephant_id[i],]
+  ele <- ele[!is.na(ele$age_range_id),]
+  ele <- ele[ele$age_range_id != 10,]
+  ages$age_mid[i] <- ifelse(nrow(ele) == 0, 10, median(ele$age_range_id, na.rm = T))
+  rm(ele)
+}
+
+# take median category and then round down to nearest integer
+ages$age_mid_round <- floor(ages$age_mid)
+ages <- ages[ages$age_mid_round < 10,]
+
+# create data frame of individuals
+mpnp_males <- ages %>%
+  select(elephant_id, age_mid_round) %>% 
+  distinct()
+
+#### create mpnp data list ####
+K <- 9
+N_mpnp <- nrow(mpnp_males)
+mpnp_ls <- list(
+  N = N_mpnp,
+  K = K,
+  age_category_index = mpnp_males$age_mid_round)
+hist(mpnp_ls$age_category_index)
+
+print('model data prepped')
+
+#### fit model to mpnp data -- divergent transitions = 3% ####
+# Fit model with cmdstanr
+age_mpnp_fit <- latent_age_ordinal_model$sample(
+  data = mpnp_ls, 
+  chains = 4,
+  parallel_chains = 4,
+  iter_sampling = 2000
+)
+print ('model fitted')
+
+# Examine the estimates. We can plot the estimated ages against the biologist assigned ages
+age_est_mat <- age_mpnp_fit$summary()[(N_mpnp+2):(N_mpnp*2+1), ]
+summary(age_est_mat)
+hist(age_est_mat$mean)
+hist(age_est_mat$rhat, breaks = 20)
+
+plot_data <- data.frame(age = ifelse(mpnp_ls$age == 1, 1, 
+                                     ifelse(mpnp_ls$age == 2, 3,
+                                            ifelse(mpnp_ls$age == 3, 7,
+                                                   ifelse(mpnp_ls$age == 4, 12,
+                                                          ifelse(mpnp_ls$age == 5, 18,
+                                                                 ifelse(mpnp_ls$age == 6, 22, 
+                                                                        ifelse(mpnp_ls$age == 7, 30, 45))))))),
+                        model_age = age_est_mat$mean) # Mean modelled age
+
+plot_data %>%
+  ggplot(aes(x=factor(age), y=model_age)) +
+  geom_point(size=4,col = 'blue', alpha=0.6) +
+  geom_vline(xintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
+  geom_hline(yintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
+  #geom_abline(slope = 1, intercept = 0)+
+  scale_y_continuous(limits = c(0,60))+
+  theme_minimal() + 
+  xlab("Assigned age") + ylab("Modelled age")
+
+# posterior predictive plot using draws from distribution to show uncertainty around mean age
+true_ages <- age_mpnp_fit$draws("true_age", format="df")
+true_ages <- true_ages[,1:N_mpnp]
+
+df <- as.data.frame(do.call(rbind, true_ages)) %>%
+  mutate(age_cat = mpnp_ls$age) %>% relocate(age_cat) %>%
+  mutate(ID = mpnp_males$elephant_id) %>% relocate(ID)
+
+df <- df %>% pivot_longer(cols = 3:102) %>% select(-name)
+
+df$true_age <- ifelse(df$age_cat == 1, 1, 
+                      ifelse(df$age_cat == 2, 3,
+                             ifelse(df$age_cat == 3, 7,
+                                    ifelse(df$age_cat == 4, 12,
+                                           ifelse(df$age_cat == 5, 18, 
+                                                  ifelse(df$age_cat == 6, 22, 
+                                                         ifelse(df$age_cat == 7, 30, 40)))))))
+
+df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
+  geom_point(size=2,col = 'blue', alpha=0.1) +
+  #stat_halfeye() +
+  geom_vline(xintercept=c(1,4,9,15,20,25,35,60), linetype="dashed", alpha=0.6) +
+  geom_hline(yintercept=c(1,4,9,15,20,25,35,60), linetype="dashed", alpha=0.6) +
+  theme_bw() + 
+  scale_x_continuous(breaks = c(1,4,9,15,20,35,60)) +
+  xlab("Assigned age") + ylab("Modelled age")
+
+#### save mpnp output ####
+colnames(true_ages) <- mpnp_males$elephant_id
+saveRDS(true_ages, '../data_processed/mpnp_longwindow_ageestimates_mcmcoutput.rds')
