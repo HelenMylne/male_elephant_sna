@@ -123,30 +123,40 @@ for(i in 1:N) {
   }
 }
 
-## build gbi matrix -- first need matrix of raw association data
-assn <- matrix(data = 0, nrow = N, ncol = N,
-               dimnames = list(x = 1:N, y = 1:N))
-for(i in 1:N){
-  for(j in i:N){
-    assn[i,j] <- rbinom(1,50,prob = ew_mat[i,j]) # all dyads observed 50 times total
+## build gbi matrix -- determine what is a reasonable sampling period (at what point is it roughly independent? half a day or a day?)  --> build a matrix which is NxNxSP. (check asnipe default sampling period because haven't specified -- if sampling period = group observation then only ever permuting within group)
+motnp <- read_csv('../data_processed/motnp_eles_long.csv') %>% 
+  filter(elephant %in% unique(c(counts_df$id_1,counts_df$id_2)))
+SP <- length(unique(motnp$encounter))
+assn <- array(NA, c(N, N, SP), dimnames = list(1:N, 1:N, 1:SP))
+for(k in 1:SP){
+  for(i in 1:N){
+    for(j in i:N){
+      if(i == j){ assn[i,j,k] <- NA }
+      else { assn[i,j,k] <- rbinom(1,1,ew_mat[i,j]) }
+    }
   }
 }
-for(i in 1:N) {
-  for(j in 1:i) {
-    assn[i,j] = assn[j,i]
+for(k in 1:SP){
+  for(i in 1:N) {
+    for(j in 1:i) {
+      assn[i,j,k] <- assn[j,i,k]
+    }
   }
 }
-ew$together <- NA
-ew$apart <- NA
-for(i in 1:nrow(ew)){
-  ew$together[i] <- assn[rownames(assn) == ew$node_1[i], colnames(assn) == ew$node_2[i]]
-  ew$apart[i] <- 50-ew$together[i]
-}
+sum(assn[,,1], na.rm = T)
+assn[,,1]
 
-motnp <- read_csv('../data_processed/motnp_eles_long.csv')
-N_sightings <- length(unique(motnp$encounter[motnp$type != 'BH']))
-gbi_sim <- matrix(data = 0, nrow = N_sightings, ncol = N,
-                  dimnames = list(x = 1:N_sightings, y = 1:N))
+gbi_mat <- matrix(0, nrow = SP, ncol = N)
+for( i in 1:N ){
+  for( j in 1:N ){
+    for( k in 1:SP ){
+      if(assn[i,j,k] == 1){
+        gbi_mat[k,j] <- 1
+        gbi_mat[k,i] <- 1
+      }
+    }
+  }
+}
 
 # run permutations and see if it says network is non-random
 N_networks <- 10000
