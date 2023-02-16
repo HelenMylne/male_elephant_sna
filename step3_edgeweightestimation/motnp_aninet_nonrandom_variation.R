@@ -1,5 +1,4 @@
 #### aninet non-random variation test ####
-library(aninet, lib.loc = '../packages/')
 library(tidyverse, lib.loc = '../packages/')
 
 #### generate gbi_matrix ####
@@ -29,6 +28,7 @@ gbi_males <- gbi_males[rowSums(gbi_males) > 0,] # remove male-only sightings
 rm(eles, eles_asnipe, motnp_ages, nodes, ids) ; gc()
 
 ( num_permutations <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )
+num_permutations
 #num_chains <- 4
 
 #permute_gbi <- gbi_MCMC(
@@ -47,20 +47,21 @@ rm(eles, eles_asnipe, motnp_ages, nodes, ids) ; gc()
 
 # make parallel
 library(doParallel)
-num_chains <- detectCores()
+(num_chains <- detectCores())
 
 cl <- makeCluster(num_chains)
 registerDoParallel(cl)
 
 seeds <- 1:num_chains
+library(aninet, lib.loc = '../packages/')
 permute_gbi <- foreach(seeds = seeds) %dopar% { # , .packages = 'aninet'
   set.seed(seeds)
-  gbi_MCMC(data = gbi_males,
-           ind_constraint = NULL, group_constraint = NULL,
-           samples = ceiling(num_permutations/num_chains),
-           thin = 100, burnin = 1000,
-           chains = num_chains,
-           FUN = NULL      # NULL = CV, Mean, SD and SRI in permute_gbi$FUN(gbi_males)
+  aninet::gbi_MCMC(data = gbi_males,
+                   ind_constraint = NULL, group_constraint = NULL,
+                   samples = ceiling(num_permutations/num_chains),
+                   thin = 100, burnin = 1000,
+                   chains = num_chains,
+                   FUN = NULL      # NULL = CV, Mean, SD and SRI in permute_gbi$FUN(gbi_males)
   )
 }
 str(permute_gbi)
