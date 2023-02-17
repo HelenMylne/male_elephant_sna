@@ -6,15 +6,19 @@
 # 5) use MOTNP age distributions to predict network centrality (third part of this script)
 
 #### set up ####
-library(tidyverse, lib.loc = 'packages/')       # library(tidyverse)
-library(cmdstanr, lib.loc = 'packages/')        # library(cmdstanr)
-library(ggdist, lib.loc = 'packages/')          # library(ggdist)
-library(posterior, lib.loc = 'packages/')       # library(posterior)
-library(bayesplot, lib.loc = 'packages/')       # library(bayesplot)
-library(rstan, lib.loc = 'packages/')           # library(rstan)
-library(igraph, lib.loc = 'packages/')          # library(igraph)
-library(LaplacesDemon, lib.loc = 'packages/')   # library(LaplacesDemon)
-library(bisonR, lib.loc = 'packages/')          # library(bisonR)
+options(future.globals.maxSize = 10000*(1024^2))   # running model with full age distributions = 5.01GB of globals, which exceeds default maximum allowed size. Set to allow up to 10 GB to allow model to run
+
+library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
+library(cmdstanr, lib.loc = '../packages/')        # library(cmdstanr)
+library(brms, lib.loc = '../packages/')            # library(brms)
+library(Rcpp, lib.loc = '../packages/')            # library(Rcpp)
+library(ggdist, lib.loc = '../packages/')          # library(ggdist)
+library(posterior, lib.loc = '../packages/')       # library(posterior)
+library(bayesplot, lib.loc = '../packages/')       # library(bayesplot)
+#library(rstan, lib.loc = '../packages/')           # library(rstan)
+library(igraph, lib.loc = '../packages/')          # library(igraph)
+library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
+library(bisonR, lib.loc = '../packages/')          # library(bisonR)
 
 # define PDF output
 pdf('../outputs/motnp_nodalregression_plots.pdf')
@@ -51,22 +55,24 @@ mean_motnp_nodal <- bison_brm(
   iter = 1000,
   thin = 10
 )
-summary(motnp_nodal_mean) # FIT 100 IMPUTED MODELS, 4 CHAINS PER MODEL, EACH 1000 DRAWS LONG (+1000 DRAWS WARM UP). WARNING AT END OF MODEL RUN THAT CHAINS <3 DRAWS LONG AS ACTUAL CHAIN IS ONLY 1 WARMUP AND 1 SAMPLE. ONLY IMPUTED CHAINS FOLLOW THE SPECIFIED ITERATIONS AND THINNING
 
-mean_eigen_values <- motnp_nodal_mean$data
-plot(eigen_values$bison_node_eigen ~ eigen_values$age, las = 1, pch = 19, col = rgb(0,0,1,0.2),
+summary(mean_motnp_nodal) # FIT 100 IMPUTED MODELS, 4 CHAINS PER MODEL, EACH 1000 DRAWS LONG (+1000 DRAWS WARM UP). WARNING AT END OF MODEL RUN THAT CHAINS <3 DRAWS LONG AS ACTUAL CHAIN IS ONLY 1 WARMUP AND 1 SAMPLE. ONLY IMPUTED CHAINS FOLLOW THE SPECIFIED ITERATIONS AND THINNING
+
+mean_eigen_values <- mean_motnp_nodal$data
+plot(mean_eigen_values$bison_node_eigen ~ mean_eigen_values$age, 
+     las = 1, pch = 19, col = rgb(0,0,1,0.2),
      xlab = 'mean age estimate', ylab = 'eigenvector centrality',
      main = 'no effect of age on eigenvector centrality')
 
-mean_mod_summary <- motnp_nodal_mean$fit
+mean_mod_summary <- mean_motnp_nodal$fit
 
-hist(motnp_nodal_mean$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
+hist(mean_motnp_nodal$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
 
 # save workspace image for reloading at a later date that doesn't require running model again
 save.image('motnp_bisonr_nodalregression_meanage.RData')
 
 # remove nodal mean age
-rm(motnp_nodal_mean, eigen_values, mod_summary) ; gc()
+rm(mean_motnp_nodal, mean_eigen_values, mean_mod_summary) ; gc()
 
 #### nodal regression -- age distribution ####
 motnp_nodal <- bison_brm(
