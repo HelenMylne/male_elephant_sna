@@ -166,7 +166,7 @@ colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 ### set priors
 priors <- get_default_priors('binary')
 priors$edge <- 'normal(-1, 2)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
-priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
+priors$fixed <- 'normal(0, 1)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
 prior_check(priors, 'binary')
 
 ### run edge weight model
