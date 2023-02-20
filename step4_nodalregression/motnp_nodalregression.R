@@ -52,8 +52,8 @@ mean_motnp_nodal <- bison_brm(
   motnp_edge_weights_strongpriors,
   mean_motnp_ages,
   chains = 4,
-  iter = 1000,
-  thin = 10
+  iter = 100000,
+  thin = 2
 )
 
 summary(mean_motnp_nodal) # FIT 100 IMPUTED MODELS, 4 CHAINS PER MODEL, EACH 1000 DRAWS LONG (+1000 DRAWS WARM UP). WARNING AT END OF MODEL RUN THAT CHAINS <3 DRAWS LONG AS ACTUAL CHAIN IS ONLY 1 WARMUP AND 1 SAMPLE. ONLY IMPUTED CHAINS FOLLOW THE SPECIFIED ITERATIONS AND THINNING
@@ -67,6 +67,10 @@ plot(mean_eigen_values$bison_node_eigen ~ mean_eigen_values$age,
 mean_mod_summary <- mean_motnp_nodal$fit
 
 hist(mean_motnp_nodal$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
+
+post <- as_draws_df(mean_motnp_nodal)
+hist(post$b_age) # what scale is this on? should it go through plogis() (aka inverse logit) or not -- what scale does eigenvector read as?
+plot(data = post[post$.chain == 1,], b_age ~ .draw, type = 'l')
 
 # save workspace image for reloading at a later date that doesn't require running model again
 save.image('motnp_bisonr_nodalregression_meanage.RData')
