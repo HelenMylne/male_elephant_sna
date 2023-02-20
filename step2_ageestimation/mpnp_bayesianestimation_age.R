@@ -322,7 +322,7 @@ df <- as.data.frame(do.call(rbind, true_ages)) %>%
   mutate(age_cat = mpnp1_ls$age) %>% relocate(age_cat) %>%
   mutate(ID = mpnp1_males$elephant_id) %>% relocate(ID)
 
-df <- df %>% pivot_longer(cols = 3:102) %>% select(-name)
+df <- df %>% pivot_longer(cols = 3:ncol(df)) %>% select(-name)
 
 df$true_age <- ifelse(df$age_cat == 1, 1, 
                       ifelse(df$age_cat == 2, 3,
@@ -333,13 +333,22 @@ df$true_age <- ifelse(df$age_cat == 1, 1,
                                                          ifelse(df$age_cat == 7, 30, 40)))))))
 
 df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
-  geom_point(size=2,col = 'blue', alpha=0.1) +
-  #stat_halfeye() +
+  geom_point(size=2, col = 'blue', alpha=0.1) +
   geom_vline(xintercept=c(1,4,9,15,20,25,35,60), linetype="dashed", alpha=0.6) +
   geom_hline(yintercept=c(1,4,9,15,20,25,35,60), linetype="dashed", alpha=0.6) +
   theme_bw() + 
   scale_x_continuous(breaks = c(1,4,9,15,20,35,60)) +
   xlab("Assigned age") + ylab("Modelled age")
+
+df %>% ggplot(aes(x = true_age, y = value, group = factor(age_cat))) +
+  geom_violin(fill = rgb(0,0,1,0.8))+
+  geom_vline(xintercept = 0, alpha = 0.6) +
+  geom_vline(xintercept=c(1,4,9,15,20,25,35,60), linetype="dashed", alpha=0.6) +
+  geom_hline(yintercept = 0, alpha = 0.6) +
+  geom_hline(yintercept=c(1,4,9,15,20,25,35,60), linetype="dashed", alpha=0.6) +
+  theme_bw() + 
+  xlab("Assigned age") + ylab("Modelled age")+
+  theme(axis.text = element_text(size = 14))
 
 #### save MPNP1 output ####
 colnames(true_ages) <- mpnp1_males$elephant_id
