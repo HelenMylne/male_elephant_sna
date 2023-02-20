@@ -175,7 +175,7 @@ eigen_cov_mpnp5 <- cov(eigen_samples_mpnp5_std)
 
 # These quantities will be given to the Stan model as data to model joint posteriors of centrality in the regression. We can run a few quick plots to see how well the approximation is working and the covariance for one of the nodes:
 eigen_samples_mpnp5_sim <- MASS::mvrnorm(1e5, eigen_mu_mpnp5, eigen_cov_mpnp5)
-plot(density(eigen_samples_mpnp5_std[, 1]), lwd=2, main="Estimated standardised centrality vs normal approximation", xlab="Logit edge weight")
+plot(density(eigen_samples_mpnp5_std[, 1]), lwd=2, main="Estimated standardised eigenvector centrality vs normal approximation", xlab="Logit edge weight")
 lines(density(eigen_samples_mpnp5_sim[, 1]), col=rgb(0, 0, 1, 0.5), lwd=2)
 
 #### eigenvector prior predictive checks (univariate Gaussian) ####
@@ -183,6 +183,15 @@ range(eigen_mu_mpnp5)
 age <- 1:60
 
 # eigenvector linear effect only
+plot(NULL, xlim = c(0,60), ylim = c(-4,4), las = 1, xlab = 'age', ylab = 'mean eigenvector centrality (std)')
+abline(h = range(eigen_mu_mpnp5), lty = 2) # eigen_samples_mpnp5_std or eigen_mu_mpnp5??
+for(i in 1:100){
+  intercept <- rnorm(1, 0, 1)
+  beta_age <- rnorm(1, 0, 0.02)
+  lines(x = age, y = intercept + beta_age*age,
+        col = rgb(0,0,1,0.4))
+}
+
 plot(NULL, xlim = c(0,60), ylim = c(-4,4), las = 1, xlab = 'age', ylab = 'mean eigenvector centrality (std)')
 abline(h = range(eigen_samples_mpnp5_std), lty = 2) # eigen_samples_mpnp5_std or eigen_mu_mpnp5??
 for(i in 1:100){
@@ -193,6 +202,16 @@ for(i in 1:100){
 }
 
 # eigenvector allowing for extremes to be most/least central
+plot(NULL, xlim = c(0,60), ylim = c(-4,4), las = 1, xlab = 'age', ylab = 'mean eigenvector centrality (std)')
+abline(h = range(eigen_mu_mpnp5), lty = 2)
+for(i in 1:100){
+  intercept <- rnorm(1, 0, 1)
+  beta_age <- rnorm(1, 0, 0.02)
+  beta_age2 <- rnorm(1, 0, 0.003)
+  lines(x = age, y = intercept + beta_age*age + beta_age2*(age^2),
+        col = rgb(0,0,1,0.4))
+}
+
 plot(NULL, xlim = c(0,60), ylim = c(-4,4), las = 1, xlab = 'age', ylab = 'mean eigenvector centrality (std)')
 abline(h = range(eigen_samples_mpnp5_std), lty = 2)
 for(i in 1:100){
