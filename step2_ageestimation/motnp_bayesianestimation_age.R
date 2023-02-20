@@ -165,7 +165,7 @@ df <- as.data.frame(do.call(rbind, true_ages)) %>%           # create small data
   mutate(age_cat = motnp_ls$age) %>% relocate(age_cat) %>%
   mutate(ID = motnp_males$id) %>% relocate(ID)
 
-df <- df %>% pivot_longer(cols = 3:102) %>% select(-name)    # convert to long format
+df <- df %>% pivot_longer(cols = 3:ncol(df)) %>% select(-name)    # convert to long format
 
 df$age_cat_centre <- ifelse(df$age_cat == 1, (0+5)/2,              # for plot ONLY, set "age" as central value in each category
                             ifelse(df$age_cat == 2, (5+10)/2,
@@ -183,7 +183,7 @@ df %>% ggplot(aes(x=age_cat_centre, y=value, group=factor(ID))) +  # plot interv
   xlab("Assigned age") + ylab("Modelled age")
 
 df %>% ggplot() +                                                  # plot intervals for each category against values set above
-  geom_violin(aes(x = true_age, y = value, group = factor(age_cat)), fill = rgb(0,0,1,0.8))+
+  geom_violin(aes(x = age_cat_centre, y = value, group = factor(age_cat)), fill = rgb(0,0,1,0.8))+
   #geom_point(aes(x = true_age, y = value, group = factor(ID)), size = 2, col = 'red', alpha = 0.1) +
   #stat_halfeye() +
   geom_vline(xintercept = 0, alpha = 0.6) +
@@ -191,7 +191,8 @@ df %>% ggplot() +                                                  # plot interv
   geom_hline(yintercept = 0, alpha = 0.6) +
   geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
   theme_bw() + 
-  xlab("Assigned age") + ylab("Modelled age")
+  xlab("Assigned age") + ylab("Modelled age")+
+  theme(axis.text = element_text(size = 14))
 
 ### save output
 colnames(true_ages) <- motnp_males$id
