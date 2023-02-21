@@ -6,12 +6,12 @@
 library(tidyverse)
 library(rstan)
 library(car)
-#library(rethinking)
+library(bisonR)
 
 #library(tidyverse, lib.loc = 'packages/')
 #library(rstan, lib.loc = 'packages/')
 #library(car, lib.loc = 'packages/')
-#library(rethinking, lib.loc = 'packages/')
+#library(bisonR, lib.loc = 'packages/')
 
 #### Read in data ####
 #df_agg <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_allpairwiseevents_splitbygrouptype_22.01.13.csv')
@@ -26,6 +26,7 @@ print('pairwise events data read in')
 #ages <- readRDS('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
 ages <- readRDS('data_processed/motnp_ageestimates_mcmcoutput.rds')
 males <- unique(c(df_agg$id_1,df_agg$id_2))
+print(males)
 ages <- as.data.frame(ages[,males])
 rm(males)
 print('age data read in')
@@ -173,4 +174,197 @@ for (i in 1:100) {
 }
 
 # Almost all of the expected (black) densities should fall within the range expected from the predicted (blue) densities. There are many other types of diagnostic check that could be carried out, but we won’t go into detail here. See the github repository page for more information.
+
+
+
+
+
+
+#### plot -- do not run unless necessary (takes a LOT of RAM and will usually need to kill all other processes) ####
+plot_df <- pivot_longer(edge_males, cols = everything(), names_to = 'dyad', values_to = 'draw_value')
+num_dyads <- length(unique(plot_df$dyad))
+plot_df$draw_id <- rep(1:4000, each = num_dyads)
+df_agg_short <- df_agg[,c(27,1:3,16:17,22:23,28:30)] # this still seems to have the mo_events/mx_events/bh_events columns so these values may change
+plot_df2 <- left_join(plot_df, df_agg_short, by = 'dyad')
+
+plot_df2$age_category_1 <- factor(plot_df2$age_category_1, levels = c("9-10","10-15","15-19","20-25","25-40","40+"))
+plot_df2$age_category_2 <- factor(plot_df2$age_category_2, levels = c("9-10","10-15","15-19","20-25","25-40","40+"))
+
+ggplot(plot_df2[plot_df2$draw_id < 1000,], aes(x = draw_value, group = dyad))+
+  geom_density(colour = rgb(0,0,1,0.1))+
+  facet_grid(age_category_1 ~ age_category_2)+
+  labs(x = 'edge weight')+
+  theme_light()+
+  theme(strip.background = element_rect(fill = rgb(0,0,1,0.6)))
+
+#### Compute normal approximation ####
+# To parameterise the multivariate normal approximation, we use the sample mean and covariance matrix, calculated from the posterior edge weight samples using the following code:
+logit_edge_mu <- apply(logit_edge_males, 2, mean)
+logit_edge_cov <- cov(logit_edge_males)
+
+# These quantities will be given to the Stan model as data to model joint posteriors of edge weight in the regression. We can run a few quick plots to see how well the approximation is working and the covariance between one pair of edge weights.
+
+logit_edge_newsamples <- MASS::mvrnorm(1e5, logit_edge_mu, logit_edge_cov)
+par(mfrow=c(1, 2))
+plot(density(logit_edge_newsamples[, 1]), lwd = 2, main = "Estimated logit edge weight vs normal approximation", xlab = "logit edge weight")
+lines(density(logit_edge_newsamples[, 1]), col = rgb(0, 0, 1, 0.5), lwd = 2)
+
+plot(logit_edge_newsamples[, 1], logit_edge_newsamples[, 2], col=rgb(0, 0, 1, 0.05), main="Covariance between edges 1 & 2", xlab="Edge 1 samples", ylab="Edge 2 samples")
+
+#### Fit model -- categorical version ####
+model_data <- list(
+  num_dyads = nrow(df_agg),                                     # Number of dyads
+  num_nodes = length(unique(c(df_agg$node_1, df_agg$node_2))),  # Number of nodes
+  logit_edge_mu = logit_edge_mu,                                # Sample means of edge weights
+  logit_edge_cov = logit_edge_cov,                              # Sample covariance of edge weights
+  dyad_type = as.integer(as.factor(df_agg$dem_type))#,           # Integer dyad types corresponding to ages of pairs
+  #age_1 = as.integer(as.factor(df_agg$age_class_1)),            # Mean of age estimates for individual 1
+  #age_2 = as.integer(as.factor(df_agg$age_class_2)),            # Mean of age estimates for individual 2
+  #node_1_id = df_agg$node_1,                                    # Node IDs for multimembership effects
+  #node_2_id = df_agg$node_2                                     # Node IDs for multimembership effects
+)
+fit_dyadic <- sampling(model_dyadic_cat, data = model_data, cores = 1, chains = 1) # THIS WILL RUN WHEN DON'T INCLUDE THE MULITMEMBERSHIP TERMS -- INCLUDING THEM CONFUSES IT BECAUSE THE VECTOR SIZES DON'T MATCH
+
+#### Diagnostics ####
+traceplot(fit_dyadic)
+
+#### Posterior predictive check ####
+# We will run a brief diagnostic check by comparing the density of expected edge weights (draws of which are shown in black) against the density of predicted edge weights from the regression model (draws of which are shown in blue).
+
+params <- rstan::extract(fit_dyadic)
+plot(density(edge_samples[1, ]), main="Posterior predictive density of responses (edge weights)",
+     ylim = c(0, 0.8), col = rgb(0, 0, 0, 0.25))
+for (i in 1:100) {
+  j <- sample(1:4000, 1)
+  lines(density(edge_samples[j, ]), col = rgb(0, 0, 0, 0.25))
+  mu <- params$beta_dyadtype[j, model_data$dyad_type] + params$mm[j, model_data$node_1_id] + params$mm[j, model_data$node_2_id]
+  sigma <- model_data$edge_cov + diag(rep(params$sigma[j], model_data$N))
+  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
+}
+
+# Almost all of the expected (black) densities should fall within the range expected from the predicted (blue) densities. There are many other types of diagnostic check that could be carried out, but we won’t go into detail here. See the github repository page for more information.
+
+#### Interpret model ####
+# Assuming we’ve now carried out any diagnostics we think are appropriate, it’s finally time to answer the scientific questions that led us to conduct the analysis. We can start off by calculating the 95% credible intervals of the model parameters. This can be done using the following code:
+
+round(summary(fit_dyadic)$summary[1:13, c(1, 4, 8)], 2) # check these values are correct for my analysis and not specific to Jordan's Star Wars one
+
+# At this point it becomes clear that the regression we’ve conducted is not exactly the same as what might be expected from standard frequentist regressions, where categories are interpreted relative to a reference category. Instead, a parameter is estimated for each category, and we can use contrasts to calculate the magnitude of differences between categories of interest. Contrasts are easily calculated as the statistic of interest from the posteriors of the model. We simply compute the difference in posteriors between the different categories using the following code:
+
+params <- rstan::extract(fit_dyadic) # again check that this is suitable beyond Jordan's example
+beta_diff <- params$beta_dyadtype[, 1] - params$beta_dyadtype[, 3]
+plot(density(beta_diff), main="Posterior difference between dyad types")
+abline(v=0, lty=2)
+
+beta_diff_summary <- round(quantile(beta_diff, probs=c(0.5, 0.025, 0.975)), 2)
+beta_diff_summary
+
+#### Fit model -- continuous version ####
+model_data <- list(
+  num_dyads = nrow(df_agg),                                     # Number of dyads
+  num_nodes = length(unique(c(df_agg$node_1, df_agg$node_2))),  # Number of nodes
+  logit_edge_mu = logit_edge_mu,                                # Sample means of edge weights
+  logit_edge_cov = logit_edge_cov,                              # Sample covariance of edge weights
+  age_diff = df_agg$age_diff_std,                               # Integer dyad types corresponding to ages of pairs
+  age_1 = df_agg$age_mean_1,                                    # Mean of age estimates for individual 1
+  age_2 = df_agg$age_mean_2,                                    # Mean of age estimates for individual 2
+  node_1_id = df_agg$node_1,                                    # Node IDs for multimembership effects
+  node_2_id = df_agg$node_2                                     # Node IDs for multimembership effects
+)
+
+fit_dyadic <- sampling(model_dyadic, data = model_data, cores = 1, chains = 1)
+
+#### Diagnostics ####
+traceplot(fit_dyadic)
+
+#### Posterior predictive check ####
+# We will run a brief diagnostic check by comparing the density of expected edge weights (draws of which are shown in black) against the density of predicted edge weights from the regression model (draws of which are shown in blue).
+
+params <- rstan::extract(fit_dyadic)
+plot(density(edge_samples[1, ]), main="Posterior predictive density of responses (edge weights)",
+     ylim = c(0, 0.8), col = rgb(0, 0, 0, 0.25))
+for (i in 1:100) {
+  j <- sample(1:4000, 1)
+  lines(density(edge_samples[j, ]), col = rgb(0, 0, 0, 0.25))
+  mu <- params$beta_dyadtype[j, model_data$dyad_type] + params$mm[j, model_data$node_1_id] + params$mm[j, model_data$node_2_id]
+  sigma <- model_data$edge_cov + diag(rep(params$sigma[j], model_data$N))
+  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
+}
+
+# Almost all of the expected (black) densities should fall within the range expected from the predicted (blue) densities. There are many other types of diagnostic check that could be carried out, but we won’t go into detail here. See the github repository page for more information.
+
+#### Interpret model ####
+# Assuming we’ve now carried out any diagnostics we think are appropriate, it’s finally time to answer the scientific questions that led us to conduct the analysis. We can start off by calculating the 95% credible intervals of the model parameters. This can be done using the following code:
+
+round(summary(fit_dyadic)$summary[1:13, c(1, 4, 8)], 2) # check these values are correct for my analysis and not specific to Jordan's Star Wars one
+
+# At this point it becomes clear that the regression we’ve conducted is not exactly the same as what might be expected from standard frequentist regressions, where categories are interpreted relative to a reference category. Instead, a parameter is estimated for each category, and we can use contrasts to calculate the magnitude of differences between categories of interest. Contrasts are easily calculated as the statistic of interest from the posteriors of the model. We simply compute the difference in posteriors between the different categories using the following code:
+
+params <- rstan::extract(fit_dyadic) # again check that this is suitable beyond Jordan's example
+beta_diff <- params$beta_dyadtype[, 1] - params$beta_dyadtype[, 3]
+plot(density(beta_diff), main="Posterior difference between dyad types")
+abline(v=0, lty=2)
+
+beta_diff_summary <- round(quantile(beta_diff, probs=c(0.5, 0.025, 0.975)), 2)
+beta_diff_summary
+
+
+############# bisonR method ###########
+load('motnp_bisonr_edgescalculated_strongprior.RData')
+
+# create dataframe of male ages
+ids <- counts_df[,c('id_1','node_1_males')] %>% distinct()
+colnames(ids) <- c('id_2','node_2_males')
+ids <- rbind(ids, counts_df[nrow(counts_df),c('id_2','node_2_males')])
+colnames(ids) <- c('id','node_males')
+motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
+  pivot_longer(cols = everything(), names_to = 'id', values_to = 'age') %>% 
+  filter(id %in% ids$id) %>% 
+  left_join(ids, by = 'id')
+motnp_ages$draw <- rep(1:8000, each = length(ids$id))
+
+# create data frame of ages and age differences
+counts_df_dyadic <- counts_df[,c('dyad_males','node_1_males','node_2_males')]
+colnames(motnp_ages)[3] <- 'node_1_males'
+counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = 'node_1_males', multiple = 'all')
+colnames(counts_df_dyadic)[4:5] <- c('id_1','age_1')
+colnames(motnp_ages)[3] <- 'node_2_males'
+counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = c('node_2_males','draw'))
+
+#counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 10 draws each
+#                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+#counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 100 draws
+#                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+#counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, # 1000 draws
+#                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+#counts_df_dyadic <- rbind(counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic,                   # 8000 draws
+#                          counts_df_dyadic, counts_df_dyadic, counts_df_dyadic, counts_df_dyadic)
+#
+#counts_df_dyadic$age_1 <- NA ; counts_df_dyadic$age_2 <- NA
+#counts_df_dyadic$draw <- NA
+#for(i in 1:nrow(counts_df)){
+#  dyad <- counts_df_dyadic[counts_df_dyadic$dyad_males == i,]
+#  age_id1 <- motnp_ages[motnp_ages$node_males == dyad$node_1_males[1],]
+#  age_id2 <- motnp_ages[motnp_ages$node_males == dyad$node_2_males[1],]
+#  dyad$age_1 <- age_id1$age
+#  dyad$age_2 <- age_id2$age
+#  dyad$draw <- 1:8000
+#  counts_df_dyadic <- counts_df_dyadic[counts_df_dyadic$dyad_males != i,]
+#  counts_df_dyadic <- rbind(counts_df_dyadic, dyad)
+#}
+
+counts_df_dyadic$age_diff <- counts_df_dyadic$age_1 - counts_df_dyadic$age_2
+counts_df_dyadic$age_mean <- mean(counts_df_dyadic$age_1, counts_df_dyadic$age_2)
+
+counts_df_dyadic <- counts_df_dyadic[,c('node_1_males','node_2_males','age_diff','age_mean')]
+
+fit_dyadic <- bison_brm (
+  bison(edge_weight(node_1_id, node_2_id)) ~ age_diff, # + age_mean??
+  fit_edge_short,
+  counts_df_dyadic,
+  num_draws = 5, # Small sample size for demonstration purposes
+  refresh = 0
+)
+summary(fit_dyadic)
+
 
