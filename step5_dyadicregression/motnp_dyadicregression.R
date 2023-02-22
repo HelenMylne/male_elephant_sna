@@ -13,6 +13,8 @@ library(bisonR)
 #library(car, lib.loc = 'packages/')
 #library(bisonR, lib.loc = 'packages/')
 
+#set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
+
 load('motnp_bisonr_edgescalculated_strongprior.RData')
 rm(random_networks, counts_df_model, gbi_males, m_mat, motnp_edges_null_strongpriors) ; gc()
 
@@ -33,6 +35,7 @@ colnames(motnp_ages)[3] <- 'node_1_males'
 counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = 'node_1_males', multiple = 'all')
 colnames(counts_df_dyadic)[4:5] <- c('id_1','age_1')
 colnames(motnp_ages)[3] <- 'node_2_males'
+rm(counts_df) ; gc()
 counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = c('node_2_males','draw'))
 colnames(counts_df_dyadic)[7:8] <- c('id_2','age_2')
 counts_df_dyadic <- counts_df_dyadic[,c(1:3,6,4:5,7:8)]
@@ -48,9 +51,20 @@ cdf_dyadic <- counts_df_dyadic[,c('dyad_males','node_1_id','node_2_id')] %>% dis
 cdf_dyadic$age_1 <- NA ; cdf_dyadic$age_2 <- NA
 for(i in 1:nrow(cdf_dyadic)){
   dyad <- counts_df_dyadic[counts_df_dyadic$dyad_males == cdf_dyadic$dyad_males[i],]
-  cdf_dyadic$age_1 <- mean(dyad$age_1)
-  cdf_dyadic$age_2 <- mean(dyad$age_2)
+  if(is.na(cdf_dyadic$age_1[i]) == TRUE) {
+    cdf_dyadic$age_1[cdf_dyadic$node_1_id == dyad$node_1_id[1]] <- mean(dyad$age_1)
+    cdf_dyadic$age_1[cdf_dyadic$node_2_id == dyad$node_2_id[1]] <- mean(dyad$age_2)
+  }
+  if(is.na(cdf_dyadic$age_2[i]) == TRUE){
+    cdf_dyadic$age_2[cdf_dyadic$node_2_id == dyad$node_2_id[1]] <- mean(dyad$age_2)
+    #cdf_dyadic$age_2[cdf_dyadic$node_1_id == dyad$node_1_id[1]] <- mean(dyad$age_1)
+  }
 }
+length(which(is.na(cdf_dyadic$age_1) == TRUE))
+length(which(is.na(cdf_dyadic$age_2) == TRUE))
+
+write_csv(cdf_dyadic, '../data_processed/motnp_dyadicregression_modeldata.csv')
+# cdf_dyadic <- read_csv('../data_processed/motnp_dyadicregression_modeldata.csv')
 
 #### fit model to mean age ####
 mean_age_dyadic <- bison_brm (
