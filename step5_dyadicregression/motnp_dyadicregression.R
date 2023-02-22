@@ -7,11 +7,15 @@ library(tidyverse)
 library(rstan)
 library(car)
 library(bisonR)
+library(brms)
+library(Rcpp)
 
 #library(tidyverse, lib.loc = 'packages/')
 #library(rstan, lib.loc = 'packages/')
 #library(car, lib.loc = 'packages/')
 #library(bisonR, lib.loc = 'packages/')
+#library(brms, lib.loc = 'packages/')
+#library(Rcpp, lib.loc = 'packages/')
 
 #set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
 
