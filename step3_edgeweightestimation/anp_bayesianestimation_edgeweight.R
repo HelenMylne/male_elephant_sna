@@ -55,12 +55,12 @@ mod_2.2
 set.seed(12345)
 
 # create file of output graphs
-pdf('data_processed/anp_edgeweights_2.2_period1to5_22.05.06.pdf', width = 10, height = 10)
+pdf('data_processed/anp_edgeweights_2.2_period1to5.pdf', width = 10, height = 10)
 
 ################ 2) Create data lists ################
-counts_df_non0 <- read_csv('data_processed/anp_bayesian_pairwiseevents_22.04.06.csv')
+counts_df_non0 <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows_impossiblepairsremoved.csv')
 
-ate <- readxl::read_excel(path = 'data_raw/Raw_ATE_Sightings_Fishlock220224.xlsx', sheet = 1) %>% janitor::clean_names()
+ate <- readxl::read_excel(path = '../data_raw/Raw_ATE_MaleSightingsCleaned_Fishlock220808.xlsx', sheet = 1) %>% janitor::clean_names()
 ate$id <- paste('M',ate$casename, sep = '')
 ate$node_id <- as.integer(as.factor(ate$casename))
 ate$obs_date <- lubridate::as_date(ate$obs_date)
@@ -81,10 +81,33 @@ for(i in 1:length(ate)){
 }
 ate <- ate[,c(1:3,25,26,4,27,28,8,29,9:24)]
 head(ate)
+table(ate$num_bulls)
+ate$num_bulls_recount <- NA
+for(i in 1:nrow(ate)){
+  x <- ate[ate$obs_id == ate$obs_id[i],]
+  ate$num_bulls_recount[i] <- nrow(x)
+}
+mean(ate$num_bulls_recount) ; sd(ate$num_bulls_recount)
+mean(ate$num_bulls) ; sd(ate$num_bulls)
 rm(date_row, ate_nums, lu, i)
 
-sightings <- ate[,c('obs_id','obs_date','correct_time_hms','obs_num_std','grid_code')] %>% distinct()
-sightings <- sightings[c(1:12,15:24176),]
+counts <- as.data.frame(table(ate$id)) ; colnames(counts) <- c('id','count')
+median(counts$count)
+
+sightings <- ate[,c('obs_id','obs_date','correct_time_hms','grid_code','obs_type_old')] %>% distinct()
+length(unique(sightings$obs_id))         # 24386
+sightings$distinct <- NA
+for(i in 1:nrow(sightings)) {
+  x <- sightings[sightings$obs_id == sightings$obs_id[i], ]
+  sightings$distinct[i] <- nrow(x)
+  if(is.na(sightings$obs_type_old[i]) == TRUE ) {
+    obs_type <- unique(x$obs_type_old[!is.na(x$obs_type_old)])
+    sightings$obs_type_old[i] <- ifelse(length(obs_type) == 1, obs_type, 'U')
+  }
+}
+sightings <- distinct(sightings)
+table(sightings$obs_type_old)
+#sightings <- sightings[c(1:12,15:24176),]
 
 males <- readxl::read_excel('data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
 males$id <- paste0('M',males$casename)
