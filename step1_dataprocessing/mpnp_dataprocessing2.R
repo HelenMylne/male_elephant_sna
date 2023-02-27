@@ -202,7 +202,7 @@ for(i in 1:nrow(events)){    # fill time window variable
 range(events$obs_id)    # check output
 table(events$period)    # check output
 
-periods ; View(events[c(sample(x = 1:nrow(events), size = 20, replace = F)),]) # visual check that periods have come out right
+periods ; #View(events[c(sample(x = 1:nrow(events), size = 20, replace = F)),]) # visual check that periods have come out right
 
 # check elephants all match up
 length(unique(all$node_1)) ; length(unique(all$node_2))         # check contain the same number of elephants
@@ -319,7 +319,7 @@ sightings$period <- NA                                     # create new variable
 for(i in 1:nrow(sightings)){
   sightings$period[i] <- which(periods <= sightings$day[i])[length(which(periods <= sightings$day[i]))] # set time window value as last value in vector
 }
-periods ; View(sightings[sample(1:nrow(sightings),20),])         # visual check that individual dates match time windows
+periods ; #View(sightings[sample(1:nrow(sightings),20),])         # visual check that individual dates match time windows
 
 # create data frame of counts per dyad per time window
 counts <- data.frame(id = rep(unique(sightings$elephant), 6),
@@ -482,7 +482,7 @@ write_csv(data5,'../data_processed/mpnp_period5_pairwiseevents.csv')
 length(unique(data6$id_1))   # not usable data -- too few identified individuals
 #write_csv(data6,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period6_pairwiseevents.csv')
 
-length(unique(data7$id_1))   # not usable data -- too few identified individuals
+#length(unique(data7$id_1))   # not usable data -- too few identified individuals
 #write_csv(data7,'../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_period7_pairwiseevents.csv')
 
 # clean up
@@ -515,7 +515,7 @@ sightings$period <- NA                                     # create new variable
 for(i in 1:nrow(sightings)){
   sightings$period[i] <- which(periods <= sightings$day[i])[length(which(periods <= sightings$day[i]))] # set time window value as last value in vector
 }
-periods ; View(sightings[sample(1:nrow(sightings),20),])         # visual check that individual dates match time windows
+periods ; #View(sightings[sample(1:nrow(sightings),20),])         # visual check that individual dates match time windows
 
 # remove sightings after period 5
 sightings <- sightings[sightings$period < 6,]
@@ -557,103 +557,3 @@ data <- data[,c(6,7,1:5,11,8:10)]  # rearrange
 
 # write data files
 write_csv(data,'../data_processed/mpnp_longtimewindow_pairwiseevents.csv')
-
-############## RUN THROUGH AGE ESTIMATION SCRIPT AND SEE IF THE REST IS NEEDED ##########
-#### add data about individual elephant ages ####
-# read in data
-#eles <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv') %>% 
-#  select(elephant, sex, age_range, date) %>%   # read in age data, remove unnecessary variables
-#  distinct()                                   # select unique rows (NOTE -- this is NOT just 1 row per elephant as some have been estimated to be in multiple age categories within a time window)
-eles <- read_csv('../data_processed/mpnp_eles_long_Jan23check.csv') %>% 
-  select(elephant, age_range, date) %>%   # read in age data, remove unnecessary variables
-  distinct()                                   # select unique rows (NOTE -- this is NOT just 1 row per elephant as some have been estimated to be in multiple age categories within a time window)
-eles$date <- as.Date(eles$date, '%d/%m/%Y')
-eles <- eles[!is.na(eles$elephant),]
-
-# identify period of each sighting
-eles$period <- NA                                      # create new variable for time window per elephant sighting
-for(i in 1:nrow(eles)){
-  eles$period[i] <- which(windows$period_start <= eles$date[i])[length(which(windows$period_start <= eles$date[i]))] # set time window ID as last value in vector
-}
-windows$period_start ; View(eles[sample(1:nrow(eles),20),])  # visual check of window against date
-
-# identify elephants whose age category changes within time window
-table(eles$age_range) # 0x1 (sub 1 year old), 0x9 (females >20), 120x10 (unknown)
-eles$age_range_NA <- ifelse(eles$age_range == 10, NA, eles$age_range)  # set unknown ages to NA
-
-eles$age_unsure <- NA    # new variable: are there multiple estimated age categories
-eles$age_min <- NA       # new variable: minimum estimated age category
-eles$age_max <- NA       # new variable: maximum estimated age category
-eles$age_maxmin <- NA    # new variable: number of estimated age categories between max and min
-eles$age_median <- NA    # new variable: median of estimated age categories
-for (i in 1:nrow(eles)) {
-  individual <- eles[eles$elephant == eles$elephant[i] & eles$period == eles$period[i],] # data frame for every sighting of elephant in that time window in which a different age estimate was made
-  summary <- summary(individual$age_range_NA, na.rm = T)   # summary values for elephant age estimates in time window
-  eles$age_unsure[i] <- nrow(individual)                   # number of sightings with different age estimates
-  eles$age_min[i]    <- summary[1]                         # minimum age estimate
-  eles$age_max[i]    <- summary[6]                         # maximum age estimate
-  eles$age_maxmin[i] <- summary[6] - summary[1]            # range of age estimates
-  eles$age_median[i] <- summary[3]                         # number of sightings with different age estimates
-}
-summary(eles$age_median)  # select median estimate
-
-eles <- eles %>% select(-age_range, -age_range_NA, -age_unsure) %>% distinct()  # remove unnecessary variables
-
-# add age data
-colnames(eles)[c(1,3:6)] <- c('id_1','age_min_1','age_max_1','age_range_1','age_median_1') # rename variables for merging
-data1_id <- left_join(x = data1_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 1st time window
-data2_id <- left_join(x = data2_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 2nd time window
-data3_id <- left_join(x = data3_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 3rd time window
-data4_id <- left_join(x = data4_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 4th time window
-data5_id <- left_join(x = data5_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 5th time window
-data6_id <- left_join(x = data6_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 6th time window
-data7_id <- left_join(x = data7_id, y = eles, by = c('id_1','period'))  # add ID1 age estimates for 7th time window
-
-colnames(eles)[c(1,3:6)] <- c('id_2','age_min_2','age_max_2','age_range_2','age_median_2') # rename variables for merging
-data1_id <- left_join(x = data1_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 1st time window
-data2_id <- left_join(x = data2_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 2nd time window
-data3_id <- left_join(x = data3_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 3rd time window
-data4_id <- left_join(x = data4_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 4th time window
-data5_id <- left_join(x = data5_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 5th time window
-data6_id <- left_join(x = data6_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 6th time window
-data7_id <- left_join(x = data7_id, y = eles, by = c('id_2','period'))  # add ID2 age estimates for 7th time window
-
-rm(eles, individual) ; gc()
-
-##### IGNORE ALL OF THIS BIT FOR NOW -- MOVE THIS TO AFTER BREAKING DOWN INTO TIME WINDOWS -- SHOULDN'T BE MEDIAN FOR ALL OF IT ########
-ele_nodes$age_class[2] <- floor(median(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[2] & 
-                                                                    efa_age$age_range_id < 10)]))  # median age class for elephant B1000 = 8. If had been somewhere between two values (e.g. 7.5) then would round down (down because more likely to be younger than older due to survival probability)
-
-ele_nodes <- ele_nodes[2:6646,] # remove first row as doesn't appear to be an actual elephant
-
-for(i in 1:length(ele_nodes$age_class)) {
-  ele_nodes$age_class[i] <- floor(median(efa_age$age_range_id[which(efa_age$elephant_id == ele_nodes$id_no[i] & 
-                                                                      efa_age$age_range_id < 10)]))
-  ele_nodes$sex[i] <- length(unique(efa$sex_id[which(efa$elephant_id == ele_nodes$id_no[i])]))
-  ele_nodes$count[i] <- length(which(efa$elephant_id == ele_nodes$id_no[i]))
-}
-check <- ele_nodes$id_no[which(ele_nodes$sex > 1)]
-for(i in 1:length(check)){
-  print(efa$sex_id[which(efa$elephant_id == check[i])])
-} # for all warnings, the sex is 1 and NA -- NA is causing apparent presence of extra sex_id
-ele_nodes$sex <- 'M' # all are male
-
-ele_nodes$age_category <- ifelse(ele_nodes$age_class < 3, 'Calf',    # create to match MOTNP categories for comparison
-                                 ifelse(ele_nodes$age_class == 3, 'Juvenile',
-                                        ifelse(ele_nodes$age_class > 3 & ele_nodes$age_class <= 5, 'Pubescent',
-                                               ifelse(ele_nodes$age_class > 5 & ele_nodes$age_class <= 8, 'Adult', 'UNK'))))
-ele_nodes$age_class <- as.factor(ele_nodes$age_class)                # create factor for age_class
-
-ele_nodes$age <- ifelse(ele_nodes$age_category == 'Adult', 'A',      # extra column for symbol age not word
-                        ifelse(ele_nodes$age_category == 'Pubescent', 'P',
-                               ifelse(ele_nodes$age_category == 'Juvenile', 'J', 'C')))
-ele_nodes$dem_class <- paste(ele_nodes$age, ele_nodes$sex, sep = '') # column combining age and sex
-ele_nodes <- ele_nodes[,c(1:6)]                                      # remove age column
-
-write_delim(ele_nodes, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_elenodes.csv')
-# ele_nodes <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_elenodes.csv')
-
-### clean environment
-rm(efa, efa_age, efa_id, efa_long, test, check, i)
-
-
