@@ -1,5 +1,6 @@
 #### aninet non-random variation test ####
 library(tidyverse, lib.loc = '../packages/')
+library(plyr, lib.loc = '../packages/')
 library(aninet, lib.loc = '../packages/')
 library(rstan, lib.loc = '../packages/')
 
@@ -28,31 +29,27 @@ gbi_males <- gbi_matrix[,colnames(gbi_matrix) %in% sort(unique(c(counts_df$id_1,
 gbi_males <- gbi_males[rowSums(gbi_males) > 0,] # remove male-only sightings
 rm(eles, eles_asnipe, nodes) ; gc()
 
-( num_permute_hypo <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )    # hypothetical minimum number of permutations necessary to reach stability
-num_permute_real <- 1000 # test how long this takes, but can't actually run parallel because needs to be as close as possible to a single long chain -- measuring burn in, not sampling from chain
+# hypothetical minimum number of permutations necessary to reach stability
+( num_permute <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )
+num_permute <- round_any(num_permute, 1000, f = ceiling)
 
-#permute_gbi <- gbi_MCMC(
-#  data = gbi_males,
-#  ind_constraint = NULL,
-#  group_constraint = NULL,
-#  samples = 10,#num_permutations/num_chains,
-#  thin = 2, #100,
-#  burnin = 1, #1000,
-#  chains = num_chains,
-#  FUN = NULL      # leaving as NULL here will mean that permute_gbi$FUN(gbi_males) below gives CV, Mean, SD and SRI
-#)
-seeds <- 1:num_permute_real
-outputs <- data.frame(permutation = 1:num_permute_real,
-                      cv = NA, mean = NA, stdev = NA, sri = NA, rhat = NA)
+# set up inputs
+chain_length <- 1000
+seeds <- 2:(num_permute/(chain_length*2))
 N <- ncol(gbi_males)
 obs <- nrow(gbi_males)
 num_chains <- 2
-permute_gbi <- array(NA, c(N,obs,num_permute_real,num_chains),
-                     dimnames = list(colnames(gbi_males),
-                                     rownames(gbi_males),
-                                     1:num_permute_real,
-                                     1:num_chains))
 
+# set up outputs
+outputs <- data.frame(permutation = 1:num_permute,
+                      cv = NA, mean = NA, stdev = NA, sri = NA, rhat = NA)
+#permute_gbi <- array(NA, c(N,obs,num_permute,num_chains),
+#                     dimnames = list(colnames(gbi_males),
+#                                     rownames(gbi_males),
+#                                     1:max(seeds),
+#                                     1:num_chains))
+
+# functions to print out Rhat at the end of the permutation
 rhat_rfun <- function(sims) {
   chains <- ncol(sims)
   n_samples <- nrow(sims)
@@ -95,53 +92,34 @@ output_function <- function(gbi) {
   return(res)
 }
 
+# run initial permutation
+set.seed(1)
+permute <- aninet::gbi_MCMC(data = gbi_males,
+                            ind_constraint = NULL, group_constraint = NULL,
+                            samples = 1000, # short chains to be repeatedly extended
+                            thin = 100, burnin = 1000,
+                            chains = num_chains,
+                            FUN = output_function) # CV, Mean, SD, SRI and Rhat
+
+outputs[which(outputs$permutation == 1),2:6] <- permute$FUN(gbi_males)
+#permute_gbi[,,1,1] <- permute$permuted_data[[1]]
+#permute_gbi[,,1,2] <- permute$permuted_data[[2]]
+
 for(seed in seeds){
+  print(paste0('start seed number ', seed, ' at ', Sys.time()))
   set.seed(seed)
-  print(paste0('start permutation number ', seed, ' at ', Sys.time()))
-  permute <- aninet::gbi_MCMC(data = gbi_males,
-                              ind_constraint = NULL, group_constraint = NULL,
-                              samples = 1000, # short chains that can repeatedly extended and see how long they take -- previously: ceiling(num_permutations/num_chains),
-                              thin = 100, burnin = 1000,
-                              chains = num_chains,
-                              FUN = output_function # NULL = CV, Mean, SD and SRI in permute_gbi$FUN(gbi_males)
-  )
-  print(paste0('initial 1000 samples drawn for permutation ', seed, ' at ', Sys.time()))
   permute <- aninet::extend.gbi_MCMC(permute, samples = 1000)
-  print(paste0('extended 1000 samples drawn for permutation ', seed, ' at ', Sys.time()))
   outputs[which(outputs$permutation == seed),2:6] <- permute$FUN(gbi_males)
-  permute_gbi[,,seed,1] <- permute$permuted_data[[1]]
-  permute_gbi[,,seed,2] <- permute$permuted_data[[2]]
+  #permute_gbi[,,seed,1] <- permute$permuted_data[[1]]
+  #permute_gbi[,,seed,2] <- permute$permuted_data[[2]]
+  # write out data every 100 extensions
+  if(seed %% 100 == 0){
+    write_csv(outputs, '../data_processed/motnp_permutation_cv_rhat.csv')
+    saveRDS(permute$permuted_data[[1]], '../data_processed/motnp_permutations_chain1.RDS')
+    saveRDS(permute$permuted_data[[2]], '../data_processed/motnp_permutations_chain2.RDS')
+    save.image('motnp_nonrandomtest_gbiMCMCpermutations.RData')
+  }
 }
 
-write_csv(outputs, '../data_processed/motnp_simulation_cv_rhat.csv')
-saveRDS(permute_gbi, '../data_processed/motnp_simulation_permutations.RDS')
-
-# make parallel
-#library(doParallel)
-#num_chains <- 1000 # test how long this takes, but can't actually run parallel because needs to be as close as possible to a single long chain -- measuring burn in, not sampling from chain
-
-#cl <- makeCluster(detectCores())
-#registerDoParallel(cl)
-
-#seeds <- 1:num_chains
-#library(aninet, lib.loc = '../packages/')
-#permute_gbi <- foreach(seed = seeds) %dopar% { # , .packages = 'aninet'
-#  set.seed(seed)
-#  print(paste0('start permutation number ', seed, ' at ', Sys.time()))
-#  permute <- aninet::gbi_MCMC(data = gbi_males,
-#                              ind_constraint = NULL, group_constraint = NULL,
-#                              samples = 1000, # short chains that can repeatedly extended and see how long they take -- previously: ceiling(num_permutations/num_chains),
-#                              thin = 100, burnin = 100, # previously burn in of 1000 but then that wouldn't register anything
-#                              chains = num_chains,
-#                              FUN = NULL # NULL = CV, Mean, SD and SRI in permute_gbi$FUN(gbi_males)
-#  )
-#  print(paste0('initial 1000 samples drawn for chain ', seed, ' at ', Sys.time()))
-#  permute <- aninet::extend.gbi_MCMC(permute, samples = 1000)
-#  print(paste0('extended 1000 samples drawn for chain ', seed, ' at ', Sys.time()))
-#}
-#str(permute_gbi)
-#permute_gbi$FUN(gbi_males)
-#permute_gbi$permuted_data
-
-#save.image('motnp_nonrandomtest_gbiMCMCpermutations.RData')
-
+# plots and p-values
+#pdf('../outputs/')
