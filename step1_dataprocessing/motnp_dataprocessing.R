@@ -316,6 +316,16 @@ eles_long <- eles_long[!is.na(eles_long$elephant),] # filter out rows with no id
 max(eles_long$date) - min(eles_long$date) # 504 days -- last 2 months no elephants identified
 length(unique(eles_long$encounter))       # 574 -- number of independent sightings containing identified individuals
 
+### add column for total number of males per sighting
+eles_long$total_males <- NA
+for(i in unique(eles_long$encounter)){
+  x <- eles_long[eles_long$encounter == i,]
+  eles_long$total_males[which(eles_long$encounter == i)] <- nrow(x)
+}
+eles_long <- eles_long[,c(1:7,17,8:16)]
+total_eles <- eles_long[,c('encounter','total_males')] %>% distinct()
+mean(total_eles$total_males) ; sd(total_eles$total_males)
+
 min(eles_na$date)
 max(eles_na$date)
 min(eles_long$date)
