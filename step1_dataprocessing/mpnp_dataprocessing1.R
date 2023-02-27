@@ -148,6 +148,7 @@ for(i in sort(unique(efa_long$encounter))) {
 rm(encounter, x, i) ; gc()
 efa_long$perc_id <- 100*(efa_long$total_id/efa_long$total_elephants) # calculate proportion of elephants identified from total
 summary(efa_long$perc_id)
+mean(efa_long$total_elephants) ; sd(efa_long$total_elephants)
 
 # remove unidentified individuals
 efa_long <- efa_long %>% filter(elephant != '-') %>% 
