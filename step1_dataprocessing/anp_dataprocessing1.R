@@ -114,6 +114,9 @@ colnames(ate)
 ## clean environment
 rm(ate_nums, date_row, test, gps, i, no_gps, test_nums)
 
+## save output
+write_csv(ate, '../data_processed/anp_sightings_rawcombined.csv')
+
 ## progress report
 print(paste0('sightings data imported at ', Sys.time()))
 
