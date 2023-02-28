@@ -240,11 +240,13 @@ plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
   coords <- igraph::layout_nicely(net)
   igraph::plot.igraph(net, layout = coords,
                       edge.width = ifelse(md < threshold, 0, md * lwd),
-                      vertex.label.color = vertex.label.color1, vertex.color = vertex.color1, vertex.size = vertex.size1,
+                      vertex.label.color = vertex.label.color1, vertex.color = vertex.color1,
+                      vertex.size = vertex.size1,
                       edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0)
   igraph::plot.igraph(net, layout = coords,
                       edge.width = ifelse(md < threshold, 0, ub * lwd),
-                      vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, vertex.size = vertex.size2,
+                      vertex.label.color = vertex.label.color2, vertex.color = vertex.color2,
+                      vertex.size = vertex.size2,
                       edge.color = edge.color1, edge.arrow.size = 0, 
                       add = TRUE)
   if (obj$directed) {
@@ -259,18 +261,20 @@ motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 
 ### create nodes data frame
-nodes <- data.frame(bull = sort(unique(motnp_ages$id)),
+nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),
+                    node = NA,
                     age = NA,
                     sightings = NA)
 for(i in 1:nrow(nodes)){
-  x <- motnp_ages[motnp_ages$id == nodes$bull[i],]
+  x <- motnp_ages[motnp_ages$id == nodes$id[i],]
   nodes$age[i] <- mean(x$age)
-  if(nodes$bull[i] != 'M99'){
-    y <- counts_df[counts_df$id_1 == nodes$bull[i], c('id_1','count_1')]
-    nodes$sightings[i] <- y[1,2]
-  }
+  if(nodes$id[i] != 'M99') { y <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','count_1','node_1_males')] }
+  else { y <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','count_2','node_2_males')] }
+  nodes$sightings[i] <- y[1,2]
+  nodes$node[i] <- y[1,3]
 }
 nodes$sightings <- as.numeric(nodes$sightings)
+nodes$node <- as.numeric(nodes$node)
 str(nodes)
 
 ### plot network
@@ -283,37 +287,45 @@ plot_network_threshold(motnp_edge_weights_strongpriors, lwd = 2, ci = 0.9, thres
 plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
                                      vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
                                      vertex.color1 = 'transparent',
-                                     vertex.size1 = 1, edge.color1 = rgb(0, 0, 0, 1),
+                                     vertex.size1 = 0, edge.color1 = rgb(0, 0, 0, 1),
                                      vertex.label.color2 = 'black', vertex.label.font2 = 'Helvetica', 
                                      vertex.color2 = 'seagreen1',
                                      vertex.size2 = 8, edge.color2 = rgb(0, 0, 0, 0.3))
 {
   edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
   threshold_edges <- edgelist[edgelist$median >= threshold,]
+  
+  if(is.data.frame(vertex.size2) == TRUE ) {
+  nodes_list <- vertex.size2[vertex.size2$node %in% as.numeric(threshold_edges$node_1) | 
+                               vertex.size2$node %in% as.numeric(threshold_edges$node_2) , 'sightings']
+  node_sightings <- log(nodes_list)*3
+  }
+  else { node_sightings <- vertex.size2 }
+
   net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]))
   md <- threshold_edges[, 3]
   ub <- threshold_edges[, 5]
   coords <- igraph::layout_nicely(net)
   igraph::plot.igraph(net, layout = coords,
-                      vertex.label.color = vertex.label.color1, label.family = vertex.label.font1, 
-                      vertex.color = vertex.color1, vertex.size = vertex.size1,
-                      edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0, edge.width = md * lwd)
-  igraph::plot.igraph(net, layout = coords,
                       vertex.label.color = vertex.label.color2, label.family = vertex.label.font2,
-                      vertex.color = vertex.color2, vertex.size = vertex.size2,
-                      edge.color = edge.color1, edge.arrow.size = 0, edge.width = ub * lwd,
+                      vertex.color = vertex.color2, vertex.size = node_sightings, #frame.color = NA,
+                      edge.color = edge.color2, edge.arrow.size = 0, edge.width = ub * lwd)
+  igraph::plot.igraph(net, layout = coords,
+                      vertex.label.color = vertex.label.color1, label.family = vertex.label.font1, 
+                      vertex.color = vertex.color1, vertex.size = vertex.size1, #frame.color = NA,
+                      edge.color = edge.color1, edge.arrow.size = 0, edge.width = md * lwd,
                       add = TRUE)
   if (obj$directed) {
-    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, 
+    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, vertex.label.font = vertex.label.font2,
                         vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, 
                         edge.color = edge.color2, add = TRUE)
   }
 }
 
 ### plot network
-plot_network_threshold2(obj = motnp_edge_weights_strongpriors, threshold = 0.2,
-                        vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
-
+plot_network_threshold2(obj = motnp_edge_weights_strongpriors, threshold = 0.15,
+                        vertex.color2 = nodes$age, vertex.size2 = nodes, lwd = 10,
+                        vertex.label.color2 = 'transparent')
 
 ### add time marker
 print(paste0('network plots completed at ', Sys.time()))
