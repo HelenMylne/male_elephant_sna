@@ -183,6 +183,145 @@ model_averaging <- function(models) {
 
 dev.off()
 
+#### Period == all ####
+for( time_window in 1:length(unique(counts_df$period))){
+  ### add time marker
+  print(paste0('start window ', time_window ,' at ', Sys.time()))
+  
+  # create output pdf
+  pdf(file = paste0('../outputs/anp',time_window,'_bisonr_edgeweight.pdf'))
+  
+  ### create data frame for edge weight model
+  counts_df_model <- counts_df[counts_df$period == time_window,
+                               c('node_1','node_2','event_count','period_count_dyad')] %>% distinct()
+  colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
+  
+  ### run edge weight model
+  anp_edge_weights <- bison_model(
+    ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+    data = counts_df_model, 
+    model_type = "binary",
+    #partial_pooling = TRUE,
+    #mc_cores = 4,
+    priors = priors
+  )
+  
+  ### run diagnostic plots
+  plot_trace(anp_edge_weights, par_ids = 2)
+  plot_predictions(anp_edge_weights, num_draws = 20, type = "density")
+  plot_predictions(anp_edge_weights, num_draws = 20, type = "point")
+  
+  ### extract edge weight summaries
+  edgelist <- get_edgelist(anp_edge_weights, ci = 0.9, transform = TRUE)
+  plot(density(edgelist$median))
+  summary(anp_edge_weights)
+  
+  ### add time marker
+  print(paste0('model completed at ', Sys.time()))
+  
+  ## non-random edge weights ####
+  ### run null model
+  anp_edges_null <- bison_model(
+    (event | duration) ~ 1, 
+    data = counts_df_model, 
+    model_type = "binary",
+    priors = priors
+  )
+  
+  ### compare null model with fitted model -- bisonR model stacking
+  model_comparison(list(non_random_model = anp_edge_weights, random_model = anp_edges_null)) # NETWORK IS RANDOM
+  
+  ### compare null model with fitted model -- Jordan pseudo model averaging
+  model_averaging(models = list(non_random_model = anp_edge_weights, random_model = anp_edges_null))
+  
+  # save workspace image
+  save.image(file = paste0('anp',time_window,'_bisonr_edgescalculated.RData'))
+  
+  ### add time marker
+  print(paste0('random network comparison completed at ', Sys.time()))
+  
+  ## plot network ####
+  # create nodes data frame
+  nodes <- data.frame(bull = sort(unique(c(counts_df_model$node_1_id,counts_df_model$node_2_id))),
+                      age = NA,
+                      sightings = NA)
+  for(i in 1:nrow(nodes)){
+    df <- counts_df[(counts_df$period == time_window & counts_df$node_1 == nodes$bull[i]),
+                    c('id_1','age_start_1','period_count_1')] %>% distinct()
+    if(nrow(df) > 0){
+      nodes$age[i] <- df$age_start_1[1]
+      nodes$sightings[i] <- df$period_count_1[1]
+    }
+    else {
+      df <- counts_df[(counts_df$period == time_window & counts_df$node_2 == nodes$bull[i]),
+                      c('id_2','age_start_2','period_count_2')] %>% distinct()
+      nodes$age[i] <- df$age_start_2[1]
+      nodes$sightings[i] <- df$period_count_2[1]
+    }
+  }
+  
+  nodes$sightings <- as.numeric(nodes$sightings)
+  str(nodes)
+  
+  # plot network
+  plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+                         vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+                         vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+                         vertex.size2 = nodes$sightings, edge.color2 = 'black')
+  plot_network_threshold2(obj = anp_edge_weights, threshold = 0.2,
+                          vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
+  
+  ### add time marker
+  print(paste0('network plots completed at ', Sys.time()))
+  
+  ## coefficient of variation of edge weights (aka social differentiation) ####
+  # extract cv for model
+  global_cv <- extract_metric(anp_edge_weights, "global_cv")
+  head(global_cv)
+  hist(global_cv)
+  
+  ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2%
+  counts_df_model <- counts_df[,c('node_1_males','node_2_males','event_count','count_dyad','id_1','id_2','dyad_males')]
+  colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
+  ew_chain <- as.data.frame(anp_edge_weights$chain)
+  colnames(ew_chain) <- counts_df_model$dyad_id
+  ew_chain <- pivot_longer(ew_chain, cols = everything(), names_to = 'dyad_id', values_to = 'draw')
+  ew_chain$chain_position <- rep(1:length(unique(ew_chain$dyad_id)), each = 4000)
+  ew_chain$draw <- LaplacesDemon::invlogit(ew_chain$draw)
+  ew_chain$mean <- NA
+  hist(ew_chain$draw)
+  plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'edge distribution', xlab = 'edge weight', ylab = 'density', las = 1)
+  for(i in sort(unique(ew_chain$dyad_id))){
+    x <- ew_chain[ew_chain$dyad_id == i,]
+    ew_chain$mean <- ifelse(ew_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ew_chain$mean)
+    lines(density(x$draw), col = rgb(0,0,1,0.1))
+  }
+  lines(density(ew_chain$draw), lwd = 2)
+  
+  quantile(ew_chain$draw, 0.98)
+  
+  ew_edgelist <- bisonR::get_edgelist(anp_edge_weights)
+  quantile(ew_edgelist$median, 0.98)
+  
+  counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
+  quantile(counts_df_model$sri, 0.98)
+  
+  ## clean up ####
+  ### save pdf
+  dev.off()
+  
+  ### save workspace image
+  save.image('anp_bisonr_edgescalculated.RData')
+  
+  ### clear environment
+  rm(list = ls()[!(ls() %in% c('counts_df','priors','periods','windows','males',
+                               'model_averaging', 'plot_network_threshold','plot_network_threshold2'))])
+  
+  ### add time marker
+  print(paste0('time window ', time_window, ' completed at ', Sys.time()))
+  
+}
+
 #### Period == 1 ####
 # create output pdf
 pdf(file = '../outputs/anp1_bisonr_edgeweight.pdf')
