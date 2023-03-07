@@ -142,8 +142,8 @@ counts_df <- counts_df %>%
 
 ### remove young males
 counts_df <- counts_df %>% 
-  filter(age_cat_id_1 > 3) %>% 
-  filter(age_cat_id_2 > 3)
+  filter(age_cat_id_1 >= 3) %>% 
+  filter(age_cat_id_2 >= 3)
 
 ### create nodes id variable which is 1:max(id) as currently covers all elephants, not just males
 counts_df$node_1_males <- as.integer(as.factor(counts_df$node_1_nogaps))
@@ -188,6 +188,88 @@ plot_predictions(motnp_edge_weights_strongpriors, num_draws = 20, type = "point"
 edgelist <- get_edgelist(motnp_edge_weights_strongpriors, ci = 0.9, transform = TRUE)
 plot(density(edgelist$median))
 summary(motnp_edge_weights_strongpriors)
+
+### compare edge weights to prior
+edges <- as.data.frame(motnp_edge_weights_strongpriors$chain) %>% 
+  pivot_longer(cols = everything(), names_to = 'dyad', values_to = 'draw') %>% 
+  mutate(dyad_id = rep(counts_df$dyad_id, 4000),
+         draw = plogis(draw))
+head(edges)
+plot(NULL, xlim = c(0,1), ylim = c(0,50), las = 1,
+     main = 'edge distributions',ylab = 'density', xlab = 'edge weight')
+plot_samples <- sample(counts_df$dyad_id, 10000, replace = F)
+for(dyad in plot_samples) {
+  x <- edges[edges$dyad_id == dyad,]
+  lines(density(x$draw),
+        col = ifelse(mean(x$draw < 0.15), rgb(0,0,1,0.1),
+                     ifelse(mean(x$draw < 0.3), rgb(1,0,0,0.1),rgb(1,0,1,0.1))))
+}
+lines(density(edges$draw), lwd = 3)
+
+edges$chain_position <- rep(1:4000, each = length(unique(edges$dyad)))
+edges <- edges[edges$chain_position < 1001,]
+edges$mean <- NA
+for(dyad in unique(edges$dyad)) {
+  edges$mean[edges$dyad == dyad] <- mean(edges$draw[edges$dyad == dyad])
+}
+plot_low <- edges[edges$mean == min(edges$mean),]
+plot_q25 <- edges[edges$mean == quantile(edges$mean, 0.25),]
+plot_mid <- edges[edges$mean == quantile(edges$mean, 0.501),]
+plot_q75 <- edges[edges$mean == quantile(edges$mean, 0.75),]
+plot_q98 <- edges[edges$mean == quantile(edges$mean, 0.98),]
+plot_high <- edges[edges$mean == max(edges$mean),]
+plot_data <- rbind(plot_low, plot_q25, plot_mid, plot_q75, plot_q98, plot_high)
+
+ggplot(plot_data, aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)))+
+  geom_density(linewidth = 1)+
+  theme_classic()+
+  scale_fill_viridis_d(alpha = 0.2)+
+  scale_color_viridis_d()+
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18))+
+  scale_x_continuous(name = 'edge weight', limits = c(0,1))
+
+priors$edge <- 'normal(-2.5, 1.5)'
+prior_plot <- data.frame(dyad = 'prior',
+                         draw = plogis(rnorm(1000, -2.5, 1.5)),
+                         dyad_id = 1000000,
+                         mean = NA,
+                         chain_position = 1:1000)
+prior_plot$mean <- mean(prior_plot$draw)
+ggplot(plot_data, aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)))+
+  geom_density(linewidth = 1)+
+  geom_density(data = prior_plot, linewidth = 1, colour = 'black', linetype = 2)+
+  theme_classic()+
+  scale_fill_viridis_d(alpha = 0.2)+
+  scale_color_viridis_d()+
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18))+
+  scale_x_continuous(name = 'edge weight', limits = c(0,1))
+
+
+head(plot_data)
+plot_chains <- rbind(plot_high, plot_mid, plot_low)
+plot_chains$order <- factor(plot_chains$dyad_id,
+                            levels = c('73914','86520','85862'))
+ggplot(#data = plot_chains,
+       #aes(y = draw, x = chain_position, colour = order)
+  )+
+  geom_line(data = plot_high, aes(y = draw, x = chain_position),
+            colour = '#fde725')+
+  geom_line(data = plot_mid, aes(y = draw, x = chain_position),
+            colour = '#21918c')+
+  geom_line(data = plot_low, aes(y = draw, x = chain_position),
+            colour = '#440154')+
+  scale_color_viridis_d()+
+  theme_classic()+
+  theme(#legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18))+
+  scale_x_continuous(name = 'chain position')+
+  scale_y_continuous(name = 'chain position',
+                     limits = c(0,1))
 
 ### add time marker
 print(paste0('strong-priored model completed at ', Sys.time()))
@@ -274,7 +356,7 @@ for(i in 1:nrow(nodes)){
   nodes$node[i] <- y[1,3]
 }
 nodes$sightings <- as.numeric(nodes$sightings)
-nodes$node <- as.numeric(nodes$node)
+nodes$node <- as.character(nodes$node)
 str(nodes)
 
 ### plot network
@@ -285,47 +367,60 @@ plot_network_threshold(motnp_edge_weights_strongpriors, lwd = 2, ci = 0.9, thres
 
 ### adapt to remove unconnected nodes
 plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
-                                     vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
-                                     vertex.color1 = 'transparent',
-                                     vertex.size1 = 0, edge.color1 = rgb(0, 0, 0, 1),
-                                     vertex.label.color2 = 'black', vertex.label.font2 = 'Helvetica', 
-                                     vertex.color2 = 'seagreen1',
-                                     vertex.size2 = 8, edge.color2 = rgb(0, 0, 0, 0.3))
+                                     label.colour = 'transparent', label.font = 'Helvetica', 
+                                     node.size = 4, node.colour = 'seagreen1',
+                                     link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
 {
   edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
   threshold_edges <- edgelist[edgelist$median >= threshold,]
-  
-  if(is.data.frame(vertex.size2) == TRUE ) {
-  nodes_list <- vertex.size2[vertex.size2$node %in% as.numeric(threshold_edges$node_1) | 
-                               vertex.size2$node %in% as.numeric(threshold_edges$node_2) , 'sightings']
-  node_sightings <- log(nodes_list)*3
-  }
-  else { node_sightings <- vertex.size2 }
-
   net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]))
+  
+  if(is.data.frame(node.size) == TRUE ) {
+    nodes_list <- data.frame(node = as.numeric(names(net[1])),
+                             sightings = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_list$sightings[i] <- nodes$sightings[which(nodes$node == nodes_list$node[i])]
+    }
+    node_sightings <- log(nodes_list$sightings)*5
+  } else { node_sightings <- node.size }
+  
+  if(is.data.frame(node.colour) == TRUE ) {
+    nodes_list <- data.frame(node = as.numeric(names(net[1])),
+                             age = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_list$age[i] <- nodes$age[which(nodes$node == nodes_list$node[i])]
+    }
+    node_age <- nodes_list$age
+  } else { node_age <- node.colour }
+  
   md <- threshold_edges[, 3]
   ub <- threshold_edges[, 5]
   coords <- igraph::layout_nicely(net)
   igraph::plot.igraph(net, layout = coords,
-                      vertex.label.color = vertex.label.color2, label.family = vertex.label.font2,
-                      vertex.color = vertex.color2, vertex.size = node_sightings, #frame.color = NA,
-                      edge.color = edge.color2, edge.arrow.size = 0, edge.width = ub * lwd)
-  igraph::plot.igraph(net, layout = coords,
-                      vertex.label.color = vertex.label.color1, label.family = vertex.label.font1, 
-                      vertex.color = vertex.color1, vertex.size = vertex.size1, #frame.color = NA,
-                      edge.color = edge.color1, edge.arrow.size = 0, edge.width = md * lwd,
-                      add = TRUE)
-  if (obj$directed) {
-    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, vertex.label.font = vertex.label.font2,
-                        vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, 
-                        edge.color = edge.color2, add = TRUE)
-  }
+                      vertex.label.color = ifelse(is.null(label.colour) == TRUE,
+                                                  ifelse(node_age < 20, 'black', 'white'),
+                                                  label.colour),
+                      label.family = label.font,
+                      vertex.color = ifelse(node_age < 15, '#FDE725FF',
+                                            ifelse(node_age < 20, '#55C667FF',
+                                                   ifelse(node_age < 30, '#1F968BFF', 
+                                                          ifelse(node_age < 40, '#39568CFF', '#440154FF')))), 
+                      vertex.size = node_sightings,
+                      frame.color = NA, frame.width = 0,
+                      edge.color = NA, edge.arrow.size = 0, edge.width = 0)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour1, edge.arrow.size = 0, edge.width = md * lwd)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour2, edge.arrow.size = 0, edge.width = ub * lwd)
 }
 
 ### plot network
 plot_network_threshold2(obj = motnp_edge_weights_strongpriors, threshold = 0.15,
-                        vertex.color2 = nodes$age, vertex.size2 = nodes, lwd = 10,
-                        vertex.label.color2 = 'transparent')
+                        node.size = nodes, node.colour = nodes, lwd = 10)
 
 ### add time marker
 print(paste0('network plots completed at ', Sys.time()))
