@@ -194,6 +194,20 @@ df %>% ggplot() +                                                  # plot interv
   xlab("Assigned age") + ylab("Modelled age")+
   theme(axis.text = element_text(size = 14))
 
+df %>% ggplot() +    # plot intervals for each category against values set above
+  geom_violin(aes(x = age_cat_centre, y = value,
+                  group = factor(age_cat),
+                  fill = factor(age_cat, levels = c(7:3,NA,NA))))+
+  geom_vline(xintercept = 0, alpha = 0.6) +
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+  geom_hline(yintercept = 0, alpha = 0.6) +
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+  theme_bw() + 
+  xlab("Assigned age") + ylab("Modelled age")+
+  theme(axis.text = element_text(size = 14), legend.position = 'none',
+        axis.title = element_text(size = 18))+
+  scale_fill_viridis_d()
+
 ### save output
 colnames(true_ages) <- motnp_males$id
 saveRDS(true_ages, file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
