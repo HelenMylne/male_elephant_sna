@@ -68,33 +68,55 @@ plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
 
 ### adapt to remove unconnected nodes
 plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
-                                     vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
-                                     vertex.color1 = 'transparent',
-                                     vertex.size1 = 1, edge.color1 = rgb(0, 0, 0, 1),
-                                     vertex.label.color2 = 'black', vertex.label.font2 = 'Helvetica', 
-                                     vertex.color2 = 'seagreen1',
-                                     vertex.size2 = 8, edge.color2 = rgb(0, 0, 0, 0.3))
+                                     label.colour = 'transparent', label.font = 'Helvetica', 
+                                     node.size = 4, node.colour = 'seagreen1',
+                                     link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
 {
   edgelist <- get_edgelist(obj, ci = ci, transform = TRUE)
   threshold_edges <- edgelist[edgelist$median >= threshold,]
   net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]))
+  
+  if(is.data.frame(node.size) == TRUE ) {
+    nodes_list <- data.frame(node = as.numeric(names(net[1])),
+                             sightings = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_list$sightings[i] <- nodes$sightings[which(nodes$node == nodes_list$node[i])]
+    }
+    node_sightings <- log(nodes_list$sightings)*5
+  } else { node_sightings <- node.size }
+  
+  if(is.data.frame(node.colour) == TRUE ) {
+    nodes_list <- data.frame(node = as.numeric(names(net[1])),
+                             age = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_list$age[i] <- nodes$age[which(nodes$node == nodes_list$node[i])]
+    }
+    node_age <- nodes_list$age
+  } else { node_age <- node.colour }
+  
   md <- threshold_edges[, 3]
   ub <- threshold_edges[, 5]
   coords <- igraph::layout_nicely(net)
   igraph::plot.igraph(net, layout = coords,
-                      vertex.label.color = vertex.label.color1, label.family = vertex.label.font1, 
-                      vertex.color = vertex.color1, vertex.size = vertex.size1,
-                      edge.color = rgb(0, 0, 0, 1), edge.arrow.size = 0, edge.width = md * lwd)
-  igraph::plot.igraph(net, layout = coords,
-                      vertex.label.color = vertex.label.color2, label.family = vertex.label.font2,
-                      vertex.color = vertex.color2, vertex.size = vertex.size2,
-                      edge.color = edge.color1, edge.arrow.size = 0, edge.width = ub * lwd,
-                      add = TRUE)
-  if (obj$directed) {
-    igraph::plot.igraph(net, edge.width = md * 0, layout = coords, 
-                        vertex.label.color = vertex.label.color2, vertex.color = vertex.color2, 
-                        edge.color = edge.color2, add = TRUE)
-  }
+                      vertex.label.color = ifelse(is.null(label.colour) == TRUE,
+                                                  ifelse(node_age < 20, 'black', 'white'),
+                                                  label.colour),
+                      label.family = label.font,
+                      vertex.color = ifelse(node_age < 15, '#FDE725FF',
+                                            ifelse(node_age < 20, '#55C667FF',
+                                                   ifelse(node_age < 30, '#1F968BFF', 
+                                                          ifelse(node_age < 40, '#39568CFF', '#440154FF')))), 
+                      vertex.size = node_sightings,
+                      frame.color = NA, frame.width = 0,
+                      edge.color = NA, edge.arrow.size = 0, edge.width = 0)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour1, edge.arrow.size = 0, edge.width = md * lwd)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour2, edge.arrow.size = 0, edge.width = ub * lwd)
 }
 
 # alternative method to compare models
@@ -269,13 +291,13 @@ for( time_window in 12:length(unique(counts_df_allwindows$period))){
   str(nodes)
   
   # plot network
-  plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+  plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
                          vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
                          vertex.label.color2 = 'black', vertex.color2 = nodes$age,
-                         vertex.size2 = nodes$sightings, edge.color2 = 'black')
-  plot_network_threshold2(obj = anp_edge_weights, threshold = 0.2,
-                          vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
-  
+                         vertex.size2 = nodes$sightings, edge.color2 = 'black') 
+  plot_network_threshold2(obj = anp_edge_weights, threshold = 0.15,
+                          node.size = nodes, node.colour = nodes, lwd = 10)
+
   ### add time marker
   print(paste0('network plots completed at ', Sys.time()))
   
@@ -453,12 +475,12 @@ for( time_window in 1:length(unique(counts_df_allwindows$period))){
   str(nodes)
   
   # plot network
-  plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.2,
+  plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
                          vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
                          vertex.label.color2 = 'black', vertex.color2 = nodes$age,
                          vertex.size2 = nodes$sightings, edge.color2 = 'black')
-  plot_network_threshold2(obj = anp_edge_weights, threshold = 0.2,
-                          vertex.color2 = nodes$age, vertex.size2 = nodes$sightings)
+  plot_network_threshold2(obj = anp_edge_weights, threshold = 0.15,
+                          node.colour = nodes$age, node.size = nodes$sightings)
   
   ### add time marker
   print(paste0('network plots completed at ', Sys.time()))
