@@ -49,6 +49,29 @@ motnp_ages$draw <- rep(1:8000, length(unique(motnp_ages$id)))
 #pdf('../outputs/motnp_nodalregression_plots_meanage.pdf')
 
 ## eigenvector only ####
+# prior predictive check
+priors$fixed
+prior_check(priors, 'binary')
+
+age <- 1:60
+plot(NULL, xlim = c(0,60), ylim = c(0,1), las = 1,
+     xlab = 'age', ylab = 'eigenvector centrality')
+for(i in 1:100){
+  intercept <- rbeta(1,1,1)
+  beta <- rnorm(1, 0, 0.005)
+  lines(x = age, y = intercept + age*beta, col = 'blue')
+  lines(x = age, y = intercept + age*plogis(beta), col = 'red') # can't ever be a negative effect so that can't be right
+}
+
+mean_age <- mean(motnp_ages$age)
+plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
+     xlab = 'age', ylab = 'eigenvector centrality')
+for(i in 1:100){
+  intercept <- rbeta(1,2,2)   # this isn't right but I don't think there is a prior for the intercept?? I've gone for a symmetrical one here that in itself explores most of the parameter space and allows it to see whether some of the lines are steep enough to go from top to bottom, but on the assumption that when combined, they will explore only the space relevant to their starting position
+  beta <- rnorm(1, 0, 0.005)
+  lines(x = age, y = intercept + (age - mean_age)*beta, col = rgb(0,0,1,0.5)) # vast majority come out somewhere sensible, and those that don't would if they started at a different value for age 10 so that comes down to my ability to work out what the intercept prior should actually be -- think this is a good prior for the slope
+}
+
 #prior_eigen <- bison_brm_get_prior(
 #  bison(node_eigen(node)) ~ age,
 #  list(motnp_edge_weights_strongpriors),
@@ -124,18 +147,21 @@ motnp_ages$draw <- rep(1:8000, length(unique(motnp_ages$id)))
 pdf('../outputs/motnp_nodalregression_eigen_agedistribution.pdf')
 
 ## define priors
-prior <- bison_brm_get_prior(
-  bison(node_eigen(node)) ~ age,
-  list(motnp_edge_weights_strongpriors),
-  motnp_ages
-)
-prior$prior[1] <- "normal(0,10)"
-bison_brm(
-  bison(global_cv(bison_network)) ~ bison_network,
-  list(fit_edge_1, fit_edge_2),
-  df_global,
-  prior=prior
-)
+#prior <- bison_brm_get_prior(
+#  bison(node_eigen(node)) ~ age,
+#  list(motnp_edge_weights_strongpriors),
+#  motnp_ages
+#)
+#prior$prior[1] <- "normal(0,10)"
+#bison_brm(
+#  bison(global_cv(bison_network)) ~ bison_network,
+#  list(fit_edge_1, fit_edge_2),
+#  df_global,
+#  prior=prior
+#)
+
+## define priors
+motnp_edge_weights_strongpriors$model_data$prior_fixed_sigma <- 0.005
 
 ## reduce age data to manageable number of draws
 test_ages <- motnp_ages[motnp_ages$draw %in% sample(motnp_ages$draw, 2000, replace = F),]
@@ -164,12 +190,14 @@ hist(motnp_eigen$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model r
 # compare to null model
 motnp_eigen_null <- bison_brm(
   bison(node_eigen(node)) ~ 1,
-  motnp_edge_weights,
-  motnp_ages,
+  motnp_edge_weights_strongpriors,
+  #motnp_ages,
+  test_ages,
   chains = 4,
   cores = 4
 )
-model_comparison(list(non_random_model = motnp_eigen, random_model = motnp_eigen_null))
+#model_comparison(list(non_random_model = motnp_eigen, random_model = motnp_eigen_null))
+#model_averaging(list(non_random_model = motnp_eigen, random_model = motnp_eigen_null))
 
 save.image('motnp_nodalregression_eigenvector.RData')
 
