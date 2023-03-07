@@ -8,11 +8,17 @@ library(bisonR, lib.loc = '../packages/')    # library(bisonR)
 library(asnipe, lib.loc = '../packages/')    # library(asnipe)
 library(sna, lib.loc = '../packages/')       # library(sna)
 library(raster, lib.loc = '../packages/')    # library(raster)
+library(janitor, lib.loc = '../packages/')   # library(janitor)
+library(gtools, lib.loc = '../packages/')    # library(gtools)
+library(igraph, lib.loc = '../packages/')    # library(igraph)
+library(loo, lib.loc = '../packages/')       # library(loo)
+library(readxl, lib.loc = '../packages/')    # library(readxl)
+library(LaplacesDemon, lib.loc = '../packages/')    # library(LaplacesDemon)
 
 # information
 sessionInfo()
 R.Version()
-rstan::stan_version()
+#rstan::stan_version()
 
 # set seed
 set.seed(12345)
@@ -142,7 +148,8 @@ sightings <- distinct(sightings) # now the right length
 table(sightings$obs_type_old)
 
 # read in individual male data
-males <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
+males <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% 
+  clean_names()
 males$id <- paste0('M',males$casename)
 ids <- sort(unique(ate$id))
 males <- males %>% dplyr::filter(id %in% ids)
@@ -184,7 +191,7 @@ rm(counts, sightings, i, x, j, obs_type)
 print(paste0('data read in at ', Sys.time()))
 
 ### run models ####
-for( time_window in 1:length(unique(counts_df_allwindows$period))){
+for( time_window in 12:length(unique(counts_df_allwindows$period))){
   ## set up ####
   ### add time marker
   print(paste0('start window ', time_window ,' at ', Sys.time()))
@@ -330,7 +337,8 @@ rm(list = ls()[!(ls() %in% c('ate','sightings','priors',
 counts_df_allwindows <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_longperiods_impossiblepairsremoved.csv')
 
 # read in individual male data
-males <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
+males <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% 
+  clean_names()
 males$id <- paste0('M',males$casename)
 ids <- sort(unique(ate$id))
 males <- males %>% dplyr::filter(id %in% ids)
