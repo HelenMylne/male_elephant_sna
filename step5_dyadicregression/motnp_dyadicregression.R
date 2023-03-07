@@ -31,22 +31,17 @@ motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
 motnp_ages$draw <- rep(1:8000, each = length(ids$id))
 
 # create data frame of ages and age differences
-#counts_df_dyadic <- counts_df[,c('dyad_males','node_1_males','node_2_males')]
-#colnames(motnp_ages)[3] <- 'node_1_males'
-#counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = 'node_1_males', multiple = 'all')
-#colnames(counts_df_dyadic)[4:5] <- c('id_1','age_1')
-#colnames(motnp_ages)[3] <- 'node_2_males'
-#rm(counts_df) ; gc()
-#counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = c('node_2_males','draw'))
-#colnames(counts_df_dyadic)[7:8] <- c('id_2','age_2')
-#counts_df_dyadic <- counts_df_dyadic[,c(1:3,6,4:5,7:8)]
-#colnames(counts_df_dyadic)[2:3] <- c('node_1_id','node_2_id')
-#head(counts_df_dyadic)
-
-#counts_df_dyadic$age_diff <- counts_df_dyadic$age_1 - counts_df_dyadic$age_2
-#counts_df_dyadic$age_mean <- mean(counts_df_dyadic$age_1, counts_df_dyadic$age_2)
-
-#counts_df_dyadic <- counts_df_dyadic[,c('node_1_males','node_2_males','age_diff','age_mean')]
+counts_df_dyadic <- counts_df[,c('dyad_males','node_1_males','node_2_males')]
+colnames(motnp_ages)[3] <- 'node_1_males'
+counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = 'node_1_males', multiple = 'all')
+colnames(counts_df_dyadic)[4:5] <- c('id_1','age_1')
+colnames(motnp_ages)[3] <- 'node_2_males'
+rm(counts_df) ; gc()
+counts_df_dyadic <- left_join(counts_df_dyadic, motnp_ages, by = c('node_2_males','draw'))
+colnames(counts_df_dyadic)[7:8] <- c('id_2','age_2')
+counts_df_dyadic <- counts_df_dyadic[,c(1:3,6,4:5,7:8)]
+colnames(counts_df_dyadic)[2:3] <- c('node_1_id','node_2_id')
+head(counts_df_dyadic)
 
 #cdf_dyadic <- counts_df_dyadic[,c('dyad_males','node_1_id','node_2_id')] %>% distinct()
 #cdf_dyadic$age_1 <- NA ; cdf_dyadic$age_2 <- NA
@@ -63,7 +58,7 @@ motnp_ages$draw <- rep(1:8000, each = length(ids$id))
 #}
 #length(which(is.na(cdf_dyadic$age_1) == TRUE))
 #length(which(is.na(cdf_dyadic$age_2) == TRUE))
-#
+
 #write_csv(cdf_dyadic, '../data_processed/motnp_dyadicregression_modeldata.csv')
 cdf_dyadic <- read_csv('../data_processed/motnp_dyadicregression_modeldata.csv')
 
@@ -77,7 +72,7 @@ mean_age_dyadic <- bison_brm (
   motnp_edge_weights_strongpriors,
   cdf_dyadic,
   #cdf_test,
-  #num_draws = 5, # Small sample size for demonstration purposes
+  num_draws = 5, # Small sample size for demonstration purposes
   #refresh = 0,
   cores = 4, 
   chains = 4,
@@ -91,12 +86,9 @@ plot(dyad_data$ ~ dyad_data$, las = 1, pch = 19, col = rgb(0,0,1,0.2),
      xlab = '', ylab = '',
      main = '')
 
-mod_summary <- mean_age_dyadic$fit
+#mod_summary <- mean_age_dyadic$fit
 
 hist(mean_age_dyadic$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
 
 save.image('motnp_dyadicregression_meanage.RData')
 dev.off()
-
-#### checking outputs #####
-#load('motnp_d')
