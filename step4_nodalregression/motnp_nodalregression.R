@@ -123,15 +123,31 @@ motnp_ages$draw <- rep(1:8000, length(unique(motnp_ages$id)))
 ## eigenvector only ####
 pdf('../outputs/motnp_nodalregression_eigen_agedistribution.pdf')
 
-#test_ages <- motnp_ages[motnp_ages$draw %in% sample(motnp_ages$draw, 80, replace = F),]
+## define priors
+prior <- bison_brm_get_prior(
+  bison(node_eigen(node)) ~ age,
+  list(motnp_edge_weights_strongpriors),
+  motnp_ages
+)
+prior$prior[1] <- "normal(0,10)"
+bison_brm(
+  bison(global_cv(bison_network)) ~ bison_network,
+  list(fit_edge_1, fit_edge_2),
+  df_global,
+  prior=prior
+)
 
+## reduce age data to manageable number of draws
+test_ages <- motnp_ages[motnp_ages$draw %in% sample(motnp_ages$draw, 2000, replace = F),]
+
+## run model
 motnp_eigen <- bison_brm(
   bison(node_eigen(node)) ~ age,
   motnp_edge_weights_strongpriors,
-  motnp_ages,
-  #test_ages,
+  #motnp_ages,
+  test_ages,
   chains = 4,
-  iter = 10000,
+  iter = 1000,
   cores = 4
 )
 summary(motnp_eigen)
