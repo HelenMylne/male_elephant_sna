@@ -201,9 +201,9 @@ periods <- data.frame(period = 1:(length(windows)-1),
                       period_end = windows[2:(length(windows))])
 
 # check out total sightings per individual/dyad per period and see if they are reasonable
-table(counts_df_allwindows$period_count_1) ; hist(counts_df_allwindows$period_count_1)
-table(counts_df_allwindows$period_count_2) ; hist(counts_df_allwindows$period_count_2)
-table(counts_df_allwindows$period_count_dyad) ; hist(counts_df_allwindows$period_count_dyad, breaks = 30)
+table(counts_df_allwindows$count_period_1) ; hist(counts_df_allwindows$count_period_1)
+table(counts_df_allwindows$count_period_2) ; hist(counts_df_allwindows$count_period_2)
+table(counts_df_allwindows$count_period_dyad) ; hist(counts_df_allwindows$count_period_dyad, breaks = 30)
 table(counts_df_allwindows$event_count) ; hist(counts_df_allwindows$event_count, breaks = 20, ylim = c(0,15000))
 # many are not seen much, but repeat sightings of pairs do seem to be genuinely rare
 
@@ -213,7 +213,7 @@ rm(counts, sightings, i, x, j, obs_type)
 print(paste0('data read in at ', Sys.time()))
 
 ### run models ####
-for( time_window in 12:length(unique(counts_df_allwindows$period))){
+for( time_window in 1:length(unique(counts_df_allwindows$period))){
   ## set up ####
   ### add time marker
   print(paste0('start window ', time_window ,' at ', Sys.time()))
@@ -223,7 +223,7 @@ for( time_window in 12:length(unique(counts_df_allwindows$period))){
   
   ### create data frame for edge weight model
   counts_df <- counts_df_allwindows[counts_df_allwindows$period == time_window,]
-  counts_df_model <- counts_df[, c('node_1','node_2','event_count','period_count_dyad')] %>% distinct()
+  counts_df_model <- counts_df[, c('node_1','node_2','event_count','count_period_dyad')] %>% distinct()
   colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
   
   ## run model ####
@@ -260,10 +260,10 @@ for( time_window in 12:length(unique(counts_df_allwindows$period))){
   )
   
   ### compare null model with fitted model -- bisonR model stacking
-  model_comparison(list(non_random_model = anp_edge_weights, random_model = anp_edges_null)) # NETWORK IS RANDOM
+  #model_comparison(list(non_random_model = anp_edge_weights, random_model = anp_edges_null)) # NETWORK IS RANDOM
   
   ### compare null model with fitted model -- Jordan pseudo model averaging
-  model_averaging(models = list(non_random_model = anp_edge_weights, random_model = anp_edges_null))
+  #model_averaging(models = list(non_random_model = anp_edge_weights, random_model = anp_edges_null))
   
   ### add time marker
   print(paste0('random network comparison completed at ', Sys.time()))
@@ -275,28 +275,28 @@ for( time_window in 12:length(unique(counts_df_allwindows$period))){
                       sightings = NA)
   for(i in 1:nrow(nodes)){
     df <- counts_df[(counts_df$period == time_window & counts_df$node_1 == nodes$bull[i]),
-                    c('id_1','age_start_1','period_count_1')] %>% distinct()
+                    c('id_1','age_start_1','count_period_1')] %>% distinct()
     if(nrow(df) > 0){
       nodes$age[i] <- df$age_start_1[1]
-      nodes$sightings[i] <- df$period_count_1[1]
+      nodes$sightings[i] <- df$count_period_1[1]
     }
     else {
       df <- counts_df[(counts_df$period == time_window & counts_df$node_2 == nodes$bull[i]),
-                      c('id_2','age_start_2','period_count_2')] %>% distinct()
+                      c('id_2','age_start_2','count_period_2')] %>% distinct()
       nodes$age[i] <- df$age_start_2[1]
-      nodes$sightings[i] <- df$period_count_2[1]
+      nodes$sightings[i] <- df$count_period_2[1]
     }
   }
   nodes$sightings <- as.numeric(nodes$sightings)
   str(nodes)
   
   # plot network
-  plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
-                         vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
-                         vertex.label.color2 = 'black', vertex.color2 = nodes$age,
-                         vertex.size2 = nodes$sightings, edge.color2 = 'black') 
-  plot_network_threshold2(obj = anp_edge_weights, threshold = 0.15,
-                          node.size = nodes, node.colour = nodes, lwd = 10)
+  #plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
+  #                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+  #                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+  #                       vertex.size2 = nodes$sightings, edge.color2 = 'black') 
+  #plot_network_threshold2(obj = anp_edge_weights, threshold = 0.15,
+  #                        node.size = nodes, node.colour = nodes, lwd = 10)
 
   ### add time marker
   print(paste0('network plots completed at ', Sys.time()))
@@ -308,7 +308,7 @@ for( time_window in 12:length(unique(counts_df_allwindows$period))){
   hist(global_cv)
   
   ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2%
-  counts_df_model <- counts_df[,c('node_1','node_2','event_count','period_count_dyad','id_1','id_2','dyad_id')]
+  counts_df_model <- counts_df[,c('node_1','node_2','event_count','count_period_dyad','id_1','id_2','dyad_id')]
   colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
   ew_chain <- as.data.frame(anp_edge_weights$chain)
   colnames(ew_chain) <- counts_df_model$dyad_id
@@ -317,13 +317,13 @@ for( time_window in 12:length(unique(counts_df_allwindows$period))){
   ew_chain$draw <- LaplacesDemon::invlogit(ew_chain$draw)
   ew_chain$mean <- NA
   hist(ew_chain$draw)
-  plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'edge distribution', xlab = 'edge weight', ylab = 'density', las = 1)
-  for(i in sort(unique(ew_chain$dyad_id))){
-    x <- ew_chain[ew_chain$dyad_id == i,]
-    ew_chain$mean <- ifelse(ew_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ew_chain$mean)
-    lines(density(x$draw), col = rgb(0,0,1,0.1))
-  }
-  lines(density(ew_chain$draw), lwd = 2)
+  #plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'edge distribution', xlab = 'edge weight', ylab = 'density', las = 1)
+  #for(i in sort(unique(ew_chain$dyad_id))){
+  #  x <- ew_chain[ew_chain$dyad_id == i,]
+  #  ew_chain$mean <- ifelse(ew_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ew_chain$mean)
+  #  lines(density(x$draw), col = rgb(0,0,1,0.1))
+  #}
+  #lines(density(ew_chain$draw), lwd = 2)
   
   (draw98 <- quantile(ew_chain$draw, 0.98))
   
@@ -385,9 +385,9 @@ periods <- data.frame(period = 1:(length(windows)-1),
                       period_end = windows[2:(length(windows))])
 
 # check out total sightings per individual/dyad per period and see if they are reasonable
-table(counts_df_allwindows$period_count_1) ; hist(counts_df_allwindows$period_count_1)
-table(counts_df_allwindows$period_count_2) ; hist(counts_df_allwindows$period_count_2)
-table(counts_df_allwindows$period_count_dyad) ; hist(counts_df_allwindows$period_count_dyad, breaks = 30)
+table(counts_df_allwindows$count_period_1) ; hist(counts_df_allwindows$count_period_1)
+table(counts_df_allwindows$count_period_2) ; hist(counts_df_allwindows$count_period_2)
+table(counts_df_allwindows$count_period_dyad) ; hist(counts_df_allwindows$count_period_dyad, breaks = 30)
 table(counts_df_allwindows$event_count) ; hist(counts_df_allwindows$event_count, breaks = 20, ylim = c(0,15000))
 # many are not seen much, but repeat sightings of pairs do seem to be genuinely rare
 
@@ -407,7 +407,7 @@ for( time_window in 1:length(unique(counts_df_allwindows$period))){
   
   ### create data frame for edge weight model
   counts_df <- counts_df_allwindows[counts_df_allwindows$period == time_window,]
-  counts_df_model <- counts_df[, c('node_1','node_2','event_count','period_count_dyad')] %>% distinct()
+  counts_df_model <- counts_df[, c('node_1','node_2','event_count','count_period_dyad')] %>% distinct()
   colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
   
   ## run model ####
@@ -444,10 +444,10 @@ for( time_window in 1:length(unique(counts_df_allwindows$period))){
   )
   
   ### compare null model with fitted model -- bisonR model stacking
-  model_comparison(list(non_random_model = anp_edge_weights, random_model = anp_edges_null)) # NETWORK IS RANDOM
+  #model_comparison(list(non_random_model = anp_edge_weights, random_model = anp_edges_null)) # NETWORK IS RANDOM
   
   ### compare null model with fitted model -- Jordan pseudo model averaging
-  model_averaging(models = list(non_random_model = anp_edge_weights, random_model = anp_edges_null))
+  #model_averaging(models = list(non_random_model = anp_edge_weights, random_model = anp_edges_null))
   
   ### add time marker
   print(paste0('random network comparison completed at ', Sys.time()))
@@ -459,28 +459,28 @@ for( time_window in 1:length(unique(counts_df_allwindows$period))){
                       sightings = NA)
   for(i in 1:nrow(nodes)){
     df <- counts_df[(counts_df$period == time_window & counts_df$node_1 == nodes$bull[i]),
-                    c('id_1','age_start_1','period_count_1')] %>% distinct()
+                    c('id_1','age_start_1','count_period_1')] %>% distinct()
     if(nrow(df) > 0){
       nodes$age[i] <- df$age_start_1[1]
-      nodes$sightings[i] <- df$period_count_1[1]
+      nodes$sightings[i] <- df$count_period_1[1]
     }
     else {
       df <- counts_df[(counts_df$period == time_window & counts_df$node_2 == nodes$bull[i]),
-                      c('id_2','age_start_2','period_count_2')] %>% distinct()
+                      c('id_2','age_start_2','count_period_2')] %>% distinct()
       nodes$age[i] <- df$age_start_2[1]
-      nodes$sightings[i] <- df$period_count_2[1]
+      nodes$sightings[i] <- df$count_period_2[1]
     }
   }
   nodes$sightings <- as.numeric(nodes$sightings)
   str(nodes)
   
   # plot network
-  plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
-                         vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
-                         vertex.label.color2 = 'black', vertex.color2 = nodes$age,
-                         vertex.size2 = nodes$sightings, edge.color2 = 'black')
-  plot_network_threshold2(obj = anp_edge_weights, threshold = 0.15,
-                          node.colour = nodes$age, node.size = nodes$sightings)
+  #plot_network_threshold(anp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
+  #                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+  #                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+  #                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
+  #plot_network_threshold2(obj = anp_edge_weights, threshold = 0.15,
+  #                        node.colour = nodes$age, node.size = nodes$sightings)
   
   ### add time marker
   print(paste0('network plots completed at ', Sys.time()))
@@ -492,7 +492,7 @@ for( time_window in 1:length(unique(counts_df_allwindows$period))){
   hist(global_cv)
   
   ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2%
-  counts_df_model <- counts_df[,c('node_1','node_2','event_count','period_count_dyad','id_1','id_2','dyad_id')]
+  counts_df_model <- counts_df[,c('node_1','node_2','event_count','count_period_dyad','id_1','id_2','dyad_id')]
   colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
   ew_chain <- as.data.frame(anp_edge_weights$chain)
   colnames(ew_chain) <- counts_df_model$dyad_id
@@ -501,13 +501,13 @@ for( time_window in 1:length(unique(counts_df_allwindows$period))){
   ew_chain$draw <- LaplacesDemon::invlogit(ew_chain$draw)
   ew_chain$mean <- NA
   hist(ew_chain$draw)
-  plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'edge distribution', xlab = 'edge weight', ylab = 'density', las = 1)
-  for(i in sort(unique(ew_chain$dyad_id))){
-    x <- ew_chain[ew_chain$dyad_id == i,]
-    ew_chain$mean <- ifelse(ew_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ew_chain$mean)
-    lines(density(x$draw), col = rgb(0,0,1,0.1))
-  }
-  lines(density(ew_chain$draw), lwd = 2)
+  #plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'edge distribution', xlab = 'edge weight', ylab = 'density', las = 1)
+  #for(i in sort(unique(ew_chain$dyad_id))){
+  #  x <- ew_chain[ew_chain$dyad_id == i,]
+  #  ew_chain$mean <- ifelse(ew_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ew_chain$mean)
+  #  lines(density(x$draw), col = rgb(0,0,1,0.1))
+  #}
+  #lines(density(ew_chain$draw), lwd = 2)
   
   (draw98 <- quantile(ew_chain$draw, 0.98))
   
