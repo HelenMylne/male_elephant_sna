@@ -196,29 +196,32 @@ for( time_window in 1:5 ){
   ### add time marker
   print(paste0('random network comparison completed at ', Sys.time()))
   
+  # save workspace image
+  save.image(file = paste0('mpnp_edgecalculations/mpnpshort',time_window,'_bisonr_edgescalculated.RData'))
+  
   ## plot network ####
   # create nodes data frame
-  nodes <- data.frame(bull = sort(unique(mpnp_ages$id)),
-                      age = NA,
-                      sightings = NA)
-  for(i in 1:nrow(nodes)){
-    x <- mpnp_ages[mpnp_ages$id == nodes$bull[i],]
-    nodes$age[i] <- mean(x$age)
-    if(nodes$bull[i] != 'M99'){
-      y <- counts_df[counts_df$id_1 == nodes$bull[i], c('id_1','count_period_1')]
-      nodes$sightings[i] <- y[1,2]
-    }
-  }
-  nodes$sightings <- as.numeric(nodes$sightings)
-  str(nodes)
+  #nodes <- data.frame(bull = sort(unique(mpnp_ages$id)),
+  #                    age = NA,
+  #                    sightings = NA)
+  #for(i in 1:nrow(nodes)){
+  #  x <- mpnp_ages[mpnp_ages$id == nodes$bull[i],]
+  #  nodes$age[i] <- mean(x$age)
+  #  if(nodes$bull[i] != 'M99'){
+  #    y <- counts_df[counts_df$id_1 == nodes$bull[i], c('id_1','count_period_1')]
+  #    nodes$sightings[i] <- y[1,2]
+  #  }
+  #}
+  #nodes$sightings <- as.numeric(nodes$sightings)
+  #str(nodes)
   
   # plot network
-  plot_network_threshold(mpnp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
-                         vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
-                         vertex.label.color2 = 'black', vertex.color2 = nodes$age,
-                         vertex.size2 = nodes$sightings, edge.color2 = 'black')
-  plot_network_threshold2(obj = mpnp_edge_weights, threshold = 0.15,
-                          node.colour = nodes$age, node.size = nodes$sightings)
+  #plot_network_threshold(mpnp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
+  #                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+  #                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+  #                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
+  #plot_network_threshold2(obj = mpnp_edge_weights, threshold = 0.15,
+  #                        node.colour = nodes$age, node.size = nodes$sightings)
 
   ### add time marker
   print(paste0('network plots completed at ', Sys.time()))
@@ -252,14 +255,14 @@ for( time_window in 1:5 ){
   draws <- left_join(draws, dyads, by = 'dyad_id')
   draws$sri <- draws$event / draws$duration
   
-  subset_draws <- draws[draws$sri > 0.2,]
-  subset_draws$median <- NA
-  for(i in 1:nrow(subset_draws)){
-    x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
-    subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
-  }
-  head(subset_draws)
-  which(is.na(subset_draws$median) == TRUE)[1]
+  #subset_draws <- draws[draws$sri > 0.2,]
+  #subset_draws$median <- NA
+  #for(i in 1:nrow(subset_draws)){
+  #  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
+  #  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
+  #}
+  #head(subset_draws)
+  #which(is.na(subset_draws$median) == TRUE)[1]
   
   #subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)
   #ggplot(data = subset_draws, mapping = aes(x = weight))+
@@ -268,10 +271,10 @@ for( time_window in 1:5 ){
   #  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
   #  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
   
-   write_csv(subset_draws, '../data_processed/mpnpshort',time_window,'_sampledyads_sri0.2_binary_vs_sri.csv')
+  # write_csv(subset_draws, '../data_processed/mpnpshort',time_window,'_sampledyads_sri0.2_binary_vs_sri.csv')
   
   # clean environment
-  rm(draws, dyads, priors, subset_draws, x) ; gc()
+  #rm(draws, dyads, priors, subset_draws, x) ; gc()
   
   ## coefficient of variation of edge weights (aka social differentiation) ####
   # extract cv for model
@@ -280,7 +283,7 @@ for( time_window in 1:5 ){
   hist(global_cv)
   
   ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2%
-  counts_df_model <- counts_df[,c('node_1','node_2','event_count','period_count_dyad','id_1','id_2','dyad_id')]
+  counts_df_model <- counts_df[,c('node_1','node_2','together','count_dyad','id_1','id_2','dyad_id')]
   colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
   ew_chain <- as.data.frame(mpnp_edge_weights$chain)
   colnames(ew_chain) <- counts_df_model$dyad_id
@@ -344,7 +347,7 @@ counts_df <- counts_df %>%
   filter(id_2 %in% unique(mpnp_ages$id))
 
 ### create model data
-counts_df_model <- counts_df[, c('node_1','node_2','event_count','period_count_dyad')] %>% distinct()
+counts_df_model <- counts_df[, c('node_1','node_2','together','count_dyad')] %>% distinct()
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 ## run model ####
@@ -387,29 +390,32 @@ model_averaging(models = list(non_random_model = mpnp_edge_weights, random_model
 ### add time marker
 print(paste0('random network comparison completed at ', Sys.time()))
 
+# save workspace image
+save.image(file = paste0('mpnp_edgecalculations/mpnp_longwindow_bisonr_edgescalculated.RData'))
+
 ## plot network ####
 # create nodes data frame
-nodes <- data.frame(bull = sort(unique(mpnp_ages$id)),
-                    age = NA,
-                    sightings = NA)
-for(i in 1:nrow(nodes)){
-  x <- mpnp_ages[mpnp_ages$id == nodes$bull[i],]
-  nodes$age[i] <- mean(x$age)
-  if(nodes$bull[i] != 'M99'){
-    y <- counts_df[counts_df$id_1 == nodes$bull[i], c('id_1','count_period_1')]
-    nodes$sightings[i] <- y[1,2]
-  }
-}
-nodes$sightings <- as.numeric(nodes$sightings)
-str(nodes)
+#nodes <- data.frame(bull = sort(unique(mpnp_ages$id)),
+#                    age = NA,
+#                    sightings = NA)
+#for(i in 1:nrow(nodes)){
+#  x <- mpnp_ages[mpnp_ages$id == nodes$bull[i],]
+#  nodes$age[i] <- mean(x$age)
+#  if(nodes$bull[i] != 'M99'){
+#    y <- counts_df[counts_df$id_1 == nodes$bull[i], c('id_1','count_period_1')]
+#    nodes$sightings[i] <- y[1,2]
+#  }
+#}
+#nodes$sightings <- as.numeric(nodes$sightings)
+#str(nodes)
 
 # plot network
-plot_network_threshold(mpnp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
-                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
-                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
-                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
-plot_network_threshold2(obj = mpnp_edge_weights, threshold = 0.15,
-                        node.size = nodes, node.colour = nodes, lwd = 10)
+#plot_network_threshold(mpnp_edge_weights, lwd = 2, ci = 0.9, threshold = 0.15,
+#                       vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
+#                       vertex.label.color2 = 'black', vertex.color2 = nodes$age,
+#                       vertex.size2 = nodes$sightings, edge.color2 = 'black')
+#plot_network_threshold2(obj = mpnp_edge_weights, threshold = 0.15,
+#                        node.size = nodes, node.colour = nodes, lwd = 10)
 
 ### add time marker
 print(paste0('network plots completed at ', Sys.time()))
@@ -443,14 +449,14 @@ draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
 draws <- left_join(draws, dyads, by = 'dyad_id')
 draws$sri <- draws$event / draws$duration
 
-subset_draws <- draws[draws$sri > 0.2,]
-subset_draws$median <- NA
-for(i in 1:nrow(subset_draws)){
-  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
-  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
-}
-head(subset_draws)
-which(is.na(subset_draws$median) == TRUE)[1]
+#subset_draws <- draws[draws$sri > 0.2,]
+#subset_draws$median <- NA
+#for(i in 1:nrow(subset_draws)){
+#  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
+#  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
+#}
+#head(subset_draws)
+#which(is.na(subset_draws$median) == TRUE)[1]
 
 #subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)
 #ggplot(data = subset_draws, mapping = aes(x = weight))+
@@ -459,10 +465,10 @@ which(is.na(subset_draws$median) == TRUE)[1]
 #  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
 #  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
 
-write_csv(subset_draws, '../data_processed/mpnp_longwindow_sampledyads_sri0.2_binary_vs_sri.csv')
+#write_csv(subset_draws, '../data_processed/mpnp_longwindow_sampledyads_sri0.2_binary_vs_sri.csv')
 
 # clean environment
-rm(draws, dyads, priors, subset_draws, x) ; gc()
+#rm(draws, dyads, priors, subset_draws, x) ; gc()
 
 ## coefficient of variation of edge weights (aka social differentiation) ####
 # extract cv for model
@@ -471,7 +477,7 @@ head(global_cv)
 hist(global_cv)
 
 ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2%
-counts_df_model <- counts_df[,c('node_1','node_2','event_count','period_count_dyad','id_1','id_2','dyad_id')]
+counts_df_model <- counts_df[,c('node_1','node_2','together','count_dyad','id_1','id_2','dyad_id')]
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
 ew_chain <- as.data.frame(mpnp_edge_weights$chain)
 colnames(ew_chain) <- counts_df_model$dyad_id
@@ -485,7 +491,7 @@ hist(ew_chain$draw)
 #  x <- ew_chain[ew_chain$dyad_id == i,]
 #  ew_chain$mean <- ifelse(ew_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ew_chain$mean)
 #  lines(density(x$draw), col = rgb(0,0,1,0.1))
-}
+#}
 #lines(density(ew_chain$draw), lwd = 2)
 
 (draw98 <- quantile(ew_chain$draw, 0.98))
