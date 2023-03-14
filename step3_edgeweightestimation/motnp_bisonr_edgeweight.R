@@ -210,7 +210,9 @@ edges$chain_position <- rep(1:4000, each = length(unique(edges$dyad)))
 edges <- edges[edges$chain_position < 1001,]
 edges$mean <- NA
 for(dyad in unique(edges$dyad)) {
+  if(is.na(edges$mean[dyad]) == TRUE){
   edges$mean[edges$dyad == dyad] <- mean(edges$draw[edges$dyad == dyad])
+  }
 }
 plot_low <- edges[edges$mean == min(edges$mean),]
 plot_q25 <- edges[edges$mean == quantile(edges$mean, 0.25),]
@@ -237,17 +239,21 @@ prior_plot <- data.frame(dyad = 'prior',
                          mean = NA,
                          chain_position = 1:1000)
 prior_plot$mean <- mean(prior_plot$draw)
-ggplot(plot_data, aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)))+
-  geom_density(linewidth = 1)+
-  geom_density(data = prior_plot, linewidth = 1, colour = 'black', linetype = 2)+
+ggplot(plot_data, aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)),
+       fill = viridis, colour = colours
+       )+
+  geom_density(linewidth = 1, alpha = 0.2)+
+  geom_density(data = prior_plot, linewidth = 1, colour = 'black', linetype = 2, alpha = 0)+
   theme_classic()+
-  scale_fill_viridis_d(alpha = 0.2)+
-  scale_color_viridis_d()+
+  scale_fill_viridis_d(option = 'plasma',
+                       alpha = 0.2)+
+  scale_color_viridis_d(
+    option = 'plasma'
+    )+
   theme(legend.position = 'none',
         axis.text = element_text(size = 14),
         axis.title = element_text(size = 18))+
   scale_x_continuous(name = 'edge weight', limits = c(0,1))
-
 
 head(plot_data)
 plot_chains <- rbind(plot_high, plot_mid, plot_low)
@@ -257,11 +263,15 @@ ggplot(#data = plot_chains,
        #aes(y = draw, x = chain_position, colour = order)
   )+
   geom_line(data = plot_high, aes(y = draw, x = chain_position),
-            colour = '#fde725')+
+            #colour = '#fde725',
+            colour = '#f0f921'
+            )+
   geom_line(data = plot_mid, aes(y = draw, x = chain_position),
-            colour = '#21918c')+
+            #colour = '#21918c',
+            colour = '#e16462')+
   geom_line(data = plot_low, aes(y = draw, x = chain_position),
-            colour = '#440154')+
+            #colour = '#440154',
+            colour = '#0d0887')+
   scale_color_viridis_d()+
   theme_classic()+
   theme(#legend.position = 'none',
