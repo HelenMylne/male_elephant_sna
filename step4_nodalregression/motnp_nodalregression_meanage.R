@@ -19,10 +19,11 @@ library(bayesplot, lib.loc = '../packages/')       # library(bayesplot)
 library(igraph, lib.loc = '../packages/')          # library(igraph)
 library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
 library(bisonR, lib.loc = '../packages/')          # library(bisonR)
+library(janitor, lib.loc = '../packages/')         # library(janitor)
 
 # load edge weight model and data frames
 load('motnp_bisonr_edgescalculated_strongprior.RData')
-rm(counts_df_model, edgelist, females_df, motnp_edges_null_strongpriors) ; gc()
+#rm(counts_df_model, edgelist, females_df, motnp_edges_null_strongpriors) ; gc()
 
 #### nodal regression -- mean age estimate only, not full distribution ####
 df_nodal <- distinct(counts_df[,c('node_1_males','id_1')])
@@ -49,12 +50,22 @@ pdf('../outputs/motnp_nodalregression_plots_meanage.pdf')
 
 ## eigenvector only ####
 # prior predictive check
+priors <- get_default_priors('binary')
 priors$fixed
 prior_check(priors, 'binary')
 
 age <- 1:60
 beta_mu <- 0
 beta_sigma <- 0.005
+
+#plot(NULL, xlim = c(0,60), ylim = c(0,1), las = 1,
+#     xlab = 'age', ylab = 'eigenvector centrality')
+#for(i in 1:100){
+#  intercept <- rbeta(1,1,1)
+#  beta <- rnorm(1, beta_mu, beta_sigma)
+#  lines(x = age, y = intercept + age*beta, col = 'blue')
+#  lines(x = age, y = intercept + age*plogis(beta), col = 'red') # can't ever be a negative effect so that can't be right
+#}
 
 mean_age <- mean(motnp_ages$age)
 plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
@@ -84,7 +95,7 @@ save.image('motnp_nodalregression_meanage.RData')
 
 ## posterior check ####
 #load('motnp_nodalregression_meanage.RData')
-rm(df_nodal, motnp_ages) ; gc()
+#rm(df_nodal, motnp_ages) ; gc()
 
 summary(mean_motnp_eigen)
 
@@ -93,13 +104,13 @@ mean_eigen_values <- mean_motnp_eigen$data
 plot(mean_eigen_values$bison_node_eigen ~ mean_eigen_values$age, 
      las = 1, pch = 19, col = rgb(0,0,1,0.2),
      xlab = 'mean age estimate', ylab = 'eigenvector centrality',
-     main = 'no effect of age on eigenvector centrality')
+     main = 'effect of age on eigenvector centrality')
 
 mean_eigen_summary <- mean_motnp_eigen$fit
 
 hist(mean_motnp_eigen$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
 
-post_eigen <- as.data.frame(as_draws_df(mean_motnp_eigen)) %>% janitor::clean_names()
+post_eigen <- as.data.frame(as_draws_df(mean_motnp_eigen)) %>% clean_names()
 plot(data = post_eigen[post_eigen$chain == 1,], b_age ~ draw, type = 'l', xlim = c(0,10000))
 lines(data = post_eigen[post_eigen$chain == 2,], b_age ~ draw, col = 'red')
 lines(data = post_eigen[post_eigen$chain == 3,], b_age ~ draw, col = 'blue')
@@ -116,16 +127,50 @@ ggplot(post_eigen, aes(x = iteration, y = b_age, colour = chain_imp))+
 hist(post_eigen$b_age)         # natural scale?
 hist(plogis(post_eigen$b_age)) # logit scale?
 
-plot(mean_motnp_eigen)
+#plot(mean_motnp_eigen)
 
-plot(conditional_effects(mean_motnp_eigen), points = TRUE) # older elephants have lower network centrality than younger
+plot(conditional_effects(mean_motnp_eigen), points = TRUE,
+     #ylab = 'mean eigenvector centrality',
+     theme = theme_classic(base_size = 14),
+     ) # older elephants have lower network centrality than younger
 
-mean_eigen_values$age_cat <- ifelse()
-boxplot(mean_eigen_values)
+mean_eigen_values$age_cat <- ifelse(mean_eigen_values$age < 15, '10-15',
+                                    ifelse(mean_eigen_values$age < 20, '16-20',
+                                           ifelse(mean_eigen_values$age < 25, '21-25',
+                                                  ifelse(mean_eigen_values$age < 40, '25-40', '40+'))))
+mean_eigen_values$age_cat <- factor(mean_eigen_values$age_cat,
+                                    levels = c('10-15','16-20','21-25','25-40','40+'))
+mean_eigen_values$age_cat2 <- factor(mean_eigen_values$age_cat,
+                                    levels = c('40+','25-40','21-25','16-20','10-15'))
+
+data <- left_join(mean_eigen_values, mean_motnp_ages, by = 'age')
+which(is.na(data$id))
+length(unique(data$id))
+
+counts1 <- counts_df[,c('id_1','count_1')] %>% distinct 
+colnames(counts1) <- c('id','count')
+counts2 <- counts_df[,c('id_2','count_2')] %>% distinct
+colnames(counts2) <- c('id','count')
+counts <- rbind(counts1, counts2) %>% distinct()
+rm(counts1, counts2) ; gc()
+
+data <- left_join(data, counts, by = 'id')
+
+ggplot(data = data, aes(x = age_cat, y = bison_node_eigen,
+                        fill = age_cat2))+
+  geom_boxplot(notch = T)+
+  geom_jitter(width = 0.2, #shape = 1,
+              mapping = aes(size = count))+
+  scale_x_discrete(name = 'age category')+
+  scale_y_continuous(name = 'mean eigenvector centrality')+
+  scale_fill_viridis_d()+
+  theme_classic()+
+  theme(legend.position = 'none', axis.title = element_text(size = 18),
+        axis.text = element_text(size = 14))
 
 # compare empirical distribution to posterior predictive distribution
 y <- mean_eigen_values$bison_node_eigen                    # extract eigenvector centralities
-yrep <- posterior_predict(mean_motnp_eigen, draws = 500)   # make predictions of eigenvector centtrality
+yrep <- posterior_predict(mean_motnp_eigen, draws = 500)   # make predictions of eigenvector centrality
 dim(yrep)
 ppc_dens_overlay(y, yrep[1:1000, ])                        # plot 1000 predictions over empirical distribution (is it ok that this slightly extends beyond x = 1??)
 ppc_hist(y, yrep[1:55, ])                                  # compare 55 predictions to empirical distribution
@@ -133,8 +178,12 @@ ppc_pit_ecdf(y, yrep[1:50,])                               # no idea....
 ppc_ecdf_overlay(y, yrep[1:50,]) + xaxis_text()            # also no idea...
 
 ## so... 
-# conditional effects plot shows a reasonably negative effect of age on centrality
-# 
+# conditional effects plot shows a slight negative effect of age on centrality
+# boxplot indicates that older pubescents and young adults are the most central
+# effects are weak: all categories show nearly full spread -- BIGGEST EFFECT SEEM TO BE NUMBER OF INDIVIDUAL SIGHTINGS: MORE SIGHTINGS = LOWER CENTRALITY
+# model very good at predicting
+
+
 
 
 
