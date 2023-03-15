@@ -183,7 +183,120 @@ ppc_ecdf_overlay(y, yrep[1:50,]) + xaxis_text()            # also no idea...
 # effects are weak: all categories show nearly full spread -- BIGGEST EFFECT SEEM TO BE NUMBER OF INDIVIDUAL SIGHTINGS: MORE SIGHTINGS = LOWER CENTRALITY
 # model very good at predicting
 
+#### posterior check -- run using SRI and see how it compares ####
+library(igraph)
+load('motnp_bisonr_edgescalculated_strongprior.RData')
 
+counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
+edges <- counts_df_model[,c('node_1_id','node_2_id','sri')]
+colnames(edges)[1:2] <- c('from','to')
+nodes <- data.frame(node_1_males = unique(c(counts_df$node_1_males, counts_df$node_2_males))) %>% 
+  left_join(distinct(counts_df[,c('node_1_males','age_category_1','count_1')]), by = 'node_1_males') %>% 
+  mutate(node_2_males = node_1_males) %>% 
+  left_join(distinct(counts_df[,c('node_2_males','age_category_2','count_2')]), by = 'node_2_males') %>% 
+  mutate(node = node_1_males,
+         age = ifelse(is.na(age_category_1) == FALSE, age_category_1, age_category_2),
+         count = ifelse(is.na(count_1) == FALSE, count_1, count_2)) %>% 
+  select(node, age, count)
+rm(motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, counts_df, counts_df_model) ; gc()
+
+adj_mat <- matrix(0, nrow = nrow(nodes), ncol = nrow(nodes))
+
+for (i in 1:nrow(edges)) {
+  dyad_row <- edges[i, ]
+  adj_mat[dyad_row$from, dyad_row$to] <- dyad_row$sri
+}
+
+# Generate igraph object
+g <- graph_from_adjacency_matrix(adj_mat, 
+          mode="undirected", weighted=TRUE)
+
+coords <- layout_nicely(g)
+plot(g,
+     edge.width = E(g)$weight,
+     vertex.size = nodes$count,
+     vertex.color = as.factor(nodes$age),
+     edge.color = rgb(0, 0, 0, 0.25),
+     layout = coords)
+
+# calculate centrality
+c <- eigen_centrality(g, directed = F)
+nodes$eigen <- c$vector
+
+# plot boxplot
+nodes$age2 <- factor(nodes$age,
+                levels = c('40+','25-40',
+                           '20-25','15-19','10-15'))
+ggplot(data = nodes, aes(x = age, y = eigen, fill = age2))+
+  geom_boxplot(notch = T)+
+  geom_jitter(width = 0.2, shape = 1,
+              aes(size = count))+
+  theme_classic()+
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18))+
+  scale_fill_viridis_d()+
+  scale_x_discrete(name = 'age category')+
+  scale_y_continuous(name = 'eigenvector centrality')
+
+ggplot(data = nodes, aes(x = count, y = eigen))+
+  geom_point(aes(colour = age2))+
+  geom_smooth()+
+  theme_classic()+
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18))+
+  scale_color_viridis_d()+
+  scale_x_continuous(name = 'count')+
+  scale_y_continuous(name = 'eigenvector centrality')
+
+## repeat using only individuals sighted 10 or more times
+nodes <- nodes[nodes$count >= 10,]
+edges <- edges[edges$from %in% nodes$node & edges$to %in% nodes$node,]
+adj_mat <- matrix(0, nrow = nrow(nodes), ncol = nrow(nodes))
+colnames(adj_mat) <- nodes$node
+rownames(adj_mat) <- nodes$node
+
+for (i in 1:nrow(edges)) {
+  dyad_row <- edges[i, ]
+  adj_mat[which(rownames(adj_mat) == dyad_row$from),
+          which(colnames(adj_mat) == dyad_row$to)] <- dyad_row$sri
+}
+
+# Generate igraph object
+g <- graph_from_adjacency_matrix(adj_mat, 
+                                 mode="undirected", weighted=TRUE)
+
+c <- eigen_centrality(g, directed = F)
+nodes$eigen <- c$vector
+nodes$age2 <- factor(nodes$age,
+                     levels = c('40+','25-40',
+                                '20-25','15-19',
+                                '10-15'))
+
+ggplot(data = nodes, aes(x = age, y = eigen,
+                         fill = age2))+
+  geom_boxplot()+
+  geom_jitter(width = 0.2, shape = 1,
+              aes(size = count))+
+  theme_classic()+
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18))+
+  scale_fill_viridis_d()+
+  scale_x_discrete(name = 'age category')+
+  scale_y_continuous(name = 'eigenvector centrality')
+
+ggplot(data = nodes, aes(x = count, y = eigen))+
+  geom_point(aes(colour = age2))+
+  geom_smooth()+
+  theme_classic()+
+  theme(legend.position = 'none',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18))+
+  scale_color_viridis_d()+
+  scale_x_continuous(name = 'count')+
+  scale_y_continuous(name = 'eigenvector centrality')
 
 
 
