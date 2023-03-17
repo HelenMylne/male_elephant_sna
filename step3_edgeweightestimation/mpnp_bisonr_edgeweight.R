@@ -127,77 +127,77 @@ model_averaging <- function(models) {
 dev.off()
 
 #### short time windows ####
-for( time_window in 1:5 ){
+#for( time_window in 1:5 ){
   ## set up ####
   ### add time marker
-  print(paste0('start window ', time_window ,' at ', Sys.time()))
+#  print(paste0('start window ', time_window ,' at ', Sys.time()))
   
   ### create output pdf
-  pdf(file = paste0('../outputs/mpnpshort',time_window,'_bisonr_edgeweight.pdf'))
+#  pdf(file = paste0('../outputs/mpnpshort',time_window,'_bisonr_edgeweight.pdf'))
   
   ### read in data frame for edge weight model
-  filename <- paste0('../data_processed/mpnp_period',time_window,'_pairwiseevents.csv')
-  counts_df <- read_csv(filename)
+#  filename <- paste0('../data_processed/mpnp_period',time_window,'_pairwiseevents.csv')
+#  counts_df <- read_csv(filename)
   
   ### read in ages for filtering
-  filename <- paste0('../data_processed/mpnp',time_window,'_ageestimates_mcmcoutput.rds')
-  mpnp_ages <- readRDS(filename) %>%
-    pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
+#  filename <- paste0('../data_processed/mpnp',time_window,'_ageestimates_mcmcoutput.rds')
+#  mpnp_ages <- readRDS(filename) %>%
+#    pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
   
   ### filter counts data frame down to males of known age only
-  length(unique(counts_df$id_1))
-  length(unique(mpnp_ages$id))   # missing individuals as some had no usable age estimate
-  counts_df <- counts_df %>% 
-    filter(id_1 %in% unique(mpnp_ages$id)) %>% 
-    filter(id_2 %in% unique(mpnp_ages$id))
+#  length(unique(counts_df$id_1))
+#  length(unique(mpnp_ages$id))   # missing individuals as some had no usable age estimate
+#  counts_df <- counts_df %>% 
+#    filter(id_1 %in% unique(mpnp_ages$id)) %>% 
+#    filter(id_2 %in% unique(mpnp_ages$id))
   
   ### create model data
-  counts_df_model <- counts_df[, c('node_1','node_2','together','count_dyad')] %>%
-    distinct()
-  colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
+#  counts_df_model <- counts_df[, c('node_1','node_2','together','count_dyad')] %>%
+#    distinct()
+#  colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
   
   ## run model ####
   ### run edge weight model
-  mpnp_edge_weights <- bison_model(
-    ( event | duration ) ~ dyad(node_1_id, node_2_id), 
-    data = counts_df_model, 
-    model_type = "binary",
-    priors = priors
-  )
+#  mpnp_edge_weights <- bison_model(
+#    ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+#    data = counts_df_model, 
+#    model_type = "binary",
+#    priors = priors
+#  )
 
   ### run diagnostic plots
-  plot_trace(mpnp_edge_weights, par_ids = 2)
-  plot_predictions(mpnp_edge_weights, num_draws = 20, type = "density")
-  plot_predictions(mpnp_edge_weights, num_draws = 20, type = "point")
+#  plot_trace(mpnp_edge_weights, par_ids = 2)
+#  plot_predictions(mpnp_edge_weights, num_draws = 20, type = "density")
+#  plot_predictions(mpnp_edge_weights, num_draws = 20, type = "point")
   
   ### extract edge weight summaries
-  edgelist <- get_edgelist(mpnp_edge_weights, ci = 0.9, transform = TRUE)
-  plot(density(edgelist$median))
-  summary(mpnp_edge_weights)
+#  edgelist <- get_edgelist(mpnp_edge_weights, ci = 0.9, transform = TRUE)
+#  plot(density(edgelist$median))
+#  summary(mpnp_edge_weights)
   
   ### add time marker
-  print(paste0('model completed at ', Sys.time()))
+#  print(paste0('model completed at ', Sys.time()))
   
   ## non-random edge weights ####
   ### run null model
-  mpnp_edges_null <- bison_model(
-    (event | duration) ~ 1, 
-    data = counts_df_model, 
-    model_type = "binary",
-    priors = priors
-  )
+#  mpnp_edges_null <- bison_model(
+#    (event | duration) ~ 1, 
+#    data = counts_df_model, 
+#    model_type = "binary",
+#    priors = priors
+#  )
   
   ### compare null model with fitted model -- bisonR model stacking
-  model_comparison(list(non_random_model = mpnp_edge_weights, random_model = mpnp_edges_null))
+#  model_comparison(list(non_random_model = mpnp_edge_weights, random_model = mpnp_edges_null))
   
   ### compare null model with fitted model -- Jordan pseudo model averaging
-  model_averaging(models = list(non_random_model = mpnp_edge_weights, random_model = mpnp_edges_null))
+#  model_averaging(models = list(non_random_model = mpnp_edge_weights, random_model = mpnp_edges_null))
   
   ### add time marker
-  print(paste0('random network comparison completed at ', Sys.time()))
+#  print(paste0('random network comparison completed at ', Sys.time()))
   
   # save workspace image
-  save.image(file = paste0('mpnp_edgecalculations/mpnpshort',time_window,'_bisonr_edgescalculated.RData'))
+#  save.image(file = paste0('mpnp_edgecalculations/mpnpshort',time_window,'_bisonr_edgescalculated.RData'))
   
   ## plot network ####
   # create nodes data frame
@@ -224,17 +224,17 @@ for( time_window in 1:5 ){
   #                        node.colour = nodes$age, node.size = nodes$sightings)
 
   ### add time marker
-  print(paste0('network plots completed at ', Sys.time()))
+#  print(paste0('network plots completed at ', Sys.time()))
   
   ## compare edge weight distributions to simple SRI ####
   ### plot against SRI
-  colnames(edgelist)[1:2] <- colnames(counts_df_model)[1:2]
-  edgelist$node_1_id <- as.integer(edgelist$node_1_id) ; edgelist$node_2_id <- as.integer(edgelist$node_2_id)
-  summary <- left_join(edgelist, counts_df_model, by = c('node_1_id','node_2_id'))
-  counts <- counts_df[,c('node_1','node_2','count_period_1','count_period_2')]
-  colnames(counts)[1:2] <- c('node_1_id','node_2_id')
-  summary <- left_join(summary, counts, by = c('node_1_id','node_2_id'))
-  summary$sri <- summary$event / (summary$duration)
+#  colnames(edgelist)[1:2] <- colnames(counts_df_model)[1:2]
+#  edgelist$node_1_id <- as.integer(edgelist$node_1_id) ; edgelist$node_2_id <- as.integer(edgelist$node_2_id)
+#  summary <- left_join(edgelist, counts_df_model, by = c('node_1_id','node_2_id'))
+#  counts <- counts_df[,c('node_1','node_2','count_period_1','count_period_2')]
+#  colnames(counts)[1:2] <- c('node_1_id','node_2_id')
+#  summary <- left_join(summary, counts, by = c('node_1_id','node_2_id'))
+#  summary$sri <- summary$event / (summary$duration)
   
   #plot(density(summary$sri), main = 'SRI vs model output: blue=all,\nred=both seen 8 times, green=both 12 times')
   #lines(density(summary$median), col = 'blue')
@@ -242,18 +242,18 @@ for( time_window in 1:5 ){
   #lines(density(summary$median[which(summary$count_1 >= 12 & summary$count_2 >= 12)]), col = 'green')
   
   # try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
-  dyads <- counts_df[,c('dyad_id','node_1','node_2')]
-  colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
-  dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))
-  length(which(is.na(dyads$duration) == TRUE))
+#  dyads <- counts_df[,c('dyad_id','node_1','node_2')]
+#  colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
+#  dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))
+#  length(which(is.na(dyads$duration) == TRUE))
   
-  draws <- as.data.frame(mpnp_edge_weights$chain) %>%
-    pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
-  draws$dyad_id <- rep(counts_df$dyad_id, 4000)
-  draws$weight <- gtools::inv.logit(draws$edge)
-  draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
-  draws <- left_join(draws, dyads, by = 'dyad_id')
-  draws$sri <- draws$event / draws$duration
+#  draws <- as.data.frame(mpnp_edge_weights$chain) %>%
+#    pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
+#  draws$dyad_id <- rep(counts_df$dyad_id, 4000)
+#  draws$weight <- gtools::inv.logit(draws$edge)
+#  draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
+#  draws <- left_join(draws, dyads, by = 'dyad_id')
+#  draws$sri <- draws$event / draws$duration
   
   #subset_draws <- draws[draws$sri > 0.2,]
   #subset_draws$median <- NA
@@ -278,20 +278,20 @@ for( time_window in 1:5 ){
   
   ## coefficient of variation of edge weights (aka social differentiation) ####
   # extract cv for model
-  global_cv <- extract_metric(mpnp_edge_weights, "global_cv")
-  head(global_cv)
-  hist(global_cv)
+#  global_cv <- extract_metric(mpnp_edge_weights, "global_cv")
+#  head(global_cv)
+#  hist(global_cv)
   
   ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2%
-  counts_df_model <- counts_df[,c('node_1','node_2','together','count_dyad','id_1','id_2','dyad_id')]
-  colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
-  ew_chain <- as.data.frame(mpnp_edge_weights$chain)
-  colnames(ew_chain) <- counts_df_model$dyad_id
-  ew_chain <- pivot_longer(ew_chain, cols = everything(), names_to = 'dyad_id', values_to = 'draw')
-  ew_chain$chain_position <- rep(1:length(unique(ew_chain$dyad_id)), each = 4000)
-  ew_chain$draw <- LaplacesDemon::invlogit(ew_chain$draw)
-  ew_chain$mean <- NA
-  hist(ew_chain$draw)
+#  counts_df_model <- counts_df[,c('node_1','node_2','together','count_dyad','id_1','id_2','dyad_id')]
+#  colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
+#  ew_chain <- as.data.frame(mpnp_edge_weights$chain)
+#  colnames(ew_chain) <- counts_df_model$dyad_id
+#  ew_chain <- pivot_longer(ew_chain, cols = everything(), names_to = 'dyad_id', values_to = 'draw')
+#  ew_chain$chain_position <- rep(1:length(unique(ew_chain$dyad_id)), each = 4000)
+#  ew_chain$draw <- LaplacesDemon::invlogit(ew_chain$draw)
+#  ew_chain$mean <- NA
+#  hist(ew_chain$draw)
   #plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'edge distribution', xlab = 'edge weight', ylab = 'density', las = 1)
   #for(i in sort(unique(ew_chain$dyad_id))){
   #  x <- ew_chain[ew_chain$dyad_id == i,]
@@ -300,29 +300,29 @@ for( time_window in 1:5 ){
   #}
   #lines(density(ew_chain$draw), lwd = 2)
   
-  (draw98 <- quantile(ew_chain$draw, 0.98))
+#  (draw98 <- quantile(ew_chain$draw, 0.98))
   
-  ew_edgelist <- bisonR::get_edgelist(mpnp_edge_weights)
-  (median98 <- quantile(ew_edgelist$median, 0.98))
+#  ew_edgelist <- bisonR::get_edgelist(mpnp_edge_weights)
+#  (median98 <- quantile(ew_edgelist$median, 0.98))
   
-  counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
-  (sri98 <- quantile(counts_df_model$sri, 0.98))
+#  counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
+#  (sri98 <- quantile(counts_df_model$sri, 0.98))
   
   ## clean up ####
   ### save pdf
-  dev.off()
+#  dev.off()
   
   # save workspace image
-  save.image(file = paste0('mpnp_edgecalculations/mpnpshort',time_window,'_bisonr_edgescalculated.RData'))
+#  save.image(file = paste0('mpnp_edgecalculations/mpnpshort',time_window,'_bisonr_edgescalculated.RData'))
   
   ### clear environment
-  rm(list = ls()[!(ls() %in% c('time_window','priors',
-                               'model_averaging', 'plot_network_threshold','plot_network_threshold2'))])
+#  rm(list = ls()[!(ls() %in% c('time_window','priors',
+#                               'model_averaging', 'plot_network_threshold','plot_network_threshold2'))])
   
   ### add time marker
-  print(paste0('time window ', time_window, ' completed at ', Sys.time()))
+#  print(paste0('time window ', time_window, ' completed at ', Sys.time()))
   
-}
+#}
 
 #### long time window ####
 ## set up ####
@@ -336,19 +336,32 @@ pdf('../outputs/mpnplongwindow_bisonr_edgeweight.pdf')
 counts_df <- read_csv('../data_processed/mpnp_longtimewindow_pairwiseevents.csv')
 
 ### read in ages for filtering
-ages <- readRDS('../data_processed/mpnplongwindow_ageestimates_mcmcoutput.rds') %>%
+ages <- readRDS('../data_processed/mpnp_longwindow_ageestimates_mcmcoutput.rds') %>%
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 
 ### filter counts data frame down to males of known age only
 length(unique(counts_df$id_1))
-length(unique(mpnp_ages$id))   # missing individuals as some had no usable age estimate
+length(unique(ages$id))   # missing individuals as some had no usable age estimate
 counts_df <- counts_df %>% 
-  filter(id_1 %in% unique(mpnp_ages$id)) %>% 
-  filter(id_2 %in% unique(mpnp_ages$id))
+  filter(id_1 %in% unique(ages$id)) %>% 
+  filter(id_2 %in% unique(ages$id))
+
+### remove NA values
+length(which(is.na(counts_df$node_1)))
+length(which(is.na(counts_df$node_2)))
+length(which(is.na(counts_df$together)))
+length(which(is.na(counts_df$count_dyad)))
+length(which(is.na(counts_df$count_1)))
+unique(counts_df$id_1[which(is.na(counts_df$count_1) == TRUE)])
+length(which(is.na(counts_df$count_2)))
+unique(counts_df$id_2[which(is.na(counts_df$count_2) == TRUE)])
 
 ### create model data
 counts_df_model <- counts_df[, c('node_1','node_2','together','count_dyad')] %>% distinct()
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
+
+## add progress marker
+print(paste0('data ready for model at ', Sys.time()))
 
 ## run model ####
 ### run edge weight model
@@ -358,6 +371,12 @@ mpnp_edge_weights <- bison_model(
   model_type = "binary",
   priors = priors
 )
+
+## add progress marker
+print(paste0('model run at ', Sys.time()))
+
+## save image
+save.image('mpnp_edgecalculations/mpnp_longwindow_bisonr_edgescalculated.RData')
 
 ### run diagnostic plots
 plot_trace(mpnp_edge_weights, par_ids = 2)
@@ -391,15 +410,15 @@ model_averaging(models = list(non_random_model = mpnp_edge_weights, random_model
 print(paste0('random network comparison completed at ', Sys.time()))
 
 # save workspace image
-save.image(file = paste0('mpnp_edgecalculations/mpnp_longwindow_bisonr_edgescalculated.RData'))
+save.image('mpnp_edgecalculations/mpnp_longwindow_bisonr_edgescalculated.RData')
 
 ## plot network ####
 # create nodes data frame
-#nodes <- data.frame(bull = sort(unique(mpnp_ages$id)),
+#nodes <- data.frame(bull = sort(unique(ages$id)),
 #                    age = NA,
 #                    sightings = NA)
 #for(i in 1:nrow(nodes)){
-#  x <- mpnp_ages[mpnp_ages$id == nodes$bull[i],]
+#  x <- ages[ages$id == nodes$bull[i],]
 #  nodes$age[i] <- mean(x$age)
 #  if(nodes$bull[i] != 'M99'){
 #    y <- counts_df[counts_df$id_1 == nodes$bull[i], c('id_1','count_period_1')]
