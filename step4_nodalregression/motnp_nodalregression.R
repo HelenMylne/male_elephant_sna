@@ -21,7 +21,7 @@ library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
 library(bisonR, lib.loc = '../packages/')          # library(bisonR)
 
 # load edge weight model and data frames
-load('motnp_bisonr_edgescalculated_strongprior.RData') # currently all saved versions of this use prior N(0,1.5) for fixed, but running regression at the moment with normal(0,1) instead
+load('motnp_bisonr_edgescalculated_strongprior.RData')
 
 #### nodal regression -- mean age estimate only, not full distribution ####
 df_nodal <- distinct(counts_df[,c('node_1_males','id_1')])
@@ -164,11 +164,11 @@ pdf('../outputs/motnp_nodalregression_eigen_agedistribution.pdf')
 motnp_edge_weights_strongpriors$model_data$prior_fixed_sigma <- 0.005
 
 ## reduce age data to manageable number of draws
-test_ages <- motnp_ages[motnp_ages$draw %in% sample(motnp_ages$draw, 2000, replace = F),]
+test_ages <- motnp_ages[motnp_ages$draw %in% sample(motnp_ages$draw, 5, replace = F),]
 
 ## run model
 motnp_eigen <- bison_brm(
-  bison(node_eigen(node)) ~ age,
+  bison(node_eigen(node)) ~ age + (1 | node),
   motnp_edge_weights_strongpriors,
   #motnp_ages,
   test_ages,
@@ -177,6 +177,8 @@ motnp_eigen <- bison_brm(
   cores = 4
 )
 summary(motnp_eigen)
+
+save.image('motnp_nodalregression_eigenvector.RData')
 
 eigen_values <- motnp_eigen$data
 plot(eigen_values$bison_node_eigen ~ eigen_values$age, las = 1, pch = 19, col = rgb(0,0,1,0.2),
@@ -188,14 +190,14 @@ mod_summary <- motnp_eigen$fit
 hist(motnp_eigen$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
 
 # compare to null model
-motnp_eigen_null <- bison_brm(
-  bison(node_eigen(node)) ~ 1,
-  motnp_edge_weights_strongpriors,
-  #motnp_ages,
-  test_ages,
-  chains = 4,
-  cores = 4
-)
+#motnp_eigen_null <- bison_brm(
+#  bison(node_eigen(node)) ~ 1,
+#  motnp_edge_weights_strongpriors,
+#  #motnp_ages,
+#  test_ages,
+#  chains = 4,
+#  cores = 4
+#)
 #model_comparison(list(non_random_model = motnp_eigen, random_model = motnp_eigen_null))
 #model_averaging(list(non_random_model = motnp_eigen, random_model = motnp_eigen_null))
 
