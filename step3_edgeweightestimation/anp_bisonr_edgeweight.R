@@ -403,7 +403,7 @@ for( time_window in 1:length(unique(counts_df_allwindows$period))){
   print(paste0('start window ', time_window ,' at ', Sys.time()))
   
   # create output pdf
-  pdf(file = paste0('../outputs/anp',time_window,'_bisonr_edgeweight.pdf'))
+  pdf(file = paste0('../outputs/anplong',time_window,'_bisonr_edgeweight.pdf'))
   
   ### create data frame for edge weight model
   counts_df <- counts_df_allwindows[counts_df_allwindows$period == time_window,]
