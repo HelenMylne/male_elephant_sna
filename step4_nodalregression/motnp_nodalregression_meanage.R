@@ -159,7 +159,7 @@ data <- left_join(data, counts, by = 'id')
 ggplot(data = data, aes(x = age_cat, y = bison_node_eigen,
                         fill = age_cat2))+
   geom_boxplot(notch = T)+
-  geom_jitter(width = 0.2, #shape = 1,
+  geom_jitter(width = 0.2, shape = 1,
               mapping = aes(size = count))+
   scale_x_discrete(name = 'age category')+
   scale_y_continuous(name = 'mean eigenvector centrality')+
@@ -184,8 +184,10 @@ ppc_ecdf_overlay(y, yrep[1:50,]) + xaxis_text()            # also no idea...
 # model very good at predicting
 
 #### posterior check -- run using SRI and see how it compares ####
-library(igraph)
+library(igraph) ; library(tidyverse) ; library(sna)
 load('motnp_bisonr_edgescalculated_strongprior.RData')
+load('motnp_nodalregression_meanage.RData')
+rm(df_nodal, mean_eigen_summary, priors, age, beta, beta_mu, beta_sigma, i, intercept, mean_age) ; gc()
 
 counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
 edges <- counts_df_model[,c('node_1_id','node_2_id','sri')]
@@ -198,30 +200,70 @@ nodes <- data.frame(node_1_males = unique(c(counts_df$node_1_males, counts_df$no
          age = ifelse(is.na(age_category_1) == FALSE, age_category_1, age_category_2),
          count = ifelse(is.na(count_1) == FALSE, count_1, count_2)) %>% 
   select(node, age, count)
-rm(motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, counts_df, counts_df_model) ; gc()
+#rm(motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, counts_df, counts_df_model) ; gc()
 
+## check same number of individuals in every category -- yes there are
+nrow(nodes) == motnp_edge_weights_strongpriors$num_nodes
+nodes_age <- table(nodes$age)
+barplot(nodes_age)
+model_age <- table(round(mean_motnp_ages$age,0))
+barplot(model_age)
+model_age <- as.data.frame(model_age)
+nodes_age <- as.data.frame(nodes_age)
+model_age$Freq == nodes_age$Freq
+
+## create adjacency matrix
 adj_mat <- matrix(0, nrow = nrow(nodes), ncol = nrow(nodes))
-
 for (i in 1:nrow(edges)) {
   dyad_row <- edges[i, ]
   adj_mat[dyad_row$from, dyad_row$to] <- dyad_row$sri
+  adj_mat[dyad_row$to, dyad_row$from] <- dyad_row$sri
 }
 
 # Generate igraph object
 g <- graph_from_adjacency_matrix(adj_mat, 
           mode="undirected", weighted=TRUE)
 
-coords <- layout_nicely(g)
-plot(g,
-     edge.width = E(g)$weight,
-     vertex.size = nodes$count,
-     vertex.color = as.factor(nodes$age),
-     edge.color = rgb(0, 0, 0, 0.25),
-     layout = coords)
+# check igraph object
+#coords <- layout_nicely(g)
+#plot(g,
+#     edge.width = E(g)$weight,
+#     vertex.size = nodes$count,
+#     vertex.color = as.factor(nodes$age),
+#     edge.color = rgb(0, 0, 0, 0.25),
+#     layout = coords)
 
 # calculate centrality
-c <- eigen_centrality(g, directed = F)
-nodes$eigen <- c$vector
+igraph_cent <- eigen_centrality(g, directed = F) # how do I know what order these are calculating?? is it node order, or order nodes appear in E(g)??
+
+# check order using randomised vertex list and see if they come out the same with igraph
+new_order <- sample(nodes$node, size = length(nodes$node), replace = F)
+adj_mat_randomised <- matrix(0, nrow = nrow(nodes), ncol = nrow(nodes),
+                             dimnames = list(x = new_order, y = new_order))
+for (i in 1:nrow(edges)) {
+  dyad_row <- edges[i, ]
+  adj_mat_randomised[which(rownames(adj_mat_randomised) == dyad_row$from[1]), 
+                     which(colnames(adj_mat_randomised) == dyad_row$to[1])] <- dyad_row$sri
+  adj_mat_randomised[which(rownames(adj_mat_randomised) == dyad_row$to[1]), 
+                     which(colnames(adj_mat_randomised) == dyad_row$from[1])] <- dyad_row$sri
+}
+g_randomised <- graph_from_adjacency_matrix(adj_mat_randomised, 
+                                 mode="undirected", weighted=TRUE)
+c_randomised <- eigen_centrality(g_randomised, directed = F)
+c_randomised$vector == igraph_cent$vector # no -- they are not automatically reverting to node name order
+V(g_randomised)
+nodes$random <- NA ; nodes$igraph <- NA
+for(i in 1:nrow(nodes)){
+  random_position <- which(new_order == nodes$node[i])
+  nodes$random[i] <- c_randomised$vector[random_position]
+  nodes$igraph[i] <- igraph_cent$vector[i]
+}
+round(nodes$igraph,5) == round(nodes$random,5) # yes -- calculates in order that igraph object was produced
+nodes <- nodes %>% select(-random)
+
+# check if individual with eigenvalue = 1 is the same in both data sets (spoiler -- no.)
+data[data$bison_node_eigen == max(data$bison_node_eigen),]
+V(g)[which(c$vector == 1)]
 
 # plot boxplot
 nodes$age2 <- factor(nodes$age,
@@ -297,6 +339,64 @@ ggplot(data = nodes, aes(x = count, y = eigen))+
   scale_color_viridis_d()+
   scale_x_continuous(name = 'count')+
   scale_y_continuous(name = 'eigenvector centrality')
+
+# try using sna function to measure and check for any similarity
+sna_cent <- evcent(dat = adj_mat, gmode = 'graph', ignore.eval = F)
+
+# plot 3 different centrality measures to see if there is any agreement at all -- no there's not
+plot(mean_eigen_values$bison_node_eigen, col = 'red', pch = 19, ylim = c(0,1))
+points(igraph_cent$vector, col = 'blue', pch = 4)
+points(sna_cent, col = 'purple', pch = 2)
+
+# test is sna output values match to either once you convert to relative values not absolute
+max_sna <- max(sna_cent)
+sna_relative <- sna_cent/max_sna
+points(sna_relative, col = 'black', pch = 2) # YES -- SNA PACKAGE AND IGRAPH AGREE ON VALUES, JUST THAT ONE IS ABSOLUTE AND ONE IS RELATIVE. ALSO IN SAME ORDER SO AS LONG AS IGRAPH ONES ARE IN RIGHT ORDER IN NODES, SO ARE SNA_CENT
+
+#### run model using SRI eigenvector values against age (first mean, then brms_multiple with all age values) ####
+nodes$sna_cent <- sna_cent
+boxplot(nodes$sna_cent ~ nodes$age)
+
+ggplot(nodes, aes(x = age, y = sna_cent,
+                  fill = factor(age, levels = c('40+','25-40','20-25','15-19','10-15'))))+
+  geom_boxplot(notch = T)+
+  geom_jitter(width = 0.2, aes(size = count), colour = rgb(0,0,0,0.5))+
+  theme_classic()+
+  theme(legend.position = 'none', axis.title = element_text(size = 18), axis.text = element_text(size = 14))+
+  scale_fill_viridis_d()+
+  scale_x_discrete(name = 'age category')+
+  scale_y_continuous(name = 'eigenvector centrality')
+
+mean_motnp_ages <- left_join(mean_motnp_ages, nodes, by = 'node')
+colnames(mean_motnp_ages)[3:4] <- c('age_mean','age_cat')
+plot(mean_motnp_ages$sna_cent ~ mean_motnp_ages$age_mean, las = 1, pch = 19,
+     xlab = 'mean age', ylab = 'eigenvector centrality')
+
+
+nodes <- mean_motnp_ages
+nodes$model_age <- mean_eigen_values$age
+nodes$model_eigen <- mean_eigen_values$bison_node_eigen
+nodes$model_age == nodes$age_mean
+
+plot(nodes$model_eigen ~ nodes$igraph, las = 1, pch = 19, xlim = c(0,1), ylim = c(0,1),
+     xlab = 'SRI eigenvector centrality', ylab = 'bisonR eigenvector centrality')
+abline(a = 0, b = 1)
+
+rm(motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, post_eigen, i, new_order, random_position, g_randomised, edges, dyad_row, c_randomised, counts_df_model, adj_mat_randomised)
+rm(adj_mat, g, igraph_cent, mean_eigen_values, mean_motnp_ages, max_sna, sna_cent, sna_relative)
+
+library(brms)
+fit <- nodes %>% brm(sna_cent ~ age_mean)
+
+
+
+
+
+
+
+
+
+
 
 
 
