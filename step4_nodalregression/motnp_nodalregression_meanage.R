@@ -25,7 +25,7 @@ library(janitor, lib.loc = '../packages/')         # library(janitor)
 load('motnp_bisonr_edgescalculated_strongprior.RData')
 #rm(counts_df_model, edgelist, females_df, motnp_edges_null_strongpriors) ; gc()
 
-#### nodal regression -- mean age estimate only, not full distribution ####
+#### read in data ####
 df_nodal <- distinct(counts_df[,c('node_1_males','id_1')])
 colnames(df_nodal) <- c('node_2_males','id_2')
 df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_males','id_2')])
@@ -48,7 +48,7 @@ for(i in 1:nrow(mean_motnp_ages)){
 # define PDF output
 pdf('../outputs/motnp_nodalregression_plots_meanage.pdf')
 
-## eigenvector only ####
+#### set priors ####
 # prior predictive check
 priors <- get_default_priors('binary')
 priors$fixed
@@ -79,7 +79,7 @@ for(i in 1:100){
 motnp_edge_weights_strongpriors$model_data$prior_fixed_mu    <- beta_mu
 motnp_edge_weights_strongpriors$model_data$prior_fixed_sigma <- beta_sigma
 
-## run model ####
+#### run model ####
 mean_motnp_eigen <- bison_brm(
   bison(node_eigen(node)) ~ age,
   motnp_edge_weights_strongpriors,
@@ -93,7 +93,7 @@ summary(mean_motnp_eigen) # FIT 100 IMPUTED MODELS, 4 CHAINS PER MODEL, EACH 100
 ## save output
 save.image('motnp_nodalregression_meanage.RData')
 
-## posterior check ####
+#### posterior check v1 -- some is good but forgot to draw from posterior so most is rubbish ####
 #load('motnp_nodalregression_meanage.RData')
 #rm(df_nodal, motnp_ages) ; gc()
 
@@ -110,7 +110,7 @@ mean_eigen_summary <- mean_motnp_eigen$fit
 
 hist(mean_motnp_eigen$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
 
-post_eigen <- as.data.frame(as_draws_df(mean_motnp_eigen)) %>% clean_names()
+post_eigen <- as.data.frame(as_draws_df(mean_motnp_eigen)) %>% janitor::clean_names()
 plot(data = post_eigen[post_eigen$chain == 1,], b_age ~ draw, type = 'l', xlim = c(0,10000))
 lines(data = post_eigen[post_eigen$chain == 2,], b_age ~ draw, col = 'red')
 lines(data = post_eigen[post_eigen$chain == 3,], b_age ~ draw, col = 'blue')
@@ -183,8 +183,8 @@ ppc_ecdf_overlay(y, yrep[1:50,]) + xaxis_text()            # also no idea...
 # effects are weak: all categories show nearly full spread -- BIGGEST EFFECT SEEM TO BE NUMBER OF INDIVIDUAL SIGHTINGS: MORE SIGHTINGS = LOWER CENTRALITY
 # model very good at predicting
 
-#### posterior check -- run using SRI and see how it compares ####
-library(igraph) ; library(tidyverse) ; library(sna)
+#### posterior check v2 -- run using SRI and see how it compares ####
+library(igraph) ; library(tidyverse) ; library(sna) ; library(brms)
 load('motnp_bisonr_edgescalculated_strongprior.RData')
 load('motnp_nodalregression_meanage.RData')
 rm(df_nodal, mean_eigen_summary, priors, age, beta, beta_mu, beta_sigma, i, intercept, mean_age) ; gc()
@@ -200,7 +200,15 @@ nodes <- data.frame(node_1_males = unique(c(counts_df$node_1_males, counts_df$no
          age = ifelse(is.na(age_category_1) == FALSE, age_category_1, age_category_2),
          count = ifelse(is.na(count_1) == FALSE, count_1, count_2)) %>% 
   select(node, age, count)
-#rm(motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, counts_df, counts_df_model) ; gc()
+nodes$model <- mean_eigen_values$bison_node_eigen
+
+mean_eigen_values <- left_join(mean_eigen_values, mean_motnp_ages, by = 'age')
+length(which(is.na(mean_eigen_values$bison_node_eigen) == TRUE))
+nodes <- left_join(nodes, mean_eigen_values, by = 'node')
+nodes$model == nodes$bison_node_eigen
+colnames(nodes)[c(2,6)] <- c('age_cat','age_years')
+nodes <- nodes %>% select(-bison_node_eigen)
+nodes <- nodes[,c(1,6,2,5,3,4)]
 
 ## check same number of individuals in every category -- yes there are
 nrow(nodes) == motnp_edge_weights_strongpriors$num_nodes
@@ -211,6 +219,7 @@ barplot(model_age)
 model_age <- as.data.frame(model_age)
 nodes_age <- as.data.frame(nodes_age)
 model_age$Freq == nodes_age$Freq
+rm(motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, nodes_age, mean_eigen_values, mean_motnp_ages) ; gc()
 
 ## create adjacency matrix
 adj_mat <- matrix(0, nrow = nrow(nodes), ncol = nrow(nodes))
@@ -252,24 +261,22 @@ g_randomised <- graph_from_adjacency_matrix(adj_mat_randomised,
 c_randomised <- eigen_centrality(g_randomised, directed = F)
 c_randomised$vector == igraph_cent$vector # no -- they are not automatically reverting to node name order
 V(g_randomised)
-nodes$random <- NA ; nodes$igraph <- NA
+nodes$igraph <- NA # ; nodes$random <- NA
 for(i in 1:nrow(nodes)){
-  random_position <- which(new_order == nodes$node[i])
-  nodes$random[i] <- c_randomised$vector[random_position]
+  #random_position <- which(new_order == nodes$node[i])
+  #nodes$random[i] <- c_randomised$vector[random_position]
   nodes$igraph[i] <- igraph_cent$vector[i]
 }
 round(nodes$igraph,5) == round(nodes$random,5) # yes -- calculates in order that igraph object was produced
 nodes <- nodes %>% select(-random)
 
 # check if individual with eigenvalue = 1 is the same in both data sets (spoiler -- no.)
-data[data$bison_node_eigen == max(data$bison_node_eigen),]
-V(g)[which(c$vector == 1)]
+nodes$node[which(nodes$model == max(nodes$model))]   # 135
+nodes$node[which(nodes$igraph == max(nodes$igraph))] # 187
 
 # plot boxplot
-nodes$age2 <- factor(nodes$age,
-                levels = c('40+','25-40',
-                           '20-25','15-19','10-15'))
-ggplot(data = nodes, aes(x = age, y = eigen, fill = age2))+
+ggplot(data = nodes, aes(x = age_cat, y = igraph,
+                         fill = factor(age_cat, levels = c('40+','25-40','20-25','15-19','10-15'))))+
   geom_boxplot(notch = T)+
   geom_jitter(width = 0.2, shape = 1,
               aes(size = count))+
@@ -281,9 +288,15 @@ ggplot(data = nodes, aes(x = age, y = eigen, fill = age2))+
   scale_x_discrete(name = 'age category')+
   scale_y_continuous(name = 'eigenvector centrality')
 
-ggplot(data = nodes, aes(x = count, y = eigen))+
-  geom_point(aes(colour = age2))+
-  geom_smooth()+
+ggplot(data = nodes)+
+  geom_point(aes(x = count, y = model,
+                 colour = factor(age_cat, levels = c('40+','25-40','20-25','15-19','10-15'))),
+             shape = 19)+
+  geom_smooth(aes(x = count, y = model), colour = 'red')+
+  geom_point(aes(x = count, y = igraph,
+                 colour = factor(age_cat, levels = c('40+','25-40','20-25','15-19','10-15'))),
+             shape = 4)+
+  geom_smooth(aes(x = count, y = igraph))+
   theme_classic()+
   theme(legend.position = 'none',
         axis.text = element_text(size = 14),
@@ -293,14 +306,14 @@ ggplot(data = nodes, aes(x = count, y = eigen))+
   scale_y_continuous(name = 'eigenvector centrality')
 
 ## repeat using only individuals sighted 10 or more times
-nodes <- nodes[nodes$count >= 10,]
-edges <- edges[edges$from %in% nodes$node & edges$to %in% nodes$node,]
-adj_mat <- matrix(0, nrow = nrow(nodes), ncol = nrow(nodes))
-colnames(adj_mat) <- nodes$node
-rownames(adj_mat) <- nodes$node
+nodes10 <- nodes[nodes$count >= 10,]
+edges10 <- edges[edges$from %in% nodes10$node & edges$to %in% nodes10$node,]
+adj_mat <- matrix(0, nrow = nrow(nodes10), ncol = nrow(nodes10))
+colnames(adj_mat) <- nodes10$node
+rownames(adj_mat) <- nodes10$node
 
-for (i in 1:nrow(edges)) {
-  dyad_row <- edges[i, ]
+for (i in 1:nrow(edges10)) {
+  dyad_row <- edges10[i, ]
   adj_mat[which(rownames(adj_mat) == dyad_row$from),
           which(colnames(adj_mat) == dyad_row$to)] <- dyad_row$sri
 }
@@ -310,13 +323,13 @@ g <- graph_from_adjacency_matrix(adj_mat,
                                  mode="undirected", weighted=TRUE)
 
 c <- eigen_centrality(g, directed = F)
-nodes$eigen <- c$vector
-nodes$age2 <- factor(nodes$age,
+nodes10$eigen <- c$vector
+nodes10$age2 <- factor(nodes10$age,
                      levels = c('40+','25-40',
                                 '20-25','15-19',
                                 '10-15'))
 
-ggplot(data = nodes, aes(x = age, y = eigen,
+ggplot(data = nodes10, aes(x = age, y = eigen,
                          fill = age2))+
   geom_boxplot()+
   geom_jitter(width = 0.2, shape = 1,
@@ -329,7 +342,7 @@ ggplot(data = nodes, aes(x = age, y = eigen,
   scale_x_discrete(name = 'age category')+
   scale_y_continuous(name = 'eigenvector centrality')
 
-ggplot(data = nodes, aes(x = count, y = eigen))+
+ggplot(data = nodes10, aes(x = count, y = eigen))+
   geom_point(aes(colour = age2))+
   geom_smooth()+
   theme_classic()+
@@ -342,23 +355,20 @@ ggplot(data = nodes, aes(x = count, y = eigen))+
 
 # try using sna function to measure and check for any similarity
 sna_cent <- evcent(dat = adj_mat, gmode = 'graph', ignore.eval = F)
+nodes$sna_cent <- sna_cent
 
 # plot 3 different centrality measures to see if there is any agreement at all -- no there's not
-plot(mean_eigen_values$bison_node_eigen, col = 'red', pch = 19, ylim = c(0,1))
-points(igraph_cent$vector, col = 'blue', pch = 4)
-points(sna_cent, col = 'purple', pch = 2)
+plot(nodes$model, col = 'red', pch = 19, ylim = c(0,1))
+points(nodes$igraph, col = 'blue', pch = 4)
+points(nodes$sna_cent, col = 'purple', pch = 2)
 
 # test is sna output values match to either once you convert to relative values not absolute
 max_sna <- max(sna_cent)
 sna_relative <- sna_cent/max_sna
 points(sna_relative, col = 'black', pch = 2) # YES -- SNA PACKAGE AND IGRAPH AGREE ON VALUES, JUST THAT ONE IS ABSOLUTE AND ONE IS RELATIVE. ALSO IN SAME ORDER SO AS LONG AS IGRAPH ONES ARE IN RIGHT ORDER IN NODES, SO ARE SNA_CENT
 
-#### run model using SRI eigenvector values against age (first mean, then brms_multiple with all age values) ####
-nodes$sna_cent <- sna_cent
-boxplot(nodes$sna_cent ~ nodes$age)
-
-ggplot(nodes, aes(x = age, y = sna_cent,
-                  fill = factor(age, levels = c('40+','25-40','20-25','15-19','10-15'))))+
+ggplot(nodes, aes(x = age_cat, y = sna_cent,
+                  fill = factor(age_cat, levels = c('40+','25-40','20-25','15-19','10-15'))))+
   geom_boxplot(notch = T)+
   geom_jitter(width = 0.2, aes(size = count), colour = rgb(0,0,0,0.5))+
   theme_classic()+
@@ -367,36 +377,118 @@ ggplot(nodes, aes(x = age, y = sna_cent,
   scale_x_discrete(name = 'age category')+
   scale_y_continuous(name = 'eigenvector centrality')
 
-mean_motnp_ages <- left_join(mean_motnp_ages, nodes, by = 'node')
-colnames(mean_motnp_ages)[3:4] <- c('age_mean','age_cat')
-plot(mean_motnp_ages$sna_cent ~ mean_motnp_ages$age_mean, las = 1, pch = 19,
+write_csv(nodes, '../data_processed/motnp_eigenvector_estimates.csv')
+
+#### posterior check v3 -- take draws from posterior and calculate values from that ####
+library(bisonR) ; library(brms) ; library(tidyverse) ; library(rethinking)
+load('motnp_nodalregression_meanage.RData')
+#rm(biologylibs, environlibs, homedrive, homelibs, homelibsprofile, mathlibs, psychlibs, rlibs, Rversion)
+
+# extract posterior draws for eigenvector
+mean_eigen_values <- extract_metric(motnp_edge_weights_strongpriors, "node_eigen") %>%
+  as.data.frame() %>%
+  summarise(across(everything(), mean)) %>%
+  pivot_longer(cols = everything()) %>%
+  rename(bison_node_eigen=value) %>%
+  mutate(node = df_nodal$node,
+         id = df_nodal$id)
+eigen_values <- extract_metric(motnp_edge_weights_strongpriors, "node_eigen") %>%
+  as.data.frame() %>% 
+  pivot_longer(cols = everything(), names_to = 'name', values_to = 'eigen') %>% 
+  left_join(mean_eigen_values, by = 'name') %>% 
+  rename(mean_eigen = bison_node_eigen) %>% 
+  select(-name)
+eigen_values <- left_join(eigen_values, mean_motnp_ages, by = c('node','id'))
+eigen_values$age_cat <- ifelse(eigen_values$age < 15, '10-15',
+                               ifelse(eigen_values$age < 20, '15-20',
+                                      ifelse(eigen_values$age < 25, '20-25',
+                                             ifelse(eigen_values$age < 40, '25-40', '40+'))))
+rm(mean_eigen_values, mean_motnp_ages, df_nodal, counts_df, counts_df_model, motnp_ages, motnp_edges_null_strongpriors, priors, age, beta, beta_mu, beta_sigma, i, intercept, mean_age) ; gc()
+
+# plot eigenvector distributions
+ggplot(eigen_values)+
+  geom_density(aes(x = eigen, group = node), colour = rgb(0,0,1,0.4))+
+  theme_classic()
+
+# plot eigenvector vs age
+ggplot(data = eigen_values#, aes(x = jitter(age))
+       )+
+  geom_point(aes(x = age, y = mean_eigen))+
+  geom_violin(aes(x = age, y = eigen, group = node), fill = rgb(0,0,1,0.2))+
+  theme_classic()+
+  theme(legend.position = 'none')+
+  scale_x_continuous(name = 'mean age')+
+  scale_y_continuous(name = 'eigenvector centrality')
+
+# plot eigenvector vs age category
+library(ggridges)
+ggplot(eigen_values, aes(x = eigen, group = node,
+                         y = age_cat, fill = age_cat)) +
+  geom_density_ridges() +
+  theme_ridges() + 
+  scale_fill_viridis_d(alpha = 0.4)+
+  theme(legend.position = "none") +
+  xlab("eigenvector centrality") +
+  ylab("age category")
+ggplot(eigen_values, aes(x = eigen, y = factor(age),
+                         group = node,
+                         fill = age_cat)) +
+  geom_density_ridges(scale = 2) +
+  theme_ridges() + 
+  scale_fill_viridis_d()+
+  theme(legend.position = "none",
+        axis.text.x = element_blank()) +
+  xlab("eigenvector centrality") +
+  ylab("age category")+
+  coord_flip()
+
+# extract posterior intercept and mean slope
+post_eigen <- as.data.frame(as_draws_df(mean_motnp_eigen)) %>% janitor::clean_names()
+#age_mean <- mean(post_eigen$b_age)
+#age_pi <- rethinking::PI(post_eigen$b_age)
+#intercept_mean <- mean(post_eigen$b_intercept)
+#rethinking::PI(post_eigen$b_intercept)
+
+# compute posterior predictions
+#pp <- as.data.frame(posterior_predict(mean_motnp_eigen))
+#colnames(pp) <- eigen_values$id[1:213]
+#pp <- pivot_longer(pp, everything(), names_to = 'id', values_to = 'eigen_predict')
+#rethinking::HPDI(pp$eigen_predict, prob = 0.95)
+
+# plot
+#raw_eigen <- extract_metric(motnp_edge_weights_strongpriors, "node_eigen") %>%
+#  as.data.frame()
+age <- seq(10,55,1)
+mu <- matrix(nrow = nrow(post_eigen)/100, ncol = length(age))
+for(i in 1:nrow(mu)){
+  for(j in 1:ncol(mu)){
+    mu[i,j] <- post_eigen$b_intercept[i] + post_eigen$b_age[i]*age[j]
+  }
+}
+mu_mean <- apply(mu, 2, mean)
+mu_hpdi <- apply(mu, 2, HPDI, prob = 0.95)
+
+#predict <- as.data.frame(posterior_predict(mean_motnp_eigen))
+#colnames(predict) <- eigen_values$id[1:213]
+#pp_hpdi <- apply(predict, 2, HPDI, prob = 0.95)
+
+sim_eigen <- matrix(ncol = length(age), nrow = 1000)
+for(i in 1:nrow(sim_eigen)){
+  for(j in 1:ncol(sim_eigen)){
+    a <- post_eigen$b_intercept[i] + post_eigen$b_age[i]*age[j]
+    b <- post_eigen$sigma[i]
+    #shapes <- simstudy::betaGetShapes(a, b)
+    #sim_eigen[i,j] <- rbeta(1, shape1 = shapes$shape1, shape2 = shapes$shape2)
+    sim_eigen[i,j] <- rbeta(1, shape1 = a, shape2 = b)
+  }
+}
+hist(sim_eigen)
+sim_pi <- apply(sim_eigen, 2, HPDI, prob = 0.95)
+
+plot(eigen ~ age, data = eigen_values, col = rgb(0,0,1,0.01),
+     pch = 19, las = 1, xlim = c(10,55), ylim = c(0,1),
      xlab = 'mean age', ylab = 'eigenvector centrality')
-
-
-nodes <- mean_motnp_ages
-nodes$model_age <- mean_eigen_values$age
-nodes$model_eigen <- mean_eigen_values$bison_node_eigen
-nodes$model_age == nodes$age_mean
-
-plot(nodes$model_eigen ~ nodes$igraph, las = 1, pch = 19, xlim = c(0,1), ylim = c(0,1),
-     xlab = 'SRI eigenvector centrality', ylab = 'bisonR eigenvector centrality')
-abline(a = 0, b = 1)
-
-rm(motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, post_eigen, i, new_order, random_position, g_randomised, edges, dyad_row, c_randomised, counts_df_model, adj_mat_randomised)
-rm(adj_mat, g, igraph_cent, mean_eigen_values, mean_motnp_ages, max_sna, sna_cent, sna_relative)
-
-library(brms)
-fit <- nodes %>% brm(sna_cent ~ age_mean)
-
-
-
-
-
-
-
-
-
-
-
-
+lines(age, mu_mean, lwd = 2, col = 'red')
+shade(mu_hpdi, age)
+shade(sim_pi, age)
 
