@@ -106,10 +106,10 @@ plot(mean_eigen_values$bison_node_eigen ~ mean_eigen_values$age,
      xlab = 'mean age estimate', ylab = 'eigenvector centrality',
      main = 'effect of age on eigenvector centrality')
 
-mean_eigen_summary <- mean_motnp_eigen$fit
-
+### plot rhat values to check convergence
 hist(mean_motnp_eigen$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
 
+### plot traces to check mixing
 post_eigen <- as.data.frame(as_draws_df(mean_motnp_eigen)) %>% janitor::clean_names()
 plot(data = post_eigen[post_eigen$chain == 1,], b_age ~ draw, type = 'l', xlim = c(0,10000))
 lines(data = post_eigen[post_eigen$chain == 2,], b_age ~ draw, col = 'red')
@@ -124,42 +124,39 @@ ggplot(post_eigen, aes(x = iteration, y = b_age, colour = chain_imp))+
   geom_line()+
   facet_wrap(imputation ~ .)   # looks good, well mixed
 
-hist(post_eigen$b_age)         # natural scale?
-hist(plogis(post_eigen$b_age)) # logit scale?
-
-#plot(mean_motnp_eigen)
-
+### plot slopes
+hist(post_eigen$b_age)
 plot(conditional_effects(mean_motnp_eigen), points = TRUE,
      #ylab = 'mean eigenvector centrality',
-     theme = theme_classic(base_size = 14),
-     ) # older elephants have lower network centrality than younger
+     theme = theme_classic(base_size = 14))  # older elephants have lower network centrality than younger
 
+### boxplot original categories against eigenvector
+# recreate categories
 mean_eigen_values$age_cat <- ifelse(mean_eigen_values$age < 15, '10-15',
                                     ifelse(mean_eigen_values$age < 20, '16-20',
                                            ifelse(mean_eigen_values$age < 25, '21-25',
                                                   ifelse(mean_eigen_values$age < 40, '25-40', '40+'))))
 mean_eigen_values$age_cat <- factor(mean_eigen_values$age_cat,
                                     levels = c('10-15','16-20','21-25','25-40','40+'))
-mean_eigen_values$age_cat2 <- factor(mean_eigen_values$age_cat,
-                                    levels = c('40+','25-40','21-25','16-20','10-15'))
 
+# combine age and count data
 data <- left_join(mean_eigen_values, mean_motnp_ages, by = 'age')
 which(is.na(data$id))
 length(unique(data$id))
-
 counts1 <- counts_df[,c('id_1','count_1')] %>% distinct 
 colnames(counts1) <- c('id','count')
 counts2 <- counts_df[,c('id_2','count_2')] %>% distinct
 colnames(counts2) <- c('id','count')
 counts <- rbind(counts1, counts2) %>% distinct()
 rm(counts1, counts2) ; gc()
-
 data <- left_join(data, counts, by = 'id')
 
+# plot boxplot with points sized by count number
 ggplot(data = data, aes(x = age_cat, y = bison_node_eigen,
-                        fill = age_cat2))+
+                        fill = factor(mean_eigen_values$age_cat,
+                                      levels = c('40+','25-40','21-25','16-20','10-15'))))+
   geom_boxplot(notch = T)+
-  geom_jitter(width = 0.2, shape = 1,
+  geom_jitter(width = 0.2, #shape = 1,
               mapping = aes(size = count))+
   scale_x_discrete(name = 'age category')+
   scale_y_continuous(name = 'mean eigenvector centrality')+
@@ -184,10 +181,10 @@ ppc_ecdf_overlay(y, yrep[1:50,]) + xaxis_text()            # also no idea...
 # model very good at predicting
 
 #### posterior check v2 -- run using SRI and see how it compares ####
-library(igraph) ; library(tidyverse) ; library(sna) ; library(brms)
-load('motnp_bisonr_edgescalculated_strongprior.RData')
-load('motnp_nodalregression_meanage.RData')
-rm(df_nodal, mean_eigen_summary, priors, age, beta, beta_mu, beta_sigma, i, intercept, mean_age) ; gc()
+#library(igraph) ; library(tidyverse) ; library(sna) ; library(brms)
+#load('motnp_bisonr_edgescalculated_strongprior.RData')
+#load('motnp_nodalregression_meanage.RData')
+#rm(df_nodal, mean_eigen_summary, priors, age, beta, beta_mu, beta_sigma, i, intercept, mean_age) ; gc()
 
 counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
 edges <- counts_df_model[,c('node_1_id','node_2_id','sri')]
@@ -380,11 +377,11 @@ ggplot(nodes, aes(x = age_cat, y = sna_cent,
 write_csv(nodes, '../data_processed/motnp_eigenvector_estimates.csv')
 
 #### posterior check v3 -- take draws from posterior and calculate values from that ####
-library(bisonR) ; library(brms) ; library(tidyverse) ; library(rethinking)
-load('motnp_nodalregression_meanage.RData')
-#rm(biologylibs, environlibs, homedrive, homelibs, homelibsprofile, mathlibs, psychlibs, rlibs, Rversion)
+#library(bisonR) ; library(brms) ; library(tidyverse) ; library(rethinking)
+#load('motnp_nodalregression_meanage.RData')
+##rm(biologylibs, environlibs, homedrive, homelibs, homelibsprofile, mathlibs, psychlibs, rlibs, Rversion)
 
-# extract posterior draws for eigenvector
+# extract mean of posterior for eigenvector
 mean_eigen_values <- extract_metric(motnp_edge_weights_strongpriors, "node_eigen") %>%
   as.data.frame() %>%
   summarise(across(everything(), mean)) %>%
@@ -392,13 +389,19 @@ mean_eigen_values <- extract_metric(motnp_edge_weights_strongpriors, "node_eigen
   rename(bison_node_eigen=value) %>%
   mutate(node = df_nodal$node,
          id = df_nodal$id)
+
+# extract posterior draws for eigenvector
 eigen_values <- extract_metric(motnp_edge_weights_strongpriors, "node_eigen") %>%
   as.data.frame() %>% 
   pivot_longer(cols = everything(), names_to = 'name', values_to = 'eigen') %>% 
   left_join(mean_eigen_values, by = 'name') %>% 
   rename(mean_eigen = bison_node_eigen) %>% 
   select(-name)
+
+# combine with mean age values to create data frame for plotting scatter plots
 eigen_values <- left_join(eigen_values, mean_motnp_ages, by = c('node','id'))
+
+# create categorical age variable for plotting boxplots
 eigen_values$age_cat <- ifelse(eigen_values$age < 15, '10-15',
                                ifelse(eigen_values$age < 20, '15-20',
                                       ifelse(eigen_values$age < 25, '20-25',
@@ -411,55 +414,43 @@ ggplot(eigen_values)+
   theme_classic()
 
 # plot eigenvector vs age
-ggplot(data = eigen_values#, aes(x = jitter(age))
-       )+
-  geom_point(aes(x = age, y = mean_eigen))+
-  geom_violin(aes(x = age, y = eigen, group = node), fill = rgb(0,0,1,0.2))+
-  theme_classic()+
-  theme(legend.position = 'none')+
-  scale_x_continuous(name = 'mean age')+
-  scale_y_continuous(name = 'eigenvector centrality')
+#ggplot(data = eigen_values#, aes(x = jitter(age))
+#       )+
+#  geom_point(aes(x = age, y = mean_eigen))+
+#  geom_violin(aes(x = age, y = eigen, group = node), fill = rgb(0,0,1,0.2))+
+#  theme_classic()+
+#  theme(legend.position = 'none')+
+#  scale_x_continuous(name = 'mean age')+
+#  scale_y_continuous(name = 'eigenvector centrality')
 
 # plot eigenvector vs age category
-library(ggridges)
-ggplot(eigen_values, aes(x = eigen, group = node,
-                         y = age_cat, fill = age_cat)) +
-  geom_density_ridges() +
-  theme_ridges() + 
-  scale_fill_viridis_d(alpha = 0.4)+
-  theme(legend.position = "none") +
-  xlab("eigenvector centrality") +
-  ylab("age category")
-ggplot(eigen_values, aes(x = eigen, y = factor(age),
-                         group = node,
-                         fill = age_cat)) +
-  geom_density_ridges(scale = 2) +
-  theme_ridges() + 
-  scale_fill_viridis_d()+
-  theme(legend.position = "none",
-        axis.text.x = element_blank()) +
-  xlab("eigenvector centrality") +
-  ylab("age category")+
-  coord_flip()
+#library(ggridges)
+#ggplot(eigen_values, aes(x = eigen, group = node,
+#                         y = age_cat, fill = age_cat)) +
+#  geom_density_ridges() +
+#  theme_ridges() + 
+#  scale_fill_viridis_d(alpha = 0.4)+
+#  theme(legend.position = "none") +
+#  xlab("eigenvector centrality") +
+#  ylab("age category")
+#ggplot(eigen_values, aes(x = eigen, y = factor(age),
+#                         group = node,
+#                         fill = age_cat)) +
+#  geom_density_ridges(scale = 2) +
+#  theme_ridges() + 
+#  scale_fill_viridis_d()+
+#  theme(legend.position = "none",
+#        axis.text.x = element_blank()) +
+#  xlab("eigenvector centrality") +
+#  ylab("age category")+
+#  coord_flip()
 
 # extract posterior intercept and mean slope
 post_eigen <- as.data.frame(as_draws_df(mean_motnp_eigen)) %>% janitor::clean_names()
-#age_mean <- mean(post_eigen$b_age)
-#age_pi <- rethinking::PI(post_eigen$b_age)
-#intercept_mean <- mean(post_eigen$b_intercept)
-#rethinking::PI(post_eigen$b_intercept)
 
-# compute posterior predictions
-#pp <- as.data.frame(posterior_predict(mean_motnp_eigen))
-#colnames(pp) <- eigen_values$id[1:213]
-#pp <- pivot_longer(pp, everything(), names_to = 'id', values_to = 'eigen_predict')
-#rethinking::HPDI(pp$eigen_predict, prob = 0.95)
-
-# plot
-#raw_eigen <- extract_metric(motnp_edge_weights_strongpriors, "node_eigen") %>%
-#  as.data.frame()
+# compute posterior means
 age <- seq(10,55,1)
-mu <- matrix(nrow = nrow(post_eigen)/100, ncol = length(age))
+mu <- matrix(nrow = nrow(post_eigen), ncol = length(age))
 for(i in 1:nrow(mu)){
   for(j in 1:ncol(mu)){
     mu[i,j] <- post_eigen$b_intercept[i] + post_eigen$b_age[i]*age[j]
@@ -468,27 +459,54 @@ for(i in 1:nrow(mu)){
 mu_mean <- apply(mu, 2, mean)
 mu_hpdi <- apply(mu, 2, HPDI, prob = 0.95)
 
-#predict <- as.data.frame(posterior_predict(mean_motnp_eigen))
-#colnames(predict) <- eigen_values$id[1:213]
-#pp_hpdi <- apply(predict, 2, HPDI, prob = 0.95)
+# compute posterior predictions -- I think this does the same as my loop above but not totally sure. The outputs are similar, but not the same.
+predict <- as.data.frame(posterior_predict(mean_motnp_eigen,
+                                           newdata = as.data.frame(age)))
+predict_mean <- apply(predict, 2, mean)
+predict_hpdi <- apply(predict, 2, HPDI, prob = 0.95)
 
+# simulate from posterior
 sim_eigen <- matrix(ncol = length(age), nrow = 1000)
 for(i in 1:nrow(sim_eigen)){
   for(j in 1:ncol(sim_eigen)){
     a <- post_eigen$b_intercept[i] + post_eigen$b_age[i]*age[j]
     b <- post_eigen$sigma[i]
-    #shapes <- simstudy::betaGetShapes(a, b)
-    #sim_eigen[i,j] <- rbeta(1, shape1 = shapes$shape1, shape2 = shapes$shape2)
+    #sim_eigen[i,j] <- rbeta(1, shape1 = a/(a+b), shape2 = 1 - (a/(a+b))) # I THINK this one is wrong as this would be shape 1 = mean of beta distribution and shape 2 = spread, where instead I want the actual shape values, but I've left it here just in case I'm wrong and need to change it back! produce fairly similar values
     sim_eigen[i,j] <- rbeta(1, shape1 = a, shape2 = b)
   }
 }
-hist(sim_eigen)
+hist(sim_eigen) # far too many getting a centrality score of 1
 sim_pi <- apply(sim_eigen, 2, HPDI, prob = 0.95)
 
-plot(eigen ~ age, data = eigen_values, col = rgb(0,0,1,0.01),
+# plot
+plot(eigen ~ age, data = eigen_values, col = rgb(0,0,1,0.01), # raw sightings
      pch = 19, las = 1, xlim = c(10,55), ylim = c(0,1),
      xlab = 'mean age', ylab = 'eigenvector centrality')
-lines(age, mu_mean, lwd = 2, col = 'red')
-shade(mu_hpdi, age)
-shade(sim_pi, age)
+lines(age, mu_mean, lwd = 2, col = 'red')                     # add mean line
+shade(mu_hpdi, age)                                           # add mean uncertainty
+shade(sim_pi, age)                                            # add predictions
 
+mean_line <- data.frame(age = age, mean = mu_mean)
+mean_shade <- data.frame(age = age, lb = mu_hpdi[1,], ub = mu_hpdi[2,])
+pred_shade <- data.frame(age = age, lb = sim_pi[1,], ub = sim_pi[2,])
+
+ggplot()+
+  geom_line(data = mean_line, aes(x = age, y = mean),
+            linewidth = 1.5, colour = 'black')+
+  geom_ribbon(data = mean_shade, aes(x = age, ymin = lb, ymax = ub),
+              fill = rgb(0,0,0,0.15))+
+  geom_ribbon(data = pred_shade, aes(x = age, ymin = lb, ymax = ub),
+              fill = rgb(0,0,0,0.15))+
+  geom_point(data = eigen_values, aes(x = age, y = eigen,
+                                      colour = as.factor(age)),
+             pch = 19, alpha = 0.01)+
+  theme_classic()+
+  theme(legend.position = 'none',
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 14))+
+  scale_colour_viridis_d(direction = -1)+
+  scale_x_continuous(name = 'mean of age distribution')+
+  scale_y_continuous(name = 'eigenvector centrality\n(1000 draws/elephant)')
+
+## save workspace image
+save.image('motnp_nodalregression_posteriorplots.RData')
