@@ -544,6 +544,13 @@ rm(counts,sightings) ; gc()
 
 table(data$count_1)  # check id1 counts for 1st time window
 table(data$count_2)  # check id2 counts for 1st time window
+length(which(is.na(data$count_1) == TRUE))
+unique(data$id_1[which(is.na(data$count_1) == TRUE)])
+length(which(is.na(data$count_2) == TRUE))
+unique(data$id_2[which(is.na(data$count_2) == TRUE)])
+
+data <- data[!is.na(data$count_1),]
+data <- data[!is.na(data$count_2),]
 
 #### add variable for sightings apart ####
 data$count_dyad <- (data$count_1 + data$count_2) - data$event_count   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
