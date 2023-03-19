@@ -591,10 +591,18 @@ gbi_males <- gbi_males[rowSums(gbi_males) > 0,] # remove male-only sightings
 # set up permutations
 N_networks <- 10000
 
+# create vector of days for each sighting
+sightings <- eles[,c('elephant','encounter','date')] %>% 
+  filter(elephant %in% sort(unique(c(counts_df$id_1, counts_df$id_2)))) %>% 
+  select(-elephant) %>% 
+  distinct()
+
 # run network permutations
 random_networks <- asnipe::network_permutation(association_data = gbi_males,
                                                association_matrix = m_mat,
-                                               permutations = N_networks)
+                                               permutations = N_networks,
+                                               days = sightings$date,
+                                               within_day = TRUE)
 print('random networks generated')
 
 cv_random_networks <- rep(0,N_networks)
@@ -607,6 +615,7 @@ print(paste0('network permutations for entire network completed at ', Sys.time()
 
 # compare permuted networks to actual network
 hist(cv_random_networks, xlim = c(min(cv_random_networks)-50,max(cv_random_networks)+50),
+     #ylim = c(0,10),  # there are 3 networks out of 10000 that have cv > 290, but then all are in the same bar as cv(m_mat)
      main = 'permutations for network of all male elephants')
 abline(v = raster::cv(m_mat), col = 'red')
 text(round(raster::cv(m_mat),3), col = 'red', x = median(cv_random_networks)+50, y = 2000)
@@ -615,6 +624,9 @@ plot_cv <- as.data.frame(cv_random_networks)
 cv_network <- raster::cv(m_mat)
 cv_random_networks <- plot_cv$cv_random_networks
 ggplot(data = plot_cv)+
+  geom_vline(xintercept = cv_network, linewidth = 1.5,
+             colour = rgb(68/255, 1/255, 84/255))+
+  #geom_text(x = cv_network - 50, y = 700,
   geom_histogram(aes(cv_random_networks),
                  fill = rgb(253/255, 231/255, 37/255),
                  colour = 'black',
@@ -626,9 +638,6 @@ ggplot(data = plot_cv)+
                                 cv_network+10))+
   scale_y_continuous(name = 'frequency',
                      expand = c(0,0))+
-  geom_vline(xintercept = cv_network, linewidth = 1.5,
-             colour = rgb(68/255, 1/255, 84/255))+
-  #geom_text(x = cv_network - 50, y = 700,
   #          colour = rgb(68/255, 1/255, 84/255),
   #          label = 'coefficient of/nvariation for/nmeasured network')+
   theme(axis.title = element_text(size = 18),
@@ -636,6 +645,18 @@ ggplot(data = plot_cv)+
 
 ### write out outputs for future reference
 write_csv(plot_cv, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')
+
+### run statistical test to confirm that difference is significant
+# plot_cv <- read_csv('../data_processed/motnp_networkpermutations_cv_strongprior.csv')
+hist(plot_cv$cv_random_networks)
+cv_network
+
+mean(plot_cv$cv_random_networks)
+sd(plot_cv$cv_random_networks)
+
+shapiro.test(sample(plot_cv$cv_random_networks, size = 5000, replace = F)) # not normally distributed
+wilcox.test(plot_cv$cv_random_networks, mu = cv_network,
+            alternative = 'less')
 
 ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2% ####
 counts_df_model <- counts_df[,c('node_1_males','node_2_males','event_count','count_dyad','id_1','id_2','dyad_males')]
