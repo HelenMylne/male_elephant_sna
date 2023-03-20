@@ -654,9 +654,7 @@ cv_network
 mean(plot_cv$cv_random_networks)
 sd(plot_cv$cv_random_networks)
 
-shapiro.test(sample(plot_cv$cv_random_networks, size = 5000, replace = F)) # not normally distributed
-wilcox.test(plot_cv$cv_random_networks, mu = cv_network,
-            alternative = 'less')
+length(which(plot_cv$cv_random_networks >= cv_network))/length(plot_cv$cv_random_networks) # 3 / 10000 = 3e-04 = p-value (don't need an additional test because that will further randomise the data which are already randomised, just need to know proportion that are greater than or equal to your value)
 
 ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2% ####
 counts_df_model <- counts_df[,c('node_1_males','node_2_males','event_count','count_dyad','id_1','id_2','dyad_males')]
