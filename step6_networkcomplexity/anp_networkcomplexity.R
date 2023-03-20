@@ -245,66 +245,98 @@ dev.off()
 write_csv(outputs, '../data_processed/anplong_allwindows_networkcomplexity.csv')
 
 #### check outputs ####
-#short_windows <- read_csv('../data_processed/anpshort_allwindows_networkcomplexity.csv')
-#max_time_window <- nrow(short_windows)
-#hist(short_windows$mean_edge, breaks = max_time_window)
-#hist(short_windows$mean_strength, breaks = max_time_window)
-#hist(short_windows$mean_eigen, breaks = max_time_window)
-#hist(short_windows$mean_density, breaks = max_time_window)
-#hist(short_windows$mean_cv, breaks = max_time_window)
-#hist(short_windows$mean_std, breaks = max_time_window)
+### short windows
+short_windows <- read_csv('../data_processed/anpshort_allwindows_networkcomplexity.csv')
+max_time_window <- nrow(short_windows)
+hist(short_windows$mean_edge, breaks = max_time_window)
+hist(short_windows$mean_strength, breaks = max_time_window)
+hist(short_windows$mean_eigen, breaks = max_time_window)
+hist(short_windows$mean_density, breaks = max_time_window)
+hist(short_windows$mean_cv, breaks = max_time_window)
+hist(short_windows$mean_std, breaks = max_time_window)
 
-#plot(plogis(short_windows$mean_edge) ~ short_windows$time_window, type = 'l',
-#     ylab = 'inv. logit mean edges', xlab = 'time window', las = 1, col = 'red',
-#     ylim = c(0,0.4))
-#lines(plogis(short_windows$q2.5_edge) ~ short_windows$time_window, col = 'red', lty = 2)
-#lines(plogis(short_windows$q97.5_edge) ~ short_windows$time_window, col = 'red', lty = 2)
+plot(plogis(short_windows$mean_edge) ~ short_windows$time_window, type = 'l',
+     ylab = 'inv. logit mean edges', xlab = 'time window', las = 1, col = 'red',
+     ylim = c(0,0.4))
+lines(plogis(short_windows$q2.5_edge) ~ short_windows$time_window, col = 'red', lty = 2)
+lines(plogis(short_windows$q97.5_edge) ~ short_windows$time_window, col = 'red', lty = 2)
 
-#plot(short_windows$mean_strength ~ short_windows$time_window, type = 'l',
-#     ylab = 'mean strength centrality', xlab = 'time window', las = 1, col = 'orange',
-#     ylim = c(0,15))
-#lines(short_windows$q2.5_strength ~ short_windows$time_window, col = 'orange', lty = 2)
-#lines(short_windows$q97.5_strength ~ short_windows$time_window, col = 'orange', lty = 2)
+plot(short_windows$mean_strength ~ short_windows$time_window, type = 'l',
+     ylab = 'mean strength centrality', xlab = 'time window', las = 1, col = 'orange',
+     ylim = c(0,15))
+lines(short_windows$q2.5_strength ~ short_windows$time_window, col = 'orange', lty = 2)
+lines(short_windows$q97.5_strength ~ short_windows$time_window, col = 'orange', lty = 2)
 
-#plot(short_windows$mean_eigen ~ short_windows$time_window, type = 'l', ylim = c(0.3,1),
-#     ylab = 'mean eigenvector centrality', xlab = 'time window', las = 1, col = 'green')
-#lines(short_windows$q2.5_eigen ~ short_windows$time_window, col = 'green', lty = 2)
-#lines(short_windows$q97.5_eigen ~ short_windows$time_window, col = 'green', lty = 2)
+plot(short_windows$mean_eigen ~ short_windows$time_window, type = 'l', ylim = c(0.3,1),
+     ylab = 'mean eigenvector centrality', xlab = 'time window', las = 1, col = 'green')
+lines(short_windows$q2.5_eigen ~ short_windows$time_window, col = 'green', lty = 2)
+lines(short_windows$q97.5_eigen ~ short_windows$time_window, col = 'green', lty = 2)
 
-#plot(short_windows$mean_density ~ short_windows$time_window, type = 'l', ylim = c(0,0.1),
-#     ylab = 'mean global density', xlab = 'time window', las = 1, col = 'blue')
-#lines(short_windows$q2.5_density ~ short_windows$time_window, col = 'blue', lty = 2)
-#lines(short_windows$q97.5_density ~ short_windows$time_window, col = 'blue', lty = 2)
+plot(short_windows$mean_density ~ short_windows$time_window, type = 'l', ylim = c(0,0.1),
+     ylab = 'mean global density', xlab = 'time window', las = 1, col = 'blue')
+lines(short_windows$q2.5_density ~ short_windows$time_window, col = 'blue', lty = 2)
+lines(short_windows$q97.5_density ~ short_windows$time_window, col = 'blue', lty = 2)
 
-#plot(short_windows$mean_cv ~ short_windows$time_window, type = 'l', ylim = c(0.9, 1.3),
-#     ylab = 'mean global cv', xlab = 'time window', las = 1, col = 'purple2')
-#lines(short_windows$q2.5_cv ~ short_windows$time_window, col = 'purple2', lty = 2)
-#lines(short_windows$q97.5_cv ~ short_windows$time_window, col = 'purple2', lty = 2)
+plot(short_windows$mean_cv ~ short_windows$time_window, type = 'l', ylim = c(0.9, 1.3),
+     ylab = 'mean global cv', xlab = 'time window', las = 1, col = 'purple2')
+lines(short_windows$q2.5_cv ~ short_windows$time_window, col = 'purple2', lty = 2)
+lines(short_windows$q97.5_cv ~ short_windows$time_window, col = 'purple2', lty = 2)
 
-#plot(short_windows$mean_std ~ short_windows$time_window, type = 'l', ylim = c(0.03,0.13),
-#     ylab = 'mean global std', xlab = 'time window', las = 1, col = 'magenta')
-#lines(short_windows$q2.5_std ~ short_windows$time_window, col = 'magenta', lty = 2)
-#lines(short_windows$q97.5_std ~ short_windows$time_window, col = 'magenta', lty = 2)
+plot(short_windows$mean_std ~ short_windows$time_window, type = 'l', ylim = c(0.03,0.13),
+     ylab = 'mean global std', xlab = 'time window', las = 1, col = 'magenta')
+lines(short_windows$q2.5_std ~ short_windows$time_window, col = 'magenta', lty = 2)
+lines(short_windows$q97.5_std ~ short_windows$time_window, col = 'magenta', lty = 2)
 
-#table(short_windows$num_components)
+table(short_windows$num_components)
+k_probs <- short_windows[,c('prob_k1','prob_k2','prob_k3','prob_k4','prob_k5')] %>%
+  pivot_longer(everything(), values_to = 'probability', names_to = 'component')
+table(k_probs$component, k_probs$probability)
+k_probs$probability2 <- ifelse(k_probs$probability < 0.00000000001, 0, k_probs$probability)
+table(k_probs$component, k_probs$probability2)
 
+### long windows
+long_windows <- read_csv('../data_processed/anplong_allwindows_networkcomplexity.csv')
+max_time_window <- nrow(long_windows)
+hist(long_windows$mean_edge, breaks = max_time_window)
+hist(long_windows$mean_strength, breaks = max_time_window)
+hist(long_windows$mean_eigen, breaks = max_time_window)
+hist(long_windows$mean_density, breaks = max_time_window)
+hist(long_windows$mean_cv, breaks = max_time_window)
+hist(long_windows$mean_std, breaks = max_time_window)
 
+plot(plogis(long_windows$mean_edge) ~ long_windows$time_window, type = 'l',
+     ylab = 'inv. logit mean edges', xlab = 'time window', las = 1, col = 'red',
+     ylim = c(0,0.2))
+lines(plogis(long_windows$q2.5_edge) ~ long_windows$time_window, col = 'red', lty = 2)
+lines(plogis(long_windows$q97.5_edge) ~ long_windows$time_window, col = 'red', lty = 2)
 
+plot(long_windows$mean_strength ~ long_windows$time_window, type = 'l',
+     ylab = 'mean strength centrality', xlab = 'time window', las = 1, col = 'orange',
+     ylim = c(0,15))
+lines(long_windows$q2.5_strength ~ long_windows$time_window, col = 'orange', lty = 2)
+lines(long_windows$q97.5_strength ~ long_windows$time_window, col = 'orange', lty = 2)
 
+plot(long_windows$mean_eigen ~ long_windows$time_window, type = 'l', ylim = c(0,1),
+     ylab = 'mean eigenvector centrality', xlab = 'time window', las = 1, col = 'green')
+lines(long_windows$q2.5_eigen ~ long_windows$time_window, col = 'green', lty = 2)
+lines(long_windows$q97.5_eigen ~ long_windows$time_window, col = 'green', lty = 2)
 
+plot(long_windows$mean_density ~ long_windows$time_window, type = 'l', ylim = c(0.02,0.04),
+     ylab = 'mean global density', xlab = 'time window', las = 1, col = 'blue')
+lines(long_windows$q2.5_density ~ long_windows$time_window, col = 'blue', lty = 2)
+lines(long_windows$q97.5_density ~ long_windows$time_window, col = 'blue', lty = 2)
 
+plot(long_windows$mean_cv ~ long_windows$time_window, type = 'l', ylim = c(0.9, 1.5),
+     ylab = 'mean global cv', xlab = 'time window', las = 1, col = 'purple2')
+lines(long_windows$q2.5_cv ~ long_windows$time_window, col = 'purple2', lty = 2)
+lines(long_windows$q97.5_cv ~ long_windows$time_window, col = 'purple2', lty = 2)
 
+plot(long_windows$mean_std ~ long_windows$time_window, type = 'l', ylim = c(0,0.06),
+     ylab = 'mean global std', xlab = 'time window', las = 1, col = 'magenta')
+lines(long_windows$q2.5_std ~ long_windows$time_window, col = 'magenta', lty = 2)
+lines(long_windows$q97.5_std ~ long_windows$time_window, col = 'magenta', lty = 2)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+table(long_windows$num_components)
+k_probs <- long_windows[,c('prob_k1','prob_k2','prob_k3','prob_k4','prob_k5')] %>%
+  pivot_longer(everything(), values_to = 'probability', names_to = 'component')
+table(k_probs$component, k_probs$probability)
