@@ -491,8 +491,6 @@ mean_shade <- data.frame(age = age, lb = mu_hpdi[1,], ub = mu_hpdi[2,])
 pred_shade <- data.frame(age = age, lb = sim_pi[1,], ub = sim_pi[2,])
 
 ggplot()+
-  geom_line(data = mean_line, aes(x = age, y = mean),
-            linewidth = 1.5, colour = 'black')+
   geom_ribbon(data = mean_shade, aes(x = age, ymin = lb, ymax = ub),
               fill = rgb(0,0,0,0.15))+
   geom_ribbon(data = pred_shade, aes(x = age, ymin = lb, ymax = ub),
@@ -500,10 +498,30 @@ ggplot()+
   geom_point(data = eigen_values, aes(x = age, y = eigen,
                                       colour = as.factor(age)),
              pch = 19, alpha = 0.01)+
+  geom_line(data = mean_line, aes(x = age, y = mean),
+            linewidth = 1.5, colour = 'black')+
   theme_classic()+
   theme(legend.position = 'none',
         axis.title = element_text(size = 18),
         axis.text = element_text(size = 14))+
+  scale_colour_viridis_d(direction = -1)+
+  scale_x_continuous(name = 'mean of age distribution')+
+  scale_y_continuous(name = 'eigenvector centrality\n(1000 draws/elephant)')
+
+ggplot()+
+  geom_ribbon(data = mean_shade, aes(x = age, ymin = lb, ymax = ub),
+              fill = rgb(0,0,0,0.15))+
+  #geom_ribbon(data = pred_shade, aes(x = age, ymin = lb, ymax = ub),
+  #            fill = rgb(0,0,0,0.15))+
+  geom_point(data = eigen_values, aes(x = age, y = eigen,
+                                      colour = as.factor(age)),
+             pch = 19, alpha = 0.01, size = 2)+
+  geom_line(data = mean_line, aes(x = age, y = mean),
+            linewidth = 2.5, colour = 'black')+
+  theme_classic()+
+  theme(legend.position = 'none',
+        axis.title = element_text(size = 28),
+        axis.text = element_text(size = 24))+
   scale_colour_viridis_d(direction = -1)+
   scale_x_continuous(name = 'mean of age distribution')+
   scale_y_continuous(name = 'eigenvector centrality\n(1000 draws/elephant)')
