@@ -21,7 +21,7 @@ set.seed(12345)
 #set_cmdstan_path('H:/rlibs/4.2.1/')
 
 #### create data lists ####
-### import data for aggregated model (binomial)
+### import data for aggregated model (binomial) -- counts of positive associations and total sightings
 counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
 
 # correct sex_1, which has loaded in as a logical vector not a character/factor
@@ -32,7 +32,7 @@ counts_df$sex_1 <- as.character(sex_1$sex) ; rm(sex_1) ; gc()
 str(counts_df)  # sex_1 still comes up as logical, but now contains the right levels
 
 # create variable for age difference
-unique(counts_df$age_category_1) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA 
+unique(counts_df$age_category_1) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA --> convert anything <5 to cat 1, and anything 5-10 to cat 2
 counts_df$age_cat_id_1 <- ifelse(counts_df$age_category_1 == '0-3', 1,
                                  ifelse(counts_df$age_category_1 == '3-4', 1,
                                         ifelse(counts_df$age_category_1 == '4-5', 1,
@@ -164,14 +164,14 @@ counts_df_model <- counts_df[, c('node_1_males','node_2_males','event_count','co
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### set priors
-priors <- get_default_priors('binary')
-priors$edge <- 'normal(-2.5, 1.5)'    # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
-priors$fixed <- 'normal(0, 1.5)'  # slightly less wide that before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
+priors <- get_default_priors('binary') # obtain structure for bison model priors
+priors$edge <- 'normal(-2.5, 1.5)'     # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
+priors$fixed <- 'normal(0, 1.5)'       # slightly less wide than before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
 prior_check(priors, 'binary')
 
 ### run edge weight model
 motnp_edge_weights_strongpriors <- bison_model(
-  ( event | duration ) ~ dyad(node_1_id, node_2_id), 
+  ( event | duration ) ~ dyad(node_1_id, node_2_id),   # count of sightings together given count of total sightings as a result of the individuals contained within the dyad
   data = counts_df_model, 
   model_type = "binary",
   #partial_pooling = TRUE,
@@ -180,72 +180,74 @@ motnp_edge_weights_strongpriors <- bison_model(
 )
 
 ### run diagnostic plots
-plot_trace(motnp_edge_weights_strongpriors, par_ids = 2)
-plot_predictions(motnp_edge_weights_strongpriors, num_draws = 20, type = "density")
-plot_predictions(motnp_edge_weights_strongpriors, num_draws = 20, type = "point")
+plot_trace(motnp_edge_weights_strongpriors, par_ids = 2)                             # trace plot
+plot_predictions(motnp_edge_weights_strongpriors, num_draws = 20, type = "density")  # compare predictions to raw data -- predictions are more variable than observations, both overestimating the number of pairs only seen together a few times, but also allowing for together scores higher than observed
+plot_predictions(motnp_edge_weights_strongpriors, num_draws = 20, type = "point")    # compare predictions to raw data -- anything below the line is predicting below SRI (e.g. upper end SHOULD be massively below line because we don't want scores of 1 from pairs seen once)
 
 ### extract edge weight summaries
-edgelist <- get_edgelist(motnp_edge_weights_strongpriors, ci = 0.9, transform = TRUE)
-plot(density(edgelist$median))
+edgelist <- get_edgelist(motnp_edge_weights_strongpriors, ci = 0.9, transform = TRUE)  # extract edge list from model (distribution summary for all dyads)
+plot(density(edgelist$median))           # median edge strength estimate for all pairs -- mostly very low
 summary(motnp_edge_weights_strongpriors)
 
 ### compare edge weights to prior
-edges <- as.data.frame(motnp_edge_weights_strongpriors$chain) %>% 
-  pivot_longer(cols = everything(), names_to = 'dyad', values_to = 'draw') %>% 
-  mutate(dyad_id = rep(counts_df$dyad_id, 4000),
-         draw = plogis(draw))
+edges <- as.data.frame(motnp_edge_weights_strongpriors$chain) %>%               # extract chain of values from model
+  pivot_longer(cols = everything(), names_to = 'dyad', values_to = 'draw') %>%  # convert to long format
+  mutate(dyad_id = rep(counts_df$dyad_id, 4000),                                # add column to identify dyad per draw
+         draw = plogis(draw))                                                   # convert draws to proportion
 head(edges)
-plot(NULL, xlim = c(0,1), ylim = c(0,50), las = 1,
+plot(NULL, xlim = c(0,1), ylim = c(0,50), las = 1,                              # prepare plot window
      main = 'edge distributions',ylab = 'density', xlab = 'edge weight')
-plot_samples <- sample(counts_df$dyad_id, 10000, replace = F)
-for(dyad in plot_samples) {
+plot_samples <- sample(counts_df$dyad_id, 10000, replace = F)                   # sample 10000 dyads to plot
+for(dyad in plot_samples) {                                                     # plot probability density for sampled dyads
   x <- edges[edges$dyad_id == dyad,]
   lines(density(x$draw),
         col = ifelse(mean(x$draw < 0.15), rgb(0,0,1,0.1),
                      ifelse(mean(x$draw < 0.3), rgb(1,0,0,0.1),rgb(1,0,1,0.1))))
 }
-lines(density(edges$draw), lwd = 3)
+lines(density(edges$draw), lwd = 3)                                             # add probability density line for all draws from all dyads
 
-edges$chain_position <- rep(1:4000, each = length(unique(edges$dyad)))
-edges <- edges[edges$chain_position < 1001,]
+edges$chain_position <- rep(1:4000, each = length(unique(edges$dyad)))          # add column for position in chain
+edges <- edges[edges$chain_position < 1001,]                                    # only take first 1000 values to speed up next plot
 edges$mean <- NA
-for(dyad in unique(edges$dyad)) {
+for(dyad in unique(edges$dyad)) {                                               # calculate mean edge per dyad
   if(is.na(edges$mean[dyad]) == TRUE){
   edges$mean[edges$dyad == dyad] <- mean(edges$draw[edges$dyad == dyad])
   }
 }
-plot_low <- edges[edges$mean == min(edges$mean),]
-plot_q25 <- edges[edges$mean == quantile(edges$mean, 0.25),]
-plot_mid <- edges[edges$mean == quantile(edges$mean, 0.501),]
-plot_q75 <- edges[edges$mean == quantile(edges$mean, 0.75),]
-plot_q98 <- edges[edges$mean == quantile(edges$mean, 0.98),]
-plot_high <- edges[edges$mean == max(edges$mean),]
-plot_data <- rbind(plot_low, plot_q25, plot_mid, plot_q75, plot_q98, plot_high)
+plot_low <- edges[edges$mean == min(edges$mean),]                               # dyad with minimum mean edge weight
+plot_q25 <- edges[edges$mean == quantile(edges$mean, 0.25),]                    # dyad with 25th percentile mean edge weight
+plot_mid <- edges[edges$mean == quantile(edges$mean, 0.501),]                   # dyad with median mean edge weight (0.5 exactly couldn't identify a single dyad, but 0.501 found it)
+plot_q75 <- edges[edges$mean == quantile(edges$mean, 0.75),]                    # dyad with 75th percentile mean edge weight
+plot_q98 <- edges[edges$mean == quantile(edges$mean, 0.98),]                    # dyad with 98th percentile mean edge weight
+plot_high <- edges[edges$mean == max(edges$mean),]                              # dyad with maximum mean edge weight
+plot_data <- rbind(plot_low, plot_q25, plot_mid, plot_q75, plot_q98, plot_high) # combine all to single data frame
 
-ggplot(plot_data, aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)))+
+ggplot(plot_data,                                                               # plot distributions of selected dyads
+       aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)))+
   geom_density(linewidth = 1)+
   theme_classic()+
-  scale_fill_viridis_d(alpha = 0.2)+
-  scale_color_viridis_d()+
+  scale_fill_viridis_d(alpha = 0.2)+                                            # colour distributions by dyad (translucent)
+  scale_color_viridis_d()+                                                      # colour distributions by dyad (solid)
   theme(legend.position = 'none',
         axis.text = element_text(size = 14),
         axis.title = element_text(size = 18))+
   scale_x_continuous(name = 'edge weight', limits = c(0,1))
 
-priors$edge <- 'normal(-2.5, 1.5)'
-prior_plot <- data.frame(dyad = 'prior',
+priors$edge <- 'normal(-2.5, 1.5)'                                              # set prior value (already set -- doesn't actually change anything, just in as a reminder of what it was)
+prior_plot <- data.frame(dyad = 'prior',                                        # create prior dataframe with draws from prior distribution, formatted to match columns in plot_data
                          draw = plogis(rnorm(1000, -2.5, 1.5)),
                          dyad_id = 1000000,
                          mean = NA,
                          chain_position = 1:1000)
-prior_plot$mean <- mean(prior_plot$draw)
-ggplot(plot_data, aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)),
-       fill = viridis, colour = colours
+prior_plot$mean <- mean(prior_plot$draw)                                        # calculate mean of edge prior distribution
+ggplot(plot_data,                                                               # plot distributions of selected dyads
+       aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)),
+       #fill = viridis, colour = colours
        )+
   geom_density(linewidth = 1, alpha = 0.2)+
-  geom_density(data = prior_plot, linewidth = 1, colour = 'black', linetype = 2, alpha = 0)+
+  geom_density(data = prior_plot, linewidth = 1, colour = 'black', linetype = 2, alpha = 0)+  # add probability density line for prior distribution -- no fill, dashed line not solid, different colour scale to others
   theme_classic()+
-  scale_fill_viridis_d(option = 'plasma',
+  scale_fill_viridis_d(option = 'plasma',                                       # use alternative viridis colour pallette to avoid confusion regarding ages (all other plots, viridis scale = age)
                        alpha = 0.2)+
   scale_color_viridis_d(
     option = 'plasma'
@@ -255,24 +257,25 @@ ggplot(plot_data, aes(x = draw, colour = as.factor(mean), fill = as.factor(mean)
         axis.title = element_text(size = 18))+
   scale_x_continuous(name = 'edge weight', limits = c(0,1))
 
-head(plot_data)
-plot_chains <- rbind(plot_high, plot_mid, plot_low)
+plot_chains <- rbind(plot_high, plot_mid, plot_low)                             # make data set for trace plots
 plot_chains$order <- factor(plot_chains$dyad_id,
-                            levels = c('73914','86520','85862'))
+                            levels = c('73914','86520','85862'))                # reorder to colour by chain so matches plot above, and also has narrowest chain on top and most uncertain at the back
 ggplot(#data = plot_chains,
        #aes(y = draw, x = chain_position, colour = order)
   )+
-  geom_line(data = plot_high, aes(y = draw, x = chain_position),
-            #colour = '#fde725',
-            colour = '#f0f921'
+  geom_line(data = plot_high, aes(y = draw, x = chain_position),                # chain for most uncertain
+            #colour = '#fde725',                                                # yellow --  viridis scale B
+            colour = '#f0f921'                                                  # yellow -- viridis scale 'plasma'
             )+
-  geom_line(data = plot_mid, aes(y = draw, x = chain_position),
-            #colour = '#21918c',
-            colour = '#e16462')+
-  geom_line(data = plot_low, aes(y = draw, x = chain_position),
-            #colour = '#440154',
-            colour = '#0d0887')+
-  scale_color_viridis_d()+
+  geom_line(data = plot_mid, aes(y = draw, x = chain_position),                 # chain for median
+            #colour = '#21918c',                                                # turquoise -- viridis scale B
+            colour = '#e16462'                                                  # orange -- viridis scale 'plasma'
+            )+
+  geom_line(data = plot_low, aes(y = draw, x = chain_position),                 # chain for minimum edge weight
+            #colour = '#440154',                                                # purple -- viridis scale B
+            colour = '#0d0887'                                                  # red -- viridis scale 'plasma'
+            )+
+  #scale_color_viridis_d()+
   theme_classic()+
   theme(#legend.position = 'none',
         axis.text = element_text(size = 14),
@@ -287,14 +290,14 @@ print(paste0('strong-priored model completed at ', Sys.time()))
 ## non-random edge weights ####
 ### run null model
 motnp_edges_null_strongpriors <- bison_model(
-  (event | duration) ~ 1, 
+  (event | duration) ~ 1,                       # response variable does not vary with dyad, all dyads drawn from the same distribution
   data = counts_df_model, 
   model_type = "binary",
   priors = priors
 )
 
 ### compare null model with fitted model -- bisonR model stacking
-model_comparison(list(non_random_model = motnp_edge_weights_strongpriors, random_model = motnp_edges_null_strongpriors)) # NETWORK IS RANDOM
+model_comparison(list(non_random_model = motnp_edge_weights_strongpriors, random_model = motnp_edges_null_strongpriors)) # compare fit for model allowed to vary by dyad vs model that draws all dyad strengths from the same distribution -- vast majority of network is best explained by random model, but 4.3% of dyads better explained by non-random. Network is therefore non-random, but with only a small proportion of dyads associating more strongly than random distribution will allow
 
 ### compare null model with fitted model -- Jordan pseudo model averaging
 model_averaging <- function(models) {
@@ -305,8 +308,8 @@ model_averaging <- function(models) {
     names(results_matrix) <- names(models)
   }
   results_matrix
-}
-model_averaging(models = list(non_random_model = motnp_edge_weights_strongpriors, random_model = motnp_edges_null_strongpriors))
+}  # produce alternative method for comparing models
+model_averaging(models = list(non_random_model = motnp_edge_weights_strongpriors, random_model = motnp_edges_null_strongpriors))            # 100% confidence that random model is better
 
 # save workspace image
 save.image('motnp_bisonr_edgescalculated_strongprior.RData')
@@ -370,13 +373,13 @@ nodes$node <- as.character(nodes$node)
 str(nodes)
 
 ### plot network
-plot_network_threshold(motnp_edge_weights_strongpriors, lwd = 2, ci = 0.9, threshold = 0.2,
+plot_network_threshold(motnp_edge_weights_strongpriors, lwd = 15, ci = 0.9, threshold = 0.2,
                        vertex.label.color1 = NA, edge.color1 = rgb(0,0,0,0.25),
                        vertex.label.color2 = 'black', vertex.color2 = nodes$age,
                        vertex.size2 = nodes$sightings, edge.color2 = 'black')
 
 ### adapt to remove unconnected nodes
-plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
+plot_network_threshold2 <- function (obj, ci = 0.95, lwd = 2, threshold = 0.3,
                                      label.colour = 'transparent', label.font = 'Helvetica', 
                                      node.size = 4, node.colour = 'seagreen1',
                                      link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
@@ -430,7 +433,7 @@ plot_network_threshold2 <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
 
 ### plot network
 plot_network_threshold2(obj = motnp_edge_weights_strongpriors, threshold = 0.15,
-                        node.size = nodes, node.colour = nodes, lwd = 10)
+                        node.size = nodes, node.colour = nodes, lwd = 15)
 
 ### add time marker
 print(paste0('network plots completed at ', Sys.time()))
@@ -521,22 +524,22 @@ dev.off()
 pdf(file = '../outputs/motnp_bisonr_edgeweight_strongprior_cv.pdf')
 
 # extract cv for model
-global_cv_strongprior <- extract_metric(motnp_edge_weights_strongpriors, "global_cv")
+global_cv_strongprior <- extract_metric(motnp_edge_weights_strongpriors, "global_cv", num_draws = 10000)
 head(global_cv_strongprior)
 hist(global_cv_strongprior)
 
 # calculate SRI for all dyads
-counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
-summary(counts_df_model$sri)
+counts_df$sri <- counts_df$event_count / counts_df$count_dyad
+summary(counts_df$sri)
 
 # calculate CV of SRI for all dyads
-raster::cv(counts_df_model$sri)  # very high, but lower than gbi_matrix
+raster::cv(counts_df$sri)         # very high, but lower than gbi_matrix
 #raster::cv(m$sri[m$sri > 0])     # still massive even when I remove the 0s -- zero inflation is real
 
 ### create SRI matrix
 # generate matrix
-N <- length(unique(c(counts_df_model$id_1, counts_df_model$id_2)))
-ids <- unique(c(counts_df_model$id_1, counts_df_model$id_2))
+N <- length(unique(c(counts_df$id_1, counts_df$id_2)))
+ids <- unique(c(counts_df$id_1, counts_df$id_2))
 m_mat <- diag(nrow = N)
 colnames(m_mat) <- ids
 rownames(m_mat) <- ids
@@ -550,7 +553,7 @@ for( i in 1:N ) {
     else {
       id1 <- colnames(m_mat)[i]
       id2 <- rownames(m_mat)[j]
-      m_mat[i,j] <- counts_df_model$sri[which(counts_df_model$id_1 == id1 & counts_df_model$id_2 == id2)]
+      m_mat[i,j] <- counts_df$sri[which(counts_df$id_1 == id1 & counts_df$id_2 == id2)]
     }
   }
 }
@@ -590,10 +593,11 @@ gbi_males <- gbi_males[rowSums(gbi_males) > 0,] # remove male-only sightings
 
 # set up permutations
 N_networks <- 10000
+# rm(counts_df_model, edgelist, eles_asnipe, eles_dt, females_df, gbi_matrix, motnp_ages, motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, i, id1, id2, j, model_averaging) ; gc()
 
 # create vector of days for each sighting
 sightings <- eles[,c('elephant','encounter','date')] %>% 
-  filter(elephant %in% sort(unique(c(counts_df$id_1, counts_df$id_2)))) %>% 
+  filter(elephant %in% ids) %>% 
   select(-elephant) %>% 
   distinct()
 
@@ -646,6 +650,62 @@ ggplot(data = plot_cv)+
 ### write out outputs for future reference
 write_csv(plot_cv, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')
 
+### combine with global_cv_strongpriors
+plot_cv_model <- data.frame(cv = c(plot_cv$cv_random_networks, (global_cv_strongprior*100)),
+                      iteration = rep(1:length(global_cv_strongprior), 2),
+                      type = rep(c('permutation','model_draw'), each = length(global_cv_strongprior)))
+write_csv(plot_cv_model, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')
+
+hist(plot_cv_model$cv)
+
+ggplot()+
+  geom_vline(xintercept = cv_network, linewidth = 1.5,
+             colour = rgb(68/255, 1/255, 84/255))+
+  #annotate('text', x = cv_network - 50, y = 700), colour = rgb(68/255, 1/255, 84/255),
+  #         label = 'coefficient of/nvariation for/nmeasured network')+
+  theme_classic()+
+  theme(axis.title = element_text(size = 18),
+        axis.text = element_text(size = 14))+
+  geom_histogram(data = plot_cv_model[plot_cv_model$type == 'model_draw',], aes(x = cv),
+                 fill = rgb(33/255, 145/255, 140/255),
+                 bins = 100,
+                 colour = 'black')+
+  geom_histogram(data = plot_cv_model[plot_cv_model$type == 'permutation',], aes(x = cv),
+                 fill = rgb(253/255, 231/255, 37/255),
+                 bins = 100,
+                 colour = 'black')+
+  scale_x_continuous(name = 'coefficient of variation',
+                     #limits = c(min(cv_random_networks)-10,
+                     #cv_network+10),
+                     expand = c(0,0))+
+  scale_y_continuous(name = 'frequency',
+                     expand = c(0,0))
+
+plot_cv_model2 <- plot_cv_model[c(1:10000, sample(10001:20000, 4000, replace = F)),]
+ggplot()+
+  geom_vline(xintercept = cv_network, linewidth = 1.5,
+             colour = rgb(68/255, 1/255, 84/255))+
+  #annotate('text', x = cv_network - 50, y = 700), colour = rgb(68/255, 1/255, 84/255),
+  #         label = 'coefficient of/nvariation for/nmeasured network')+
+  theme_classic()+
+  theme(axis.title = element_text(size = 28),
+        axis.text = element_text(size = 22))+
+  geom_histogram(data = plot_cv_model2[plot_cv_model2$type == 'model_draw',], aes(x = cv),
+                 fill = rgb(33/255, 145/255, 140/255),
+                 bins = 100,
+                 colour = 'black')+
+  geom_histogram(data = plot_cv_model2[plot_cv_model2$type == 'permutation',], aes(x = cv),
+                 fill = rgb(253/255, 231/255, 37/255),
+                 bins = 100,
+                 colour = 'black')+
+  scale_x_continuous(name = 'coefficient of variation',
+                     #limits = c(min(cv_random_networks)-10,
+                     #cv_network+10),
+                     breaks = round(seq(100, 400, by = 50),-1),
+                     expand = c(0,0))+
+  scale_y_continuous(name = 'frequency',
+                     expand = c(0,0))
+
 ### run statistical test to confirm that difference is significant
 # plot_cv <- read_csv('../data_processed/motnp_networkpermutations_cv_strongprior.csv')
 hist(plot_cv$cv_random_networks)
@@ -655,6 +715,11 @@ mean(plot_cv$cv_random_networks)
 sd(plot_cv$cv_random_networks)
 
 length(which(plot_cv$cv_random_networks >= cv_network))/length(plot_cv$cv_random_networks) # 3 / 10000 = 3e-04 = p-value (don't need an additional test because that will further randomise the data which are already randomised, just need to know proportion that are greater than or equal to your value)
+
+mean(global_cv)
+sd(global_cv)
+
+max(global_cv) ; min(plot_cv$cv_random_networks)
 
 ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2% ####
 counts_df_model <- counts_df[,c('node_1_males','node_2_males','event_count','count_dyad','id_1','id_2','dyad_males')]
