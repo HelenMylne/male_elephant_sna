@@ -1,6 +1,7 @@
 #### set up ####
 # load packages
-library(tidyverse) #, lib.loc = '../packages/') # library(tidyverse)
+# library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(bisonR) ; library(asnipe) ; library(sna) ; library(raster)
+library(tidyverse, lib.loc = '../packages/') # library(tidyverse)
 library(dplyr, lib.loc = '../packages/')     # library(dplyr)
 #library(rstan, lib.loc = '../packages/')     # library(rstan)
 library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
@@ -135,7 +136,6 @@ counts_df <- counts_df %>%
   filter(name_1 != 'Tori'    & name_2 != 'Tori')
 
 ### filter counts data frame down to males only
-females_df <- counts_df
 counts_df <- counts_df %>% 
   filter(id_1 %in% unique(motnp_ages$id)) %>% 
   filter(id_2 %in% unique(motnp_ages$id))
@@ -165,14 +165,24 @@ colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### set priors
 priors <- get_default_priors('binary') # obtain structure for bison model priors
-priors$edge <- 'normal(-2.5, 1.5)'     # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
-priors$fixed <- 'normal(0, 1.5)'       # slightly less wide than before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
+priors$edge <- c('normal(-2.5, 1.5)')     # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
+priors$fixed <- 'normal(-5,3)'       # slightly less wide than before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
 prior_check(priors, 'binary')
+prior_parameters <- bisonR::extract_prior_parameters(priors)
+
+### create dummy variable indicating if ever seen together or not -- use to select which prior to draw edge weight from
+counts_df_model$seen_together <- ifelse(counts_df_model$event > 0, 1, 0)
+counts_df_model$never_together <- 1 - counts_df_model$seen_together
+
+### new prior for zero-inflated dyads (never seen together)
+ plot(density( LaplacesDemon::invlogit(rnorm(1000, -5, 3)) ), col = 'blue')      # new -- dyads never sighted together
+lines(density( LaplacesDemon::invlogit(rnorm(1000, -2.5, 1.5)) ), col = 'red')   # original -- dyads ≥ 1 seen together 
 
 ### run edge weight model
 motnp_edge_weights_strongpriors <- bison_model(
-  ( event | duration ) ~ dyad(node_1_id, node_2_id),   # count of sightings together given count of total sightings as a result of the individuals contained within the dyad
-  data = counts_df_model, 
+# ( event | duration ) ~ dyad(node_1_id, node_2_id),   # count of sightings together given count of total sightings as a result of the individuals contained within the dyad
+  ( event | duration ) ~ dyad(node_1_id, node_2_id) + seen_together*normal(-2.5,1.5) + never_together*normal(-5,3),
+  data = counts_df_model,
   model_type = "binary",
   #partial_pooling = TRUE,
   #mc_cores = 4,
@@ -233,7 +243,7 @@ ggplot(plot_data,                                                               
         axis.title = element_text(size = 18))+
   scale_x_continuous(name = 'edge weight', limits = c(0,1))
 
-priors$edge <- 'normal(-2.5, 1.5)'                                              # set prior value (already set -- doesn't actually change anything, just in as a reminder of what it was)
+#priors$edge <- 'normal(-2.5, 1.5)'                                              # set prior value (already set -- doesn't actually change anything, just in as a reminder of what it was)
 prior_plot <- data.frame(dyad = 'prior',                                        # create prior dataframe with draws from prior distribution, formatted to match columns in plot_data
                          draw = plogis(rnorm(1000, -2.5, 1.5)),
                          dyad_id = 1000000,
@@ -319,7 +329,7 @@ print(paste0('random network comparison completed at ', Sys.time()))
 
 ## plot network ####
 ### adapt bisonR plot_network function to give more flexibility over plotting options
-plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,
+plot_network_threshold <- function (obj, ci = 0.9, lwd = 2, threshold = 0.3,  # threshold = median edge weight must be over X
                                     vertex.label.color1 = 'transparent', vertex.label.font1 = NA, 
                                     vertex.color1 = 'transparent',
                                     vertex.size1 = 1, edge.color1 = rgb(0, 0, 0, 1),
@@ -356,21 +366,21 @@ motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 
 ### create nodes data frame
-nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),
-                    node = NA,
-                    age = NA,
-                    sightings = NA)
+nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
+                    node = NA, age = NA, sightings = NA)                  # data needed on each
 for(i in 1:nrow(nodes)){
-  x <- motnp_ages[motnp_ages$id == nodes$id[i],]
-  nodes$age[i] <- mean(x$age)
-  if(nodes$id[i] != 'M99') { y <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','count_1','node_1_males')] }
-  else { y <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','count_2','node_2_males')] }
+  # add age data
+  x <- motnp_ages[motnp_ages$id == nodes$id[i],]                          # vector of ages per individual
+  nodes$age[i] <- mean(x$age)                                             # for initial test purposes, age = mean only
+  # add node id and count data
+  if(nodes$id[i] != 'M99') { y <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','count_1','node_1_males')] }   # add data for M99 -- only male who is only present in counts_df in ID2, all others are ID1
+  else { y <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','count_2','node_2_males')] }  # add data for all other males
   nodes$sightings[i] <- y[1,2]
   nodes$node[i] <- y[1,3]
 }
-nodes$sightings <- as.numeric(nodes$sightings)
-nodes$node <- as.character(nodes$node)
-str(nodes)
+nodes$sightings <- as.numeric(nodes$sightings)   # convert to numeric
+nodes$node <- as.character(nodes$node)           # convert to character
+str(nodes)                                       # check structure
 
 ### plot network
 plot_network_threshold(motnp_edge_weights_strongpriors, lwd = 15, ci = 0.9, threshold = 0.2,
@@ -378,7 +388,7 @@ plot_network_threshold(motnp_edge_weights_strongpriors, lwd = 15, ci = 0.9, thre
                        vertex.label.color2 = 'black', vertex.color2 = nodes$age,
                        vertex.size2 = nodes$sightings, edge.color2 = 'black')
 
-### adapt to remove unconnected nodes
+### adapt to remove unconnected nodes and simplify input requirements
 plot_network_threshold2 <- function (obj, ci = 0.95, lwd = 2, threshold = 0.3,
                                      label.colour = 'transparent', label.font = 'Helvetica', 
                                      node.size = 4, node.colour = 'seagreen1',
@@ -443,75 +453,73 @@ print(paste0('network plots completed at ', Sys.time()))
 #load('motnp_bisonr_edgescalculated_strongprior.RData')
 
 ### plot against SRI
-head(edgelist)
-colnames(edgelist)[1:2] <- colnames(counts_df_model)[1:2]
-edgelist$node_1_id <- as.integer(edgelist$node_1_id) ; edgelist$node_2_id <- as.integer(edgelist$node_2_id)
-summary <- left_join(edgelist, counts_df_model, by = c('node_1_id','node_2_id'))
-counts <- counts_df[,c('node_1_males','node_2_males','count_1','count_2')]
-colnames(counts)[1:2] <- c('node_1_id','node_2_id')
-summary <- left_join(summary, counts, by = c('node_1_id','node_2_id'))
-summary$sri <- summary$event / (summary$duration)
+head(edgelist)                                                                      # check structure of edgelist
+colnames(edgelist)[1:2] <- colnames(counts_df_model)[1:2]                           # rename for join function
+edgelist$node_1_id <- as.integer(edgelist$node_1_id)                                # convert to integers
+edgelist$node_2_id <- as.integer(edgelist$node_2_id)                                # convert to integers
+summary <- left_join(edgelist, counts_df_model, by = c('node_1_id','node_2_id'))    # combine distribution data with raw counts
+counts <- counts_df[,c('node_1_males','node_2_males','count_1','count_2')]          # add individual count data
+colnames(counts)[1:2] <- c('node_1_id','node_2_id')                                 # rename for join function
+summary <- left_join(summary, counts, by = c('node_1_id','node_2_id'))              # combine summary data with individual counts
+summary$sri <- summary$event / (summary$duration)                                   # calculate basic SRI
 
-plot(density(summary$sri), main = 'SRI vs model output: blue=all,\nred=both seen 8 times, green=both 12 times')
-lines(density(summary$median), col = 'blue')
-lines(density(summary$median[which(summary$count_1 >= 8 & summary$count_2 >= 8)]), col = 'red')
-lines(density(summary$median[which(summary$count_1 >= 12 & summary$count_2 >= 12)]), col = 'green')
+plot(density(summary$sri), main = 'SRI vs model output: blue=all,\nred=both seen 8 times, green=both 12 times') # plot SRI distribution
+lines(density(summary$median), col = 'blue')                                                                    # distribution of median estimates
+lines(density(summary$median[which(summary$count_1 >= 8 & summary$count_2 >= 8)]), col = 'red')                 # distribution of median estimates for frequently sighted males
+lines(density(summary$median[which(summary$count_1 >= 12 & summary$count_2 >= 12)]), col = 'green')             # distribution of median estimates for frequently sighted males
 
 # try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
-dyads <- counts_df[,c('dyad_id','node_1_males','node_2_males')]
-colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')
-dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))
+dyads <- counts_df[,c('dyad_id','node_1_males','node_2_males')]                        # create data frame of dyads
+colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')                                # rename for joining
+dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))            # join with counts data (creates counts_df_model but with dyad_id)
 length(which(is.na(dyads$duration) == TRUE))
 
-draws <- as.data.frame(motnp_edge_weights_strongpriors$chain) %>% pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')
-draws$dyad_id <- rep(counts_df$dyad_id, 4000) ## IS THIS RIGHT??
-draws$weight <- gtools::inv.logit(draws$edge)
-draws$draw <- rep(1:4000,  each = nrow(counts_df_model))
-draws <- left_join(draws, dyads, by = 'dyad_id')
-draws$sri <- draws$event / draws$duration
+draws <- as.data.frame(motnp_edge_weights_strongpriors$chain) %>%                      # generate dataframe of draws per dyad
+  pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')       # convert to a long format
+draws$dyad_id <- rep(counts_df$dyad_id, 4000)                                          # add dyad_id data
+draws$weight <- gtools::inv.logit(draws$edge)                                          # convert to 0-1 bounded values
+draws$draw <- rep(1:4000,  each = nrow(counts_df_model))                               # add chain position number
+draws <- left_join(draws, dyads, by = 'dyad_id')                                       # combine to add node data
+draws$sri <- draws$event / draws$duration                                              # calculate basic SRI to compare with distributions
 
-set.seed(15)
-subset_draws <- draws[draws$dyad_id %in% sample(draws$dyad_id, 150, replace = F),]
-subset_draws$median <- NA
-for(i in 1:nrow(subset_draws)){
-  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
-  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
-}
-head(subset_draws)
-which(is.na(subset_draws$median) == TRUE)[1]
+set.seed(15)                                                                           # make subsetting reproducible
+subset_draws <- draws[draws$dyad_id %in% sample(draws$dyad_id, 150, replace = F),]     # sample 150 dyads at random to plot (takes a very long time)
+subset_draws$median <- NA ; for(i in 1:nrow(subset_draws)){                            # set up for loop
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]                  # generate dataset cut down to just the dyad in question
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i]) }   # record median draw value
+head(subset_draws)                                                                     # check structure of data frame
+which(is.na(subset_draws$median) == TRUE)[1]                                           # check that all are filled in
 
-subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)
-ggplot(data = subset_draws, mapping = aes(x = weight))+
-  geom_density(colour = 'blue')+
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+
-  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)           # order dataframe based on total sightings per pair
+ggplot(data = subset_draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
 
-write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_strongprior.csv')
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_strongprior.csv')    # save output for future reference
 
-subset_draws <- draws[draws$sri > 0.2,]
-subset_draws$median <- NA
-for(i in 1:nrow(subset_draws)){
-  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]
-  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i])
-}
-head(subset_draws)
-which(is.na(subset_draws$median) == TRUE)[1]
+subset_draws <- draws[draws$sri > 0.2,]                                                # repeat subsetting but selecting only the dyads with the highest SRI values (generally some of the least sighted individuals)
+subset_draws$median <- NA ; for(i in 1:nrow(subset_draws)){                            # set up for loop
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]                  # generate dataset cut down to just the dyad in question
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i]) }   # record median draw value
+head(subset_draws)                                                                     # check structure of data frame
+which(is.na(subset_draws$median) == TRUE)[1]                                           # check that all are filled in
 
-subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)
-ggplot(data = subset_draws, mapping = aes(x = weight))+
-  geom_density(colour = 'blue')+
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15)+
-  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)           # order dataframe based on total sightings per pair
+ggplot(data = subset_draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15)+                                       # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
 
-ggplot(data = subset_draws, mapping = aes(x = weight))+
-  geom_density(colour = 'blue')+
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+
-  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red')
+ggplot(data = subset_draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
 
-write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_strongprior.csv')
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_strongprior.csv')    # save output for future reference
 
 # clean environment
 rm(draws, dyads, priors, subset_draws, x) ; gc()
@@ -538,33 +546,30 @@ raster::cv(counts_df$sri)         # very high, but lower than gbi_matrix
 
 ### create SRI matrix
 # generate matrix
-N <- length(unique(c(counts_df$id_1, counts_df$id_2)))
-ids <- unique(c(counts_df$id_1, counts_df$id_2))
-m_mat <- diag(nrow = N)
-colnames(m_mat) <- ids
-rownames(m_mat) <- ids
+N <- length(unique(c(counts_df$id_1, counts_df$id_2)))      # number of elephants
+ids <- unique(c(counts_df$id_1, counts_df$id_2))            # IDs of elephants
+m_mat <- diag(nrow = N)                                     # matrix of males -- NxN to fill with SRI
+colnames(m_mat) <- ids ; rownames(m_mat) <- ids             # dimnames = elephant IDs
 
 # populate matrix with SRI values
-for( i in 1:N ) {
-  for( j in 1:N ) {
-    if( i >= j ) {
-      m_mat[i,j] <- m_mat[j,i]
-    }
+for( i in 1:N ) {                                           # rows
+  for( j in 1:N ) {                                         # columns
+    if( i >= j ) { m_mat[i,j] <- m_mat[j,i] }               # make symmetrical about diagonal
     else {
-      id1 <- colnames(m_mat)[i]
-      id2 <- rownames(m_mat)[j]
-      m_mat[i,j] <- counts_df$sri[which(counts_df$id_1 == id1 & counts_df$id_2 == id2)]
+      id1 <- colnames(m_mat)[i]                             # identify elephant 1 of dyad
+      id2 <- rownames(m_mat)[j]                             # identify elephant 2 of dyad
+      m_mat[i,j] <- counts_df$sri[which(counts_df$id_1 == id1 & counts_df$id_2 == id2)]      # add SRI values -- match IDs and dyad
     }
   }
 }
 
 # calculate CV for matrix
-raster::cv(m_mat) # still way too high
-which(is.nan(m_mat) == TRUE)
-sd(m_mat)/mean(m_mat) # matches raster version -- check it is doing what I think it is doing
+raster::cv(m_mat)                # still way too high
+which(is.nan(m_mat) == TRUE)     # check if any are blank
+sd(m_mat)/mean(m_mat)            # matches raster version -- check it is doing what I think it is doing
 
 # create gbi_matrix
-eles <- read_csv(file = '../data_processed/motnp_eles_long.csv')
+eles <- read_csv(file = '../data_processed/motnp_eles_long.csv')       # read in long format of raw data
 eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_')              # make single variable for unique locations
 eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]                         # rearrange variables
 nodes_data <- read_csv(file = '../data_processed/motnp_elenodes.csv' ) # read in node data
@@ -596,45 +601,44 @@ N_networks <- 10000
 # rm(counts_df_model, edgelist, eles_asnipe, eles_dt, females_df, gbi_matrix, motnp_ages, motnp_edge_weights_strongpriors, motnp_edges_null_strongpriors, i, id1, id2, j, model_averaging) ; gc()
 
 # create vector of days for each sighting
-sightings <- eles[,c('elephant','encounter','date')] %>% 
-  filter(elephant %in% ids) %>% 
-  select(-elephant) %>% 
-  distinct()
+sightings <- eles[,c('elephant','encounter','date')] %>%  # set up dataframe of actual encounters
+  filter(elephant %in% ids) %>%                           # remove encounters that only include females, youngsters, or dead males
+  select(-elephant) %>%                                   # remove ID column
+  distinct()                                              # cut down to one row per encounter
 
 # run network permutations
-random_networks <- asnipe::network_permutation(association_data = gbi_males,
-                                               association_matrix = m_mat,
-                                               permutations = N_networks,
-                                               days = sightings$date,
-                                               within_day = TRUE)
+random_networks <- asnipe::network_permutation(association_data = gbi_males, # permute network -- raw data = gbi_matrix
+                                               association_matrix = m_mat,   # SRI matrix
+                                               permutations = N_networks,    # 10000 times
+                                               days = sightings$date,        # permute within day only
+                                               within_day = TRUE)            # permute within day only
 print('random networks generated')
 
-cv_random_networks <- rep(0,N_networks)
-for (i in c(1:N_networks)) {
-  net_rand <- random_networks[i,,]
-  cv_random_networks[i] <- raster::cv(net_rand)
-  if(i %% 1000 == 0) {print(i)}
+# calculate coefficient of variation per randomised network
+cv_random_networks <- rep(0,N_networks) ; for (i in c(1:N_networks)) {       # set up for loop
+  net_rand <- random_networks[i,,]                                           # select random network
+  cv_random_networks[i] <- raster::cv(net_rand)                              # calculate CV and save into vector
+  if(i %% 1000 == 0) {print(i)}                                              # track progress
 }
 print(paste0('network permutations for entire network completed at ', Sys.time()))
 
 # compare permuted networks to actual network
-hist(cv_random_networks, xlim = c(min(cv_random_networks)-50,max(cv_random_networks)+50),
+hist(cv_random_networks, xlim = c(min(cv_random_networks)-50,max(cv_random_networks)+50),   # plot histogram of random netowkr CVs
      #ylim = c(0,10),  # there are 3 networks out of 10000 that have cv > 290, but then all are in the same bar as cv(m_mat)
      main = 'permutations for network of all male elephants')
-abline(v = raster::cv(m_mat), col = 'red')
-text(round(raster::cv(m_mat),3), col = 'red', x = median(cv_random_networks)+50, y = 2000)
+abline(v = raster::cv(m_mat), col = 'red')                                                  # add line for measured network
+text(round(raster::cv(m_mat),3), col = 'red', x = median(cv_random_networks)+50, y = 2000)  # add text to specify value for measured network
 
-plot_cv <- as.data.frame(cv_random_networks)
-cv_network <- raster::cv(m_mat)
-cv_random_networks <- plot_cv$cv_random_networks
-ggplot(data = plot_cv)+
-  geom_vline(xintercept = cv_network, linewidth = 1.5,
-             colour = rgb(68/255, 1/255, 84/255))+
+plot_cv <- as.data.frame(cv_random_networks)                # create dataframe
+cv_network <- raster::cv(m_mat)                             # save value of measured CV
+cv_random_networks <- plot_cv$cv_random_networks            # vector of randomised CV values
+ggplot(data = plot_cv)+                                     # plot CV values
+  geom_vline(xintercept = cv_network, linewidth = 1.5,      # add line for true value
+             colour = rgb(68/255, 1/255, 84/255))+          # dark purple (viridis scale)
   #geom_text(x = cv_network - 50, y = 700,
-  geom_histogram(aes(cv_random_networks),
-                 fill = rgb(253/255, 231/255, 37/255),
-                 colour = 'black',
-                 bins = 100)+
+  geom_histogram(aes(cv_random_networks),                   # random cv values
+                 fill = rgb(253/255, 231/255, 37/255),      # yellow (viridis scale)
+                 colour = 'black', bins = 100)+             # set bin width
   theme_classic()+
   scale_x_continuous(name = 'coefficient of variation',
                      expand = c(0,0),
@@ -651,29 +655,24 @@ ggplot(data = plot_cv)+
 write_csv(plot_cv, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')
 
 ### combine with global_cv_strongpriors
-plot_cv_model <- data.frame(cv = c(plot_cv$cv_random_networks, (global_cv_strongprior*100)),
+plot_cv_model <- data.frame(cv = c(plot_cv$cv_random_networks, (global_cv_strongprior*100)),             # combine permutations and model values
                       iteration = rep(1:length(global_cv_strongprior), 2),
                       type = rep(c('permutation','model_draw'), each = length(global_cv_strongprior)))
-write_csv(plot_cv_model, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')
-
-hist(plot_cv_model$cv)
-
+write_csv(plot_cv_model, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')               # save for future reference
 ggplot()+
-  geom_vline(xintercept = cv_network, linewidth = 1.5,
-             colour = rgb(68/255, 1/255, 84/255))+
+  geom_vline(xintercept = cv_network, linewidth = 1.5,                                                   # line for measured network from SRI values
+             colour = rgb(68/255, 1/255, 84/255))+                                                       # dark purple (viridis)
   #annotate('text', x = cv_network - 50, y = 700), colour = rgb(68/255, 1/255, 84/255),
   #         label = 'coefficient of/nvariation for/nmeasured network')+
   theme_classic()+
   theme(axis.title = element_text(size = 18),
         axis.text = element_text(size = 14))+
-  geom_histogram(data = plot_cv_model[plot_cv_model$type == 'model_draw',], aes(x = cv),
-                 fill = rgb(33/255, 145/255, 140/255),
-                 bins = 100,
-                 colour = 'black')+
-  geom_histogram(data = plot_cv_model[plot_cv_model$type == 'permutation',], aes(x = cv),
-                 fill = rgb(253/255, 231/255, 37/255),
-                 bins = 100,
-                 colour = 'black')+
+  geom_histogram(data = plot_cv_model[plot_cv_model$type == 'model_draw',], aes(x = cv),                 # histogram of CV draws from model
+                 fill = rgb(33/255, 145/255, 140/255),                                                   # yellow (viridis)
+                 bins = 100, colour = 'black')+
+  geom_histogram(data = plot_cv_model[plot_cv_model$type == 'permutation',], aes(x = cv),                # histogram of CV draws from permutations
+                 fill = rgb(253/255, 231/255, 37/255),                                                   # turquoise  (viridis)
+                 bins = 100, colour = 'black')+
   scale_x_continuous(name = 'coefficient of variation',
                      #limits = c(min(cv_random_networks)-10,
                      #cv_network+10),
@@ -681,23 +680,22 @@ ggplot()+
   scale_y_continuous(name = 'frequency',
                      expand = c(0,0))
 
-plot_cv_model2 <- plot_cv_model[c(1:10000, sample(10001:20000, 4000, replace = F)),]
+# repeat plot for poster -- larger fonts, fewer draws
+plot_cv_model2 <- plot_cv_model[c(1:10000, sample(10001:20000, 4000, replace = F)),]                     # select only 4000 values from dataframe
 ggplot()+
-  geom_vline(xintercept = cv_network, linewidth = 1.5,
-             colour = rgb(68/255, 1/255, 84/255))+
+  geom_vline(xintercept = cv_network, linewidth = 1.5,                                                   # line for measured network from SRI values
+             colour = rgb(68/255, 1/255, 84/255))+                                                       # dark purple (viridis)
   #annotate('text', x = cv_network - 50, y = 700), colour = rgb(68/255, 1/255, 84/255),
   #         label = 'coefficient of/nvariation for/nmeasured network')+
   theme_classic()+
   theme(axis.title = element_text(size = 28),
         axis.text = element_text(size = 22))+
-  geom_histogram(data = plot_cv_model2[plot_cv_model2$type == 'model_draw',], aes(x = cv),
-                 fill = rgb(33/255, 145/255, 140/255),
-                 bins = 100,
-                 colour = 'black')+
-  geom_histogram(data = plot_cv_model2[plot_cv_model2$type == 'permutation',], aes(x = cv),
-                 fill = rgb(253/255, 231/255, 37/255),
-                 bins = 100,
-                 colour = 'black')+
+  geom_histogram(data = plot_cv_model2[plot_cv_model2$type == 'model_draw',], aes(x = cv),               # histogram of CV draws from model
+                 fill = rgb(33/255, 145/255, 140/255),                                                   # yellow (viridis)
+                 bins = 100, colour = 'black')+
+  geom_histogram(data = plot_cv_model2[plot_cv_model2$type == 'permutation',], aes(x = cv),              # histogram of CV draws from permutations
+                 fill = rgb(253/255, 231/255, 37/255),                                                   # turquoise  (viridis)
+                 bins = 100, colour = 'black')+
   scale_x_continuous(name = 'coefficient of variation',
                      #limits = c(min(cv_random_networks)-10,
                      #cv_network+10),
@@ -708,44 +706,40 @@ ggplot()+
 
 ### run statistical test to confirm that difference is significant
 # plot_cv <- read_csv('../data_processed/motnp_networkpermutations_cv_strongprior.csv')
-hist(plot_cv$cv_random_networks)
-cv_network
+hist(plot_cv$cv_random_networks)    # plot cv values from random networks -- 1 tiny bar very high value and outside of the main distribution
+cv_network                          # plot line for measured value -- falls over the tiny bar
 
-mean(plot_cv$cv_random_networks)
-sd(plot_cv$cv_random_networks)
+mean(plot_cv$cv_random_networks)    # mean is far lower than measured value
+sd(plot_cv$cv_random_networks)      # mean + 2*SD is still far lower than measured value
 
 length(which(plot_cv$cv_random_networks >= cv_network))/length(plot_cv$cv_random_networks) # 3 / 10000 = 3e-04 = p-value (don't need an additional test because that will further randomise the data which are already randomised, just need to know proportion that are greater than or equal to your value)
 
-mean(global_cv)
-sd(global_cv)
-
-max(global_cv) ; min(plot_cv$cv_random_networks)
+mean(global_cv) ; sd(global_cv)     # totally outside either the random distribution and also doesn't overlap at all with the SRI measured network
+max(global_cv) ; min(plot_cv$cv_random_networks)     # no overlap
 
 ### plot chain output and look for highest values -- random networks indicating only 2% likelihood of non-random model being best = look to see what value of edges are top 2% ####
-counts_df_model <- counts_df[,c('node_1_males','node_2_males','event_count','count_dyad','id_1','id_2','dyad_males')]
-colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')
-ms_chain <- as.data.frame(motnp_edge_weights_strongpriors$chain)
-colnames(ms_chain) <- counts_df_model$dyad_id
-ms_chain <- pivot_longer(ms_chain, cols = everything(), names_to = 'dyad_id', values_to = 'draw')
-ms_chain$chain_position <- rep(1:length(unique(ms_chain$dyad_id)), each = 4000)
-ms_chain$draw <- LaplacesDemon::invlogit(ms_chain$draw)
-ms_chain$mean <- NA
-hist(ms_chain$draw)
-plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'distribution of edges for male network using strong prior', xlab = 'edge weight', ylab = 'density', las = 1)
-for(i in sample(unique(ms_chain$dyad_id), size = 1000, replace = F)){
-  x <- ms_chain[ms_chain$dyad_id == i,]
-  ms_chain$mean <- ifelse(ms_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ms_chain$mean)
-  lines(density(x$draw), col = rgb(0,0,1,0.1))
+counts_df_model <- counts_df[,c('node_1_males','node_2_males','event_count','count_dyad','id_1','id_2','dyad_males')]   # select variables of interest
+colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration','id_1','id_2','dyad_id')                      # rename variables
+ms_chain <- as.data.frame(motnp_edge_weights_strongpriors$chain)                                                        # extract chain values
+colnames(ms_chain) <- counts_df_model$dyad_id                                                                           # rename with dyad IDs
+ms_chain <- pivot_longer(ms_chain, cols = everything(), names_to = 'dyad_id', values_to = 'draw')                       # pivot longer
+ms_chain$chain_position <- rep(1:length(unique(ms_chain$dyad_id)), each = 4000)                                         # add chain positions
+ms_chain$draw <- LaplacesDemon::invlogit(ms_chain$draw)                                                                 # convert values to 0-1 bounded
+ms_chain$mean <- NA                                                                                                     # set up for loop for mean values
+hist(ms_chain$draw)                                                                                                     # plot histogram of draw values
+plot(NULL, xlim = c(0,1), ylim = c(0,30), main = 'distribution of edges for male network using strong prior',           # empty plot for density lines
+     xlab = 'edge weight', ylab = 'density', las = 1)
+for(i in sample(unique(ms_chain$dyad_id), size = 1000, replace = F)){                                                   # set up for loop using 1000 sample dyads
+  x <- ms_chain[ms_chain$dyad_id == i,]                                                                                 # select values for dyad weights
+  ms_chain$mean <- ifelse(ms_chain$dyad_id[i] == x$dyad_id[1], mean(x$draw), ms_chain$mean)                             # calculate mean values
+  lines(density(x$draw), col = rgb(0,0,1,0.1))                                                                          # plot sample line
 }
-lines(density(ms_chain$draw), lwd = 2)
+lines(density(ms_chain$draw), lwd = 2)                                                                                  # plot average line
 
-quantile(ms_chain$draw, 0.98)
-
-ms_edgelist <- bisonR::get_edgelist(motnp_edge_weights_strongpriors)
-quantile(ms_edgelist$median, 0.98)
-
-counts_df_model$sri <- counts_df_model$event / counts_df_model$duration
-quantile(counts_df_model$sri, 0.98)
+quantile(ms_chain$draw, 0.98)                                                                                           # identify 98th percentile draw
+quantile(edgelist$median, 0.98)                                                                                         # identify 98th percentile median
+counts_df_model$sri <- counts_df_model$event / counts_df_model$duration                                                 # calculate SRI values
+quantile(counts_df_model$sri, 0.98)                                                                                     # identify 98th percentile SRI
 
 ## clean up ####
 ### save pdf
