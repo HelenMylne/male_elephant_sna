@@ -1,14 +1,15 @@
 #### set up ####
 #### set up ####
 # load packages
-library(tidyverse)
-library(dplyr)
-library(rstan)
-library(igraph)
-library(cmdstanr)
-library(bisonR)
-library(brms)
-library(mclust)
+#library(tidyverse) ; library(dplyr) ; library(rstan) ; library(igraph) ; library(cmdstanr) ; library(bisonR) ; library(brms) ; library(mclust)
+library(tidyverse, lib.loc = '../packages/')
+library(dplyr, lib.loc = '../packages/')
+library(rstan, lib.loc = '../packages/')
+library(igraph, lib.loc = '../packages/')
+library(cmdstanr, lib.loc = '../packages/')
+library(bisonR, lib.loc = '../packages/')
+library(brms, lib.loc = '../packages/')
+library(mclust, lib.loc = '../packages/')
 
 #### load in network model ####
 load('motnp_bisonr_edgescalculated_strongprior.RData')
