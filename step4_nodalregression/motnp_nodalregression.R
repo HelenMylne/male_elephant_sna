@@ -1,12 +1,14 @@
-#### information #####
+##### information #####
 # 1) to estimate the ages of individuals in other populations, first came up with a survival curve for the Amboseli elephants which have good birth and death data.
 # 2) selected the Gompertz bathtub distribution
 # 3) use distribution to convert MOTNP ages in categories to probability distributions of true age (first part of this script)
 # 4) extract node centrality distribution from draws of edge weight
 # 5) use MOTNP age distributions to predict network centrality (third part of this script)
 
-#### set up ####
+##### set up ####
 options(future.globals.maxSize = 10000*(1024^2))   # running model with full age distributions = 5.01GB of globals, which exceeds default maximum allowed size. Set to allow up to 10 GB to allow model to run
+
+# library(tidyverse) ; library(cmdstanr) ; library(brms) ; library(Rcpp) ; library(ggdist) ; library(posterior) ; library(bayesplot) ; library(igraph) ; library(LaplacesDemon) ; library(bisonR) ; library(janitor)
 
 library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
 library(cmdstanr, lib.loc = '../packages/')        # library(cmdstanr)
@@ -28,7 +30,7 @@ load('motnp_bisonr_edgescalculated_strongprior.RData')
 # define PDF output
 pdf('../outputs/motnp_nodalregression_plots_meanage.pdf')
 
-#### read in data ####
+##### read in data ####
 df_nodal <- distinct(counts_df[,c('node_1_males','id_1')])
 colnames(df_nodal) <- c('node_2_males','id_2')
 df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_males','id_2')])
@@ -48,8 +50,8 @@ for(i in 1:nrow(mean_motnp_ages)){
   rm(x)
 }
 
-#### eigenvector only ####
-## set priors ####
+##### eigenvector only ####
+### set priors ####
 # prior predictive check
 priors <- get_default_priors('binary')
 priors$fixed
@@ -81,7 +83,7 @@ motnp_edge_weights_strongpriors$model_data$prior_fixed_mu    <- beta_mu
 motnp_edge_weights_strongpriors$model_data$prior_fixed_sigma <- beta_sigma
 
 
-## run model -- mean age value only ####
+### run model -- mean age value only ####
 mean_motnp_eigen <- bison_brm(
   bison(node_eigen(node)) ~ age,
   motnp_edge_weights_strongpriors,
@@ -95,7 +97,7 @@ summary(mean_motnp_eigen) # FIT 100 IMPUTED MODELS, 4 CHAINS PER MODEL, EACH 100
 ## save output
 save.image('motnp_nodalregression_meanage.RData')
 
-## posterior check v1 -- some is good but forgot to draw from posterior so most is rubbish ####
+# posterior check v1 -- some is good but forgot to draw from posterior so most is rubbish ####
 #load('motnp_nodalregression_meanage.RData')
 #rm(df_nodal, motnp_ages) ; gc()
 
@@ -182,7 +184,7 @@ ppc_ecdf_overlay(y, yrep[1:50,]) + xaxis_text()            # also no idea...
 # effects are weak: all categories show nearly full spread -- BIGGEST EFFECT SEEM TO BE NUMBER OF INDIVIDUAL SIGHTINGS: MORE SIGHTINGS = LOWER CENTRALITY
 # model very good at predicting
 
-## posterior check v2 -- run using SRI and see how it compares ####
+# posterior check v2 -- run using SRI and see how it compares ####
 #library(igraph) ; library(tidyverse) ; library(sna) ; library(brms)
 #load('motnp_bisonr_edgescalculated_strongprior.RData')
 #load('motnp_nodalregression_meanage.RData')
@@ -378,7 +380,7 @@ ggplot(nodes, aes(x = age_cat, y = sna_cent,
 
 write_csv(nodes, '../data_processed/motnp_eigenvector_estimates.csv')
 
-## posterior check v3 -- take draws from posterior and calculate values from that ####
+# posterior check v3 -- take draws from posterior and calculate values from that ####
 #library(bisonR) ; library(brms) ; library(tidyverse) ; library(rethinking)
 #load('motnp_nodalregression_meanage.RData')
 ##rm(biologylibs, environlibs, homedrive, homelibs, homelibsprofile, mathlibs, psychlibs, rlibs, Rversion)
@@ -531,16 +533,123 @@ ggplot()+
 ## save workspace image
 save.image('motnp_nodalregression_posteriorplots.RData')
 
-## run model -- full age distribution ####
-pdf('../outputs/motnp_nodalregression_eigen_agedistribution.pdf')
+### run model -- full age distribution ####
+#pdf('../outputs/motnp_nodalregression_eigen_agedistribution.pdf')
 
 ## define priors
 motnp_edge_weights_strongpriors$model_data$prior_fixed_sigma <- 0.005
 
 ## reduce age data to manageable number of draws
+motnp_ages$draw <- rep(1:8000, each = length(unique(motnp_ages$id)))
 test_ages <- motnp_ages[motnp_ages$draw %in% sample(motnp_ages$draw, 5, replace = F),]
 
 ## run model
+x <- bison_mice(edgemodel_list = list(motnp_edge_weights_strongpriors),
+                data_list = test_ages,
+                param_names = unique(c(counts_df_model$node_1_id, counts_df_model$node_2_id)),
+                target_name = 'node',
+                metric_name = 'eigen',
+                num_draws = 10,
+                z_score = F)
+
+edgemodel_list <- list(motnp_edge_weights_strongpriors)
+data_list_long <- test_ages %>% 
+  rename(id_1 = id) %>% 
+  left_join(distinct(counts_df[,c('node_1_males','id_1')]), by = 'id_1') %>% 
+  rename(id_2 = id_1) %>% 
+  left_join(distinct(counts_df[nrow(counts_df),c('node_2_males','id_2')]), by = 'id_2') %>% 
+  mutate(id = ifelse(is.na(id_2), id_1, id_2),
+         node = ifelse(is.na(node_2_males), node_1_males, node_2_males)) %>% 
+  filter(is.na(node) == F) %>% 
+  select(node, age)
+#data_list <- pivot_wider(data = data_list_long,
+#                         names_from = 'node', 
+#                         values_from = 'age') %>% 
+#  unnest(cols = everything())
+
+data_list <- data.frame()
+
+param_names <- node  #unique(c(counts_df$node_1_males, counts_df$node_2_males))
+target_name <- 'node'
+metric_name <- 'eigen'
+num_draws <- 10
+z_score <- F
+
+#### bison_mice code ####
+if (class(edgemodel_list)[1] != "list") edgemodel_list <- list(edgemodel_list)
+if (class(data_list)[1] != "list") data_list <- list(data_list)
+
+new_bison_term <- paste0("bison_", target_name, "_", metric_name)
+
+posterior_samples_list <- list()
+
+for (i in 1:length(edgemodel_list)) {
+  if (target_name == "node") {
+    #node_ids <- sapply(
+    #  dplyr::pull(data_list[[i]], param_names[1]),                   # doesn't work because param_names = nodes, data_list[[1]] = ages
+    #  function(x) which(names(edgemodel_list[[i]]$node_to_idx) == x) # produces a list per elephant of 5 zeroes because age doesn't match to node ids
+    #)
+    posterior_samples <- extract_metric(edgemodel_list[[i]], paste0(target_name, "_", metric_name), num_draws)#[, node_ids]
+  }
+  
+  # Make sure posterior samples are in matrix format (for num_draws=1).
+  posterior_samples_list[[i]] <- matrix(posterior_samples, nrow=num_draws)
+}
+
+# Generate list of dataframes.
+imputed_dataframes <- lapply(1:num_draws, function(i) {
+  # For each posterior draw, combine dataframes from different edge models and data
+  new_data_list <- lapply(1:length(edgemodel_list), function(j) {
+    new_data <- data_list[[j]]
+    if (z_score) {
+      new_data[new_bison_term] <- (posterior_samples_list[[j]][i, ] - mean(posterior_samples_list[[j]][i, ]))/sd(posterior_samples_list[[j]][i, ])
+    } else {
+      new_data[new_bison_term] <- posterior_samples_list[[j]][i, ]
+    }
+    new_data["bison_network"] <- j
+    new_data
+  })
+  new_data <- dplyr::bind_rows(new_data_list)
+  new_data$bison_network <- factor(new_data$bison_network)
+  new_data
+})
+
+imputed_dataframes <- dplyr::bind_rows(imputed_dataframes, .id=".imp")
+imputed_dataframes <- dplyr::mutate(imputed_dataframes, .imp=as.integer(.imp))
+
+original_dataframes <- lapply(1:length(edgemodel_list), function(j) {
+  new_data <- data_list[[j]]
+  new_data["bison_network"] <- j
+  new_data$bison_network <- factor(new_data$bison_network)
+  new_data
+})
+original_dataframes <- dplyr::bind_rows(original_dataframes)
+original_dataframes[".imp"] <- 0
+
+combined_dataframes <- dplyr::bind_rows(list(original_dataframes, imputed_dataframes))
+
+mice::as.mids(as.data.frame(combined_dataframes))
+
+######
+# impute the nhanes dataset
+imp <- mice(nhanes, print = FALSE)
+# extract the data in long format
+X <- complete(imp, action = "long", include = TRUE)
+
+# nhanes example without .id
+test1 <- as.mids(X)
+is.mids(test1)
+identical(complete(test1, action = "long", include = TRUE), X)
+
+# nhanes example, where we explicitly specify .id as column 2
+test3 <- as.mids(X, .id = ".id")
+is.mids(test3)
+identical(complete(test3, action = "long", include = TRUE), X)
+
+
+
+#########
+# old model run
 motnp_eigen <- bison_brm(
   bison(node_eigen(node)) ~ age + (1 | node),
   motnp_edge_weights_strongpriors,
