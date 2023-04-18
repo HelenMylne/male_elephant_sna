@@ -4,14 +4,15 @@
 # follow through Mia's code to determine which curve will best fit Amboseli data. she ran it on a high performance cluster, so it’s set up to run in parallel, but the basta model can also be run in parallel on its own (just like Stan). we will need to implement it as a custom function in Stan for the final analysis, given that we need to define it in the prior anyway. 
 
 #### load packages ####
-library(tidyverse)
-library(cmdstanr)
-library(ggdist)
-library(posterior)
-library(bayesplot)
-library(rstan)
-library(igraph)
-library(LaplacesDemon)
+#library(tidyverse) ; library(cmdstanr) ; library(ggdist) ; library(posterior) ; library(bayesplot) ; library(rstan) ; library(igraph) ; library(LaplacesDemon)
+library(tidyverse, lib.loc = '../packages')
+library(cmdstanr, lib.loc = '../packages')
+library(ggdist, lib.loc = '../packages')
+library(posterior, lib.loc = '../packages')
+library(bayesplot, lib.loc = '../packages')
+library(rstan, lib.loc = '../packages')
+library(igraph, lib.loc = '../packages')
+library(LaplacesDemon, lib.loc = '../packages')
 
 #library(ggthemes)
 #library(survival)
@@ -59,9 +60,9 @@ hist(elephants_ls$age_category_index)                                           
 
 # look at actual age vs biologist assigned age: chance of being mis-classified is lower if actual age is in middle of age category, and biased towards lower end of class.
 data.frame(elephants_ls) %>%       
-  ggplot(aes(x = age, y = age_guess, col=factor(age_category_index))) +
-  geom_point(size=4,alpha=0.6) +
-  geom_vline(xintercept=c(5, 10, 15, 20, 25, 40, 60), col=factor(1:7), linetype="dashed", alpha=0.6) +
+  ggplot(aes(x = age, y = age_guess, col = factor(age_category_index))) +             # plot assigned vs true age
+  geom_point(size = 4, alpha = 0.6) +                                                 # plot points
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), col = factor(1:7), linetype = "dashed", alpha = 0.6) +        # add vertical lines at category boundaries
   theme_minimal() + 
   xlab("Assigned age") + ylab("Age")
 
@@ -77,26 +78,25 @@ age_estimation_fit <- latent_age_ordinal_model$sample(
 # Examine the estimates
 age_est_mat <- age_estimation_fit$summary()[202:401, ] # true age estimates for each elephant
 summary(age_est_mat)
-hist(age_est_mat$mean)
-hist(age_est_mat$rhat, breaks = 20)
+hist(age_est_mat$mean)                                 # plot histogram of mean age values
+hist(age_est_mat$rhat, breaks = 20)                    # check rhat values
 
-plot_data <- data.frame(age = elephants_ls$age,       # Biologists original age est
-                        model_age = age_est_mat$mean) # Mean modelled age
-
+plot_data <- data.frame(age = elephants_ls$age,        # Biologists original age est
+                        model_age = age_est_mat$mean)  # Mean modelled age
 plot_data %>%
-  ggplot(aes(x=factor(age), y=model_age)) +
-  geom_point(size=4,col = 'blue', alpha=0.6) +
-  geom_vline(xintercept=c(5, 10, 15, 20, 25, 40, 60), linetype="dashed", alpha=0.6) +
-  geom_hline(yintercept=c(5, 10, 15, 20, 25, 40, 60), linetype="dashed", alpha=0.6) +
-  geom_abline(slope = 1, intercept = 0)+
+  ggplot(aes(x = factor(age), y = model_age)) +        # true age vs modelled age
+  geom_point(size = 4,col = 'blue', alpha = 0.6) +     # add points
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +    # add vertical lines at category boundaries
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +    # add horizontal lines at category boundaries
+  geom_abline(slope = 1, intercept = 0)+               # x=y line to show where values should fall if perfectly estimated
   scale_y_continuous(limits = c(0,60))+
   theme_minimal() + 
   xlab("Assigned age") + ylab("Modelled age")
 
 #### load MOTNP data ####
-motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
-  filter(sex == 'M')               # males only
-#motnp_males <- read_csv('../data_processed/motnp_elenodes.csv') %>% filter(sex == 'M')
+motnp_males <- read_csv('../data_processed/motnp_elenodes.csv') %>% filter(sex == 'M')  # select male nodes only 
+#motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
+#  filter(sex == 'M')               # males only
 unique(motnp_males$age_category)
 motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1,     # standardise calf categories
                                  ifelse(motnp_males$age_category == "3-4", 1,
@@ -117,7 +117,7 @@ motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2,    # con
 #### create data list ####
 N_motnp <- nrow(motnp_males)  # number of males
 K <- 8                        # number of age thresholds
-motnp_ls <- list(
+motnp_ls <- list(             # generate list of males to be included
   N = N_motnp,
   K = K,
   age_category_index = motnp_males$age_cat_id)
@@ -135,23 +135,23 @@ age_motnp_fit <- latent_age_ordinal_model$sample(
 # Examine the estimates
 age_est_mat <- age_motnp_fit$summary()[(N_motnp+2):(N_motnp*2+1), ] # true ages of elephants
 summary(age_est_mat)
-hist(age_est_mat$mean)
-hist(age_est_mat$rhat, breaks = 20)
+hist(age_est_mat$mean)                                              # plot histogram of mean age values
+hist(age_est_mat$rhat, breaks = 20)                                 # check rhat values
 
-plot_data <- data.frame(age = ifelse(motnp_ls$age == 1, 3, 
+plot_data <- data.frame(age = ifelse(motnp_ls$age == 1, 3,          # set dummy "true" age in centre of each age category (ONLY for plotting purposes)
                                      ifelse(motnp_ls$age == 2, 8,
                                             ifelse(motnp_ls$age == 3, 12,
                                                    ifelse(motnp_ls$age == 4, 18,
                                                           ifelse(motnp_ls$age == 5, 22, 
                                                                  ifelse(motnp_ls$age == 6, 32, 45)))))),
-                        model_age = age_est_mat$mean) # Mean modelled age
+                        model_age = age_est_mat$mean)               # Mean modelled age
 
 plot_data %>%
-  ggplot(aes(x=factor(age), y=model_age)) +
-  geom_point(size=4,col = 'blue', alpha=0.6) +
-  #geom_vline(xintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
-  geom_hline(yintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
-  #geom_abline(slope = 1, intercept = 0)+
+  ggplot(aes(x = factor(age), y = model_age)) +        # true age vs modelled age
+  geom_point(size = 4,col = 'blue', alpha = 0.6) +     # add points
+  #geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add vertical lines at category boundaries
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +      # add horizontal lines at category boundaries
+  #geom_abline(slope = 1, intercept = 0)+              # x=y line to show where values should fall if perfectly estimated
   scale_y_continuous(limits = c(0,60))+
   theme_minimal() + 
   xlab("Assigned age") + ylab("Modelled age")
@@ -165,7 +165,7 @@ df <- as.data.frame(do.call(rbind, true_ages)) %>%           # create small data
   mutate(age_cat = motnp_ls$age) %>% relocate(age_cat) %>%
   mutate(ID = motnp_males$id) %>% relocate(ID)
 
-df <- df %>% pivot_longer(cols = 3:ncol(df)) %>% select(-name)    # convert to long format
+df <- df %>% pivot_longer(cols = 3:ncol(df)) %>% select(-name)     # convert to long format
 
 df$age_cat_centre <- ifelse(df$age_cat == 1, (0+5)/2,              # for plot ONLY, set "age" as central value in each category
                             ifelse(df$age_cat == 2, (5+10)/2,
@@ -177,8 +177,8 @@ df$age_cat_centre <- ifelse(df$age_cat == 1, (0+5)/2,              # for plot ON
 df %>% ggplot(aes(x=age_cat_centre, y=value, group=factor(ID))) +  # plot intervals for each category against values set above
   geom_point(size=2,col = 'blue', alpha=0.1) +
   #stat_halfeye() +
-  geom_vline(xintercept=c(5,10,15,20,25,40,60), linetype="dashed", alpha=0.6) +
-  geom_hline(yintercept=c(5,10,15,20,25,40,60), linetype="dashed", alpha=0.6) +
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add vertical lines at category boundaries
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add horizontal lines at category boundaries
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")
 
@@ -186,30 +186,27 @@ df %>% ggplot() +                                                  # plot interv
   geom_violin(aes(x = age_cat_centre, y = value, group = factor(age_cat)), fill = rgb(0,0,1,0.8))+
   #geom_point(aes(x = true_age, y = value, group = factor(ID)), size = 2, col = 'red', alpha = 0.1) +
   #stat_halfeye() +
-  geom_vline(xintercept = 0, alpha = 0.6) +
-  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
-  geom_hline(yintercept = 0, alpha = 0.6) +
-  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+  geom_vline(xintercept = 0, alpha = 0.6) +                                               # add vertical lines at 0
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add vertical lines at category boundaries
+  geom_hline(yintercept = 0, alpha = 0.6) +                                               # add horizontal lines at 0
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add horizontal lines at category boundaries
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")+
   theme(axis.text = element_text(size = 14))
 
-df %>% ggplot() +    # plot intervals for each category against values set above
-  geom_violin(aes(x = age_cat_centre, y = value,
-                  group = factor(age_cat),
-                  fill = factor(age_cat, levels = c(7:3,NA,NA))))+
-  geom_vline(xintercept = 0, alpha = 0.6) +
-  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
-  geom_hline(yintercept = 0, alpha = 0.6) +
-  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+df %>% ggplot() +                                                 # plot intervals for each category against values set above
+  geom_violin(aes(x = age_cat_centre, y = value, group = factor(age_cat), fill = factor(age_cat, levels = c(7:3,NA,NA))))+
+  geom_vline(xintercept = 0, alpha = 0.6) +                                               # add vertical lines at 0
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add vertical lines at category boundaries
+  geom_hline(yintercept = 0, alpha = 0.6) +                                               # add horizontal lines at 0
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add horizontal lines at category boundaries
   theme_bw() + 
   xlab("Assigned age") + ylab("Modelled age")+
-  theme(axis.text = element_text(size = 14), legend.position = 'none',
-        axis.title = element_text(size = 18))+
+  theme(axis.text = element_text(size = 14), legend.position = 'none', axis.title = element_text(size = 18))+
   scale_fill_viridis_d()
 
 ### save output
 colnames(true_ages) <- motnp_males$id
-saveRDS(true_ages, file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
-#saveRDS(true_ages, file = '../data_processed/motnp_ageestimates_mcmcoutput.rds')
+saveRDS(true_ages, file = '../data_processed/motnp_ageestimates_mcmcoutput.rds')          # save output for next steps
+#saveRDS(true_ages, file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
 
