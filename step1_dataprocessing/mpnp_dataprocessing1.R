@@ -6,12 +6,13 @@
 
 ### set up ####
 # load packages
-library(tidyverse)
-library(dplyr)
-library(lubridate)
-library(janitor)
-library(hms)
-library(readxl)
+#library(tidyverse) ; library(dplyr) ; library(lubridate) ; library(janitor) ; library(hms) ; library(readxl)
+library(tidyverse, '../packages/')
+library(dplyr, '../packages/')
+library(lubridate, '../packages/')
+library(janitor, '../packages/')
+library(hms, '../packages/')
+library(readxl, '../packages/')
 
 # set seed
 set.seed(12345)
@@ -51,7 +52,7 @@ efa <- efa[,c(1:15,18:27,31:32)]                                     # rearrange
 efa$Date <- lubridate::as_date(efa$Date)                             # make date
 efa <- janitor::clean_names(efa)                                     # clean up
 
-# correct IDs
+# correct IDs -- some have b instead B that gets treated as 2 separate elephants
 efa <- efa %>% separate(col = elephant_id, into = c('letter','number'), sep = 1, remove = F)
 unique(efa$letter)
 efa$elephant_id <- ifelse(efa$letter == 'b', paste0('B',efa$number), efa$elephant_id)
@@ -64,6 +65,7 @@ length(which(table(efa$elephant_sighting_id) == 2)) # 1017 elephants seen as pai
 
 table(efa$age_range_id) # 2 = <5, 3 = 5-9, 4 = 10-15, 5 = 16-20, 6 = 21-25, 7 = 26-35, 8 = 36+, 10 = Unknown (most are 4-7)
 
+# reaction index -- check proportion of reactions
 summary(efa$reaction_indices)
 efa$reaction_indices <- factor(efa$reaction_indices, levels = c(1:3))
 table(efa$reaction_indices) # none come towards the truck
@@ -111,9 +113,9 @@ str(efa)
 #$ notes                     : chr [1:13429] "Collared elephant" NA NA NA ...
 
 # add additional encounter numbers for those that are missing
-efa$encounter <- paste(efa$elephant_sighting_id, efa$date, efa$time, sep = '_')
-for(i in 1:nrow(efa)){
-  if(is.na(efa$elephant_sighting_id[i]) == TRUE){
+efa$encounter <- paste(efa$elephant_sighting_id, efa$date, efa$time, sep = '_')                     # single variable unique for all encounters
+for(i in 1:nrow(efa)){                                                                              # set up for loop
+  if(is.na(efa$elephant_sighting_id[i]) == TRUE){                                                   # only run loop if 
     x <- efa[efa$encounter == efa$encounter[i],]
     if(nrow(x) == 1){
       efa$elephant_sighting_id[i] <- max(efa$elephant_sighting_id, na.rm = TRUE)+1
