@@ -31,7 +31,7 @@ vignettes/*.pdf
 .rds
 .xlsx
 # DS Store files for Mac Finder navigation
-.DS_Store
+*.DS_Store
 # R markdown files -- currently don't need them
 .Rmd
 motnp_bisonr_randomnetwork_binaryconjugate.RData
