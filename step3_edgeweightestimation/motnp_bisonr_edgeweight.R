@@ -152,6 +152,10 @@ counts_df$node_2_males <- as.integer(as.factor(counts_df$node_2_nogaps))+1
 ### standardise dyad_id for males only
 counts_df$dyad_males <- as.integer(as.factor(counts_df$dyad_id))
 
+### write out data as ready to go into model
+# write_csv(counts_df, '../data_processed/motnp_binomialpairwiseevents_malesonly.csv')
+# counts_df <- read_csv('../data_processed/motnp_binomialpairwiseevents_malesonly.csv')
+
 ### add time marker
 print(paste0('data read in at ', Sys.time()))
 
@@ -165,10 +169,56 @@ colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### set priors
 priors <- get_default_priors('binary') # obtain structure for bison model priors
-priors$edge <- c('normal(-2.5, 1.5)')     # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
+priors$edge <- 'normal(-2.5,1.5)' 
+#priors$edge <- "prior_string('
+#real conditional_prior_lpdf(real mu, int seen_together) {
+#    if (seen_together == 1) {
+#      return normal_lpdf(mu | -2.5, 1.5);
+#    } else {
+#      return normal_lpdf(mu | -5, 3);
+#    }
+#  }
+#')"     # slightly right skewed so that more density is towards 0 but still very weak and all values are possible
 priors$fixed <- 'normal(-5,3)'       # slightly less wide than before, but zero centred so allows age to have a positive or negative impact on centrality and edge weight
 prior_check(priors, 'binary')
-prior_parameters <- bisonR::extract_prior_parameters(priors)
+
+# extract prior_parameters -- code copied directly from bisonR GitHub
+extract_distribution <- function(prior_string) {
+  parameter_string <- stringr::str_replace_all(prior_string, " ", "")
+  parameter_split <- stringr::str_split(parameter_string, "\\(|\\)|,")[[1]]
+  distribution_name <- parameter_split[1]
+  parameter_values <- parameter_split[2:(length(parameter_split) - 1)]
+  parameter_values <- as.numeric(parameter_values)
+  return(list(distribution_name=distribution_name, parameter_values=parameter_values))
+}
+extract_prior_parameters <- function(priors) {
+  prior_parameters <- list()
+  for (parameter_name in names(priors)) {
+    prior_distribution <- extract_distribution(priors[parameter_name])
+    distribution_name <- prior_distribution$distribution_name
+    parameter_values <- prior_distribution$parameter_values
+    if (distribution_name == "normal") {
+      prior_parameters[[paste("prior", parameter_name, "mu", sep="_")]] <- parameter_values[1]
+      prior_parameters[[paste("prior", parameter_name, "sigma", sep="_")]] <- parameter_values[2]
+    }
+    if (distribution_name == "half-normal") {
+      prior_parameters[[paste("prior", parameter_name, "sigma", sep="_")]] <- parameter_values[1]
+    }
+    if (distribution_name == "beta") {
+      prior_parameters[[paste("prior", parameter_name, "alpha", sep="_")]] <- parameter_values[1]
+      prior_parameters[[paste("prior", parameter_name, "beta", sep="_")]] <- parameter_values[2]
+    }
+    if (distribution_name == "gamma") {
+      prior_parameters[[paste("prior", parameter_name, "alpha", sep="_")]] <- parameter_values[1]
+      prior_parameters[[paste("prior", parameter_name, "beta", sep="_")]] <- parameter_values[2]
+    }
+  }
+  # print(prior_parameters)
+  prior_parameters
+}
+prior_parameters <- extract_prior_parameters(priors)
+prior_parameters$prior_edge_mu <- 'c(-2.5, -5)'
+prior_parameters$prior_edge_sigma <- list(1.5, 3)
 
 ### create dummy variable indicating if ever seen together or not -- use to select which prior to draw edge weight from
 counts_df_model$seen_together <- ifelse(counts_df_model$event > 0, 1, 0)
@@ -180,13 +230,131 @@ lines(density( LaplacesDemon::invlogit(rnorm(1000, -2.5, 1.5)) ), col = 'red')  
 
 ### run edge weight model
 motnp_edge_weights_strongpriors <- bison_model(
-# ( event | duration ) ~ dyad(node_1_id, node_2_id),   # count of sightings together given count of total sightings as a result of the individuals contained within the dyad
-  ( event | duration ) ~ dyad(node_1_id, node_2_id) + seen_together*normal(-2.5,1.5) + never_together*normal(-5,3),
+  ( event | duration ) ~ dyad(node_1_id, node_2_id)#*seen_together,   # count of sightings together given count of total sightings as a result of the individuals contained within the dyad
   data = counts_df_model,
   model_type = "binary",
   #partial_pooling = TRUE,
   #mc_cores = 4,
   priors = priors
+)
+
+motnp_edge_weights_strongpriors$stan_model$code()
+#  "data {"                                                                                                                 
+#  "  int<lower=0> num_rows; // Number of data points"                                                                      
+#  "  int<lower=0> num_edges; // Number of edge weights to estimate"                                                        
+#  "  int<lower=0> num_fixed; // Number of fixed effect parameters"                                                         
+#  "  int<lower=0> num_random; // Number of random effect parameters"                                                       
+#  "  int<lower=0> num_random_groups; // Number of random effect groups"                                                    
+#  ""                                                                                                                       
+#  "  array[num_rows] int event; // Outcome for each data point (presence/absence)"                                         
+#  "  array[num_rows] int divisor; // Duration of each observation"                                                         
+#  "  array[num_rows] int dyad_ids; // Dyad IDs of each observation for indexing edge weights"                              
+#  "  matrix[num_rows, num_fixed] design_fixed; // Design matrix for fixed effects"                                         
+#  "  matrix[num_rows, num_random] design_random; // Design matrix for random effects."                                     
+#  "  array[num_random] int<lower=0, upper=num_random_groups> random_group_index; // Index for groupings for random effects"
+#  ""                                                                                                                       
+#  "  real prior_edge_mu; // Prior mean for fixed effects"                                                                  
+#  "  real<lower=0> prior_edge_sigma; // Prior standard deviation for fixed effects"                                        
+#  "  real prior_fixed_mu; // Prior mean for fixed effects"                                                                 
+#  "  real<lower=0> prior_fixed_sigma; // Prior standard deviation for fixed effects"                                       
+#  "  real prior_random_mean_mu; // Prior mean on centralisation of random effects"                                         
+#  "  real<lower=0> prior_random_mean_sigma; // Prior standard deviation on centralisation of random effects"               
+#  "  real<lower=0> prior_random_std_sigma; // Prior standard deviation on dispersion of random effects"                    
+#  "  real<lower=0> prior_zero_prob_alpha; // Prior alpha on zero inflation"                                                
+#  "  real<lower=0> prior_zero_prob_beta; // Prior beta on zero inflation"                                                  
+#  ""                                                                                                                       
+#  "  int<lower=0, upper=1> priors_only; // Whether to sample from only the priors"                                         
+#  "  int<lower=0, upper=1> partial_pooling; // Whether to pool edge weight estimates"                                      
+#  "  int<lower=0, upper=1> zero_inflated; // Whether to use zero-inflated edge model"                                      
+#  "}"                                                                                                                      
+#  ""                                                                                                                       
+#  "parameters {"                                                                                                           
+#  "  vector[num_edges] edge_weight; // Parameters for edge weights."                                                       
+#  "  vector[num_fixed] beta_fixed; // Parameters for fixed effects."                                                       
+#  "  vector[num_random] beta_random; // Parameters for random effects."                                                    
+#  "  vector[num_random_groups] random_group_mu; // Hyperpriors for random effects (mean)."                                 
+#  "  vector<lower=0>[num_random_groups] random_group_sigma; // Hyperpriors for random effects (std. dev.)."                
+#  "  vector<lower=0>[partial_pooling] edge_sigma; // Random effect for edge weight pooling."                               
+#  "  vector<lower=0>[zero_inflated] zero_prob; // Zero inflated parameter for probability of zeroes."                      
+#  "}"                                                                                                                      
+#  ""                                                                                                                       
+#  "transformed parameters {"                                                                                               
+#  "  vector[num_rows] predictor;"                                                                                          
+#  "  predictor = rep_vector(0, num_rows);"                                                                                 
+#  "  if (num_edges > 0) {"                                                                                                 
+#  "    predictor += edge_weight[dyad_ids];"                                                                                
+#  "  }"                                                                                                                    
+#  "  if (num_fixed > 0) {"                                                                                                 
+#  "    predictor += design_fixed * beta_fixed;"                                                                            
+#  "  }"                                                                                                                    
+#  "  if (num_random > 0) {"                                                                                                
+#  "    predictor += design_random * beta_random;"                                                                          
+#  "  }"                                                                                                                    
+#  "}"                                                                                                                      
+#  ""                                                                                                                       
+#  "model {"                                                                                                                
+#  "  if (!priors_only) {"                                                                                                  
+#  "    // Main model"                                                                                                      
+#  "    if (zero_inflated == 0) {"                                                                                          
+#  "      event ~ binomial(divisor, inv_logit(predictor));"                                                                 
+#  "    } else {"                                                                                                           
+#  "      for (i in 1:num_rows) {"                                                                                          
+#  "        if (event[i] == 0) {"                                                                                           
+#  "          target += log_sum_exp("                                                                                       
+#  "            bernoulli_lpmf(1 | zero_prob[1]),"                                                                          
+#  "            bernoulli_lpmf(0 | zero_prob[1]) + binomial_lpmf(event[i] | divisor[i], inv_logit(predictor[i]))"           
+#  "          );"                                                                                                           
+#  "        } else {"                                                                                                       
+#  "          target += bernoulli_lpmf(0 | zero_prob[1]) + binomial_lpmf(event[i] | divisor[i], inv_logit(predictor[i]));"  
+#  "        }"                                                                                                              
+#  "      }"                                                                                                                
+#  "      zero_prob ~ beta(prior_zero_prob_alpha, prior_zero_prob_beta);"                                                   
+#  "    }"                                                                                                                  
+#  "  }"                                                                                                                    
+#  "  // Priors"                                                                                                            
+#  "  if (num_edges > 0) {"                                                                                                 
+#  "    if (partial_pooling == 0) {"                                                                                        
+#  "      edge_weight ~ normal(prior_edge_mu, prior_edge_sigma);"                                                           
+#  "    } else {"                                                                                                           
+#  "      edge_weight ~ normal(prior_edge_mu, edge_sigma[1]);"                                                              
+#  "      edge_sigma ~ normal(0, prior_edge_sigma);"                                                                        
+#  "    }"                                                                                                                  
+#  "  }"                                                                                                                    
+#  ""                                                                                                                       
+#  "  if (num_fixed > 0) {"                                                                                                 
+#  "    beta_fixed ~ normal(prior_fixed_mu, prior_fixed_sigma);"                                                            
+#  "  }"                                                                                                                    
+#  ""                                                                                                                       
+#  "  if (num_random > 0) {"                                                                                                
+#  "    beta_random ~ normal(random_group_mu[random_group_index], random_group_sigma[random_group_index]);"                 
+#  "    // Hyperpriors"                                                                                                     
+#  "    random_group_mu ~ normal(prior_random_mean_mu, prior_random_mean_sigma);"                                           
+#  "    random_group_sigma ~ normal(0, prior_random_std_sigma);"                                                            
+#  "  }"                                                                                                                    
+#  "}"                                                                                                                      
+#  ""                                                                                                                       
+#  "generated quantities {"                                                                                                 
+#  "  array[num_rows] int event_pred;"                                                                                      
+#  "  event_pred = binomial_rng(divisor, inv_logit(predictor));"                                                            
+#  "  vector[num_rows] log_lik;"                                                                                            
+#  "  for (i in 1:num_rows) {"                                                                                              
+# "    log_lik[i] = binomial_lpmf(event[i] | divisor[i], inv_logit(predictor[i]));"                                        
+# "  }"                                                                                                                    
+# "}"
+
+prior_parameters <- extract_prior_parameters(priors)
+prior_parameters$prior_edge_mu_0 <- -5
+prior_parameters$prior_edge_mu_1 <- -2.5
+prior_parameters$prior_edge_sigma_0 <- 3
+prior_parameters$prior_edge_sigma_1 <- 1.5
+prior_parameters <- prior_parameters[c(10:13,3:9)]
+
+motnp_edge_weights_strongpriors <- bison_model_hkm_2priors(
+  ( event | duration ) ~ dyad(node_1_id, node_2_id),#*seen_together,
+  #( event | duration ) ~ dyad(node_1_id, node_2_id) + seen_together*normal(-2.5,1.5) + never_together*normal(-5,3),
+  data = counts_df_model,
+  model_type = "binary",
+  prior_parameters = prior_parameters
 )
 
 ### run diagnostic plots
