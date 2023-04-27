@@ -375,12 +375,13 @@ edges <- as.data.frame(motnp_edge_weights_strongpriors$chain) %>%               
 head(edges)
 plot(NULL, xlim = c(0,1), ylim = c(0,50), las = 1,                              # prepare plot window
      main = 'edge distributions',ylab = 'density', xlab = 'edge weight')
-plot_samples <- sample(counts_df$dyad_id, 10000, replace = F)                   # sample 10000 dyads to plot
+plot_seen <- sample(counts_df$dyad_id[which(counts_df$event_count > 0)], 5000, replace = F)      # sample 5000 dyads that were seen together to plot
+plot_unseen <- sample(counts_df$dyad_id[which(counts_df$event_count == 0)], 5000, replace = F)   # sample 5000 dyads that were NOT seen together to plot
+plot_samples <- c(plot_seen,plot_unseen)                                        # sample 10000 dyads to plot
 for(dyad in plot_samples) {                                                     # plot probability density for sampled dyads
   x <- edges[edges$dyad_id == dyad,]
   lines(density(x$draw),
-        col = ifelse(mean(x$draw < 0.15), rgb(0,0,1,0.1),
-                     ifelse(mean(x$draw < 0.3), rgb(1,0,0,0.1),rgb(1,0,1,0.1))))
+        col = ifelse(dyad %in% plot_seen, 'red','blue'))
 }
 lines(density(edges$draw), lwd = 3)                                             # add probability density line for all draws from all dyads
 
@@ -389,7 +390,7 @@ edges <- edges[edges$chain_position < 1001,]                                    
 edges$mean <- NA
 for(dyad in unique(edges$dyad)) {                                               # calculate mean edge per dyad
   if(is.na(edges$mean[dyad]) == TRUE){
-  edges$mean[edges$dyad == dyad] <- mean(edges$draw[edges$dyad == dyad])
+    edges$mean[edges$dyad == dyad] <- mean(edges$draw[edges$dyad == dyad])
   }
 }
 plot_low <- edges[edges$mean == min(edges$mean),]                               # dyad with minimum mean edge weight
@@ -824,8 +825,8 @@ write_csv(plot_cv, '../data_processed/motnp_networkpermutations_cv_strongprior.c
 
 ### combine with global_cv_strongpriors
 plot_cv_model <- data.frame(cv = c(plot_cv$cv_random_networks, (global_cv_strongprior*100)),             # combine permutations and model values
-                      iteration = rep(1:length(global_cv_strongprior), 2),
-                      type = rep(c('permutation','model_draw'), each = length(global_cv_strongprior)))
+                            iteration = rep(1:length(global_cv_strongprior), 2),
+                            type = rep(c('permutation','model_draw'), each = length(global_cv_strongprior)))
 write_csv(plot_cv_model, '../data_processed/motnp_networkpermutations_cv_strongprior.csv')               # save for future reference
 ggplot()+
   geom_vline(xintercept = cv_network, linewidth = 1.5,                                                   # line for measured network from SRI values
