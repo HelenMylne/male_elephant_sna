@@ -1,5 +1,6 @@
-#### aninet non-random variation test ####
+#### asnipe non-random variation test ####
 # library(tidyverse) ; library(plyr) ; library(aninet) ; library(rstan) ; library(asnipe)
+library(cmdstanr, lib.loc = '../packages/')
 library(cli, lib.loc = '../packages/')
 library(rstan, lib.loc = '../packages/')
 library(plyr, lib.loc = '../packages/')
@@ -9,9 +10,11 @@ library(asnipe, lib.loc = '../packages/')
 library(data.table, lib.loc = '../packages/')
 library(spatsoc, lib.loc = '../packages/')
 library(raster, lib.loc = '../packages/')
+library(bisonR, lib.loc = '../packages/')
+library(terra, lib.loc = '../packages/')
 
 load('motnp_bisonr_edgescalculated_strongprior.RData')
-rm(list = ls()[! ls() %in% c('motnp_edge_weights_strongpriors', 'counts_df')])
+rm(list = ls()[! ls() %in% c('motnp_edge_weights_strongpriors', 'counts_df')]) ; gc()
 
 #### generate gbi_matrix ####
 eles <- read_csv('../data_processed/motnp_eles_long.csv')
@@ -35,24 +38,12 @@ gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID')  # 
 gbi_males <- gbi_matrix[,colnames(gbi_matrix) %in% sort(unique(c(counts_df$id_1, counts_df$id_2)))]
 gbi_males <- gbi_males[rowSums(gbi_males) > 0,] # remove female-only sightings
 
-#### set up aninet run ####
-# hypothetical minimum number of permutations necessary to reach stability
+#### calculate number of permtuations to run ####
 #( num_permute <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )
-num_permute <- 44278000
+num_permute <- 455216741
 num_permute <- round_any(num_permute, 1000, f = ceiling)
 
-# set up inputs
-#chain_length <- 1000
-#seeds <- 2:(num_permute/(chain_length*2))
-#N <- ncol(gbi_males)
-#obs <- nrow(gbi_males)
-#num_chains <- 2
-
-# set up outputs
-#outputs <- data.frame(permutation = 1:num_permute,
-#                      cv = NA, mean = NA, stdev = NA, sri = NA, rhat = NA)
-
-# functions to print out Rhat at the end of the permutation
+#### functions to print out Rhat at the end of the permutation ####
 rhat_rfun <- function(sims) {
   chains <- ncol(sims)
   n_samples <- nrow(sims)
@@ -78,22 +69,6 @@ z_scale <- function(x) {
   }
   z
 }
-
-#output_function <- function(gbi) {
-#  x <- get_numerator(gbi, data_format = "GBI", return = "vector")
-#  d <- get_denominator(gbi, data_format = "GBI", return = "vector")
-#  sri <- x/d
-#  bulk_rhat <- rhat_rfun(z_scale(gbi))
-#  gbi_folded <- abs(gbi - median(gbi))
-#  tail_rhat <- rhat_rfun(z_scale(gbi_folded))
-#  res <- c(mean(sri, na.rm = T),
-#           stats::sd(sri, na.rm = T), 
-#           stats::sd(sri, na.rm = T)/mean(sri, na.rm = T), 
-#           mean(sri > 0, na.rm = T),
-#           max(bulk_rhat, tail_rhat))
-#  names(res) <- c("Mean", "SD", "CV", "Non-zero", 'Rhat')
-#  return(res)
-#}
 
 rhat <- function(gbi) {
   x <- get_numerator(gbi, data_format = "GBI", return = "vector")
@@ -140,34 +115,16 @@ rhat <- function(gbi) {
 #pdf('../outputs/')
 
 #### set up asnipe run ####
-# extract edge weights from model
-edges <- bisonR::extract_metric(motnp_edge_weights_strongpriors, "edge_weight", num_draws = 1000) %>% 
-  plogis() %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'variable_num', values_to = 'weight') %>% 
-  mutate(dyad_males = rep(counts_df$dyad_males, 1000)) %>% 
-  select(-variable_num)
-print('edge values drawn')
-
-### create SRI matrix
 # generate matrix
 ids <- unique(c(counts_df$id_1, counts_df$id_2))            # IDs of elephants
 num_eles <- length(ids)                                     # number of elephants
-m_mat <- diag(nrow = N)                                     # matrix of males -- NxN to fill with SRI
+m_mat <- diag(nrow = num_eles)                              # matrix of males -- NxN to fill with SRI
 colnames(m_mat) <- ids ; rownames(m_mat) <- ids             # dimnames = elephant IDs
+print('matrix generated')
 
-# obtain mean edge weights
-edges$mean_weight <- NA
-for(i in 1:nrow(counts_df)){
-  edges$mean_weight[edges$dyad_males == counts_df$dyad_males] <- mean(edges$weight[edges$dyad_males == counts_df$dyad_males])
-  if(i %% 1000 == 0) { print(i) }
-}
-print('mean edges calculated')
-
-# create data frame to draw values from
-mean_edges <- edges[,c('dyad_males','mean_weight')] %>%
-  distinct() %>% 
-  left_join(counts_df[,c('dyad_males','id_1','id_2')])
+# obtain SRI
+counts_df$sri <- counts_df$event_count / counts_df$count_dyad
+print('SRI calculated')
 
 # populate matrix with SRI values
 for( i in 1:num_eles ) {                                    # rows
@@ -176,15 +133,14 @@ for( i in 1:num_eles ) {                                    # rows
     else {
       id1 <- colnames(m_mat)[i]                             # identify elephant 1 of dyad
       id2 <- rownames(m_mat)[j]                             # identify elephant 2 of dyad
-      m_mat[i,j] <- mean_edges$mean_weight[which(mean_edges$id_1 == id1 & mean_edges$id_2 == id2)]      # add edge values -- match IDs and dyad
+      m_mat[i,j] <- counts_df$sri[which(counts_df$id_1 == id1 & counts_df$id_2 == id2)]      # add edge values -- match IDs and dyad
     }
   }
 }
-saveRDS(m_mat, '../data_processed/motnp_edgematrix_meanweights.RDS')
 print('SRI matrix calculated')
 
 ### set up inputs
-chain_length <- 100
+chain_length <- 1000
 asnipe_seeds <- 2:(num_permute/chain_length)
 obs <- nrow(gbi_males)
 
@@ -226,8 +182,9 @@ outputs$stdev[outputs$permutation == chain_length] <- sd(mat_new)
 outputs$rhat[outputs$permutation == chain_length]  <- rhat(mat_new)
 outputs$p[outputs$permutation == chain_length]     <- length(which(outputs$cv[outputs$permutation == chain_length] >= cv_random_networks))/outputs$permutation[outputs$permutation == chain_length]
 
-# save every 100th network
-saved_networks <- array(NA, dim = c(nrow(outputs)-1, num_eles, num_eles), dimnames = list(NULL, ids, ids))
+# save every 1000th network
+saved_networks <- array(NA, dim = c(nrow(outputs)-1, num_eles, num_eles),
+                        dimnames = list(NULL, ids, ids))
 saved_networks[1,,] <- mat_new
 
 for(seed in asnipe_seeds){
@@ -254,12 +211,12 @@ for(seed in asnipe_seeds){
   outputs$rhat[outputs$permutation == permutation]  <- rhat(mat_new)
   outputs$p[outputs$permutation == permutation]     <- length(which(outputs$cv[outputs$permutation == permutation] >= cv_random_networks))/outputs$permutation[outputs$permutation == permutation]
   
-  ### save every 100th network
+  ### save every 1000th network
   saved_networks <- array(NA, dim = c(nrow(outputs)-1, num_eles, num_eles), dimnames = list(NULL, ids, ids))
   saved_networks[seed,,] <- mat_new
   
   ### save workspace every 10000th network
-  if(seed %% 100 == 0) {
+  if(seed %% 10 == 0) {
     saveRDS(cv_random_networks, '../data_processed/motnp_cv_permutations.csv')
     save.image('motnp_permutations.RData')
     }
