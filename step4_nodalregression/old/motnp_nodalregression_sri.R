@@ -4,7 +4,7 @@ library(brms)
 
 ### read in data (produced in posterior check of motnp_nodalregression_meanage.R)
 nodes <- read_csv('../data_processed/motnp_eigenvector_estimates.csv')
-nodes <- nodes %>% select(-model) # this column is wrong
+nodes <- nodes %>% select(-model) # this column is wrong -- is it though??
 
 ### compare eigenvectors from bisonR model to those from igraph
 #plot(nodes$model ~ nodes$igraph, las = 1, pch = 19, xlim = c(0,1), ylim = c(0,1),
@@ -33,6 +33,7 @@ fit_prior <-  brm(bf(sna_cent ~ age_years,
 gc()
 pp_check(fit_prior, ndraws = 100)
 
+# fit model
 fit <-  brm(bf(sna_cent ~ age_years,
                phi ~ age_years,
                zi ~ 1),
