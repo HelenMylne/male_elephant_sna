@@ -1,10 +1,14 @@
 #### aninet non-random variation test ####
 # library(tidyverse) ; library(plyr) ; library(aninet) ; library(rstan) ; library(asnipe)
-library(tidyverse, lib.loc = '../packages/')
-library(plyr, lib.loc = '../packages/')
-library(aninet, lib.loc = '../packages/')
+library(cli, lib.loc = '../packages/')
 library(rstan, lib.loc = '../packages/')
+library(plyr, lib.loc = '../packages/')
+library(tidyverse, lib.loc = '../packages/')
 library(asnipe, lib.loc = '../packages/')
+#library(aninet, lib.loc = '../packages/')
+library(data.table, lib.loc = '../packages/')
+library(spatsoc, lib.loc = '../packages/')
+library(raster, lib.loc = '../packages/')
 
 load('motnp_bisonr_edgescalculated_strongprior.RData')
 rm(list = ls()[! ls() %in% c('motnp_edge_weights_strongpriors', 'counts_df')])
@@ -33,24 +37,20 @@ gbi_males <- gbi_males[rowSums(gbi_males) > 0,] # remove female-only sightings
 
 #### set up aninet run ####
 # hypothetical minimum number of permutations necessary to reach stability
-( num_permute <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )
+#( num_permute <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )
+num_permute <- 44278000
 num_permute <- round_any(num_permute, 1000, f = ceiling)
 
 # set up inputs
-chain_length <- 1000
-seeds <- 2:(num_permute/(chain_length*2))
-N <- ncol(gbi_males)
-obs <- nrow(gbi_males)
-num_chains <- 2
+#chain_length <- 1000
+#seeds <- 2:(num_permute/(chain_length*2))
+#N <- ncol(gbi_males)
+#obs <- nrow(gbi_males)
+#num_chains <- 2
 
 # set up outputs
-outputs <- data.frame(permutation = 1:num_permute,
-                      cv = NA, mean = NA, stdev = NA, sri = NA, rhat = NA)
-#permute_gbi <- array(NA, c(N,obs,num_permute,num_chains),
-#                     dimnames = list(colnames(gbi_males),
-#                                     rownames(gbi_males),
-#                                     1:max(seeds),
-#                                     1:num_chains))
+#outputs <- data.frame(permutation = 1:num_permute,
+#                      cv = NA, mean = NA, stdev = NA, sri = NA, rhat = NA)
 
 # functions to print out Rhat at the end of the permutation
 rhat_rfun <- function(sims) {
@@ -79,21 +79,21 @@ z_scale <- function(x) {
   z
 }
 
-output_function <- function(gbi) {
-  x <- get_numerator(gbi, data_format = "GBI", return = "vector")
-  d <- get_denominator(gbi, data_format = "GBI", return = "vector")
-  sri <- x/d
-  bulk_rhat <- rhat_rfun(z_scale(gbi))
-  gbi_folded <- abs(gbi - median(gbi))
-  tail_rhat <- rhat_rfun(z_scale(gbi_folded))
-  res <- c(mean(sri, na.rm = T),
-           stats::sd(sri, na.rm = T), 
-           stats::sd(sri, na.rm = T)/mean(sri, na.rm = T), 
-           mean(sri > 0, na.rm = T),
-           max(bulk_rhat, tail_rhat))
-  names(res) <- c("Mean", "SD", "CV", "Non-zero", 'Rhat')
-  return(res)
-}
+#output_function <- function(gbi) {
+#  x <- get_numerator(gbi, data_format = "GBI", return = "vector")
+#  d <- get_denominator(gbi, data_format = "GBI", return = "vector")
+#  sri <- x/d
+#  bulk_rhat <- rhat_rfun(z_scale(gbi))
+#  gbi_folded <- abs(gbi - median(gbi))
+#  tail_rhat <- rhat_rfun(z_scale(gbi_folded))
+#  res <- c(mean(sri, na.rm = T),
+#           stats::sd(sri, na.rm = T), 
+#           stats::sd(sri, na.rm = T)/mean(sri, na.rm = T), 
+#           mean(sri > 0, na.rm = T),
+#           max(bulk_rhat, tail_rhat))
+#  names(res) <- c("Mean", "SD", "CV", "Non-zero", 'Rhat')
+#  return(res)
+#}
 
 rhat <- function(gbi) {
   x <- get_numerator(gbi, data_format = "GBI", return = "vector")
@@ -107,34 +107,34 @@ rhat <- function(gbi) {
 }
 
 #### run initial permutation ####
-set.seed(1)
-permute <- aninet::gbi_MCMC(data = gbi_males,
-                            ind_constraint = NULL, group_constraint = NULL,
-                            samples = 1000, # short chains to be repeatedly extended
-                            thin = 100, burnin = 1000,
-                            chains = num_chains,
-                            FUN = output_function) # CV, Mean, SD, SRI and Rhat
+#set.seed(1)
+#permute <- aninet::gbi_MCMC(data = gbi_males,
+#                            ind_constraint = NULL, group_constraint = NULL,
+#                            samples = 1000, # short chains to be repeatedly extended
+#                            thin = 100, burnin = 1000,
+#                            chains = num_chains,
+#                            FUN = output_function) # CV, Mean, SD, SRI and Rhat
 
-outputs[which(outputs$permutation == 1),2:6] <- permute$FUN(gbi_males)
-#permute_gbi[,,1,1] <- permute$permuted_data[[1]]
-#permute_gbi[,,1,2] <- permute$permuted_data[[2]]
+#outputs[which(outputs$permutation == 1),2:6] <- permute$FUN(gbi_males)
+##permute_gbi[,,1,1] <- permute$permuted_data[[1]]
+##permute_gbi[,,1,2] <- permute$permuted_data[[2]]
 
 #### extend as far as necessary ####
-for(seed in seeds){
-  print(paste0('start seed number ', seed, ' at ', Sys.time()))
-  set.seed(seed)
-  permute <- aninet::extend.gbi_MCMC(permute, samples = 1000)
-  outputs[which(outputs$permutation == seed),2:6] <- permute$FUN(gbi_males)
-  #permute_gbi[,,seed,1] <- permute$permuted_data[[1]]
-  #permute_gbi[,,seed,2] <- permute$permuted_data[[2]]
-  # write out data every 100 extensions
-  if(seed %% 100 == 0){
-    write_csv(outputs, '../data_processed/motnp_permutation_cv_rhat.csv')
-    saveRDS(permute$permuted_data[[1]], '../data_processed/motnp_permutations_chain1.RDS')
-    saveRDS(permute$permuted_data[[2]], '../data_processed/motnp_permutations_chain2.RDS')
-    save.image('motnp_nonrandomtest_gbiMCMCpermutations.RData')
-  }
-}
+#for(seed in seeds){
+#  print(paste0('start seed number ', seed, ' at ', Sys.time()))
+#  set.seed(seed)
+#  permute <- aninet::extend.gbi_MCMC(permute, samples = 1000)
+#  outputs[which(outputs$permutation == seed),2:6] <- permute$FUN(gbi_males)
+#  #permute_gbi[,,seed,1] <- permute$permuted_data[[1]]
+#  #permute_gbi[,,seed,2] <- permute$permuted_data[[2]]
+#  # write out data every 100 extensions
+#  if(seed %% 100 == 0){
+#    write_csv(outputs, '../data_processed/motnp_permutation_cv_rhat.csv')
+#    saveRDS(permute$permuted_data[[1]], '../data_processed/motnp_permutations_chain1.RDS')
+#    saveRDS(permute$permuted_data[[2]], '../data_processed/motnp_permutations_chain2.RDS')
+#    save.image('motnp_nonrandomtest_gbiMCMCpermutations.RData')
+#  }
+#}
 
 # plots and p-values
 #pdf('../outputs/')
@@ -147,6 +147,7 @@ edges <- bisonR::extract_metric(motnp_edge_weights_strongpriors, "edge_weight", 
   pivot_longer(cols = everything(), names_to = 'variable_num', values_to = 'weight') %>% 
   mutate(dyad_males = rep(counts_df$dyad_males, 1000)) %>% 
   select(-variable_num)
+print('edge values drawn')
 
 ### create SRI matrix
 # generate matrix
@@ -161,6 +162,7 @@ for(i in 1:nrow(counts_df)){
   edges$mean_weight[edges$dyad_males == counts_df$dyad_males] <- mean(edges$weight[edges$dyad_males == counts_df$dyad_males])
   if(i %% 1000 == 0) { print(i) }
 }
+print('mean edges calculated')
 
 # create data frame to draw values from
 mean_edges <- edges[,c('dyad_males','mean_weight')] %>%
@@ -178,7 +180,8 @@ for( i in 1:num_eles ) {                                    # rows
     }
   }
 }
-write_csv(m_mat, '../data_processed/motnp_edgematrix_meanweights.csv')
+saveRDS(m_mat, '../data_processed/motnp_edgematrix_meanweights.RDS')
+print('SRI matrix calculated')
 
 ### set up inputs
 chain_length <- 100
@@ -203,6 +206,7 @@ sightings <- eles[,c('elephant','encounter','date')] %>%  # set up dataframe of 
   distinct()                                              # cut down to one row per encounter
 
 ### run network permutations
+set.seed(1)
 random_networks <- asnipe::network_permutation(association_data = gbi_males, # permute network -- raw data = gbi_matrix
                                                association_matrix = m_mat,   # SRI matrix
                                                permutations = chain_length,  # 1000 times
@@ -228,6 +232,7 @@ saved_networks[1,,] <- mat_new
 
 for(seed in asnipe_seeds){
   permutation <- chain_length*seed
+  set.seed(seed)
   ### run network permutations
   random_networks <- asnipe::network_permutation(association_data = gbi_males,   # permute network -- raw data = gbi_matrix
                                                  association_matrix = mat_new,   # SRI matrix
@@ -254,5 +259,8 @@ for(seed in asnipe_seeds){
   saved_networks[seed,,] <- mat_new
   
   ### save workspace every 10000th network
-  if(seed %% 100 == 0) { save.image('motnp_permutations.RData') }
+  if(seed %% 100 == 0) {
+    saveRDS(cv_random_networks, '../data_processed/motnp_cv_permutations.csv')
+    save.image('motnp_permutations.RData')
+    }
 }
