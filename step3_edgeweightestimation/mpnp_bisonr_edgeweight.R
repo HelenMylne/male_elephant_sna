@@ -5,15 +5,15 @@
 
 #### Set up ####
 # load packages
+library(cmdstanr, lib.loc = '../packages/')    # library(cmdstanr)
 library(tidyverse, lib.loc = '../packages/')   # library(tidyverse)
 library(dplyr, lib.loc = '../packages/')       # library(dplyr)
 #library(rstan, lib.loc = '../packages/')      # library(rstan)
-library(cmdstanr, lib.loc = '../packages/')    # library(cmdstanr)
 library(bisonR, lib.loc = '../packages/')      # library(bisonR)
-#library(igraph, lib.loc = '../packages/')     # library(igraph)
+library(igraph, lib.loc = '../packages/')     # library(igraph)
 library(asnipe, lib.loc = '../packages/')      # library(asnipe)
 library(sna, lib.loc = '../packages/')         # library(sna)
-library(raster, lib.loc = '../packages/')      # library(raster)
+#library(raster, lib.loc = '../packages/')      # library(raster)
 
 # information
 sessionInfo()
