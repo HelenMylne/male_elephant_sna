@@ -1,3 +1,4 @@
+library(tidyverse)
 library(brms)
 
 # Dummy data
@@ -36,6 +37,13 @@ real conditional_prior(real mu, int x) {
     }
   }
 ")
+
+# Fit the model
+fit_default_prior <- brm(
+  y ~ z * x,
+  data = data,
+  family = gaussian())
+stancode(fit_default_prior)
 
 # Fit the model
 fit <- brm(
