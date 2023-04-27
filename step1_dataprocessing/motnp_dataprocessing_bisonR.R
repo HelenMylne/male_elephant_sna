@@ -55,6 +55,7 @@ eles_asnipe <- eles_asnipe[,c(3,7)]            # create data table for gbi matri
 eles_asnipe <- data.table::setDT(eles_asnipe)  # create data table for gbi matrix
 gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID')  # create gbi matrix
 
+#### old version ####
 ### code to convert gbi matrix format to dyadic data frame, shared by Prof Dan Franks and available from @JHart96 GitHub repository (https://github.com/JHart96/bison_examples/blob/main/examples/convert_gbi.md) -- NOTE: this step takes ~ 1.5 days to run
 gbi_df <- data.frame(node_1 = numeric(), node_2 = numeric(), social_event = numeric(), obs_id = numeric()) # create empty data frame
 for (obs_id in 1:nrow(gbi_matrix)) {              # run through every sighting in gbi matrix
@@ -177,3 +178,9 @@ length(which(is.na(dyads$id_pad_2)))                 # 0 entries where elephants
 
 ### write csv
 readr::write_delim(dyads, '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_bayesian_binomialpairwiseevents.csv', delim = ',') # write to file
+
+#### bisonR version ####
+bison_df <- bisonR::convert_gbi_to_bison(gbi_matrix)
+
+old_df <- read_csv('../data_processed/motnp_bayesian_bernoullipairwiseevents.csv')
+which(bison_df != olf_df)
