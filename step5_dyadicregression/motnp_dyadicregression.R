@@ -62,6 +62,8 @@ rm(counts_df_model, motnp_edges_null_strongpriors) ; gc()
 #}
 #length(which(cdf_dyadic$min_age >= cdf_dyadic$max_age))
 
+#cdf_dyadic$age_difference <- cdf_dyadic$max_age - cdf_dyadic$min_age
+
 #head(cdf_dyadic)
 
 #write_csv(cdf_dyadic, '../data_processed/motnp_dyadicregression_modeldata.csv')
@@ -104,15 +106,16 @@ cdf_dyadic <- read_csv('../data_processed/motnp_dyadicregression_modeldata.csv')
 
 #### fit model to mean age ####
 mean_age_dyadic <- bison_brm (
-  bison(edge_weight(node_1_id, node_2_id)) ~ min_age + max_age + min_age:max_age + (1 | mm(node_1_id, node_2_id)),
+  #bison(edge_weight(node_1_id, node_2_id)) ~ min_age + max_age + min_age:max_age + (1 | mm(node_1_id, node_2_id)),
+  bison(edge_weight(node_1_id, node_2_id)) ~ age_difference + (1 | mm(node_1_id, node_2_id)),
   motnp_edge_weights_strongpriors,
   cdf_dyadic,
   #num_draws = 5, # Small sample size for demonstration purposes
   #refresh = 0,
   cores = 4, 
   chains = 4,
-  iter = 1000,
-  control = list(max_treedepth = 20)
+  #control = list(max_treedepth = 20),
+  iter = 1000
 )
 summary(mean_age_dyadic)
 
