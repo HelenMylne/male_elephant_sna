@@ -162,67 +162,33 @@ print(paste0('data read in at ', Sys.time()))
 
 #### edge weights -- stronger priors, males only ####
 # add pdf output file
-pdf(file = '../outputs/motnp_bisonr_edgeweight_strongprior.pdf')
+pdf(file = '../outputs/motnp_bisonr_edgeweight_widebinomconj.pdf')
 
 ### create data frame for edge weight model
 counts_df_model <- counts_df[, c('node_1_males','node_2_males','event_count','count_dyad')] %>% distinct()
 colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
-### separate priors for zero-inflated dyads (never seen together)
-plot(density( LaplacesDemon::invlogit(rnorm(1000, -5, 3)) ), col = 'blue')      # new -- dyads never sighted together
-lines(density( LaplacesDemon::invlogit(rnorm(1000, -2.5, 1.5)) ), col = 'red')   # original -- dyads ≥ 1 seen together 
+### new wide prior
+plot(density( rbeta(50000, 0.7, 1.5) ), xlim = c(0,1), col = 'red')
 
 ### set priors for dyads seen together at any point
-priors_seen <- get_default_priors('binary') # obtain structure for bison model priors
-priors_seen$edge <- 'normal(-2.5,1.5)' 
-prior_check(priors_seen, 'binary')
-
-### set priors for dyads never seen together at any point
-priors_unseen <- get_default_priors('binary') # obtain structure for bison model priors
-priors_unseen$edge <- 'normal(-5,3)' 
-prior_check(priors_unseen, 'binary')
+priors <- get_default_priors('binary_conjugate') # obtain structure for bison model priors
+priors$edge <- 'beta(0.7,1.5)' 
+prior_check(priors, 'binary_conjugate')
 
 ### create dummy variable indicating if ever seen together or not -- use to select which prior to draw edge weight from
 counts_df_model$seen_together <- ifelse(counts_df_model$event > 0, 1, 0)
 
-### run edge weight model with prior for pairs seen together at least once
-motnp_fit_seen <- bison_model(
+### run edge weight model
+motnp_fit_edges <- bison_model(
   ( event | duration ) ~ dyad(node_1_id, node_2_id),   # count of sightings together given count of total sightings as a result of the individuals contained within the dyad
   data = counts_df_model,
-  model_type = "binary",
-  priors = priors_seen
-)
-
-### run edge weight model with prior for pairs never seen together
-motnp_fit_unseen <- bison_model(
-  ( event | duration ) ~ dyad(node_1_id, node_2_id),   # count of sightings together given count of total sightings as a result of the individuals contained within the dyad
-  data = counts_df_model,
-  model_type = "binary",
-  priors = priors_unseen
+  model_type = "binary_conjugate",
+  priors = priors
 )
 
 ### save workspace
 save.image('motnp_bisonr_edgescalculated_2priors.RData')
-
-### combine models together
-motnp_fit_edges <- motnp_fit_unseen           # new model with new name
-edges_unseen <- motnp_fit_edges$edge_samples  # extract edge samples for unseen dyads
-edges_seen <- motnp_fit_seen$edge_samples     # extract edge samples for observed dyads
-dyads <- motnp_fit_edges$dyad_to_idx %>%      # extract dyad id numbers for comparisons
-  as.data.frame()
-colnames(dyads) <- c('node_1_id','node_2_id') # rename for joining
-dyads$dyad_id_model <- row_number(dyads)      # add dyad id column
-dyads <- left_join(dyads, counts_df_model[,c('node_1_id','node_2_id','seen_together')],
-                   by = c('node_1_id','node_2_id'))  # join on seen_together data
-for(i in 1:nrow(dyads)){
-  if(dyads$seen_together[i] == 1){
-    edges_unseen[,i] <- edges_seen[,i]        # replace edges for seen dyads with those from other model
-  }
-}
-
-### make space in workspace
-save.image('motnp_bisonr_edgescalculated_2priors.RData')
-rm(motnp_fit_unseen, motnp_fit_seen) ; gc()
 
 ### run diagnostic plots
 plot_trace(motnp_fit_edges, par_ids = 2)                             # trace plot
@@ -237,8 +203,8 @@ edges <- as.data.frame(motnp_fit_edges$chain) %>%               # extract chain 
 head(edges)
 plot(NULL, xlim = c(0,1), ylim = c(0,50), las = 1,                              # prepare plot window
      main = 'edge distributions',ylab = 'density', xlab = 'edge weight')
-plot_seen <- sample(counts_df$dyad_id[which(counts_df$event_count > 0)], 5000, replace = F)      # sample 5000 dyads that were seen together to plot
-plot_unseen <- sample(counts_df$dyad_id[which(counts_df$event_count == 0)], 5000, replace = F)   # sample 5000 dyads that were NOT seen together to plot
+plot_seen <- sample(counts_df$dyad_id[which(counts_df$event_count > 0)], 500, replace = F)      # sample 5000 dyads that were seen together to plot
+plot_unseen <- sample(counts_df$dyad_id[which(counts_df$event_count == 0)], 500, replace = F)   # sample 5000 dyads that were NOT seen together to plot
 plot_samples <- c(plot_seen,plot_unseen)                                        # sample 10000 dyads to plot
 for(dyad in plot_samples) {                                                     # plot probability density for sampled dyads
   x <- edges[edges$dyad_id == dyad,]
@@ -353,7 +319,7 @@ model_averaging <- function(models) {
 model_averaging(models = list(non_random_model = motnp_fit_edges, random_model = motnp_edges_null_strongpriors))            # 100% confidence that random model is better
 
 # save workspace image
-save.image('motnp_bisonr_edgescalculated_strongprior.RData')
+save.image('motnp_bisonr_edgescalculated_widebinomconj.RData')
 
 ### add time marker
 print(paste0('random network comparison completed at ', Sys.time()))
@@ -786,5 +752,5 @@ rm(list= ls()[!(ls() %in% c('motnp_fit_edges','motnp_edges_null_strongpriors',
                             'random_networks'))])
 
 ### write over saved workspace image -- only keep the things you might need later that take a long time to run
-save.image('motnp_bisonr_edgescalculated_strongprior.RData')
+save.image('motnp_bisonr_edgescalculated_widebinomconj.RData')
 
