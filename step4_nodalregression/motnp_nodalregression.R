@@ -37,7 +37,7 @@ df_nodal <- rbind(df_nodal, counts_df[nrow(counts_df),c('node_2_males','id_2')])
 colnames(df_nodal) <- c('node','id')
 
 motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>% 
-  select(sort(unique(c(counts_df$id_1, counts_df$id_2)))) %>% 
+  dplyr::select(sort(unique(c(counts_df$id_1, counts_df$id_2)))) %>% 
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 motnp_ages <- left_join(motnp_ages, df_nodal, by = 'id')
 motnp_ages$draw <- rep(1:8000, length(unique(motnp_ages$id)))
@@ -81,7 +81,6 @@ for(i in 1:100){
 
 motnp_edge_weights_strongpriors$model_data$prior_fixed_mu    <- beta_mu
 motnp_edge_weights_strongpriors$model_data$prior_fixed_sigma <- beta_sigma
-
 
 ### run model -- mean age value only ####
 mean_motnp_eigen <- bison_brm(
@@ -575,31 +574,68 @@ metric_name <- 'eigen'
 num_draws <- 10
 z_score <- F
 
+motnp_ages_list <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>% 
+  dplyr::select(sort(unique(c(counts_df$id_1, counts_df$id_2)))) %>% 
+  as.list()
+for(i in 1:length(motnp_ages_list)){
+  id <- names(motnp_ages_list[i])
+  motnp_ages_list[[i]] <- as.data.frame(motnp_ages_list[[i]])
+  colnames(id)
+}
+
+#mean_motnp_eigen <- bison_mice(
+  edgemodel_list = list(motnp_edge_weights_strongpriors)#,
+  #data_list = as.data.frame(motnp_ages_list)#,
+  #data_list = list(df_nodal$node, motnp_ages_list)
+  data_list = array(data = NA, dim = c(213, 8000))#,
+                    #dimnames = list(df_nodal$id, 'age_value',1:8000))
+for(i in 1:nrow(motnp_ages)){
+  for(j in 1:ncol(motnp_ages)){
+  data_list[i,,j] <- motnp_ages[,i]
+  }
+}
+  param_names = df_nodal$node#, c(counts_df_model$id_1,counts_df_model$id_2), 'node_id' ,df_nodal$id , 
+  target_name = 'node'#,
+  metric_name = 'eigen'#,
+  num_draws = 10#,
+  z_score = T
+#)
+
 #### bison_mice code ####
 if (class(edgemodel_list)[1] != "list") edgemodel_list <- list(edgemodel_list)
-if (class(data_list)[1] != "list") data_list <- list(data_list)
+#if (class(data_list)[1] != "list") data_list <- list(data_list)
 
 new_bison_term <- paste0("bison_", target_name, "_", metric_name)
 
 posterior_samples_list <- list()
 
-for (i in 1:length(edgemodel_list)) {
-  if (target_name == "node") {
-    #node_ids <- sapply(
-    #  dplyr::pull(data_list[[i]], param_names[1]),                   # doesn't work because param_names = nodes, data_list[[1]] = ages
-    #  function(x) which(names(edgemodel_list[[i]]$node_to_idx) == x) # produces a list per elephant of 5 zeroes because age doesn't match to node ids
-    #)
-    posterior_samples <- extract_metric(edgemodel_list[[i]], paste0(target_name, "_", metric_name), num_draws)#[, node_ids]
-  }
-  
-  # Make sure posterior samples are in matrix format (for num_draws=1).
-  posterior_samples_list[[i]] <- matrix(posterior_samples, nrow=num_draws)
+# actual bison code
+if (target_name == "node") {
+  node_ids <- sapply(
+    dplyr::pull(data_list[[i]], param_names[1]),                   # doesn't work because param_names = nodes, data_list[[1]] = ages
+    function(x) which(names(edgemodel_list[[i]]$node_to_idx) == x) # produces a list per elephant of 5 zeroes because age doesn't match to node ids
+  )
+  posterior_samples <- extract_metric(edgemodel_list[[i]], paste0(target_name, "_", metric_name), num_draws)#[, node_ids]
 }
+
+# me messing around until something does something without an error
+if (target_name == "node") {
+  # node_ids <- 1:213
+  node_ids <- sapply(
+    dplyr::pull(as.data.frame(data_list[[1]]), param_names[1]),
+    function(x) which(names(edgemodel_list[[1]]$node_to_idx) == x)
+  )
+  posterior_samples <- extract_metric(edgemodel_list[[1]], paste0(target_name, "_", metric_name), num_draws)#[, node_ids]
+}
+
+# Make sure posterior samples are in matrix format (for num_draws=1).
+posterior_samples_list[[i]] <- matrix(posterior_samples, nrow=num_draws)
 
 # Generate list of dataframes.
 imputed_dataframes <- lapply(1:num_draws, function(i) {
   # For each posterior draw, combine dataframes from different edge models and data
-  new_data_list <- lapply(1:length(edgemodel_list), function(j) {
+  new_data_list <- lapply(2,#1:length(edgemodel_list),
+                          function(j) {
     new_data <- data_list[[j]]
     if (z_score) {
       new_data[new_bison_term] <- (posterior_samples_list[[j]][i, ] - mean(posterior_samples_list[[j]][i, ]))/sd(posterior_samples_list[[j]][i, ])
@@ -629,131 +665,3 @@ original_dataframes[".imp"] <- 0
 combined_dataframes <- dplyr::bind_rows(list(original_dataframes, imputed_dataframes))
 
 mice::as.mids(as.data.frame(combined_dataframes))
-
-######
-# impute the nhanes dataset
-imp <- mice(nhanes, print = FALSE)
-# extract the data in long format
-X <- complete(imp, action = "long", include = TRUE)
-
-# nhanes example without .id
-test1 <- as.mids(X)
-is.mids(test1)
-identical(complete(test1, action = "long", include = TRUE), X)
-
-# nhanes example, where we explicitly specify .id as column 2
-test3 <- as.mids(X, .id = ".id")
-is.mids(test3)
-identical(complete(test3, action = "long", include = TRUE), X)
-
-
-
-#########
-# old model run
-motnp_eigen <- bison_brm(
-  bison(node_eigen(node)) ~ age + (1 | node),
-  motnp_edge_weights_strongpriors,
-  #motnp_ages,
-  test_ages,
-  chains = 4,
-  iter = 1000,
-  cores = 4
-)
-summary(motnp_eigen)
-
-save.image('motnp_nodalregression_eigenvector.RData')
-
-eigen_values <- motnp_eigen$data
-plot(eigen_values$bison_node_eigen ~ eigen_values$age, las = 1, pch = 19, col = rgb(0,0,1,0.2),
-     xlab = 'mean age estimate', ylab = 'eigenvector centrality',
-     main = 'effect of age on eigenvector centrality')
-
-mod_summary <- motnp_eigen$fit
-
-hist(motnp_eigen$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
-
-# compare to null model
-#motnp_eigen_null <- bison_brm(
-#  bison(node_eigen(node)) ~ 1,
-#  motnp_edge_weights_strongpriors,
-#  #motnp_ages,
-#  test_ages,
-#  chains = 4,
-#  cores = 4
-#)
-#model_comparison(list(non_random_model = motnp_eigen, random_model = motnp_eigen_null))
-#model_averaging(list(non_random_model = motnp_eigen, random_model = motnp_eigen_null))
-
-save.image('motnp_nodalregression_eigenvector.RData')
-
-rm(motnp_eigen, eigen_values, mod_summary, motnp_eigen_null) ; gc()
-dev.off()
-
-#### strength only ####
-#prior_strength <- bison_brm_get_prior(
-#  bison(node_eigen(node)) ~ age,
-#  list(motnp_edge_weights_strongpriors),
-#  counts_df_model
-#)
-#prior_strength$fixed <- 'normal(0,1)'
-
-#mean_motnp_strength <- bison_brm(
-#  bison(node_strength(node)) ~ age,
-#  motnp_edge_weights_strongpriors,
-#  mean_motnp_ages,
-#  chains = 4,
-#  iter = 10000,
-#  thin = 2
-#)
-
-#summary(mean_motnp_strength) # FIT 100 IMPUTED MODELS, 4 CHAINS PER MODEL, EACH 1000 DRAWS LONG (+1000 DRAWS WARM UP). WARNING AT END OF MODEL RUN THAT CHAINS <3 DRAWS LONG AS ACTUAL CHAIN IS ONLY 1 WARMUP AND 1 SAMPLE. ONLY IMPUTED CHAINS FOLLOW THE SPECIFIED ITERATIONS AND THINNING
-
-#mean_strength_values <- mean_motnp_strength$data
-#plot(mean_strength_values$bison_node_strength ~ mean_strength_values$age, 
-#     las = 1, pch = 19, col = rgb(0,0,1,0.2),
-#     xlab = 'mean age estimate', ylab = 'strength',
-#     main = 'no effect of age on node strength')
-
-#mean_strength_summary <- mean_motnp_strength$fit
-
-#hist(mean_motnp_strength$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
-
-#post_strength <- as_draws_df(mean_motnp_strength)
-#hist(post_strength$b_age) # what scale is this on? should it go through plogis() (aka inverse logit) or not -- what scale does strength read as?
-#plot(data = post_strength[post_strength$.chain == 1,], b_age ~ .draw, type = 'l')
-
-## save output
-#save.image('motnp_nodalregression_meanage.RData')
-
-#pdf('../outputs/motnp_nodalregression_strength_agedistribution.pdf')
-
-#motnp_strength <- bison_brm(
-#  bison(node_strength(node)) ~ age,
-#  motnp_edge_weights_strongpriors,
-#  motnp_ages,
-#  chains = 4,
-#  iter = 10000
-#)
-#summary(motnp_strength)
-
-#strength_values <- motnp_strength$data
-#plot(strength_values$bison_node_strength ~ strength_values$age, las = 1, pch = 19, col = rgb(0,0,1,0.2),
-#     xlab = 'mean age estimate', ylab = 'strength centrality',
-#     main = 'effect of age on strength centrality')
-
-#mod_summary <- motnp_strength$fit
-
-#hist(motnp_strength$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
-
-# compare to null model
-#motnp_strength_null <- bison_brm(
-#  bison(node_strength(node)) ~ 1,
-#  motnp_edge_weights,
-#  motnp_ages,
-#  chains = 4
-#)
-#model_comparison(list(non_random_model = motnp_strength, random_model = motnp_strength_null))
-
-#save.image('motnp_nodalregression_strength.RData')
-
-#dev.off()
