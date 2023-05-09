@@ -42,18 +42,13 @@ colnames(counts_df_model) <- c('node_1_id','node_2_id','event','duration')
 
 ### new wide prior
 prior_alpha <- 0.7
-prior_beta <- 1.5
+prior_beta <- 3
 plot(density( rbeta(50000, prior_alpha, prior_beta) ), xlim = c(0,1), col = 'red')
 
 ### set priors for dyads seen together at any point
 priors <- get_default_priors('binary_conjugate') # obtain structure for bison model priors
 priors$edge <- paste0('beta(',prior_alpha,',',prior_beta,')') 
 prior_check(priors, 'binary_conjugate')
-prior_predictive_check(formula = ( event | duration ) ~ dyad(node_1_id, node_2_id),
-                       data = counts_df_model,
-                       model_type = 'binary_conjugate',
-                       plot_type = 'density',
-                       priors = priors)
 
 ### create dummy variable indicating if ever seen together or not -- use to select which prior to draw edge weight from
 counts_df_model$seen_together <- ifelse(counts_df_model$event > 0, 1, 0)
@@ -67,7 +62,7 @@ motnp_fit_edges <- bison_model(
 )
 
 ### save workspace
-save.image('motnp_bisonr_edgescalculated_widebinomconj.RData')
+save.image('motnp_bisonr_edgescalculated_widebinomconj_v2.RData')
 
 ### run diagnostic plots
 #plot_trace(motnp_fit_edges, par_ids = 2)                            # trace plot -- not needed for conjugate model??
@@ -119,9 +114,8 @@ ggplot(plot_data,                                                               
         axis.title = element_text(size = 18))+
   scale_x_continuous(name = 'edge weight', limits = c(0,1))
 
-priors$edge <- 'normal(-2.5, 1.5)'                                              # set prior value (already set -- doesn't actually change anything, just in as a reminder of what it was)
 prior_plot <- data.frame(dyad = 'prior',                                        # create prior dataframe with draws from prior distribution, formatted to match columns in plot_data
-                         draw = plogis(rbeta(5000,0.7,1.5)),
+                         draw = plogis(rbeta(5000,prior_alpha,prior_beta)),
                          dyad_id = 1000000,
                          mean = NA,
                          chain_position = 1:1000)
@@ -178,33 +172,33 @@ print(paste0('binomial conjugate model completed at ', Sys.time()))
 #load('motnp_bisonr_edgescalculated_widebinomconj.RData')
 #priors <- get_default_priors('binary_conjugate') # obtain structure for bison model priors
 #priors$edge <- 'beta(0.7,1.5)'
-motnp_edges_null <- bison_model(
-  (event | duration) ~ 1,                       # response variable does not vary with dyad, all dyads drawn from the same distribution -- THIS RUNS BUT COMPARISONS TO FULL MODEL DON'T WORK
-  data = counts_df_model, 
-  model_type = "binary_conjugate",
-  priors = priors
-)
+#motnp_edges_null <- bison_model(
+#  (event | duration) ~ 1,                       # response variable does not vary with dyad, all dyads drawn from the same distribution -- THIS RUNS BUT COMPARISONS TO FULL MODEL DON'T WORK
+#  data = counts_df_model, 
+#  model_type = "binary_conjugate",
+#  priors = priors
+#)
 
 ### compare null model with fitted model -- bisonR model stacking
-model_comparison(list(non_random_model = motnp_fit_edges, random_model = motnp_edges_null)) # compare fit for model allowed to vary by dyad vs model that draws all dyad strengths from the same distribution -- vast majority of network is best explained by random model, but 4.3% of dyads better explained by non-random. Network is therefore non-random, but with only a small proportion of dyads associating more strongly than random distribution will allow
+#model_comparison(list(non_random_model = motnp_fit_edges, random_model = motnp_edges_null)) # compare fit for model allowed to vary by dyad vs model that draws all dyad strengths from the same distribution -- vast majority of network is best explained by random model, but 4.3% of dyads better explained by non-random. Network is therefore non-random, but with only a small proportion of dyads associating more strongly than random distribution will allow
 
 ### compare null model with fitted model -- Jordan pseudo model averaging
-model_averaging <- function(models) {
-  loos <- lapply(models, function(model) loo::loo(model$log_lik, r_eff=NA))
-  
-  results_matrix <- loo::loo_model_weights(loos, method="pseudobma")
-  if (!is.null(names(models))) {
-    names(results_matrix) <- names(models)
-  }
-  results_matrix
-}  # produce alternative method for comparing models
-model_averaging(models = list(non_random_model = motnp_fit_edges, random_model = motnp_edges_null))            # 100% confidence that random model is better
+#model_averaging <- function(models) {
+#  loos <- lapply(models, function(model) loo::loo(model$log_lik, r_eff=NA))
+#  
+#  results_matrix <- loo::loo_model_weights(loos, method="pseudobma")
+#  if (!is.null(names(models))) {
+#    names(results_matrix) <- names(models)
+#  }
+#  results_matrix
+#}  # produce alternative method for comparing models
+#model_averaging(models = list(non_random_model = motnp_fit_edges, random_model = motnp_edges_null))            # 100% confidence that random model is better
 
 # save workspace image
-save.image('motnp_bisonr_edgescalculated_widebinomconj.RData')
+#save.image('motnp_bisonr_edgescalculated_widebinomconj_v2.RData')
 
 ### add time marker
-print(paste0('random network comparison completed at ', Sys.time()))
+#print(paste0('random network comparison completed at ', Sys.time()))
 
 ## plot network ####
 ### adapt bisonR plot_network function to give more flexibility over plotting options
@@ -377,7 +371,7 @@ ggplot(data = subset_draws, mapping = aes(x = weight))+                         
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
   geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
 
-write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_widebinomconj.csv')    # save output for future reference
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_widebinomconj_v2.csv')    # save output for future reference
 
 subset_draws <- read_csv('../data_processed/motnp_sampledyads_random_binary_vs_sri_widebinomconj.csv')
 subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)           # order dataframe based on total sightings per pair
@@ -407,7 +401,7 @@ ggplot(data = subset_draws, mapping = aes(x = weight))+                         
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
   geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
 
-write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_widebinomconj.csv')    # save output for future reference
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_widebinomconj_v2.csv')    # save output for future reference
 
 # clean environment
 rm(draws, dyads, priors, subset_draws, x) ; gc()
@@ -540,13 +534,13 @@ ggplot(data = plot_cv)+                                     # plot CV values
         axis.text = element_text(size = 14))
 
 ### write out outputs for future reference
-write_csv(plot_cv, '../data_processed/motnp_networkpermutations_cv_widebinomconj.csv')
+write_csv(plot_cv, '../data_processed/motnp_networkpermutations_cv_widebinomconj_v2.csv')
 
 ### combine with global_cv
 plot_cv_model <- data.frame(cv = c(plot_cv$cv_random_networks, (global_cv_widebinomconj*100)),             # combine permutations and model values
                             iteration = rep(1:length(global_cv_widebinomconj), 2),
                             type = rep(c('permutation','model_draw'), each = length(global_cv_widebinomconj)))
-write_csv(plot_cv_model, '../data_processed/motnp_networkpermutations_cv_widebinomconj.csv')               # save for future reference
+write_csv(plot_cv_model, '../data_processed/motnp_networkpermutations_cv_widebinomconj_v2.csv')               # save for future reference
 ggplot()+
   geom_vline(xintercept = cv_network, linewidth = 1.5,                                                   # line for measured network from SRI values
              colour = rgb(68/255, 1/255, 84/255))+                                                       # dark purple (viridis)
@@ -643,4 +637,4 @@ rm(list= ls()[!(ls() %in% c('motnp_fit_edges','motnp_edges_null',
                             'random_networks'))])
 
 ### write over saved workspace image -- only keep the things you might need later that take a long time to run
-save.image('motnp_bisonr_edgescalculated_widebinomconj.RData')
+save.image('motnp_bisonr_edgescalculated_widebinomconj_v2.RData')
