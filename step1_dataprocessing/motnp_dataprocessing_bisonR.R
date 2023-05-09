@@ -12,14 +12,13 @@
 #library(zoo)        # sort date columns out
 #library(asnipe)     # generating networks
 
+library(cmdstanr, lib.loc = '../packages/')
 library(tidyverse, lib.loc = '../packages/')
 library(lubridate, lib.loc = '../packages/')
 library(janitor, lib.loc = '../packages/')
-library(hms, lib.loc = '../packages/')
 library(readxl, lib.loc = '../packages/')
 library(data.table, lib.loc = '../packages/')
 library(spatsoc, lib.loc = '../packages/')
-library(cmdstanr, lib.loc = '../packages/')
 library(bisonR, lib.loc = '../packages/')
 
 #### import data ####
@@ -184,7 +183,30 @@ gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID')  # 
 #### bisonR version ####
 bison_df <- bisonR::convert_gbi_to_bison(gbi_matrix)
 
-old_df <- read_csv('../data_processed/motnp_bayesian_bernoullipairwiseevents.csv')
-which(bison_df != olf_df)
+save.image('motnp_datareprocessed_bisonR.RData')
+
+write_csv(bison_df, '../data_processed/motnp_bisonR_binomialpairwiseevents.csv')
+
+old_df <- read_csv('../data_processed/motnp_binomialpairwiseevents_malesonly.csv')
+nodes <- unique(c(old_df$node_1, old_df$node_2))
+
+bison_males <- bison_df %>%
+  filter(node_1 %in% nodes) %>% 
+  filter(node_2 %in% nodes) %>% 
+  left_join(old_df[,c('dyad_id','node_1','node_2')], by = c('node_1','node_2'))
+length(unique(bison_males$dyad_id))
+
+bison_agg <- old_df %>% 
+  select(-event_count, -apart)
+
+bison_agg$event_count <- NA
+for(i in 1:nrow(bison_agg)){
+  dyad <- bison_males[bison_males$dyad_id == bison_agg$dyad_id[i],]
+  bison_agg$event_count <- sum(dyad$event)
+}
+
+which(bison_agg$event_count != old_df$event_count)
+which(bison_agg$event_count > bison_agg$count_1)
+which(bison_agg$event_count > bison_agg$count_2)
 
 save.image('motnp_datareprocessed_bisonR.RData')
