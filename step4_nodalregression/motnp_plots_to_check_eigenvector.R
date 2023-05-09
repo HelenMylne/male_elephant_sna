@@ -5,13 +5,12 @@ library(tidyverse) ; library(bisonR) ; library(igraph)
 theme_set(theme_classic())
 
 #### load data ####
-#load('motnp_bisonr_edgescalculated_widebinomconj.RData')
+#load('motnp_bisonr_edgescalculated_widebinomconj_v2.RData')
 load('motnp_nodalregression_meanage.RData')
 
 ### read in data (produced in posterior check v2 of motnp_nodalregression_meanage.R)
 nodes <- read_csv('../data_processed/motnp_eigenvector_estimates.csv') %>% 
   select(-model) # column was a single draw from the posterior, not means
-#nodes <- nodes[,c(1:5)] ; colnames(nodes)[4] <- 'mean_age' # only for when working without having yet run the actual nodal regression
 
 # extract mean of posterior for eigenvector
 mean_eigen_values <- extract_metric(motnp_fit_edges, "node_eigen") %>%
@@ -34,7 +33,6 @@ eigen_values <- extract_metric(motnp_fit_edges, "node_eigen") %>%
 # add mean model values to nodes data frame
 nodes <- left_join(nodes, mean_eigen_values[,2:3], by = 'node')
 colnames(nodes)[8] <- 'model'
-#colnames(nodes)[6] <- 'model' # only for when working without having yet run the actual nodal regression
 
 # clean up environment
 rm(counts_df_model, df_nodal, mean_eigen_summary, motnp_ages, motnp_edges_null_strongpriors, priors, age, beta, beta_mu, beta_sigma, i, intercept, mean_age) ; gc()
@@ -46,6 +44,8 @@ ggplot()+
   geom_point(data = nodes, aes(x = igraph, y = model,  colour = age_cat, size = count))+
   theme(legend.position = 'none')+
   scale_colour_viridis_d(direction = -1)+
+  scale_x_continuous('eigenvector from putting SRI through igraph')+
+  scale_y_continuous('eigenvector from extract_metric(bison_model)')+
   geom_line(aes(x = seq(0.1,1,0.1), y = seq(0.1,1,0.1)))
 
 ## v2 -- SRI for igraph = mean of bisonR distribution
@@ -78,6 +78,8 @@ ggplot()+
                                colour = age_cat, size = count))+
   theme(legend.position = 'none')+
   scale_colour_viridis_d(direction = -1)+
+  scale_x_continuous('mean eigen centrality using igraph per bisonR draw')+
+  scale_y_continuous('mean eigen centrality using bisonR extract_metric()')+
   geom_line(aes(x = seq(0.3,1,0.1), y = seq(0.3,1,0.1)))
 
 ## v3 -- SRI for igraph = loop through posterior draws of edge weight
@@ -192,7 +194,7 @@ nodes %>% ggplot()+
 
 ## v2 -- bisonr
 nodes %>% ggplot()+
-  geom_point(aes(x = count, y = model, colour = as.factor(age_years)))+
+  geom_point(aes(x = count, y = model, colour = as.factor(mean_age)))+
   scale_colour_viridis_d(direction = -1)+
   theme(legend.position = 'none')+
   scale_x_continuous(name = 'number of observations per elephant')+
