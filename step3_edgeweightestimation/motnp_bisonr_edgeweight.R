@@ -213,6 +213,16 @@ for(dyad in plot_samples) {                                                     
 }
 lines(density(edges$draw), lwd = 3)                                             # add probability density line for all draws from all dyads
 
+for (i in 1:length(sample_seen)) {
+  seen <- edges[edges$dyad_id == sample_seen[i],]
+  unsn <- edges[edges$dyad_id == sample_unsn[i],]
+  lines(density(seen$draw), col=rgb(0, 0, 1, 0.05))
+  lines(density(unsn$draw), col=rgb(1, 0, 0, 0.05))
+}
+lines(density(counts_df$sri[counts_df$event_count > 0]), lwd = 2, col = 'green')
+lines(density(counts_df$sri[counts_df$event_count == 0]), lwd = 2)
+lines(density(counts_df$sri), lwd = 2)
+
 edges$chain_position <- rep(1:4000, each = length(unique(edges$dyad)))          # add column for position in chain
 edges <- edges[edges$chain_position < 1001,]                                    # only take first 1000 values to speed up next plot
 edges$mean <- NA
