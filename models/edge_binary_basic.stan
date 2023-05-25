@@ -15,7 +15,7 @@ model {
         if (together[i] == 0)
             edge_weight[i] ~ beta(0.7, 10);
         else
-            edge_weight[i] ~ beta(2, 8);
+            edge_weight[i] ~ beta(1, 5);
         }
 
     together ~ binomial(count_dyad, edge_weight);
