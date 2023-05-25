@@ -7,7 +7,7 @@ data {
   array[n_dyads] int node_2;              // node ids for multimembership random effects
   array[n_dyads] int age_min;             // lower node age of dyad
   array[n_dyads] int age_max;             // upper node age of dyad
-  int<lower=0> n_samples;
+  int<lower=0> n_samples;                 // number of samples to run in model
 }
 
 parameters {
@@ -17,42 +17,32 @@ parameters {
   real b_min;                             // slope of effect of minimum age
   real b_max;                             // slope of effect of maximum age
   real b_int;                             // slope of effect of interaction between minimum and maximum age
-  //real mu;
-  //real sigma;
+  real intercept;
 }
 
 transformed parameters {
   vector[n_dyads] weights = inv_logit(edge_weight);
   for (i in 1:n_dyads) {
-    weights[i] += b_min * age_min[i] + b_max * age_max[i] + b_int * age_min[i] * age_max[i] + mm[node_1[i]] + mm[node_2[i]];
+    weights[i] += intercept + b_min*age_min[i] + b_max*age_max[i] + b_int*age_min[i]*age_max[i] + mm[node_1[i]] + mm[node_2[i]];
   }
 }
 
 model {
     for (i in 1:n_dyads) {
-        // Conditional priors
+        // Conditional priors -- much lower prior mean if never seen together than if seen together at least once
         if (together[i] == 0)
             edge_weight[i] ~ beta(0.7, 10);
         else
             edge_weight[i] ~ beta(1, 5);
         }
     // produce edge model
-    together ~ binomial(count_dyad, edge_weight);
+    together ~ binomial(count_dyad, edge_weight);   // estimate edge weight from sightings together out of total sightings
   
-  //vector[n_dyads] weights = inv_logit(edge_weight);
-    
-  // take values from edge model and use in dyadic regression
-  //for (d in 1:n_dyads) {
-    //i = node_1[d];
-    //j = node_2[d];
-    //weights[d] = b_min*age_min[d] + b_max*age_max[d] + b_int*age_min[d]*age_max[d] + mm[node_1[d]] + mm[node_2[d]];
-    //real mu = b_min*age_min[d] + b_max*age_max[d] + b_int*age_min[d]*age_max[d] + mm[node_1[d]] + mm[node_2[d]];
-    //edge_weight ~ beta(mu, (1 - mu));
-    b_min ~ normal(0,1);
-    b_max ~ normal(0,1);
-    b_int ~ normal(0,1);
-    //sigma ~ exponential(1);
-  //}
+  // priors for weight effects
+  intercept ~ normal(0,1);
+  b_min ~ normal(0,0.05);
+  b_max ~ normal(0,0.05);
+  b_int ~ normal(0,0.05);
   mm ~ normal(0, sigma_mm);
   sigma_mm ~ exponential(1);
 }
