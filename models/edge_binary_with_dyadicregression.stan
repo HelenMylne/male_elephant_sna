@@ -20,27 +20,20 @@ data {
 parameters {
   // edge weight
   vector<lower=0, upper=1>[n_dyads] edge_weight;      // edge weights for each dyad
+  
   // likelihood
-  //real<lower=1> alpha_weight;             // Beta distribution shape parameter
-  //real<lower=1> beta_weight;              // Beta distribution shape parameter
   real<lower=0> sigma_weight;             // Error standard deviation
+  
   // age effects
   real intercept;                         // intercept for model
   real b_min;                             // slope of effect of minimum age
   real b_max;                             // slope of effect of maximum age
   real b_int;                             // slope of effect of interaction between minimum and maximum age
+  
   // multimembership effects
   vector[n_dyads] mm;                     // multimembership effects
   real<lower=0> sigma_mm;                 // standard deviation of multimembership effects
 }
-
-//transformed parameters {
-//  vector[n_dyads] weights = edge_weight;
-  //for (i in 1:n_dyads) {
-  //  weights[i] = intercept + b_min*age_min[i] + b_max*age_max[i] + b_int*age_min[i]*age_max[i] + mm[node_1[i]] + mm[node_2[i]];
-  //}
-  // weights = intercept + b_min*age_min + b_max*age_max + b_int*age_min*age_max + mm[node_1] + mm[node_2] // Dan said this could be vectorised rather than being as a loop but whenever I try it I just get errors saying that there is no avialble argument signatures for * and + between a vector and a real
-//}
 
 model {
     // priors for edge weight (conditional -- based on if ever seen together)
@@ -56,8 +49,6 @@ model {
   logit(edge_weight) ~ normal(intercept + b_min*age_min + b_max*age_max + mm[node_1] + mm[node_2], sigma_weight);  // b_int*age_min*age_max + 
   
   // priors for likelihood
-  //alpha_weight ~ gamma(1, 1);      // Gamma prior for shape parameter alpha
-  //beta_weight ~ gamma(5, 1);       // Gamma prior for shape parameter beta
   sigma_weight ~ exponential(1);     // Cauchy prior for error standard deviation sigma
   
   // priors for age effects
