@@ -63,7 +63,7 @@ rm(list = ls()) ; gc()
 par(mfrow = c(1,1))
 
 # load edge weight model
-edge_binary <- cmdstan_model("models/edge_binary_with_dyadicregression_hkm.stan")
+edge_binary <- cmdstan_model("models/edge_binary_with_dyadicregression.stan")
 edge_binary
 
 #### create data lists ####
