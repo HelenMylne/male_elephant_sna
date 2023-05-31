@@ -14,11 +14,6 @@ library(rstan, lib.loc = '../packages')
 library(igraph, lib.loc = '../packages')
 library(LaplacesDemon, lib.loc = '../packages')
 
-#library(ggthemes)
-#library(survival)
-#library(tidybayes)
-#library(data.table)
-
 #### load model ####
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
 latent_age_ordinal_model <- cmdstan_model("models/motnp_age_ordinal_regression.stan")
@@ -95,8 +90,6 @@ plot_data %>%
 
 #### load MOTNP data ####
 motnp_males <- read_csv('../data_processed/motnp_elenodes.csv') %>% filter(sex == 'M')  # select male nodes only 
-#motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
-#  filter(sex == 'M')               # males only
 unique(motnp_males$age_category)
 motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1,     # standardise calf categories
                                  ifelse(motnp_males$age_category == "3-4", 1,
@@ -176,7 +169,6 @@ df$age_cat_centre <- ifelse(df$age_cat == 1, (0+5)/2,              # for plot ON
 
 df %>% ggplot(aes(x=age_cat_centre, y=value, group=factor(ID))) +  # plot intervals for each category against values set above
   geom_point(size=2,col = 'blue', alpha=0.1) +
-  #stat_halfeye() +
   geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add vertical lines at category boundaries
   geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add horizontal lines at category boundaries
   theme_bw() + 
@@ -185,7 +177,6 @@ df %>% ggplot(aes(x=age_cat_centre, y=value, group=factor(ID))) +  # plot interv
 df %>% ggplot() +                                                  # plot intervals for each category against values set above
   geom_violin(aes(x = age_cat_centre, y = value, group = factor(age_cat)), fill = rgb(0,0,1,0.8))+
   #geom_point(aes(x = true_age, y = value, group = factor(ID)), size = 2, col = 'red', alpha = 0.1) +
-  #stat_halfeye() +
   geom_vline(xintercept = 0, alpha = 0.6) +                                               # add vertical lines at 0
   geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add vertical lines at category boundaries
   geom_hline(yintercept = 0, alpha = 0.6) +                                               # add horizontal lines at 0
@@ -208,5 +199,11 @@ df %>% ggplot() +                                                 # plot interva
 ### save output
 colnames(true_ages) <- motnp_males$id
 saveRDS(true_ages, file = '../data_processed/motnp_ageestimates_mcmcoutput.rds')          # save output for next steps
-#saveRDS(true_ages, file = '../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_ageestimates_mcmcoutput.rds')
+save.image('motnp_ageestimation.RData')
+
+### extract probability distributions
+age_probs <- age_motnp_fit$summary()
+age_probs <- age_probs[(nrow(age_probs)-4):nrow(age_probs),]
+age_probs
+
 
