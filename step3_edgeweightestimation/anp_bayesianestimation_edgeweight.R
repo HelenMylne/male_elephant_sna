@@ -39,7 +39,7 @@ library(readxl, lib.loc = 'packages/')      # library(readxl)
 set.seed(12345)
 
 # create file of output graphs
-pdf('../outputs/anp_edgeweights_period1_2step_beta1.5_dyadreg0.1.pdf', width = 20, height = 15)
+pdf('../outputs/anp_edgeweights_period1_mixtureprior.pdf', width = 20, height = 15)
 
 #### prior predictive check ####
 age_min <- 5:50
@@ -132,31 +132,22 @@ fit_edges_anp1 <- edge_binary$sample(
 
 ### check model
 fit_edges_anp1
-#variable        mean     median    sd   mad         q5        q95 rhat ess_bulk ess_tail
-#lp__           -5125.17 -5124.42 29.94 29.99 -5174.70 -5077.04 1.00     1403     2395
-#edge_weight[1]     0.04     0.02  0.04  0.03     0.00     0.13 1.00     4931     2188
-#edge_weight[2]     0.05     0.03  0.06  0.04     0.00     0.17 1.00     4879     2130
-#edge_weight[3]     0.05     0.03  0.06  0.04     0.00     0.17 1.00     4974     2342
-#edge_weight[4]     0.04     0.02  0.04  0.03     0.00     0.12 1.00     4572     2201
-#edge_weight[5]     0.05     0.03  0.05  0.04     0.00     0.16 1.00     4881     2182
-#edge_weight[6]     0.04     0.03  0.05  0.03     0.00     0.15 1.00     4942     2154
-#edge_weight[7]     0.05     0.03  0.06  0.04     0.00     0.17 1.00     4128     2029
-#edge_weight[8]     0.05     0.03  0.06  0.04     0.00     0.16 1.00     4586     2144
-#edge_weight[9]     0.05     0.03  0.06  0.04     0.00     0.17 1.00     4684     2108
 
 # Extract posterior samples
 posterior_samples <- fit_edges_anp1$draws()
 
-# break down into parameters
+# extract edge weights
 edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf_1)+1)]
 posterior_samples <- posterior_samples[,,(nrow(cdf_1)+2):length(posterior_samples[1,1,])]
-mm_matrix <- posterior_samples[,,1:n_dyads]
-posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
-sigma_mm <- posterior_samples[,,1]
-b_min <- posterior_samples[,,2]
-b_max <- posterior_samples[,,3]
-b_int <- posterior_samples[,,4]
-intercept <- posterior_samples[,,5]
+
+# extract dyadic regression slopes
+#mm_matrix <- posterior_samples[,,1:n_dyads]
+#posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
+#sigma_mm <- posterior_samples[,,1]
+#b_min <- posterior_samples[,,2]
+#b_max <- posterior_samples[,,3]
+#b_int <- posterior_samples[,,4]
+#intercept <- posterior_samples[,,5]
 rm(posterior_samples) ; gc()
 
 # save edge samples
@@ -175,11 +166,11 @@ for(i in 2:n_dyads){
 }
 
 ### save data 
-saveRDS(edges, '../data_processed/anp1_edgedistributions_beta1.5.RDS')
+saveRDS(edges, '../data_processed/anp1_edgedistributions_mixtureprior.RDS')
 #edges <- readRDS('../data_processed/anp1_edgedistributions_beta1.5.RDS')
 
 # save parameter values
-extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
+#extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
   draws <- as.data.frame(draws) %>% 
     pivot_longer(everything(), names_to = 'chain', values_to = 'slope_draw') %>% 
     separate(chain, sep = c(1,2), remove = T, into = c('chain','.', 'parameter')) %>% 
@@ -189,14 +180,14 @@ extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
   draws$draw_id <- draws$position + (draws$chain-1)*n_samples
   return(draws)
 }
-b_min <- extract_slopes(b_min)
-b_max <- extract_slopes(b_max)
-b_int <- extract_slopes(b_int)
-intercept <- extract_slopes(intercept)
-parameters <- rbind(b_min, b_max, b_int, intercept)
+#b_min <- extract_slopes(b_min)
+#b_max <- extract_slopes(b_max)
+#b_int <- extract_slopes(b_int)
+#intercept <- extract_slopes(intercept)
+#parameters <- rbind(b_min, b_max, b_int, intercept)
 
 ### save data 
-saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
+#saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
 
 #### check outputs ####
 # Assign random set of columns to check
@@ -250,6 +241,7 @@ plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, thresh
   edgelist <- edgelist[,c(4:5,1:3)]
   #net_all <- igraph::graph_from_edgelist(as.matrix(edgelist[, 1:2]), directed = F)
   threshold_edges <- edgelist[edgelist$median >= threshold,]
+  if(nrow(threshold_edges) == 0) { stop('No edges above threshold') }
   net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]), directed = F)
   
   if(is.data.frame(node.size) == TRUE ) {
@@ -317,8 +309,18 @@ for(j in 1:n_dyads){
 colnames(edge_samples) <- cdf_1$dyad_id
 
 ### plot network
+plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.05,
+                           node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.10,
+                           node.size = nodes, node.colour = nodes, lwd = 15)
 plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.15,
-                        node.size = nodes, node.colour = nodes, lwd = 15)
+                           node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.20,
+                           node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.25,
+                           node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.30,
+                           node.size = nodes, node.colour = nodes, lwd = 15)
 
 ### save image
 save.image('anp1_edgeweights_stanmodel.RData')
