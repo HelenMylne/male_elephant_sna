@@ -12,7 +12,6 @@ data {
 parameters {
   // edge weight
   vector<lower=0, upper=1>[n_dyads] edge_weight;      // edge weights for each dyad
-  real<lower=0, upper=1> theta;                       // mixture prior multiplication factor
   
   // likelihood
   real<lower=0> sigma_weight;             // Error standard deviation
@@ -29,17 +28,17 @@ parameters {
 }
 
 model {
+    // conditional prior for edge weight
+    for (i in 1:n_dyads) {
+        if (together[i] == 0)
+            edge_weight[i] ~ beta(0.7, 10);
+        else
+            edge_weight[i] ~ beta(1, 5);
+        }
+
     // estimate probability of association from times together out of times observed
     together ~ binomial(count_dyad, edge_weight);
-    // mixture prior for edge weight
-    for(i in 1:n_dyads){
-      target += log_mix(theta,
-                        beta_lpdf(edge_weight[i] | 0.7, 10),
-                        beta_lpdf(edge_weight[i] | 1, 5));
-    }
-    // prior for theta = flat prior 0-1
-    theta ~ beta(1,1);
-  
+
   // model
   for(i in 1:n_dyads) {
     logit(edge_weight[i]) ~ normal(intercept + b_min*age_min[i] + b_max*age_max[i] + mm[node_1[i]] + mm[node_2[i]], sigma_weight);  // b_int*age_min*age_max + 
@@ -59,4 +58,3 @@ model {
   sigma_mm ~ exponential(1);
 
 }
-
