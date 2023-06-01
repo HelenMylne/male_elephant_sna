@@ -1,5 +1,5 @@
 #### set up ####
-# library(tidyverse) ; library(dplyr) ; library(rstan) ; library(rethinking) ; library(igraph) ; library(dagitty) ; library(cmdstanr)
+# library(tidyverse) ; library(dplyr) ; library(rstan) ; library(rethinking) ; library(igraph) ; library(cmdstanr)
 library(tidyverse, lib.loc = 'packages/')
 library(dplyr, lib.loc = 'packages/')
 #library(rstan, lib.loc = 'packages/')
@@ -34,9 +34,9 @@ counts_ls <- list(
   )
 
 ### Fit model
-n_samples <- 1000
-n_chains <- 4
-n_dyads <- nrow(counts_df)
+num_samples <- 1000
+num_chains <- 4
+num_dyads <- nrow(counts_df)
 fit_weight_motnp <- edge_binary$sample(
   data = counts_ls, 
   chains = num_chains, 
@@ -102,7 +102,7 @@ colnames(edges) <- c('chain1','chain2','chain3','chain4')
 edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')
 edges$dyad <- counts_ls$dyad_ids[1]
 edges$position <- rep(1:n_samples, each = n_chains)
-for(i in 2:n_dyads){
+for(i in 2:num_dyads){
   x <- as.data.frame(edge_weights_matrix[,,i])
   colnames(x) <- c('chain1','chain2','chain3','chain4')
   x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
