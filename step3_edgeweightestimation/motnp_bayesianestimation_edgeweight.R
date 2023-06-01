@@ -21,11 +21,12 @@
 # install.packages('readxl')
 
 # load packages
-# library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(igraph) ; library(janitor) ; library(lubridate) ; library(hms) ; library(readxl)
+# library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(dagitty) ; library(igraph) ; library(janitor) ; library(lubridate) ; library(hms) ; library(readxl)
 library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
 library(dplyr, lib.loc = 'packages/')       # library(dplyr)
 #library(rstan, lib.loc = 'packages/')      # library(rstan)
 library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
+library(dagitty)
 library(igraph, lib.loc = 'packages/')      # library(igraph)
 library(janitor, lib.loc = 'packages/')     # library(janitor)
 library(lubridate, lib.loc = 'packages/')   # library(lubridate)
@@ -54,7 +55,7 @@ binom <- dagitty::dagitty("dag{
                          }")
 dagitty::coordinates(binom) <- list(x = c(age_1 = 0, age_2 = 2, edgeweight = 1, relatedness_dyad = 1),
                                     y = c(age_1 = 0, age_2 = 0, edgeweight = 1, relatedness_dyad = 2))
-drawdag(binom)
+rethinking::drawdag(binom)
 
 # plot with letters
 binom <- dagitty::dagitty("dag{
@@ -67,11 +68,11 @@ binom <- dagitty::dagitty("dag{
                          }")
 dagitty::coordinates(binom) <- list(x = c(A_1 = 0, A_2 = 2, EW = 1, R_d = 1),
                                     y = c(A_1 = 0, A_2 = 0, EW = 1, R_d = 2))
-drawdag(binom, radius = 6, cex = 1.6)
+rethinking::drawdag(binom, radius = 6, cex = 1.6)
 
 # clear environment and reset plot window
 rm(binom)
-#dev.off()
+
 #### complete data processing ####
 # load in age data
 motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
@@ -266,18 +267,18 @@ fit_edges_motnp <- edge_binary$sample(
 fit_edges_motnp
 
 ### extract posterior samples
-posterior_samples <- fit_edges_anp1$draws()
+posterior_samples <- fit_edges_motnp$draws()
 
 ### break down into parameters
 edge_weights_matrix <- posterior_samples[,,2:(nrow(counts_df)+1)]
 posterior_samples <- posterior_samples[,,(nrow(counts_df)+2):length(posterior_samples[1,1,])]
-mm_matrix <- posterior_samples[,,1:n_dyads]
-posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
-sigma_mm <- posterior_samples[,,1]
-b_min <- posterior_samples[,,2]
-b_max <- posterior_samples[,,3]
-b_int <- posterior_samples[,,4]
-intercept <- posterior_samples[,,5]
+#mm_matrix <- posterior_samples[,,1:n_dyads]
+#posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
+#sigma_mm <- posterior_samples[,,1]
+#b_min <- posterior_samples[,,2]
+#b_max <- posterior_samples[,,3]
+#b_int <- posterior_samples[,,4]
+#intercept <- posterior_samples[,,5]
 rm(posterior_samples) ; gc()
 
 ### save edge samples
@@ -294,8 +295,8 @@ for(i in 2:n_dyads){
   x$position <- rep(1:n_samples, each = n_chains)
   edges <- rbind(edges, x)
 }
-saveRDS(edges, '../data_processed/anp1_edgedistributions_mixtureprior.RDS')
-#edges <- readRDS('../data_processed/anp1_edgedistributions_beta1.5.RDS')
+saveRDS(edges, '../data_processed/motnp_edgedistributions_mixtureprior.RDS')
+#edges <- readRDS('../data_processed/motnp_edgedistributions_beta1.5.RDS')
 
 ### save parameter values
 extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
@@ -308,12 +309,12 @@ extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
   draws$draw_id <- draws$position + (draws$chain-1)*n_samples
   return(draws)
 }
-b_min <- extract_slopes(b_min)
-b_max <- extract_slopes(b_max)
-b_int <- extract_slopes(b_int)
-intercept <- extract_slopes(intercept)
-parameters <- rbind(b_min, b_max, b_int, intercept)
-saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
+#b_min <- extract_slopes(b_min)
+#b_max <- extract_slopes(b_max)
+#b_int <- extract_slopes(b_int)
+#intercept <- extract_slopes(intercept)
+#parameters <- rbind(b_min, b_max, b_int, intercept)
+#saveRDS(parameters, '../data_processed/motnp_dyadicregression_slopeparameters.RDS')
 
 #### check outputs: edge weights ####
 # Assign random set of columns to check
@@ -346,10 +347,10 @@ for(i in 1:length(plot_dyads)){
 }
 
 ### create plotting function
-plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
-                                        label.colour = 'transparent', label.font = 'Helvetica', 
-                                        node.size = 4, node.colour = 'seagreen1',
-                                        link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
+plot_network_threshold <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
+                                    label.colour = 'transparent', label.font = 'Helvetica', 
+                                    node.size = 4, node.colour = 'seagreen1',
+                                    link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
 {
   dyad_name <- do.call(paste, c(dyad_data[c("node_1", "node_2")], sep=" <-> "))
   edge_lower <- apply(edge_samples, 2, function(x) quantile(x, probs=0.025))
@@ -367,6 +368,7 @@ plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, thresh
   edgelist <- edgelist[,c(4:5,1:3)]
   #net_all <- igraph::graph_from_edgelist(as.matrix(edgelist[, 1:2]), directed = F)
   threshold_edges <- edgelist[edgelist$median >= threshold,]
+  if(nrow(threshold_edges) == 0) { stop('No edges above threshold') }
   net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]), directed = F)
   
   if(is.data.frame(node.size) == TRUE ) {
@@ -434,12 +436,22 @@ for(j in 1:n_dyads){
 colnames(edge_samples) <- counts_df$dyad_id
 
 ### plot network
-plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.1,
-                           node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.05,
+                       node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.10,
+                       node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.15,
+                       node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.20,
+                       node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.25,
+                       node.size = nodes, node.colour = nodes, lwd = 15)
+plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.30,
+                       node.size = nodes, node.colour = nodes, lwd = 15)
 
 ### save image
-save.image('anp1_edgeweights_stanmodel.RData')
-#load('anp1_edgeweights_stanmodel.RData')
+save.image('motnp_edgeweights_stanmodel.RData')
+#load('motnp_edgeweights_stanmodel.RData')
 
 #### check outputs: dyadic regression ####
 ### create mean data frame to plot average values over full distribution
@@ -633,4 +645,4 @@ ggplot()+
 dev.off()
 
 ### clear workspace
-rm(counts_df, n_dyads, counts_ls, n_eles, fit_edges_anp1, edges, plot_dyads, plot_edges, nodes, edge_weights_matrix, edge_samples)
+rm(counts_df, n_dyads, counts_ls, n_eles, fit_edges_motnp, edges, plot_dyads, plot_edges, nodes, edge_weights_matrix, edge_samples)
