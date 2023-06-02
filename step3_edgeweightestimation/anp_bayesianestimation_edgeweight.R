@@ -39,23 +39,24 @@ library(readxl, lib.loc = 'packages/')      # library(readxl)
 set.seed(12345)
 
 # create file of output graphs
-pdf('../outputs/anp_edgeweights_period1_mixtureprior.pdf', width = 20, height = 15)
+pdf('../outputs/anp_edgeweights_period1_conditionalprior_dyadreg.pdf', width = 20, height = 15)
 
 #### prior predictive check ####
 age_min <- 5:50
-N_max <- 12
-age_max <- seq(10, 50, length.out = N_max)
+age_max <- seq(10, 50, length.out = 12)
 par(mfrow = c(4,3))
 for(age in age_max){
   plot(NULL, xlim = c(5,50), ylim = c(0,1), las = 1,
      xlab = 'age of younger', ylab = 'edge weight', main = paste0('oldest = ',round(age)))
   for(i in 1:100){
-    intercept <- rnorm(1,-3,0.5)
-    beta_min <- rnorm(1, 0, 0.005)
-    beta_max <- rnorm(1, 0, 0.005)
-    beta_int <- rnorm(1, 0, 0.005)
+    intercept <- rnorm(1,-2,1)
+    beta_min <- rnorm(1, 0, 0.1)
+    beta_max <- rnorm(1, 0, 0.1)
+    #beta_int <- rnorm(1, 0, 0.005)
     min_new <- age_min[age > age_min]
-    lines(x = min_new, y = plogis(intercept + min_new*beta_min + age*beta_max + min_new*age*beta_int), 
+    lines(x = min_new, y = plogis(intercept + min_new*beta_min + 
+                                  #min_new*age*beta_int + 
+                                  age*beta_max), 
           col = rgb(0,0,1,0.2))
   }
 }
@@ -119,8 +120,7 @@ counts_ls <- list(
   node_1     = cdf_1$node_1,
   node_2     = cdf_1$node_2,
   age_min    = cdf_1$age_min,
-  age_max    = cdf_1$age_max,
-  n_samples  = n_samples
+  age_max    = cdf_1$age_max
 )
 n_eles <- length(unique(c(cdf_1$id_1, cdf_1$id_2)))
 
@@ -141,13 +141,18 @@ edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf_1)+1)]
 posterior_samples <- posterior_samples[,,(nrow(cdf_1)+2):length(posterior_samples[1,1,])]
 
 # extract dyadic regression slopes
-#mm_matrix <- posterior_samples[,,1:n_dyads]
-#posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
-#sigma_mm <- posterior_samples[,,1]
-#b_min <- posterior_samples[,,2]
-#b_max <- posterior_samples[,,3]
-#b_int <- posterior_samples[,,4]
-#intercept <- posterior_samples[,,5]
+sigma_weight <- posterior_samples[,,1]
+intercept <- posterior_samples[,,2]
+b_min <- posterior_samples[,,3]
+b_max <- posterior_samples[,,4]
+posterior_samples <- posterior_samples[,,5:length(posterior_samples[1,1,])]
+#b_int <- posterior_samples[,,1]
+#posterior_samples <- posterior_samples[,,2:length(posterior_samples[1,1,])]
+
+# extract multimembership samples
+mm_matrix <- posterior_samples[,,1:n_dyads]
+posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
+sigma_mm <- posterior_samples[,,1]
 rm(posterior_samples) ; gc()
 
 # save edge samples
@@ -166,11 +171,11 @@ for(i in 2:n_dyads){
 }
 
 ### save data 
-saveRDS(edges, '../data_processed/anp1_edgedistributions_mixtureprior.RDS')
-#edges <- readRDS('../data_processed/anp1_edgedistributions_beta1.5.RDS')
+saveRDS(edges, '../data_processed/anp1_edgedistributions_conditionalprior_dyadreg.RDS')
+#edges <- readRDS('../data_processed/anp1_edgedistributions_conditionalprior_dyadreg.RDS')
 
 # save parameter values
-#extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
+extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
   draws <- as.data.frame(draws) %>% 
     pivot_longer(everything(), names_to = 'chain', values_to = 'slope_draw') %>% 
     separate(chain, sep = c(1,2), remove = T, into = c('chain','.', 'parameter')) %>% 
@@ -180,14 +185,15 @@ saveRDS(edges, '../data_processed/anp1_edgedistributions_mixtureprior.RDS')
   draws$draw_id <- draws$position + (draws$chain-1)*n_samples
   return(draws)
 }
-#b_min <- extract_slopes(b_min)
-#b_max <- extract_slopes(b_max)
+b_min <- extract_slopes(b_min)
+b_max <- extract_slopes(b_max)
 #b_int <- extract_slopes(b_int)
-#intercept <- extract_slopes(intercept)
-#parameters <- rbind(b_min, b_max, b_int, intercept)
+intercept <- extract_slopes(intercept)
+parameters <- rbind(b_min, b_max, #b_int,
+                    intercept)
 
 ### save data 
-#saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
+saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
 
 #### check outputs ####
 # Assign random set of columns to check
