@@ -21,15 +21,15 @@
 
 # load packages
 # library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(igraph) ; library(janitor) ; library(lubridate) ; library(hms) ; library(readxl)
-library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
-library(dplyr, lib.loc = 'packages/')       # library(dplyr)
-#library(rstan, lib.loc = 'packages/')      # library(rstan)
-library(cmdstanr, lib.loc = 'packages/')    # library(cmdstanr)
-library(igraph, lib.loc = 'packages/')      # library(igraph)
-library(janitor, lib.loc = 'packages/')     # library(janitor)
-library(lubridate, lib.loc = 'packages/')   # library(lubridate)
-library(hms, lib.loc = 'packages/')         # library(hms)
-library(readxl, lib.loc = 'packages/')      # library(readxl)
+library(tidyverse, lib.loc = '../packages/')   # library(tidyverse)
+library(dplyr, lib.loc = '../packages/')       # library(dplyr)
+#library(rstan, lib.loc = '../packages/')      # library(rstan)
+library(cmdstanr, lib.loc = '../packages/')    # library(cmdstanr)
+library(igraph, lib.loc = '../packages/')      # library(igraph)
+library(janitor, lib.loc = '../packages/')     # library(janitor)
+library(lubridate, lib.loc = '../packages/')   # library(lubridate)
+library(hms, lib.loc = '../packages/')         # library(hms)
+library(readxl, lib.loc = '../packages/')      # library(readxl)
 
 # set stan path
 #set_cmdstan_path('/Users/helen/.cmdstan/cmdstan-2.32.1')
