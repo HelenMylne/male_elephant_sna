@@ -64,7 +64,7 @@ rm(list = ls()) ; gc()
 par(mfrow = c(1,1))
 
 # load edge weight model
-edge_binary <- cmdstan_model("models/edge_binary_with_dyadicregression.stan")
+edge_binary <- cmdstan_model("models/edge_binary_basic.stan")
 edge_binary
 
 #### create data lists ####
@@ -116,11 +116,11 @@ counts_ls <- list(
   n_dyads    = n_dyads,                  # total number of times one or other of the dyad was observed
   dyad_ids   = cdf_1$dyad_id,            # identifier for each dyad
   together   = cdf_1$event_count,        # count number of sightings seen together
-  count_dyad = cdf_1$period_count_dyad,  # count total number of times seen
-  node_1     = cdf_1$node_1,
-  node_2     = cdf_1$node_2,
-  age_min    = cdf_1$age_min,
-  age_max    = cdf_1$age_max
+  count_dyad = cdf_1$period_count_dyad#,  # count total number of times seen
+  #node_1     = cdf_1$node_1,
+  #node_2     = cdf_1$node_2,
+  #age_min    = cdf_1$age_min,
+  #age_max    = cdf_1$age_max
 )
 n_eles <- length(unique(c(cdf_1$id_1, cdf_1$id_2)))
 
@@ -138,21 +138,21 @@ posterior_samples <- fit_edges_anp1$draws()
 
 # extract edge weights
 edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf_1)+1)]
-posterior_samples <- posterior_samples[,,(nrow(cdf_1)+2):length(posterior_samples[1,1,])]
+#posterior_samples <- posterior_samples[,,(nrow(cdf_1)+2):length(posterior_samples[1,1,])]
 
 # extract dyadic regression slopes
-sigma_weight <- posterior_samples[,,1]
-intercept <- posterior_samples[,,2]
-b_min <- posterior_samples[,,3]
-b_max <- posterior_samples[,,4]
-posterior_samples <- posterior_samples[,,5:length(posterior_samples[1,1,])]
+#sigma_weight <- posterior_samples[,,1]
+#intercept <- posterior_samples[,,2]
+#b_min <- posterior_samples[,,3]
+#b_max <- posterior_samples[,,4]
+#posterior_samples <- posterior_samples[,,5:length(posterior_samples[1,1,])]
 #b_int <- posterior_samples[,,1]
 #posterior_samples <- posterior_samples[,,2:length(posterior_samples[1,1,])]
 
 # extract multimembership samples
-mm_matrix <- posterior_samples[,,1:n_dyads]
-posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
-sigma_mm <- posterior_samples[,,1]
+#mm_matrix <- posterior_samples[,,1:n_dyads]
+#posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
+#sigma_mm <- posterior_samples[,,1]
 rm(posterior_samples) ; gc()
 
 # save edge samples
@@ -175,27 +175,27 @@ saveRDS(edges, '../data_processed/anp1_edgedistributions_conditionalprior_dyadre
 #edges <- readRDS('../data_processed/anp1_edgedistributions_conditionalprior_dyadreg.RDS')
 
 # save parameter values
-extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
-  draws <- as.data.frame(draws) %>% 
-    pivot_longer(everything(), names_to = 'chain', values_to = 'slope_draw') %>% 
-    separate(chain, sep = c(1,2), remove = T, into = c('chain','.', 'parameter')) %>% 
-    select(-.)
-  draws$chain <- as.numeric(draws$chain)
-  draws$position <- rep(1:n_samples, each = n_chains)
-  draws$draw_id <- draws$position + (draws$chain-1)*n_samples
-  return(draws)
-}
-b_min <- extract_slopes(b_min)
-b_max <- extract_slopes(b_max)
+#extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
+#  draws <- as.data.frame(draws) %>% 
+#    pivot_longer(everything(), names_to = 'chain', values_to = 'slope_draw') %>% 
+#    separate(chain, sep = c(1,2), remove = T, into = c('chain','.', 'parameter')) %>% 
+#    select(-.)
+#  draws$chain <- as.numeric(draws$chain)
+#  draws$position <- rep(1:n_samples, each = n_chains)
+#  draws$draw_id <- draws$position + (draws$chain-1)*n_samples
+#  return(draws)
+#}
+#b_min <- extract_slopes(b_min)
+#b_max <- extract_slopes(b_max)
 #b_int <- extract_slopes(b_int)
-intercept <- extract_slopes(intercept)
-parameters <- rbind(b_min, b_max, #b_int,
-                    intercept)
+#intercept <- extract_slopes(intercept)
+#parameters <- rbind(b_min, b_max, #b_int,
+#                    intercept)
 
 ### save data 
-saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
+#saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
 
-#### check outputs ####
+#### check outputs: edge weights ####
 # Assign random set of columns to check
 if(length(which(cdf_1$event_count >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(cdf_1$event_count >= 1)) }
 plot_dyads <- c(sample(cdf_1$dyad_id[cdf_1$event_count >= 1], size = n_test, replace = F),
@@ -225,6 +225,7 @@ for(i in 1:length(plot_dyads)){
   lines(density(x$edge_draw), col = ifelse(x$seen_together == 1, rgb(0,0,1,0.1), rgb(1,0,0,0.1)))
 }
 
+#### check outputs: plot network ####
 ### create plotting function
 plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
                                      label.colour = 'transparent', label.font = 'Helvetica', 
@@ -328,10 +329,96 @@ plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, thres
 plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.30,
                            node.size = nodes, node.colour = nodes, lwd = 15)
 
-### save image
-save.image('anp1_edgeweights_stanmodel.RData')
-#load('anp1_edgeweights_stanmodel.RData')
+### clean workspace
+rm(counts, counts_df, counts_ls, males, x) ; gc()
 
+### save image
+save.image('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
+#load('anpshort1_edgeweights_conditionalprior.RData')
+
+#### check outputs: compare edge weight distributions to simple SRI ####
+# load in workspace image with edge weights already calculated
+#load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
+
+### create data frame with SRI and bison weights in it
+make_edgelist <- function (edge_samples, dyad_data)
+{
+  dyad_name <- do.call(paste, c(dyad_data[c("node_1", "node_2")], sep=" <-> "))
+  edge_lower <- apply(edge_samples, 2, function(x) quantile(x, probs=0.025))
+  edge_upper <- apply(edge_samples, 2, function(x) quantile(x, probs=0.975))
+  edge_median <- apply(edge_samples, 2, function(x) quantile(x, probs=0.5))
+  edge_list <- cbind(
+    "median"=round(edge_median, 3), 
+    "2.5%"=round(edge_lower, 3), 
+    "97.5%"=round(edge_upper, 3)
+  )
+  rownames(edge_list) <- dyad_name
+  edgelist <- as.data.frame(edge_list)
+  edgelist$node_1 <- as.character(dyad_data$node_1)
+  edgelist$node_2 <- as.character(dyad_data$node_2)
+  edgelist <- edgelist[,c(4:5,1:3)]
+  return(edgelist)
+}
+edgelist <- make_edgelist(edge_samples = edge_samples, dyad_data = cdf_1)     # obtain edge list
+head(edgelist)                                                                # check structure of edgelist
+edgelist$node_1 <- as.integer(edgelist$node_1)                                # convert to integers
+edgelist$node_2 <- as.integer(edgelist$node_2)                                # convert to integers
+summary <- left_join(edgelist, cdf_1[,c(1:7,10,26:29,32:33)], by = c('node_1','node_2'))    # combine distribution data with raw counts
+head(summary)
+summary$sri <- summary$event_count / summary$period_count_dyad
+
+### plot bison against SRI
+plot(density(summary$sri), main = 'red = SRI, blue = BISoN', col = 'red', lwd = 2, las = 1) # plot SRI distribution
+lines(density(summary$median), col = 'blue', lwd = 2)                                       # distribution of median estimates
+
+# try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
+plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
+draws <- left_join(plot_edges, cdf_1[,c('dyad_id','event_count','period_count_dyad')], by = 'dyad_id') # combine to add node data
+draws$sri <- draws$event_count / draws$period_count_dyad                     # calculate basic SRI to compare with distributions
+
+draws$median <- NA ; for(i in 1:nrow(draws)){                                # set up for loop
+  x <- draws[draws$dyad == draws$dyad[i],]                                   # generate dataset cut down to just the dyad in question
+  draws$median[i] <- median(x$edge_draw) }                                   # record median draw value
+head(draws)                                                                  # check structure of data frame
+which(is.na(draws$median) == TRUE)[1]                                        # check that all are filled in
+
+draws$dyad_id <- reorder(draws$dyad_id, draws$duration)                      # order data frame based on total sightings per pair
+ggplot(data = draws, mapping = aes(x = weight))+                             # plot data frame
+  geom_density(colour = 'blue')+                                             # plot density plots of probability distributions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+          # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+  # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                # add line showing where the SRI value is
+
+write_csv(draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_strongprior.csv')    # save output for future reference
+
+draws <- draws[draws$sri > 0.2,]                                                # repeat subsetting but selecting only the dyads with the highest SRI values (generally some of the least sighted individuals)
+draws$median <- NA ; for(i in 1:nrow(draws)){                            # set up for loop
+  x <- draws[draws$dyad_id == draws$dyad_id[i],]                  # generate dataset cut down to just the dyad in question
+  draws$median[i] <- ifelse(draws$dyad_id[i] == x$dyad_id[1], median(x$weight), draws$median[i]) }   # record median draw value
+head(draws)                                                                     # check structure of data frame
+which(is.na(draws$median) == TRUE)[1]                                           # check that all are filled in
+
+draws$dyad_id <- reorder(draws$dyad_id, draws$duration)           # order dataframe based on total sightings per pair
+ggplot(data = draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15)+                                       # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
+
+ggplot(data = draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
+
+write_csv(draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_strongprior.csv')    # save output for future reference
+
+# clean environment
+rm(draws, dyads, priors, draws, x) ; gc()
+dev.off()
+
+
+#### check outputs: edges against age values ####
 ### create mean data frame to plot average values over full distribution
 mean_edges <- data.frame(dyad = cdf_1$dyad_id,
                          node_1 = cdf_1$node_1, node_2 = cdf_1$node_2,
@@ -665,3 +752,5 @@ for(time_window in 2:n_windows){
   rm(cdf, n_dyads, counts_ls, n_eles, fit_edges, posterior_samples, edges, plot_dyads, plot_edges, nodes, edge_weights_matrix, edge_samples)
   
 }
+
+
