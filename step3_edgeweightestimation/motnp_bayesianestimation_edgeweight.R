@@ -22,6 +22,7 @@
 
 # load packages
 # library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(dagitty) ; library(igraph) ; library(janitor) ; library(lubridate) ; library(hms) ; library(readxl)
+# set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
 library(tidyverse, lib.loc = 'packages/')   # library(tidyverse)
 library(dplyr, lib.loc = 'packages/')       # library(dplyr)
 #library(rstan, lib.loc = 'packages/')      # library(rstan)
@@ -41,7 +42,7 @@ library(readxl, lib.loc = 'packages/')      # library(readxl)
 set.seed(12345)
 
 # create file of output graphs
-pdf('../outputs/motnp_edgeweights_mixtureprior.pdf', width = 20, height = 20)
+pdf('../outputs/motnp_edgeweights_conditionalprior.pdf', width = 20, height = 20)
 
 #### draw dyadic regression DAGS ####
 # plot with full names
@@ -271,7 +272,7 @@ posterior_samples <- fit_edges_motnp$draws()
 
 ### break down into parameters
 edge_weights_matrix <- posterior_samples[,,2:(nrow(counts_df)+1)]
-posterior_samples <- posterior_samples[,,(nrow(counts_df)+2):length(posterior_samples[1,1,])]
+#posterior_samples <- posterior_samples[,,(nrow(counts_df)+2):length(posterior_samples[1,1,])]
 #mm_matrix <- posterior_samples[,,1:n_dyads]
 #posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
 #sigma_mm <- posterior_samples[,,1]
@@ -295,8 +296,8 @@ for(i in 2:n_dyads){
   x$position <- rep(1:n_samples, each = n_chains)
   edges <- rbind(edges, x)
 }
-saveRDS(edges, '../data_processed/motnp_edgedistributions_mixtureprior.RDS')
-#edges <- readRDS('../data_processed/motnp_edgedistributions_beta1.5.RDS')
+saveRDS(edges, '../data_processed/motnp_edgedistributions_conditionalprior.RDS')
+#edges <- readRDS('../data_processed/motnp_edgedistributions_conditionalprior.RDS')
 
 ### save parameter values
 extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
@@ -450,8 +451,8 @@ plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, thres
                        node.size = nodes, node.colour = nodes, lwd = 15)
 
 ### save image
-save.image('motnp_edgeweights_stanmodel.RData')
-#load('motnp_edgeweights_stanmodel.RData')
+save.image('motnp_edgeweights_conditionalpriors.RData')
+#load('motnp_edgeweights_conditionalpriors.RData')
 
 #### check outputs: dyadic regression ####
 ### create mean data frame to plot average values over full distribution
@@ -640,6 +641,84 @@ ggplot()+
 ggplot()+
   geom_line(data = mean_predict_long, mapping = aes(x = age_diff, y = mean_edge_weight, colour = age_min, group = age_min))+
   scale_x_continuous(limits = c(0,40))
+
+#### check outputs: compare to simple SRI ####
+# load in edge weights
+saveRDS(edges, '../data_processed/motnp_edgedistributions_conditionalprior.RDS')
+
+
+### plot against SRI
+head(edgelist)                                                                      # check structure of edgelist
+colnames(edgelist)[1:2] <- colnames(counts_df_model)[1:2]                           # rename for join function
+edgelist$node_1_id <- as.integer(edgelist$node_1_id)                                # convert to integers
+edgelist$node_2_id <- as.integer(edgelist$node_2_id)                                # convert to integers
+summary <- left_join(edgelist, counts_df_model, by = c('node_1_id','node_2_id'))    # combine distribution data with raw counts
+counts <- counts_df[,c('node_1_males','node_2_males','count_1','count_2')]          # add individual count data
+colnames(counts)[1:2] <- c('node_1_id','node_2_id')                                 # rename for join function
+summary <- left_join(summary, counts, by = c('node_1_id','node_2_id'))              # combine summary data with individual counts
+summary$sri <- summary$event / (summary$duration)                                   # calculate basic SRI
+
+plot(density(summary$sri), main = 'SRI vs model output: blue=all,\nred=both seen 8 times, green=both 12 times') # plot SRI distribution
+lines(density(summary$median), col = 'blue')                                                                    # distribution of median estimates
+lines(density(summary$median[which(summary$count_1 >= 8 & summary$count_2 >= 8)]), col = 'red')                 # distribution of median estimates for frequently sighted males
+lines(density(summary$median[which(summary$count_1 >= 12 & summary$count_2 >= 12)]), col = 'green')             # distribution of median estimates for frequently sighted males
+
+# try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
+dyads <- counts_df[,c('dyad_id','node_1_males','node_2_males')]                        # create data frame of dyads
+colnames(dyads) <- c('dyad_id','node_1_id','node_2_id')                                # rename for joining
+dyads <- left_join(dyads, counts_df_model, by = c('node_1_id','node_2_id'))            # join with counts data (creates counts_df_model but with dyad_id)
+length(which(is.na(dyads$duration) == TRUE))
+
+draws <- as.data.frame(motnp_fit_edges$chain) %>%                      # generate dataframe of draws per dyad
+  pivot_longer(cols = everything(), names_to = 'dyad_model', values_to = 'edge')       # convert to a long format
+draws$dyad_id <- rep(counts_df$dyad_id, 4000)                                          # add dyad_id data
+draws$weight <- gtools::inv.logit(draws$edge)                                          # convert to 0-1 bounded values
+draws$draw <- rep(1:4000,  each = nrow(counts_df_model))                               # add chain position number
+draws <- left_join(draws, dyads, by = 'dyad_id')                                       # combine to add node data
+draws$sri <- draws$event / draws$duration                                              # calculate basic SRI to compare with distributions
+
+set.seed(15)                                                                           # make subsetting reproducible
+subset_draws <- draws[draws$dyad_id %in% sample(draws$dyad_id, 150, replace = F),]     # sample 150 dyads at random to plot (takes a very long time)
+subset_draws$median <- NA ; for(i in 1:nrow(subset_draws)){                            # set up for loop
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]                  # generate dataset cut down to just the dyad in question
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i]) }   # record median draw value
+head(subset_draws)                                                                     # check structure of data frame
+which(is.na(subset_draws$median) == TRUE)[1]                                           # check that all are filled in
+
+subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)           # order dataframe based on total sightings per pair
+ggplot(data = subset_draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
+
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_strongprior.csv')    # save output for future reference
+
+subset_draws <- draws[draws$sri > 0.2,]                                                # repeat subsetting but selecting only the dyads with the highest SRI values (generally some of the least sighted individuals)
+subset_draws$median <- NA ; for(i in 1:nrow(subset_draws)){                            # set up for loop
+  x <- subset_draws[subset_draws$dyad_id == subset_draws$dyad_id[i],]                  # generate dataset cut down to just the dyad in question
+  subset_draws$median[i] <- ifelse(subset_draws$dyad_id[i] == x$dyad_id[1], median(x$weight), subset_draws$median[i]) }   # record median draw value
+head(subset_draws)                                                                     # check structure of data frame
+which(is.na(subset_draws$median) == TRUE)[1]                                           # check that all are filled in
+
+subset_draws$dyad_id <- reorder(subset_draws$dyad_id, subset_draws$duration)           # order dataframe based on total sightings per pair
+ggplot(data = subset_draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15)+                                       # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
+
+ggplot(data = subset_draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
+
+write_csv(subset_draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_strongprior.csv')    # save output for future reference
+
+# clean environment
+rm(draws, dyads, priors, subset_draws, x) ; gc()
+dev.off()
 
 ### end pdf
 dev.off()
