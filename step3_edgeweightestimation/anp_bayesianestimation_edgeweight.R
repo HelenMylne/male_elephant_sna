@@ -398,16 +398,24 @@ draws$median <- NA ; for(i in 1:nrow(draws)){                            # set u
 head(draws)                                                                     # check structure of data frame
 which(is.na(draws$median) == TRUE)[1]                                           # check that all are filled in
 
-draws$dyad_id <- reorder(draws$dyad_id, draws$duration)           # order dataframe based on total sightings per pair
-ggplot(data = draws, mapping = aes(x = weight))+                                # plot dataframe
+draws$dyad_id <- reorder(draws$dyad_id, draws$period_count_dyad)           # order dataframe based on total sightings per pair
+ggplot(data = draws, mapping = aes(x = edge_draw))+                                # plot dataframe
   geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15)+                                       # split by dyad, allow to vary height depending on dyad
+  facet_wrap(. ~ dyad_id, nrow = 20)+                                       # split by dyad, allow to vary height depending on dyad
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
-
-ggplot(data = draws, mapping = aes(x = weight))+                                # plot dataframe
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red') +                        # add line showing where the SRI value is
+  theme(strip.text.x = element_text(size=0))
+draws$dyad_id <- reorder(draws$dyad_id, draws$sri)           # order dataframe based on total sightings per pair
+ggplot(data = draws, mapping = aes(x = edge_draw))+                                # plot dataframe
   geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
+  facet_wrap(. ~ dyad_id, nrow = 20)+                                       # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red') +                        # add line showing where the SRI value is
+  theme(strip.text.x = element_text(size=0))
+
+ggplot(data = draws, mapping = aes(x = edge_draw))+                                # plot dataframe
+  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 20, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
   geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
 
@@ -416,7 +424,6 @@ write_csv(draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_stron
 # clean environment
 rm(draws, dyads, priors, draws, x) ; gc()
 dev.off()
-
 
 #### check outputs: edges against age values ####
 ### create mean data frame to plot average values over full distribution
