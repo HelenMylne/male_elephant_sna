@@ -20,28 +20,27 @@ library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
 library(bisonR, lib.loc = '../packages/')          # library(bisonR)
 library(janitor, lib.loc = '../packages/')         # library(janitor)
 
-#### prior predictive check ####
-priors <- get_default_priors('binary')
-priors$fixed
-prior_check(priors, 'binary')
+## load work space from calculating edge weights
+load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
+rm(counts_df, x, i, males, counts_ls, plot_edges) ; gc()
 
+## define PDF output
+pdf('../outputs/anpshort1_nodalregression_conditionalprior.pdf')
+
+#### prior predictive check ####
 age <- 1:60
 beta_mu <- 0
 beta_sigma <- 0.005
-
-load('anp_edgecalculations/anpshort1_bisonr_edgescalculated.RData')
-rm(counts_df_model, counts_df_allwindows, df, edgelist, ew_chain, ew_edgelist, global_cv, anp_edges_null, draw98, i, ids, median98, sri98, plot_network_threshold, plot_network_threshold2) ; gc()
-
 mean_age <- mean(nodes$age)
 plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
      xlab = 'age', ylab = 'eigenvector centrality')
 for(i in 1:100){
-  intercept <- rbeta(1,2,2)   # this isn't right but I don't think there is a prior for the intercept?? I've gone for a symmetrical one here that in itself explores most of the parameter space and allows it to see whether some of the lines are steep enough to go from top to bottom, but on the assumption that when combined, they will explore only the space relevant to their starting position
+  intercept <- rbeta(1,2,2)   # is this right?? I've gone for a symmetrical one here that in itself explores most of the parameter space and allows it to see whether some of the lines are steep enough to go from top to bottom, but on the assumption that when combined, they will explore only the space relevant to their starting position
   beta <- rnorm(1, beta_mu, beta_sigma)
-  lines(x = age, y = intercept + (age - mean_age)*beta, col = rgb(0,0,1,0.5)) # vast majority come out somewhere sensible, and those that don't would if they started at a different value for age 10 so that comes down to my ability to work out what the intercept prior should actually be -- think this is a good prior for the slope
+  lines(x = age, y = intercept + (age - mean_age)*beta, col = rgb(0,0,1,0.5)) # vast majority come out somewhere sensible, and those that don't would if they started at a different value for age 10 so fine in combo with posterior intercept
 }
 
-#### nodal regression -- only one age value ####
+#### nodal regression -- bisonR, all time windows ####
 # load edge weight model and data frames
 for( time_window in 1:36) {
   
@@ -142,28 +141,6 @@ for( time_window in 1:36) {
 }
 
 #### nodal regression -- time window 1 only, not using bisonR ####
-# load edge weight model and data frames
-## load work space from calculating edge weights
-load('anp_edgecalculations/anpshort1_bisonr_edgescalculated.RData')
-rm(counts_df, x, posterior_samples, i) ; gc()
-
-## create nodal data frame from counts_df (data frame of dyad counts of sightings together vs apart)
-# define PDF output
-pdf('../outputs/anpshort1_nodalregression_stanmodel.pdf')
-
-#### prior predictive check
-age <- 1:60
-beta_mu <- 0
-beta_sigma <- 0.005
-mean_age <- mean(nodes$age)
-plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
-     xlab = 'age', ylab = 'eigenvector centrality')
-for(i in 1:100){
-  intercept <- rbeta(1,2,2)   # this isn't right but I don't think there is a prior for the intercept?? I've gone for a symmetrical one here that in itself explores most of the parameter space and allows it to see whether some of the lines are steep enough to go from top to bottom, but on the assumption that when combined, they will explore only the space relevant to their starting position
-  beta <- rnorm(1, beta_mu, beta_sigma)
-  lines(x = age, y = intercept + (age - mean_age)*beta, col = rgb(0,0,1,0.5)) # vast majority come out somewhere sensible, and those that don't would if they started at a different value for age 10 so that comes down to my ability to work out what the intercept prior should actually be -- think this is a good prior for the slope
-}
-
 ### extract eigenvector centralities
 eigen <- array(data = NA, dim = c(n_eles, 4, n_samples*n_chains),
                dimnames = list(nodes$node, c('node','age','sightings','eigenvector'), 1:(n_samples*n_chains)))
@@ -197,11 +174,11 @@ for(draw in 1:(n_samples*n_chains)){
 ## check eigenvector against sightings
 plot(NULL, xlim = c(0,max(nodes$sightings)), ylim = c(0,1), las = 1, xlab = 'sightings', ylab = 'eigenvector')
 for(i in 1:n_samples){
-  points(eigen[,4,i] ~ eigen[,3,i], pch = 19, col = rgb(0,0,1,0.1))
+  points(eigen[,4,i] ~ eigen[,3,i], pch = 19, col = rgb(0.5,0,1,0.1))
 }
 for(i in 1:n_eles){
   x <- eigen[i,,]
-  points(mean(x[4,]) ~ x[3,1], pch = 19, col = 'red')
+  points(mean(x[4,]) ~ x[3,1], pch = 19, col = 'yellow')
 }
 
 ## run model ####
@@ -210,17 +187,23 @@ eigen_list <- list()
 for(i in 1:(n_chains*n_samples)){
   eigen_list[[i]] <- eigen[,,i]
 }
+
+prior_slope <- set_prior(prior = 'normal(0, 0.005)')
+#prior_intercept <- set_prior(prior = 'beta(2, 2)')
+
 anp_eigen <- brm_multiple(
   formula = bf(eigenvector ~ age),
   data = eigen_list,
   chains = 4,
   iter = 10000,
-  thin = 2
+  thin = 2,
+  prior = prior_slope
 )
+
 summary(anp_eigen)
 
 ## save output
-save.image(paste0('anp_edgecalculations/anpshort1_nodalregression_stanmodel.RData'))
+save.image('anpshort1_nodalregression_conditionaledge.RData')
 
 ## posterior check ####
 # plot
