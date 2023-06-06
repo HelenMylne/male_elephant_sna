@@ -41,28 +41,6 @@ set.seed(12345)
 # create file of output graphs
 pdf('../outputs/anp_edgeweights_period1_conditionalprior_dyadreg.pdf', width = 20, height = 15)
 
-#### prior predictive check ####
-age_min <- 5:50
-age_max <- seq(10, 50, length.out = 12)
-par(mfrow = c(4,3))
-for(age in age_max){
-  plot(NULL, xlim = c(5,50), ylim = c(0,1), las = 1,
-     xlab = 'age of younger', ylab = 'edge weight', main = paste0('oldest = ',round(age)))
-  for(i in 1:100){
-    intercept <- rnorm(1,-2,1)
-    beta_min <- rnorm(1, 0, 0.1)
-    beta_max <- rnorm(1, 0, 0.1)
-    #beta_int <- rnorm(1, 0, 0.005)
-    min_new <- age_min[age > age_min]
-    lines(x = min_new, y = plogis(intercept + min_new*beta_min + 
-                                  #min_new*age*beta_int + 
-                                  age*beta_max), 
-          col = rgb(0,0,1,0.2))
-  }
-}
-rm(list = ls()) ; gc()
-par(mfrow = c(1,1))
-
 # load edge weight model
 edge_binary <- cmdstan_model("models/edge_binary_basic.stan")
 edge_binary
