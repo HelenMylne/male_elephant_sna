@@ -37,3 +37,9 @@ vignettes/*.pdf
 # produced images
 *.png
 *.svg
+# other file types used in production of chapter
+*.ppt
+*.pptx
+*.doc
+*.docx
+
