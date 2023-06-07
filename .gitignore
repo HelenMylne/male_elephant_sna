@@ -30,6 +30,7 @@ vignettes/*.pdf
 .csv
 .rds
 .xlsx
+*.exe
 # DS Store files for Mac Finder navigation
 *.DS_Store
 # R markdown files -- currently don't need them
