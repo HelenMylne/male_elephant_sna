@@ -5,7 +5,7 @@
 # Data input: raw data provided by ATE processed in scripts 22.03.20_anp_dataprocessing1.R and 22.03.22_anp_dataprocessing2.R
 
 #### set up ####
-# install packages
+### install packages
 # install.packages('tidyverse')
 # install.packages('dplyr')
 # install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
@@ -19,7 +19,7 @@
 # install.packages('hms')
 # install.packages('readxl')
 
-# load packages
+### load packages
 # library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(igraph) ; library(janitor) ; library(lubridate) ; library(hms) ; library(readxl)
 library(tidyverse, lib.loc = '../packages/')   # library(tidyverse)
 library(dplyr, lib.loc = '../packages/')       # library(dplyr)
@@ -31,35 +31,28 @@ library(lubridate, lib.loc = '../packages/')   # library(lubridate)
 library(hms, lib.loc = '../packages/')         # library(hms)
 library(readxl, lib.loc = '../packages/')      # library(readxl)
 
-# set stan path
+### set stan path
 #set_cmdstan_path('/Users/helen/.cmdstan/cmdstan-2.32.1')
 #set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0')
 
-# set seed
+### set seed
 set.seed(12345)
 
-# create file of output graphs
-pdf('../outputs/anp_edgeweights_period1_conditionalprior_dyadreg.pdf', width = 20, height = 15)
+### create file of output graphs
+pdf('../outputs/anpshort1_edgeweights_conditionalprior.pdf', width = 20, height = 15)
 
-# load edge weight model
+### load edge weight model
 edge_binary <- cmdstan_model("models/edge_binary_basic.stan")
 edge_binary
 
-#### create data lists ####
+#### import data ####
+### import aggregated counts of sightings together and apart, and info about individuals
 counts_df <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows_impossiblepairsremoved.csv')
 
+### set up values for running loop
 periods <- sort(unique(c(counts_df$period_start, counts_df$period_end)))
-
-males <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>% janitor::clean_names()
-males$id <- paste0('M',males$casename)
-ids <- sort(unique(c(counts_df$id_1, counts_df$id_2)))
-males <- males %>% dplyr::filter(id %in% ids)
-
-# softcode certain values
 n_windows <- length(unique(counts_df$period))
-n_males <- length(unique(males$id))
 
-#### run model on real standardised data -- period 1 ####
 ### subset by time window
 cdf_1 <- counts_df[counts_df$period == 1,]
 
@@ -78,14 +71,6 @@ for(i in 1:nrow(nodes)){
   nodes$sightings[i] <- x$period_count
 }
 
-### identify older and younger of dyad
-cdf_1$age_min <- NA ; cdf_1$age_max <- NA
-for(i in 1:nrow(cdf_1)){
-  x <- c(cdf_1$age_start_1[i],cdf_1$age_start_2[i])
-  cdf_1$age_min[i] <- min(x)
-  cdf_1$age_max[i] <- max(x)
-}
-
 ### create data list
 n_chains <- 4
 n_samples <- 1000
@@ -95,45 +80,28 @@ counts_ls <- list(
   dyad_ids   = cdf_1$dyad_id,            # identifier for each dyad
   together   = cdf_1$event_count,        # count number of sightings seen together
   count_dyad = cdf_1$period_count_dyad#,  # count total number of times seen
-  #node_1     = cdf_1$node_1,
-  #node_2     = cdf_1$node_2,
-  #age_min    = cdf_1$age_min,
-  #age_max    = cdf_1$age_max
 )
-n_eles <- length(unique(c(cdf_1$id_1, cdf_1$id_2)))
 
+#### run model on real standardised data -- period 1 ####
 ### Fit model
 fit_edges_anp1 <- edge_binary$sample(
   data = counts_ls, 
   chains = n_chains, 
-  parallel_chains = n_chains)
+  parallel_chains = n_chains,
+  iter_warmup = n_samples,
+  iter_sampling = n_samples)
 
 ### check model
 fit_edges_anp1
 
-# Extract posterior samples
+### Extract posterior samples
 posterior_samples <- fit_edges_anp1$draws()
 
-# extract edge weights
+### extract edge weights
 edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf_1)+1)]
-#posterior_samples <- posterior_samples[,,(nrow(cdf_1)+2):length(posterior_samples[1,1,])]
+rm(posterior_samples, x, i) ; gc()
 
-# extract dyadic regression slopes
-#sigma_weight <- posterior_samples[,,1]
-#intercept <- posterior_samples[,,2]
-#b_min <- posterior_samples[,,3]
-#b_max <- posterior_samples[,,4]
-#posterior_samples <- posterior_samples[,,5:length(posterior_samples[1,1,])]
-#b_int <- posterior_samples[,,1]
-#posterior_samples <- posterior_samples[,,2:length(posterior_samples[1,1,])]
-
-# extract multimembership samples
-#mm_matrix <- posterior_samples[,,1:n_dyads]
-#posterior_samples <- posterior_samples[,,(n_dyads+1):length(posterior_samples[1,1,])]
-#sigma_mm <- posterior_samples[,,1]
-rm(posterior_samples) ; gc()
-
-# save edge samples
+### save edge samples
 edges <- as.data.frame(edge_weights_matrix[,,1])
 colnames(edges) <- c('chain1','chain2','chain3','chain4')
 edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')
@@ -149,32 +117,11 @@ for(i in 2:n_dyads){
 }
 
 ### save data 
-saveRDS(edges, '../data_processed/anp1_edgedistributions_conditionalprior_dyadreg.RDS')
-#edges <- readRDS('../data_processed/anp1_edgedistributions_conditionalprior_dyadreg.RDS')
-
-# save parameter values
-#extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
-#  draws <- as.data.frame(draws) %>% 
-#    pivot_longer(everything(), names_to = 'chain', values_to = 'slope_draw') %>% 
-#    separate(chain, sep = c(1,2), remove = T, into = c('chain','.', 'parameter')) %>% 
-#    select(-.)
-#  draws$chain <- as.numeric(draws$chain)
-#  draws$position <- rep(1:n_samples, each = n_chains)
-#  draws$draw_id <- draws$position + (draws$chain-1)*n_samples
-#  return(draws)
-#}
-#b_min <- extract_slopes(b_min)
-#b_max <- extract_slopes(b_max)
-#b_int <- extract_slopes(b_int)
-#intercept <- extract_slopes(intercept)
-#parameters <- rbind(b_min, b_max, #b_int,
-#                    intercept)
-
-### save data 
-#saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
+saveRDS(edges, '../data_processed/anpshort1_edgedistributions_conditionalprior.RDS')
+#edges <- readRDS('../data_processed/anpshort1_edgedistributions_conditionalprior.RDS')
 
 #### check outputs: edge weights ####
-# Assign random set of columns to check
+### Assign random set of columns to check
 if(length(which(cdf_1$event_count >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(cdf_1$event_count >= 1)) }
 plot_dyads <- c(sample(cdf_1$dyad_id[cdf_1$event_count >= 1], size = n_test, replace = F),
                 sample(cdf_1$dyad_id[cdf_1$event_count == 0], size = n_test, replace = F))
@@ -308,14 +255,14 @@ plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, thres
                            node.size = nodes, node.colour = nodes, lwd = 15)
 
 ### clean workspace
-rm(counts, counts_df, counts_ls, males, x) ; gc()
+rm(counts_ls, x, edge_weights_matrix, i, j) ; gc()
 
 ### save image
 save.image('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
-#load('anpshort1_edgeweights_conditionalprior.RData')
+#load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 
 #### check outputs: compare edge weight distributions to simple SRI ####
-# load in workspace image with edge weights already calculated
+### load in workspace image with edge weights already calculated
 #load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 
 ### create data frame with SRI and bison weights in it
@@ -349,259 +296,52 @@ summary$sri <- summary$event_count / summary$period_count_dyad
 plot(density(summary$sri), main = 'red = SRI, blue = BISoN', col = 'red', lwd = 2, las = 1) # plot SRI distribution
 lines(density(summary$median), col = 'blue', lwd = 2)                                       # distribution of median estimates
 
-# try plotting a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
+### plot a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
 plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
-draws <- left_join(plot_edges, cdf_1[,c('dyad_id','event_count','period_count_dyad')], by = 'dyad_id') # combine to add node data
-draws$sri <- draws$event_count / draws$period_count_dyad                     # calculate basic SRI to compare with distributions
+draws <- left_join(plot_edges, summary, by = 'dyad_id') %>%                  # combine to add node and median value data
+  select(-dyad.x) %>% rename(dyad = dyad.y)                                  # clean up names
+which(is.na(draws) == TRUE)                                                  # check fully merged
 
-draws$median <- NA ; for(i in 1:nrow(draws)){                                # set up for loop
-  x <- draws[draws$dyad == draws$dyad[i],]                                   # generate dataset cut down to just the dyad in question
-  draws$median[i] <- median(x$edge_draw) }                                   # record median draw value
-head(draws)                                                                  # check structure of data frame
-which(is.na(draws$median) == TRUE)[1]                                        # check that all are filled in
+draws$dyad_id <- reorder(draws$dyad_id, draws$period_count_dyad)             # order data frame based on total sightings per pair
+ggplot(data = draws, mapping = aes(x = edge_draw)) +                         # plot data frame
+  geom_density(colour = 'blue') +                                            # plot density plots of probability distributions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 20) +                                       # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3) + # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red') +              # add line showing where the SRI value is
+  theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
 
-draws$dyad_id <- reorder(draws$dyad_id, draws$duration)                      # order data frame based on total sightings per pair
-ggplot(data = draws, mapping = aes(x = weight))+                             # plot data frame
-  geom_density(colour = 'blue')+                                             # plot density plots of probability distributions output per dyad
-  facet_wrap(. ~ dyad_id, nrow = 10, ncol = 15, scales = 'free_y')+          # split by dyad, allow to vary height depending on dyad
+draws$dyad_id <- reorder(draws$dyad_id, draws$sri)                           # order dataframe based on SRI
+ggplot(data = draws, mapping = aes(x = edge_draw))+                          # plot dataframe
+  geom_density(colour = 'blue')+                                             # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 20)+                                        # split by dyad, allow to vary height depending on dyad
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+  # add line showing where the median estimate is
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                # add line showing where the SRI value is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red') +              # add line showing where the SRI value is
+  theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
+ggplot(data = draws, mapping = aes(x = edge_draw))+                          # repeat but with free y axes
+  geom_density(colour = 'blue')+                                             # plot density plots of probability distirbtuions output per dyad
+  facet_wrap(. ~ dyad_id, nrow = 20, scales = 'free_y')+                     # split by dyad, allow to vary height depending on dyad
+  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+  # add line showing where the median estimate is
+  geom_vline(mapping = aes(xintercept = sri), colour = 'red')+               # add line showing where the SRI value is
+  theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
 
-write_csv(draws, '../data_processed/motnp_sampledyads_random_binary_vs_sri_strongprior.csv')    # save output for future reference
+write_csv(draws, '../data_processed/anpshort1_sampledyads_conditionalprior.csv') # save output for future reference
 
-draws <- draws[draws$sri > 0.2,]                                                # repeat subsetting but selecting only the dyads with the highest SRI values (generally some of the least sighted individuals)
-draws$median <- NA ; for(i in 1:nrow(draws)){                            # set up for loop
-  x <- draws[draws$dyad_id == draws$dyad_id[i],]                  # generate dataset cut down to just the dyad in question
-  draws$median[i] <- ifelse(draws$dyad_id[i] == x$dyad_id[1], median(x$weight), draws$median[i]) }   # record median draw value
-head(draws)                                                                     # check structure of data frame
-which(is.na(draws$median) == TRUE)[1]                                           # check that all are filled in
-
-draws$dyad_id <- reorder(draws$dyad_id, draws$period_count_dyad)           # order dataframe based on total sightings per pair
-ggplot(data = draws, mapping = aes(x = edge_draw))+                                # plot dataframe
-  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
-  facet_wrap(. ~ dyad_id, nrow = 20)+                                       # split by dyad, allow to vary height depending on dyad
-  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red') +                        # add line showing where the SRI value is
-  theme(strip.text.x = element_text(size=0))
-draws$dyad_id <- reorder(draws$dyad_id, draws$sri)           # order dataframe based on total sightings per pair
-ggplot(data = draws, mapping = aes(x = edge_draw))+                                # plot dataframe
-  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
-  facet_wrap(. ~ dyad_id, nrow = 20)+                                       # split by dyad, allow to vary height depending on dyad
-  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red') +                        # add line showing where the SRI value is
-  theme(strip.text.x = element_text(size=0))
-
-ggplot(data = draws, mapping = aes(x = edge_draw))+                                # plot dataframe
-  geom_density(colour = 'blue')+                                                       # plot density plots of probability distirbtuions output per dyad
-  facet_wrap(. ~ dyad_id, nrow = 20, scales = 'free_y')+                    # split by dyad, allow to vary height depending on dyad
-  geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+            # add line showing where the median estimate is
-  geom_vline(mapping = aes(xintercept = sri), colour = 'red')                          # add line showing where the SRI value is
-
-write_csv(draws, '../data_processed/motnp_sampledyads_sri0.2_binary_vs_sri_strongprior.csv')    # save output for future reference
-
-# clean environment
-rm(draws, dyads, priors, draws, x) ; gc()
+### clean environment
+rm(draws, plot_edges, n_test, plot_dyads) ; gc()
+save.image('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 dev.off()
-
-#### check outputs: edges against age values ####
-### create mean data frame to plot average values over full distribution
-mean_edges <- data.frame(dyad = cdf_1$dyad_id,
-                         node_1 = cdf_1$node_1, node_2 = cdf_1$node_2,
-                         together = cdf_1$event_count, count_dyad = cdf_1$period_count_dyad,
-                         age_1 = cdf_1$age_start_1, age_2 = cdf_1$age_start_2,
-                         age_min = cdf_1$age_min, age_max = cdf_1$age_max, age_diff = cdf_1$age_diff,
-                         edge_mean = NA)
-for(i in 1:nrow(mean_edges)) {
-  x <- edges[edges$dyad == mean_edges$dyad[i],]
-  mean_edges$edge_mean[i] <- mean(x$edge_draw)
-}
-
-### add categories for box plots
-mean_edges$age_cat_min <- ifelse(mean_edges$age_min < 15, '10-15',
-                                 ifelse(mean_edges$age_min < 20, '15-20',
-                                        ifelse(mean_edges$age_min < 25, '20-25',
-                                               ifelse(mean_edges$age_min < 40, '25-40', '40+'))))
-mean_edges$age_cat_max <- ifelse(mean_edges$age_max < 15, '10-15',
-                                 ifelse(mean_edges$age_max < 20, '15-20',
-                                        ifelse(mean_edges$age_max < 25, '20-25',
-                                               ifelse(mean_edges$age_max < 40, '25-40', '40+'))))
-
-### plot raw data
-theme_set(theme_classic())
-ggplot()+
-  geom_point(data = mean_edges, aes(x = age_min, y = edge_mean),
-             shape = 19, colour = rgb(0,0,1,0.1)
-  )+
-  scale_x_continuous('age of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')
-ggplot()+
-  geom_point(data = mean_edges, aes(x = age_min, y = edge_mean,
-                                    colour = age_max), # this makes it look more interesting than it is -- there is a definite pattern at first glance, but actually appears to be nothing more than that the older the youngest male is, the older the oldest must be to be older than the youngest, whereas when the youngest is very young the oldest doesn't have to be very old to still be the oldest
-             shape = 19)+
-  scale_x_continuous('age of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')
-ggplot()+
-  geom_point(data = mean_edges, aes(x = age_min, y = edge_mean, colour = age_diff), # much less exciting now
-             shape = 19)+
-  scale_x_continuous('age of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')
-
-edges <- left_join(edges, mean_edges, by = 'dyad')
-ggplot()+
-  geom_point(data = edges, aes(x = age_min, y = edge_draw),
-             shape = 19, colour = rgb(0,0,1,0.01))+
-  geom_point(data = mean_edges, aes(x = age_min, y = edge_mean),
-             shape = 19, colour = 'red')+
-  scale_x_continuous('age of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')
-ggplot()+
-  geom_violin(data = edges, aes(x = age_cat_min, y = edge_draw))+
-  geom_jitter(data = mean_edges, aes(x = age_cat_min, y = edge_mean, size = count_dyad),
-              shape = 1, width = 0.3, colour = rgb(0,0,1,0.1))+
-  scale_x_discrete('age of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')
-
-ggplot()+
-  geom_point(data = edges, aes(x = count_dyad, y = edge_draw), colour = rgb(0,0,1,0.01))+
-  geom_point(data = mean_edges, aes(x = count_dyad, y = edge_mean), colour = 'red')+
-  scale_x_continuous('number of sightings of dyad')+
-  scale_y_continuous('edge weight')
-
-ggplot()+
-  geom_point(data = mean_edges, aes(x = age_min, y = age_max, colour = edge_mean))+
-  scale_x_continuous('age of younger dyad member')+
-  scale_y_continuous('age of older dyad member')
-
-# compute posterior means
-age_min <- seq(5,46,1)
-age_max <- seq(5,46,1)
-#mu <- array(NA, dim = c(length(age_max), length(age_min), n_samples), dimnames = list(age_max, age_min, 1:n_samples))
-#for(min in 1:nrow(mu)){
-#  for(max in 1:ncol(mu)){
-#    for(sample in 1:n_samples){
-#      if( min <= max ){
-#      mu[min,max,sample] <- b_min$slope_draw[sample]*age_min[min] + b_max$slope_draw[sample]*age_max[max] + b_int$slope_draw[sample]*age_min[min]*age_max[max]
-#      }
-#    }
-#  }
-#}
-mu <- array(NA, dim = c(n_samples, length(age_min), length(age_max)), dimnames = list(1:n_samples, age_min, age_max))
-for(sample in 1:n_samples){
-  for(min in 1:length(age_min)){
-    for(max in 1:length(age_max)){
-      if( min <= max ){
-        mu[sample,min,max] <- intercept$slope_draw[sample] + b_min$slope_draw[sample]*age_min[min] + b_max$slope_draw[sample]*age_max[max] + b_int$slope_draw[sample]*age_min[min]*age_max[max]
-      }
-    }
-  }
-}
-mu <- plogis(mu)
-
-mu_max_age <- function(edge_prediction_array, age_threshold){
-  minimum_ages <- as.numeric(colnames(edge_prediction_array[1,,]))
-  maximum_ages <- as.numeric(names(edge_prediction_array[1,1,]))
-  predictions <- edge_prediction_array[,which(minimum_ages <= age_threshold),which(maximum_ages == age_threshold)]
-  if(is.null(dim(predictions)) == TRUE) { mean_edge <- mean(predictions) } else { mean_edge <- apply(predictions, 2, mean) }
-  return(mean_edge)
-}
-mu_mean_max20 <- mu_max_age(mu, 20)
-mu_mean_max25 <- mu_max_age(mu, 25)
-mu_mean_max30 <- mu_max_age(mu, 30)
-mu_mean_max35 <- mu_max_age(mu, 35)
-mu_mean_max41 <- mu_max_age(mu, 41)
-mu_mean_max46 <- mu_max_age(mu, 46)
-
-pi_max_age <- function(edge_prediction_array, age_threshold){
-  minimum_ages <- as.numeric(colnames(edge_prediction_array[1,,]))
-  maximum_ages <- as.numeric(names(edge_prediction_array[1,1,]))
-  predictions <- edge_prediction_array[,which(minimum_ages <= age_threshold),which(maximum_ages == age_threshold)]
-  if(is.null(dim(predictions)) == TRUE) { 
-    mean_edge <- rethinking::HPDI(predictions) 
-    } else { 
-    mean_edge <- apply(predictions, 2, rethinking::HPDI) 
-    }
-  return(mean_edge)
-}
-pi_mean_max20 <- pi_max_age(mu, 20)
-pi_mean_max25 <- pi_max_age(mu, 25)
-pi_mean_max30 <- pi_max_age(mu, 30)
-pi_mean_max35 <- pi_max_age(mu, 35)
-pi_mean_max41 <- pi_max_age(mu, 41)
-pi_mean_max46 <- pi_max_age(mu, 46)
-
-# simulate from posterior -- NOT YET WORKED THIS BIT OUT
-#sim_edges <- matrix(ncol = length(age_min), nrow = n_samples)
-#for(i in 1:nrow(sim_edges)){
-#  for(j in 1:ncol(sim_edges)){
-#    mean_sim <- intercept$slope_draw[i] + b_min$slope_draw[i]*age_min[j] + b_max$slope_draw[i]*age_max[j] + b_int$slope_draw[i]*age_min[j]*age_max[j]
-#    sigma_sim <- ????????
-#    sim_edges[i,j] <- rnorm(1, mu = mean_sim, sigma = sigma_sim)
-#  }
-#}
-#hist(sim_edges) # far too many getting a centrality score of 1
-#sim_pi <- apply(sim_edges, 2, rethinking::HPDI, prob = 0.95)
-
-# plot
-par(mfrow = c(3,2))
-ages <- c(20,25,30,35,41,46)
-mu_list <- list(mu_mean_max20, mu_mean_max25, mu_mean_max30, mu_mean_max35, mu_mean_max41, mu_mean_max46)
-pi_list <- list(pi_mean_max20, pi_mean_max25, pi_mean_max30, pi_mean_max35, pi_mean_max41, pi_mean_max46)
-for(i in 1:6){
-  plot(edge_mean ~ age_min, data = mean_edges[mean_edges$age_max == ages[i],], col = rgb(0,0,1,0.5), # raw sightings
-     pch = 19, las = 1, xlim = c(5,45), ylim = c(0,1),
-     xlab = 'age of younger dyad member', ylab = 'edge weight',
-     main = paste0('older = ',ages[i],' years old'))
-  rethinking::shade(pi_list[[i]], age_min[which(age_min <= ages[i])], lwd = 2, col = rgb(0.5,0,1,0.2))      # add mean line
-  lines(age_min[which(age_min <= ages[i])], mu_list[[i]], lwd = 2, col = 'purple')                          # add mean shading
-  #rethinking::shade(sim_pi, age_min)                                                                   # add predictions
-}
-par(mfrow = c(1,1))
-
-### heat map: x = min age, y = max age, colour = edge weight
-ggplot()+
-  geom_tile(data = mean_edges, mapping = aes(x = age_min, y = age_max, fill = edge_mean))+
-  scale_x_continuous('age of younger dyad member')+
-  scale_y_continuous('age of older dyad member')
-
-mean_predict <- matrix(NA, nrow = length(age_max), ncol = length(age_min))
-for(i in 1:nrow(mean_predict)){
-  for(j in 1:ncol(mean_predict)){
-    if(i <= j){
-      x <- mu_max_age(mu, age_max[j])
-      mean_predict[,j] <- c(x ,rep(NA, length(mean_predict[,j]) - length(x)))
-    }
-  }
-}
-colnames(mean_predict) <- paste0('max.',age_max)
-rownames(mean_predict) <- paste0('min.',age_min)
-mean_predict_long <- as.data.frame(mean_predict) %>% 
-  pivot_longer(everything(), names_to = 'age_max', values_to = 'mean_edge_weight') %>% 
-  separate(age_max, into = c('max.min','age_max'), sep = 4) %>% 
-  select(-max.min) %>% 
-  mutate(age_min = rep(rownames(mean_predict), each = ncol(mean_predict))) %>% 
-  separate(age_min, into = c('max.min','age_min'), sep = 4) %>% 
-  select(-max.min) %>% 
-  mutate(age_diff = as.numeric(age_max) - as.numeric(age_min))
-  #filter(!is.na(mean_edge_weight)) %>% 
-mean_predict_long$age_max <- as.numeric(mean_predict_long$age_max)
-mean_predict_long$age_min <- as.numeric(mean_predict_long$age_min)
-ggplot()+
-  geom_tile(data = mean_predict_long, mapping = aes(x = age_min, y = age_max, fill = mean_edge_weight))
-ggplot()+
-  geom_line(data = mean_predict_long, mapping = aes(x = age_diff, y = mean_edge_weight, colour = age_min, group = age_min))+
-  scale_x_continuous(limits = c(0,40))
-
-### end pdf
-dev.off()
-
-### clear workspace
-rm(cdf_1, n_dyads, counts_ls, n_eles, fit_edges_anp1, edges, plot_dyads, plot_edges, nodes, edge_weights_matrix, edge_samples)
+rm(cdf_1, edge_samples, edgelist, edges, fit_edges_anp1, nodes, summary, n_dyads) ; gc()
 
 ################ generate loop to run through windows 2:end ################
 for(time_window in 2:n_windows){
-  ### set up pdf of outputs
-  pdf('../data_processed/anp_edgeweights_period',time_window,'.pdf', width = 20, height = 15)
+  #### set up ####
+  ### set seed
+  set.seed(12345)
   
+  ### create file of output graphs
+  pdf(paste0('../outputs/anpshort',time_window,'_edgeweights_conditionalprior.pdf', width = 20, height = 15))
+  
+  #### import data ####
   ### subset by time window
   cdf <- counts_df[counts_df$period == time_window,]
   
@@ -626,17 +366,17 @@ for(time_window in 2:n_windows){
   
   ### set values for model
   n_dyads <- nrow(cdf)
-  n_eles <- length(unique(c(cdf$id_1, cdf$id_2)))
   
   ### create data list
   counts_ls <- list(
-    n_dyads    = n_dyads,                  # total number of times one or other of the dyad was observed
+    n_dyads    = n_dyads,                # total number of times one or other of the dyad was observed
     dyad_ids   = cdf$dyad_id,            # identifier for each dyad
     together   = cdf$event_count,        # count number of sightings seen together
     count_dyad = cdf$period_count_dyad)  # count total number of times seen
   
+  #### run model on real standardised data -- period 1 ####
   ### Fit model
-  fit_edges <- edge_binary$sample(
+  fit_edges_anp <- edge_binary$sample(
     data = counts_ls, 
     chains = n_chains, 
     parallel_chains = n_chains,
@@ -644,13 +384,14 @@ for(time_window in 2:n_windows){
     iter_sampling = n_samples)
   
   ### check model
-  fit_edges
+  fit_edges_anp
   
   # Extract posterior samples
-  posterior_samples <- fit_edges$draws()
+  posterior_samples <- fit_edges_anp$draws()
   
   # Convert the array to a matrix -- save for eigenvector centralities
-  edge_weights_matrix <- posterior_samples[,,2:(length(posterior_samples)/n_chains*n_samples)]
+  edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf)+1)]
+  rm(posterior_samples, x, i) ; gc()
   
   # convert matrix to data frame -- save samples and plot outputs
   edges <- as.data.frame(edge_weights_matrix[,,1])
@@ -668,15 +409,11 @@ for(time_window in 2:n_windows){
   }
   
   ### save data 
-  saveRDS(edges, paste0('../data_processed/anp',time_window,'_edgedistributions.RDS'))
+  saveRDS(edges, paste0('../data_processed/anpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
   
   #### check outputs ####
   # Assign random set of columns to check
-  if(length(which(cdf$event_count >= 1)) >= 200){
-    n_test <- 200
-  } else {
-      n_test <- length(which(cdf$event_count >= 1))
-      }
+  if(length(which(cdf$event_count >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(cdf$event_count >= 1)) }
   plot_dyads <- c(sample(cdf$dyad_id[cdf$event_count >= 1], size = n_test, replace = F),
                   sample(cdf$dyad_id[cdf$event_count == 0], size = n_test, replace = F))
   plot_edges <- edges[edges$dyad %in% plot_dyads,]
@@ -704,38 +441,82 @@ for(time_window in 2:n_windows){
     lines(density(x$edge_draw), col = ifelse(x$seen_together == 1, rgb(0,0,1,0.1), rgb(1,0,0,0.1)))
   }
   
-  ### create nodes data frame
-  nodes <- data.frame(id = sort(unique(c(cdf$id_1,cdf$id_2))),          # all unique individuals
-                      node = NA, age = NA, sightings = NA)                  # data needed on each
-  for(i in 1:nrow(nodes)){
-    # extract data about individual from cdf data frame
-    if(nodes$id[i] %in% cdf$id_1) {
-      x <- cdf[cdf$id_1 == nodes$id[i], c('id_1','node_1','period_count_1','age_start_1')] %>% distinct()
-    } else { x <- cdf[cdf$id_2 == nodes$id[i], c('id_2','node_2','period_count_2','age_start_2')] %>% distinct() }
-    colnames(x) <- c('id','node','period_count','age_start')
-    # add individual data
-    nodes$node[i] <- x$node
-    nodes$age[i] <- x$age_start                                             # for initial test purposes, age = mean only
-    nodes$sightings[i] <- x$period_count
-  }
-  
+  #### check outputs: plot network ####
   ### create single matrix of edge samples
-  edge_samples <- matrix(data = NA, nrow = n_samples, ncol = n_dyads)
+  edge_samples <- matrix(data = NA, nrow = n_samples*n_chains, ncol = n_dyads)
   for(j in 1:n_dyads){
     edge_samples[,j] <- edge_weights_matrix[,,j]
   }
   colnames(edge_samples) <- cdf$dyad_id
   
   ### plot network
-  #plot_network_threshold2(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.15,
-  #                        node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.05,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.10,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.15,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.20,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.25,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.30,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
   
-  ### end pdf
+  ### clean workspace
+  rm(counts_ls, x, edge_weights_matrix, i, j) ; gc()
+  
+  ### save image
+  save.image(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  
+  #### check outputs: compare edge weight distributions to simple SRI ####
+  ### create data frame with SRI and bison weights in it
+  edgelist <- make_edgelist(edge_samples = edge_samples, dyad_data = cdf)     # obtain edge list
+  head(edgelist)                                                                # check structure of edgelist
+  edgelist$node_1 <- as.integer(edgelist$node_1)                                # convert to integers
+  edgelist$node_2 <- as.integer(edgelist$node_2)                                # convert to integers
+  summary <- left_join(edgelist, cdf[,c(1:7,10,26:29,32:33)], by = c('node_1','node_2'))    # combine distribution data with raw counts
+  head(summary)
+  summary$sri <- summary$event_count / summary$period_count_dyad
+  
+  ### plot bison against SRI
+  plot(density(summary$sri), main = 'red = SRI, blue = BISoN', col = 'red', lwd = 2, las = 1) # plot SRI distribution
+  lines(density(summary$median), col = 'blue', lwd = 2)                                       # distribution of median estimates
+  
+  ### plot a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
+  plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
+  draws <- left_join(plot_edges, summary, by = 'dyad_id') %>%                  # combine to add node and median value data
+    select(-dyad.x) %>% rename(dyad = dyad.y)                                  # clean up names
+  which(is.na(draws) == TRUE)                                                  # check fully merged
+  
+  draws$dyad_id <- reorder(draws$dyad_id, draws$period_count_dyad)             # order data frame based on total sightings per pair
+  ggplot(data = draws, mapping = aes(x = edge_draw)) +                         # plot data frame
+    geom_density(colour = 'blue') +                                            # plot density plots of probability distributions output per dyad
+    facet_wrap(. ~ dyad_id, nrow = 20) +                                       # split by dyad, allow to vary height depending on dyad
+    geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3) + # add line showing where the median estimate is
+    geom_vline(mapping = aes(xintercept = sri), colour = 'red') +              # add line showing where the SRI value is
+    theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
+  
+  draws$dyad_id <- reorder(draws$dyad_id, draws$sri)                           # order dataframe based on SRI
+  ggplot(data = draws, mapping = aes(x = edge_draw))+                          # plot dataframe
+    geom_density(colour = 'blue')+                                             # plot density plots of probability distirbtuions output per dyad
+    facet_wrap(. ~ dyad_id, nrow = 20)+                                        # split by dyad, allow to vary height depending on dyad
+    geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+  # add line showing where the median estimate is
+    geom_vline(mapping = aes(xintercept = sri), colour = 'red') +              # add line showing where the SRI value is
+    theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
+  ggplot(data = draws, mapping = aes(x = edge_draw))+                          # repeat but with free y axes
+    geom_density(colour = 'blue')+                                             # plot density plots of probability distirbtuions output per dyad
+    facet_wrap(. ~ dyad_id, nrow = 20, scales = 'free_y')+                     # split by dyad, allow to vary height depending on dyad
+    geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+  # add line showing where the median estimate is
+    geom_vline(mapping = aes(xintercept = sri), colour = 'red')+               # add line showing where the SRI value is
+    theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
+  
+  write_csv(draws, paste0('../data_processed/anpshort',time_window,'_sampledyads_conditionalprior.csv')) # save output for future reference
+  
+  ### clean environment
+  rm(draws, plot_edges, n_test, plot_dyads) ; gc()
+  save.image(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
   dev.off()
-  
-  ### clear workspace
-  rm(cdf, n_dyads, counts_ls, n_eles, fit_edges, posterior_samples, edges, plot_dyads, plot_edges, nodes, edge_weights_matrix, edge_samples)
+  rm(cdf, edge_samples, edgelist, edges, fit_edges_anp1, nodes, summary, n_dyads) ; gc()
   
 }
-
-
