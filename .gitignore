@@ -43,4 +43,4 @@ vignettes/*.pdf
 *.pptx
 *.doc
 *.docx
-
+*.db
