@@ -42,19 +42,19 @@ set.seed(12345)
 pdf('../outputs/anpshort1_edgeweights_conditionalprior.pdf', width = 20, height = 15)
 
 ### load edge weight model
-edge_binary <- cmdstan_model("models/edge_binary_basic.stan")
-edge_binary
+edge_binary <- cmdstan_model("models/edge_binary_basic.stan")   # load model
+edge_binary                                                     # check model priors etc.
 
 #### import data ####
 ### import aggregated counts of sightings together and apart, and info about individuals
-counts_df <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows_impossiblepairsremoved.csv')
+counts_df <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows_impossiblepairsremoved.csv')  # counts_df = data frame of all dyad information, spceifically including aggregated counts of together vs apart
 
 ### set up values for running loop
-periods <- sort(unique(c(counts_df$period_start, counts_df$period_end)))
-n_windows <- length(unique(counts_df$period))
+periods <- sort(unique(c(counts_df$period_start, counts_df$period_end)))  # dates  of short time windows in ANP data
+n_windows <- length(unique(counts_df$period))                             # number of short time windows in ANP data
 
 ### subset by time window
-cdf_1 <- counts_df[counts_df$period == 1,]
+cdf_1 <- counts_df[counts_df$period == 1,]                                # select data for first time window only
 
 ### create nodes data frame for period 1
 nodes <- data.frame(id = sort(unique(c(cdf_1$id_1,cdf_1$id_2))),          # all unique individuals
@@ -66,30 +66,28 @@ for(i in 1:nrow(nodes)){
   } else { x <- cdf_1[cdf_1$id_2 == nodes$id[i], c('id_2','node_2','period_count_2','age_start_2')] %>% distinct() }
   colnames(x) <- c('id','node','period_count','age_start')
   # add individual data
-  nodes$node[i] <- x$node
-  nodes$age[i] <- x$age_start                                             # for initial test purposes, age = mean only
-  nodes$sightings[i] <- x$period_count
+  nodes$node[i] <- x$node                 # node ID number
+  nodes$age[i] <- x$age_start             # estimated age in years at the start of the time window
+  nodes$sightings[i] <- x$period_count    # number of sightings within the time window
 }
 
 ### create data list
-n_chains <- 4
-n_samples <- 1000
-n_dyads <- nrow(cdf_1)
-counts_ls <- list(
+n_chains <- 4                            # number of MCMC chains to run
+n_samples <- 1000                        # number of samples per chain
+n_dyads <- nrow(cdf_1)                   # number of dyads in time window
+counts_ls <- list(                       # create data list
   n_dyads    = n_dyads,                  # total number of times one or other of the dyad was observed
   dyad_ids   = cdf_1$dyad_id,            # identifier for each dyad
   together   = cdf_1$event_count,        # count number of sightings seen together
-  count_dyad = cdf_1$period_count_dyad#,  # count total number of times seen
+  count_dyad = cdf_1$period_count_dyad   # count total number of times seen
 )
 
 #### run model on real standardised data -- period 1 ####
 ### Fit model
 fit_edges_anp1 <- edge_binary$sample(
   data = counts_ls, 
-  chains = n_chains, 
-  parallel_chains = n_chains,
-  iter_warmup = n_samples,
-  iter_sampling = n_samples)
+  chains = n_chains, parallel_chains = n_chains,
+  iter_warmup = n_samples, iter_sampling = n_samples)
 
 ### check model
 fit_edges_anp1
@@ -98,56 +96,57 @@ fit_edges_anp1
 posterior_samples <- fit_edges_anp1$draws()
 
 ### extract edge weights
-edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf_1)+1)]
-rm(posterior_samples, x, i) ; gc()
+edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf_1)+1)]  # remove column of intercepts
+rm(posterior_samples, x, i) ; gc()                             # clean workspace
 
-### save edge samples
-edges <- as.data.frame(edge_weights_matrix[,,1])
-colnames(edges) <- c('chain1','chain2','chain3','chain4')
-edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')
-edges$dyad <- counts_ls$dyad_ids[1]
-edges$position <- rep(1:n_samples, each = n_chains)
-for(i in 2:n_dyads){
+### convert edge samples to data frame, putting all chains into 1 column
+edges <- as.data.frame(edge_weights_matrix[,,1])               # convert draws for first dyad to data frame
+colnames(edges) <- c('chain1','chain2','chain3','chain4')      # rename columns
+edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain') # tidy draws for first dyad
+edges$dyad <- counts_ls$dyad_ids[1]                            # add dyad id column
+edges$position <- rep(1:n_samples, each = n_chains)            # position within chain for traceplots
+for(i in 2:n_dyads){                                           # repeat for the rest of the dyads
   x <- as.data.frame(edge_weights_matrix[,,i])
   colnames(x) <- c('chain1','chain2','chain3','chain4')
   x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
   x$dyad <- counts_ls$dyad_ids[i]
   x$position <- rep(1:n_samples, each = n_chains)
-  edges <- rbind(edges, x)
+  edges <- rbind(edges, x)                                     # append each to the last to create a single dataframe with all dyads
 }
 
-### save data 
+### save edge samples for use in dyadic/nodal regressions 
 saveRDS(edges, '../data_processed/anpshort1_edgedistributions_conditionalprior.RDS')
 #edges <- readRDS('../data_processed/anpshort1_edgedistributions_conditionalprior.RDS')
 
 #### check outputs: edge weights ####
 ### Assign random set of columns to check
-if(length(which(cdf_1$event_count >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(cdf_1$event_count >= 1)) }
-plot_dyads <- c(sample(cdf_1$dyad_id[cdf_1$event_count >= 1], size = n_test, replace = F),
-                sample(cdf_1$dyad_id[cdf_1$event_count == 0], size = n_test, replace = F))
-plot_edges <- edges[edges$dyad %in% plot_dyads,]
-plot_edges$seen_together <- NA
-for(i in 1:length(plot_dyads)){
-  plot_edges$seen_together[plot_edges$dyad == plot_dyads[i]] <- ifelse(cdf_1$event_count[cdf_1$dyad_id == plot_dyads[i]] > 0, 1, 0)
+if(length(which(cdf_1$event_count >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(cdf_1$event_count >= 1)) } # set number of dyads to sample: will be equal numbers of dyads that have and have not ever been seen together, so if there are 200 or more dyads that have been seen together at some point then cap at 200, otherwise use as many as there are
+plot_dyads <- c(sample(cdf_1$dyad_id[cdf_1$event_count >= 1], size = n_test, replace = F), # randomly sample dyads that have been seen together
+                sample(cdf_1$dyad_id[cdf_1$event_count == 0], size = n_test, replace = F)) # randomly sample dyads never seen together
+plot_edges <- edges[edges$dyad %in% plot_dyads,]                    # subset edge weight data using randomly drawn dyads
+plot_edges$seen_together <- NA ; for(i in 1:length(plot_dyads)){    # set up for loop
+  plot_edges$seen_together[plot_edges$dyad == plot_dyads[i]] <- ifelse(cdf_1$event_count[cdf_1$dyad_id == plot_dyads[i]] > 0, 1, 0) # the value of seen_together is 1 if the dyad has ever been seen in the same group, and 0 if they have not
 }
 
 ### build traceplots
-ggplot(data = plot_edges[plot_edges$seen_together == 1,], aes(y = edge_draw, x = position, colour = chain))+
+ggplot(data = plot_edges[plot_edges$seen_together == 1,],   # plot only dyads that have been seen together
+       aes(y = edge_draw, x = position, colour = chain))+   # plot all chains over each other for each dyad to check mixing
+  geom_line()+                                              # draw as line plot
+  facet_wrap(. ~ dyad)+                                     # new panel per dyad as each pair has own edge weight parameter
+  theme_classic()+                                          # make it look nicer
+  theme(legend.position = 'none',                           # remove legend
+        strip.background = element_blank(), strip.text = element_blank())    # remove facet strips
+ggplot(data = plot_edges[plot_edges$seen_together == 0,],   # repeat for dyads that have never been seen together
+       aes(y = edge_draw, x = position, colour = chain))+
   geom_line()+
   facet_wrap(. ~ dyad)+
-  theme_classic()+
-  theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
-ggplot(data = plot_edges[plot_edges$seen_together == 0,], aes(y = edge_draw, x = position, colour = chain))+
-  geom_line()+
-  facet_wrap(. ~ dyad)+
-  theme_classic()+
-  theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
+  theme_classic() + theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
 
 ### density plots
-plot(NULL, xlim = c(0,1), ylim = c(0,30), las = 1, xlab = 'edge weight', ylab = 'density')
-for(i in 1:length(plot_dyads)){
-  x <- plot_edges[plot_edges$dyad == plot_dyads[i],]
-  lines(density(x$edge_draw), col = ifelse(x$seen_together == 1, rgb(0,0,1,0.1), rgb(1,0,0,0.1)))
+plot(NULL, xlim = c(0,1), ylim = c(0,30), las = 1, xlab = 'edge weight', ylab = 'density')         # set up plot window
+for(i in 1:length(plot_dyads)){                                                                    # plot randomly sampled dyads
+  x <- plot_edges[plot_edges$dyad == plot_dyads[i],]                                               # select data to plot
+  lines(density(x$edge_draw), col = ifelse(x$seen_together == 1, rgb(0,0,1,0.1), rgb(1,0,0,0.1)))  # draw edge weight probability plot. blue = seen together at least once, red = never seen together
 }
 
 #### check outputs: plot network ####
@@ -516,6 +515,206 @@ for(time_window in 2:n_windows){
   ### clean environment
   rm(draws, plot_edges, n_test, plot_dyads) ; gc()
   save.image(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  dev.off()
+  rm(cdf, edge_samples, edgelist, edges, fit_edges_anp1, nodes, summary, n_dyads) ; gc()
+  
+}
+
+## clean up for long windows
+rm(list = ls()[! ls() %in% c('make_edgelist','plot_network_threshold','n_samples','n_chains','edge_binary')])
+
+################ generate loop to run through long windows ################
+### import aggregated counts of sightings together and apart, and info about individuals
+counts_df <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_longperiods_impossiblepairsremoved.csv')  # counts_df = data frame of all dyad information, spceifically including aggregated counts of together vs apart
+
+### set up values for running loop
+periods <- sort(unique(c(counts_df$period_start, counts_df$period_end)))  # dates  of long time windows in ANP data
+n_windows <- length(unique(counts_df$period))                             # number of long time windows in ANP data
+
+### run loop
+for(time_window in 1:n_windows){
+  #### set up ####
+  ### set seed
+  set.seed(12345)
+  
+  ### create file of output graphs
+  pdf(paste0('../outputs/anplong',time_window,'_edgeweights_conditionalprior.pdf', width = 20, height = 15))
+  
+  #### import data ####
+  ### subset by time window
+  cdf <- counts_df[counts_df$period == time_window,]
+  
+  ### create nodes data frame
+  nodes <- data.frame(id = sort(unique(c(cdf$id_1,cdf$id_2))),          # all unique individuals
+                      node = NA, age = NA, sightings = NA)              # data needed on each
+  for(i in 1:nrow(nodes)){
+    # extract data about individual from cdf data frame
+    if(nodes$id[i] %in% cdf$id_1) {
+      x <- cdf[cdf$id_1 == nodes$id[i], c('id_1','node_1','period_count_1','age_start_1')] %>%
+        distinct()
+    } else { 
+      x <- cdf[cdf$id_2 == nodes$id[i], c('id_2','node_2','period_count_2','age_start_2')] %>%
+        distinct()
+    }
+    colnames(x) <- c('id','node','period_count','age_start')
+    # add individual data
+    nodes$node[i] <- x$node
+    nodes$age[i] <- x$age_start
+    nodes$sightings[i] <- x$period_count
+  }
+  
+  ### set values for model
+  n_dyads <- nrow(cdf)
+  
+  ### create data list
+  counts_ls <- list(
+    n_dyads    = n_dyads,                # total number of times one or other of the dyad was observed
+    dyad_ids   = cdf$dyad_id,            # identifier for each dyad
+    together   = cdf$event_count,        # count number of sightings seen together
+    count_dyad = cdf$period_count_dyad)  # count total number of times seen
+  
+  #### run model on real standardised data -- period 1 ####
+  ### Fit model
+  fit_edges_anp <- edge_binary$sample(
+    data = counts_ls, 
+    chains = n_chains, 
+    parallel_chains = n_chains,
+    iter_warmup = n_samples,
+    iter_sampling = n_samples)
+  
+  ### check model
+  fit_edges_anp
+  
+  # Extract posterior samples
+  posterior_samples <- fit_edges_anp$draws()
+  
+  # Convert the array to a matrix -- save for eigenvector centralities
+  edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf)+1)]
+  rm(posterior_samples, x, i) ; gc()
+  
+  # convert matrix to data frame -- save samples and plot outputs
+  edges <- as.data.frame(edge_weights_matrix[,,1])
+  colnames(edges) <- c('chain1','chain2','chain3','chain4')
+  edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')
+  edges$dyad <- counts_ls$dyad_ids[1]
+  edges$position <- rep(1:n_samples, each = n_chains)
+  for(i in 2:n_dyads){
+    x <- as.data.frame(edge_weights_matrix[,,i])
+    colnames(x) <- c('chain1','chain2','chain3','chain4')
+    x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
+    x$dyad <- counts_ls$dyad_ids[i]
+    x$position <- rep(1:n_samples, each = n_chains)
+    edges <- rbind(edges, x)
+  }
+  
+  ### save data 
+  saveRDS(edges, paste0('../data_processed/anplong',time_window,'_edgedistributions_conditionalprior.RDS'))
+  
+  #### check outputs ####
+  # Assign random set of columns to check
+  if(length(which(cdf$event_count >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(cdf$event_count >= 1)) }
+  plot_dyads <- c(sample(cdf$dyad_id[cdf$event_count >= 1], size = n_test, replace = F),
+                  sample(cdf$dyad_id[cdf$event_count == 0], size = n_test, replace = F))
+  plot_edges <- edges[edges$dyad %in% plot_dyads,]
+  plot_edges$seen_together <- NA
+  for(i in 1:length(plot_dyads)){
+    plot_edges$seen_together[plot_edges$dyad == plot_dyads[i]] <- ifelse(cdf$event_count[cdf$dyad_id == plot_dyads[i]] > 0, 1, 0)
+  }
+  
+  ### build traceplots
+  ggplot(data = plot_edges[plot_edges$seen_together == 1,], aes(y = edge_draw, x = position, colour = chain))+
+    geom_line()+
+    facet_wrap(. ~ dyad)+
+    theme_classic()+
+    theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
+  ggplot(data = plot_edges[plot_edges$seen_together == 0,], aes(y = edge_draw, x = position, colour = chain))+
+    geom_line()+
+    facet_wrap(. ~ dyad)+
+    theme_classic()+
+    theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
+  
+  ### density plots
+  plot(NULL, xlim = c(0,1), ylim = c(0,50), las = 1, xlab = 'edge weight', ylab = 'density')
+  for(i in 1:length(plot_dyads)){
+    x <- plot_edges[plot_edges$dyad == plot_dyads[i],]
+    lines(density(x$edge_draw), col = ifelse(x$seen_together == 1, rgb(0,0,1,0.1), rgb(1,0,0,0.1)))
+  }
+  
+  #### check outputs: plot network ####
+  ### create single matrix of edge samples
+  edge_samples <- matrix(data = NA, nrow = n_samples*n_chains, ncol = n_dyads)
+  for(j in 1:n_dyads){
+    edge_samples[,j] <- edge_weights_matrix[,,j]
+  }
+  colnames(edge_samples) <- cdf$dyad_id
+  
+  ### plot network
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.05,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.10,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.15,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.20,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.25,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf, threshold = 0.30,
+                             node.size = nodes, node.colour = nodes, lwd = 15)
+  
+  ### clean workspace
+  rm(counts_ls, x, edge_weights_matrix, i, j) ; gc()
+  
+  ### save image
+  save.image(paste0('anp_edgecalculations/anplong',time_window,'_edgeweights_conditionalprior.RData'))
+  
+  #### check outputs: compare edge weight distributions to simple SRI ####
+  ### create data frame with SRI and bison weights in it
+  edgelist <- make_edgelist(edge_samples = edge_samples, dyad_data = cdf)     # obtain edge list
+  head(edgelist)                                                                # check structure of edgelist
+  edgelist$node_1 <- as.integer(edgelist$node_1)                                # convert to integers
+  edgelist$node_2 <- as.integer(edgelist$node_2)                                # convert to integers
+  summary <- left_join(edgelist, cdf[,c(1:7,10,26:29,32:33)], by = c('node_1','node_2'))    # combine distribution data with raw counts
+  head(summary)
+  summary$sri <- summary$event_count / summary$period_count_dyad
+  
+  ### plot bison against SRI
+  plot(density(summary$sri), main = 'red = SRI, blue = BISoN', col = 'red', lwd = 2, las = 1) # plot SRI distribution
+  lines(density(summary$median), col = 'blue', lwd = 2)                                       # distribution of median estimates
+  
+  ### plot a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
+  plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
+  draws <- left_join(plot_edges, summary, by = 'dyad_id') %>%                  # combine to add node and median value data
+    select(-dyad.x) %>% rename(dyad = dyad.y)                                  # clean up names
+  which(is.na(draws) == TRUE)                                                  # check fully merged
+  
+  draws$dyad_id <- reorder(draws$dyad_id, draws$period_count_dyad)             # order data frame based on total sightings per pair
+  ggplot(data = draws, mapping = aes(x = edge_draw)) +                         # plot data frame
+    geom_density(colour = 'blue') +                                            # plot density plots of probability distributions output per dyad
+    facet_wrap(. ~ dyad_id, nrow = 20) +                                       # split by dyad, allow to vary height depending on dyad
+    geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3) + # add line showing where the median estimate is
+    geom_vline(mapping = aes(xintercept = sri), colour = 'red') +              # add line showing where the SRI value is
+    theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
+  
+  draws$dyad_id <- reorder(draws$dyad_id, draws$sri)                           # order dataframe based on SRI
+  ggplot(data = draws, mapping = aes(x = edge_draw))+                          # plot dataframe
+    geom_density(colour = 'blue')+                                             # plot density plots of probability distirbtuions output per dyad
+    facet_wrap(. ~ dyad_id, nrow = 20)+                                        # split by dyad, allow to vary height depending on dyad
+    geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+  # add line showing where the median estimate is
+    geom_vline(mapping = aes(xintercept = sri), colour = 'red') +              # add line showing where the SRI value is
+    theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
+  ggplot(data = draws, mapping = aes(x = edge_draw))+                          # repeat but with free y axes
+    geom_density(colour = 'blue')+                                             # plot density plots of probability distirbtuions output per dyad
+    facet_wrap(. ~ dyad_id, nrow = 20, scales = 'free_y')+                     # split by dyad, allow to vary height depending on dyad
+    geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+  # add line showing where the median estimate is
+    geom_vline(mapping = aes(xintercept = sri), colour = 'red')+               # add line showing where the SRI value is
+    theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
+  
+  write_csv(draws, paste0('../data_processed/anplong',time_window,'_sampledyads_conditionalprior.csv')) # save output for future reference
+  
+  ### clean environment
+  rm(draws, plot_edges, n_test, plot_dyads) ; gc()
+  save.image(paste0('anp_edgecalculations/anplong',time_window,'_edgeweights_conditionalprior.RData'))
   dev.off()
   rm(cdf, edge_samples, edgelist, edges, fit_edges_anp1, nodes, summary, n_dyads) ; gc()
   
