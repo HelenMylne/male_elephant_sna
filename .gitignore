@@ -30,6 +30,7 @@ vignettes/*.pdf
 .csv
 .rds
 .xlsx
+*.exe
 # DS Store files for Mac Finder navigation
 *.DS_Store
 # R markdown files -- currently don't need them
@@ -37,3 +38,10 @@ vignettes/*.pdf
 # produced images
 *.png
 *.svg
+# other file types used in production of chapter
+*.ppt
+*.pptx
+*.doc
+*.docx
+*.db
+*.pdf
