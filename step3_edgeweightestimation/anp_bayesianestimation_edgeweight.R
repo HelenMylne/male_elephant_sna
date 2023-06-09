@@ -21,14 +21,13 @@
 
 ### load packages
 # library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(igraph) ; library(janitor) ; library(lubridate) ; library(hms) ; library(readxl)
+library(cmdstanr, lib.loc = '../packages/')    # library(cmdstanr)
 library(tidyverse, lib.loc = '../packages/')   # library(tidyverse)
 library(dplyr, lib.loc = '../packages/')       # library(dplyr)
 #library(rstan, lib.loc = '../packages/')      # library(rstan)
-library(cmdstanr, lib.loc = '../packages/')    # library(cmdstanr)
 library(igraph, lib.loc = '../packages/')      # library(igraph)
 library(janitor, lib.loc = '../packages/')     # library(janitor)
 library(lubridate, lib.loc = '../packages/')   # library(lubridate)
-library(hms, lib.loc = '../packages/')         # library(hms)
 library(readxl, lib.loc = '../packages/')      # library(readxl)
 
 ### set stan path
@@ -287,7 +286,7 @@ edgelist <- make_edgelist(edge_samples = edge_samples, dyad_data = cdf_1)     # 
 head(edgelist)                                                                # check structure of edgelist
 edgelist$node_1 <- as.integer(edgelist$node_1)                                # convert to integers
 edgelist$node_2 <- as.integer(edgelist$node_2)                                # convert to integers
-summary <- left_join(edgelist, cdf_1[,c(1:7,10,26:29,32:33)], by = c('node_1','node_2'))    # combine distribution data with raw counts
+summary <- left_join(edgelist, cdf_1, by = c('node_1','node_2'))    # combine distribution data with raw counts
 head(summary)
 summary$sri <- summary$event_count / summary$period_count_dyad
 
@@ -474,7 +473,7 @@ for(time_window in 2:n_windows){
   head(edgelist)                                                                # check structure of edgelist
   edgelist$node_1 <- as.integer(edgelist$node_1)                                # convert to integers
   edgelist$node_2 <- as.integer(edgelist$node_2)                                # convert to integers
-  summary <- left_join(edgelist, cdf[,c(1:7,10,26:29,32:33)], by = c('node_1','node_2'))    # combine distribution data with raw counts
+  summary <- left_join(edgelist, cdf, by = c('node_1','node_2'))    # combine distribution data with raw counts
   head(summary)
   summary$sri <- summary$event_count / summary$period_count_dyad
   
@@ -674,7 +673,7 @@ for(time_window in 1:n_windows){
   head(edgelist)                                                                # check structure of edgelist
   edgelist$node_1 <- as.integer(edgelist$node_1)                                # convert to integers
   edgelist$node_2 <- as.integer(edgelist$node_2)                                # convert to integers
-  summary <- left_join(edgelist, cdf[,c(1:7,10,26:29,32:33)], by = c('node_1','node_2'))    # combine distribution data with raw counts
+  summary <- left_join(edgelist, cdf, by = c('node_1','node_2'))    # combine distribution data with raw counts
   head(summary)
   summary$sri <- summary$event_count / summary$period_count_dyad
   
