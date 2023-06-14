@@ -337,7 +337,7 @@ for(time_window in 2:n_windows){
   set.seed(12345)
   
   ### create file of output graphs
-  pdf(paste0('../outputs/anpshort',time_window,'_edgeweights_conditionalprior.pdf', width = 20, height = 15))
+  pdf(file = paste0('../outputs/anpshort',time_window,'_edgeweights_conditionalprior_TEST.pdf'), width = 20, height = 15)
   
   #### import data ####
   ### subset by time window
@@ -511,7 +511,7 @@ for(time_window in 2:n_windows){
   
   write_csv(draws, paste0('../data_processed/anpshort',time_window,'_sampledyads_conditionalprior.csv')) # save output for future reference
   
-  ### clean environment
+  ### clean environment ####
   rm(draws, plot_edges, n_test, plot_dyads) ; gc()
   save.image(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
   dev.off()
@@ -537,7 +537,7 @@ for(time_window in 1:n_windows){
   set.seed(12345)
   
   ### create file of output graphs
-  pdf(paste0('../outputs/anplong',time_window,'_edgeweights_conditionalprior.pdf', width = 20, height = 15))
+  pdf(paste0('../outputs/anplong',time_window,'_edgeweights_conditionalprior.pdf'), width = 20, height = 15)
   
   #### import data ####
   ### subset by time window
