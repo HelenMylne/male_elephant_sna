@@ -1,12 +1,12 @@
 #### asnipe non-random variation test ####
 # library(tidyverse) ; library(plyr) ; library(aninet) ; library(rstan) ; library(asnipe)
-library(cmdstanr, lib.loc = '../packages/')
 library(cli, lib.loc = '../packages/')
+library(cmdstanr, lib.loc = '../packages/')
+library(tidyverse, lib.loc = '../packages/')
 library(rstan, lib.loc = '../packages/')
 library(plyr, lib.loc = '../packages/')
-library(tidyverse, lib.loc = '../packages/')
 library(asnipe, lib.loc = '../packages/')
-#library(aninet, lib.loc = '../packages/')
+#library(aninet, lib.loc = '../packages/')     # can't install runjags on Viking so can't install aninet
 library(data.table, lib.loc = '../packages/')
 library(spatsoc, lib.loc = '../packages/')
 library(raster, lib.loc = '../packages/')
@@ -70,7 +70,62 @@ z_scale <- function(x) {
   z
 }
 
-rhat <- function(gbi) {
+get_numerator <- function(data, data_format = "SP", return = "vector"){                    # lifted from aninet to make it work
+  if(data_format == "SP"){
+    X <- apply(data,c(2,3),sum)
+  }
+  if(data_format == "GBI"){
+    X <- t(data) %*% data
+    diag(X) <- 0
+  }
+  if(return == "vector" | is.null(return)){
+    return(X[lower.tri(X)])
+  }
+  if(return == "matrix"){
+    diag(X) = 0
+    colnames(X) = colnames(data)
+    row.names(X) = colnames(data)
+    return(X)
+  }
+}
+
+get_denominator <- function(data, index = "SRI", data_format = "SP", return = "vector"){   # lifted from aninet to make it work
+  if(!index %in% c("SRI", "HWI", "BII")) stop("Invalid Association Index")
+  if(data_format == "SP"){
+    occur <- ifelse(apply(data,c(1,2),sum) > 0, 1, 0)
+    if(index == "BII") denominator <- t(occur) %*% occur
+    if(index == "SRI") denominator <- nrow(occur) - t(1-occur) %*% (1-occur)
+    if(index == "HWI"){
+      ya <- t(occur) %*% (1-occur)
+      yb <- t(ya)
+      yab <- t(occur) %*% (occur)
+      denominator <- 0.5*(ya+yb) + yab
+    }
+  }
+  if(data_format =="GBI"){
+    if(index == "BII") denominator <- t(data) %*% data
+    if(index == "SRI") denominator <- nrow(data) - t(1-data) %*% (1- data)
+    if(index == "HWI"){
+      ya <- t(data) %*% (1-data)
+      yb <- t(ya)
+      yab <- t(data) %*% data
+      denominator <- 0.5*(ya+yb) + yab
+    }
+  }
+  if(return == "vector" | is.null(return)){
+    return(denominator[lower.tri(denominator)])
+  }
+  if(return == "matrix"){
+    D = denominator
+    D[upper.tri(D)] = t(D)[upper.tri(D)]
+    colnames(D) = colnames(data)
+    row.names(D) = colnames(data)
+    diag(D) = 0
+    return(D)
+  }
+}
+
+rhat <- function(gbi) {                                                                 # lifted from aninet to make it work
   x <- get_numerator(gbi, data_format = "GBI", return = "vector")
   d <- get_denominator(gbi, data_format = "GBI", return = "vector")
   sri <- x/d
@@ -158,7 +213,7 @@ outputs$p[outputs$permutation == 0]     <- length(which(outputs$cv[outputs$permu
 ### create vector of days for each sighting
 sightings <- eles[,c('elephant','encounter','date')] %>%  # set up dataframe of actual encounters
   filter(elephant %in% ids) %>%                           # remove encounters that only include females, youngsters, or dead males
-  select(-elephant) %>%                                   # remove ID column
+  dplyr::select(-elephant) %>%                                   # remove ID column
   distinct()                                              # cut down to one row per encounter
 
 ### run network permutations
