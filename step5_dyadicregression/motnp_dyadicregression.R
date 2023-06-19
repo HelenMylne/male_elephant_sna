@@ -3,9 +3,9 @@
 # runs through dyadic regression as specified by Jordan Hart in BISoN examples (https://github.com/JHart96/bison_examples/blob/main/examples/dyadic_regression_stan.md)
 
 #### Set up ####
+library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
 library(tidyverse, lib.loc = '../packages/') # library(tidyverse)
 library(car, lib.loc = '../packages/')       # library(car)
-library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
 library(bisonR, lib.loc = '../packages/')    # library(bisonR)
 library(brms, lib.loc = '../packages/')      # library(brms)
 #library(rstan, lib.loc = '../packages/')     # library(rstan)
@@ -105,14 +105,15 @@ cdf_dyadic <- read_csv('../data_processed/motnp_dyadicregression_modeldata.csv')
 #brms::prior_draws(prior)
 
 #### fit model to mean age ####
+print('data ready for model')
 mean_age_dyadic <- bison_brm (
-  #bison(edge_weight(node_1_id, node_2_id)) ~ min_age + max_age + min_age:max_age + (1 | mm(node_1_id, node_2_id)),
-  bison(edge_weight(node_1_id, node_2_id)) ~ age_difference + (1 | mm(node_1_id, node_2_id)),
+#  bison(edge_weight(node_1_id, node_2_id)) ~ min_age + max_age + min_age:max_age + (1 | mm(node_1_id, node_2_id)),
+   bison(edge_weight(node_1_id, node_2_id)) ~ age_difference + (1 | mm(node_1_id, node_2_id)),
   motnp_edge_weights_strongpriors,
   cdf_dyadic,
   #num_draws = 5, # Small sample size for demonstration purposes
   #refresh = 0,
-  cores = 4, 
+  #cores = 4, 
   chains = 4,
   #control = list(max_treedepth = 20),
   iter = 1000

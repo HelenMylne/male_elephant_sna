@@ -10,8 +10,8 @@ options(future.globals.maxSize = 10000*(1024^2))   # running model with full age
 
 # library(tidyverse) ; library(cmdstanr) ; library(brms) ; library(Rcpp) ; library(ggdist) ; library(posterior) ; library(bayesplot) ; library(igraph) ; library(LaplacesDemon) ; library(bisonR) ; library(janitor)
 
-library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
 library(cmdstanr, lib.loc = '../packages/')        # library(cmdstanr)
+library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
 library(brms, lib.loc = '../packages/')            # library(brms)
 library(Rcpp, lib.loc = '../packages/')            # library(Rcpp)
 library(ggdist, lib.loc = '../packages/')          # library(ggdist)
@@ -22,6 +22,7 @@ library(igraph, lib.loc = '../packages/')          # library(igraph)
 library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
 library(bisonR, lib.loc = '../packages/')          # library(bisonR)
 library(janitor, lib.loc = '../packages/')         # library(janitor)
+library(extraDistr, lib.loc = '../packages/')      # library(extraDistr)
 
 # load edge weight model and data frames
 load('motnp_bisonr_edgescalculated_strongprior.RData')
@@ -64,7 +65,8 @@ motnp_edge_weights_strongpriors$model_data$prior_fixed_mu    <- beta_mu
 motnp_edge_weights_strongpriors$model_data$prior_fixed_sigma <- beta_sigma
 
 ##### convert to mids (multiply imputed data set) object ####
-ages_test <- motnp_ages[motnp_ages$draw <= 8,]
+num_draws <- 8      # only for testing purposes, use just first few draws not all of them
+ages_test <- motnp_ages[motnp_ages$draw <= num_draws,]
 ages_list <- vector("list", num_draws)
 for(i in 1:num_draws){
   ages_list[[i]] <- ages_test[ages_test$draw == i,1:3]
