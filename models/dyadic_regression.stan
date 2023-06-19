@@ -1,12 +1,12 @@
 data {
   int num_dyads; // number of edges
   int num_nodes; // number of nodes
-  vector[num_dyads] edge_mu;             // means of Gaussian approximation of logit edge weights
-  matrix[num_dyads, num_dyads] edge_cov; // covariance matrix of Gaussian approximation of logit edge weights
-  vector[num_dyads] age_min;    // age of younger member of dyad
-  vector[num_dyads] age_max;    // age of  older  member of dyad
-  //int node_1[num_dyads];   // node 1 for multimembership
-  //int node_2[num_dyads];   // node 2 for multimembership
+  vector[num_dyads] edge_mu;              // means of Gaussian approximation of logit edge weights
+  matrix[num_dyads, num_dyads] edge_cov;      // covariance matrix of Gaussian approximation of logit edge weights
+  vector[num_dyads] age_min;     // age of younger member of dyad
+  vector[num_dyads] age_max;     // age of  older  member of dyad
+  array[num_dyads] int node_1;   // node 1 for multimembership
+  array[num_dyads] int node_2;   // node 1 for multimembership
 }
 
 parameters {
@@ -19,14 +19,14 @@ parameters {
   real<lower=0> sigma;
   
   // multimembership
-  //vector[num_nodes] mm_nodes;
-  //real<lower=0> sigma_mm;
+  vector[num_nodes] mm_nodes;
+  real<lower=0> sigma_mm;
 }
 
 transformed parameters {
   vector[num_dyads] age_effect;
   for(i in 1:num_dyads){
-    age_effect[i] = b_min*age_min[i] + b_max*age_max[i] + b_int*(age_min[i]*age_max[i]);// + mm_nodes[node_1] + mm_nodes[node_2]
+    age_effect[i] = b_min*age_min[i] + b_max*age_max[i] + b_int*(age_min[i]*age_max[i]) + mm_nodes[node_1[i]] + mm_nodes[node_2[i]];
   }
 }
 
@@ -43,7 +43,7 @@ model {
   sigma ~ exponential(1); // PREVIOUSLY NORMAL(0,1)
   
   // multimembership priors
-  //mm_nodes ~ normal(0, sigma_mm);
-  //sigma_mm ~ exponential(1);
+  mm_nodes ~ normal(0, sigma_mm);
+  sigma_mm ~ exponential(1);
 }
 
