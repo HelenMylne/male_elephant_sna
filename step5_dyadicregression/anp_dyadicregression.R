@@ -4,20 +4,18 @@
 
 #### set up ####
 #library(tidyverse) ; library(car) ; library(cmdstanr) ; library(bisonR) ; library(brms)
+library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
 library(tidyverse, lib.loc = '../packages/') # library(tidyverse)
 library(car, lib.loc = '../packages/')       # library(car)
-library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
-library(bisonR, lib.loc = '../packages/')    # library(bisonR)
-library(brms, lib.loc = '../packages/')      # library(brms)
-#library(rstan, lib.loc = '../packages/')     # library(rstan)
-#library(Rcpp, lib.loc = '../packages/')      # library(Rcpp)
+#library(bisonR, lib.loc = '../packages/')    # library(bisonR)
+#library(brms, lib.loc = '../packages/')      # library(brms)
 
 #set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
 
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 rm(edgelist, counts_df, edge_binary, nodes) ; gc()
 
-pdf('../outputs/anp1_dyadicregression_withmm_plots.pdf')
+pdf('../outputs/anp1_dyadicregression.pdf')
 
 #### prior predictive check ####
 age_min <- 5:50
@@ -39,6 +37,9 @@ for(age in age_max){
 }
 rm(age, age_min, age_max, beta_max, beta_min, i, min_new) ; gc()
 par(mfrow = c(1,1))
+
+# add time marker
+print(paste0('prior predictive check completed at ', Sys.time()))
 
 #### fit multivariate Gaussian distribution to output of edge weight model ####
 # edge weights from beta() model stored in edge_samples, where column is dyad and row is edge draw (1:4000)
@@ -69,7 +70,10 @@ plot(mv_edge_samples[, 1], mv_edge_samples[, 2], col = rgb(0,0,1,0.05), las = 1,
      main = "Covariance between edges 1 & 2", xlab = "Edge 1 samples", ylab = "Edge 2 samples")
 
 # save image so far
-save.image('anpshort1_dyadicregression_withmm.RData')
+save.image('anpshort1_dyadicregression.RData')
+
+# add time marker
+print(paste0('multivariate Gaussian approximation fitted at ', Sys.time()))
 
 #### fit dyadic regression ####
 ### identify older and younger of dyad
@@ -80,6 +84,20 @@ for(i in 1:nrow(cdf_1)){
   cdf_1$age_max[i] <- max(x)
 }
 
+## convert node IDs to values 1:52 not numbers based on casename
+eles <- cdf_1[,c('id_1','node_1')] %>% distinct()
+ele2 <- cdf_1[,c('id_2','node_2')] %>% distinct() %>% filter(!(id_2 %in% eles$id_1))
+colnames(eles) <- c('id','node_original') ; colnames(ele2) <- c('id','node_original')
+eles <- rbind(eles, ele2) ; rm(ele2) ; gc()
+eles$id_1 <- eles$id ; eles$id_2 <- eles$id
+eles$node_1_dyadreg <- as.integer(as.factor(eles$node_original))
+eles$node_2_dyadreg <- eles$node_1_dyadreg
+cdf_1 <- cdf_1 %>% 
+  rename(node_1_original = node_1,
+         node_2_original = node_2) %>% 
+  left_join(eles[,c('id_1','node_1_dyadreg')], by = 'id_1') %>% 
+  left_join(eles[,c('id_2','node_2_dyadreg')], by = 'id_2')
+
 ## create data list
 dyad_data <- list(
   num_dyads = n_dyads,                                    # number of dyads
@@ -88,12 +106,15 @@ dyad_data <- list(
   edge_cov = edge_cov,                                    # sample covariance of logit edge weights
   age_min = cdf_1$age_min,                                # age of younger dyad member
   age_max = cdf_1$age_max,                                # age of  older  dyad member
-  node_1 = cdf_1$node_1,                                  # node IDs for multimembership effects
-  node_2 = cdf_1$node_2                                   # node IDs for multimembership effects
+  node_1 = cdf_1$node_1_dyadreg,                          # node IDs for multimembership effects
+  node_2 = cdf_1$node_2_dyadreg                           # node IDs for multimembership effects
 )
 
 ## load dyadic regression model
 dyadic_regression <- cmdstan_model('models/dyadic_regression.stan')
+
+# add time marker
+print(paste0('start model run at ', Sys.time()))
 
 ## fit dyadic regression
 fit_dyadreg_anp1 <- dyadic_regression$sample(
@@ -101,11 +122,14 @@ fit_dyadreg_anp1 <- dyadic_regression$sample(
   chains = n_chains,
   parallel_chains = n_chains)
 
-## save image
-save.image('anpshort1_dyadicregression_conditionaledge.RData')
+# save image so far
+save.image('anpshort1_dyadicregression.RData')
+
+# add time marker
+print(paste0('finish model run at ', Sys.time()))
 
 #### check outputs ####
-#load('anpshort1_dyadicregression_conditionaledge')
+#load('anpshort1_dyadicregression.RData')
 fit_dyadreg_anp1$summary()
 
 ## extract draws
@@ -114,7 +138,7 @@ draws <- fit_dyadreg_anp1$draws()
 ## extract dyadic regression slopes
 b_min <- draws[,,'b_min']
 b_max <- draws[,,'b_max']
-#b_int <- draws[,,'b_int']
+b_int <- draws[,,'b_int']
 sigma <- draws[,,'sigma']
 
 ## extract overall age effects
@@ -122,11 +146,14 @@ draws <- draws[,,5:length(draws[1,1,])]   # ONCE ADD INTERACTION, CHANGE TO: dra
 age_effects <- draws[,,1:n_dyads]
 
 ## extract multimembership samples -- CHECK THIS IS IN THE RIGHT ORDER
-#draws <- draws[,,(n_dyads+1):length(draws[1,1,])]
-#mm_matrix <- draws[,,1:n_dyads]
-#sigma_mm <- draws[,,(n_dyads+1)]
-#length(draws[1,1,]) == length(mm_matrix[1,1,]) + length(sigma_mm[1,1,])
+draws <- draws[,,(n_dyads+1):length(draws[1,1,])]
+mm_matrix <- draws[,,1:n_dyads]
+sigma_mm <- draws[,,(n_dyads+1)]
+length(draws[1,1,]) == length(mm_matrix[1,1,]) + length(sigma_mm[1,1,])
 rm(draws) ; gc()
+
+# add time marker
+print(paste0('parameters extracted at ', Sys.time()))
 
 ## save parameter values
 extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
@@ -149,6 +176,9 @@ parameters <- rbind(b_min, b_max, #b_int,
 ## save data 
 saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS')
 
+# add time marker
+print(paste0('parameters saved to file at ', Sys.time()))
+
 ## traceplots
 ggplot(data = parameters)+
   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
@@ -156,6 +186,9 @@ ggplot(data = parameters)+
   theme(legend.position = 'none')+
   scale_colour_viridis_d()+
   facet_wrap( . ~ parameter )
+
+# add time marker
+print(paste0('traceplots run at ', Sys.time()))
 
 #### plot edges against age values ####
 #edges <- readRDS('../data_processed/anpshort1_edgedistributions_conditionalprior.RDS')
@@ -234,6 +267,9 @@ ggplot()+
   scale_x_continuous('age of younger dyad member')+
   scale_y_continuous('age of older dyad member')
 
+# add time marker
+print(paste0('age vs edge predictions completed at ', Sys.time()))
+
 #### plot predictions ####
 ## posterior predictive check
 plot(density(edge_samples[1, ]), main = "Posterior predictive density of responses (edge weights)",
@@ -299,7 +335,7 @@ pi_mean_max35 <- pi_max_age(mu, 35)
 pi_mean_max41 <- pi_max_age(mu, 41)
 pi_mean_max46 <- pi_max_age(mu, 46)
 
-## simulate from posterior -- NOT YET WORKED THIS BIT OUT
+## simulate from posterior -- IS THIS RIGHT??
 sim_edges <- matrix(nrow = n_samples, ncol = length(age_min))
 for(i in 1:nrow(sim_edges)){
   for(j in 1:ncol(sim_edges)){
@@ -360,6 +396,11 @@ ggplot()+
 ### end pdf
 dev.off()
 
+# save image
+save.image('anpshort1_dyadicregression.RData')
+
 ### clear workspace
 rm(cdf_1, n_dyads, counts_ls, n_eles, fit_edges_anp1, edges, plot_dyads, plot_edges, nodes, edge_weights_matrix, edge_samples)
 
+# add time marker
+print(paste0('completed at ', Sys.time()))
