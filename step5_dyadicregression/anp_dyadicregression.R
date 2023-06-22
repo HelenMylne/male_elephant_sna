@@ -15,11 +15,7 @@ library(car, lib.loc = '../packages/')       # library(car)
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 rm(edgelist, counts_df, edge_binary, nodes) ; gc()
 
-<<<<<<< HEAD
 pdf('../outputs/anp1_dyadicregression_plots.pdf')
-=======
-pdf('../outputs/anp1_dyadicregression.pdf')
->>>>>>> cf0ed9bb87e6a86f7cdf594409f8e5aee2a97f03
 
 #### prior predictive check ####
 age_min <- 5:50
@@ -75,12 +71,9 @@ plot(mv_edge_samples[, 1], mv_edge_samples[, 2], col = rgb(0,0,1,0.05), las = 1,
 
 # save image so far
 save.image('anpshort1_dyadicregression.RData')
-<<<<<<< HEAD
-=======
 
 # add time marker
 print(paste0('multivariate Gaussian approximation fitted at ', Sys.time()))
->>>>>>> cf0ed9bb87e6a86f7cdf594409f8e5aee2a97f03
 
 #### fit dyadic regression ####
 ### identify older and younger of dyad
