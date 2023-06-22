@@ -15,7 +15,7 @@ library(car, lib.loc = '../packages/')       # library(car)
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 rm(edgelist, counts_df, edge_binary, nodes) ; gc()
 
-pdf('../outputs/anp1_dyadicregression.pdf')
+pdf('../outputs/anp1_dyadicregression_plots.pdf')
 
 #### prior predictive check ####
 age_min <- 5:50

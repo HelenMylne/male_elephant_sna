@@ -2,3 +2,4 @@ two_prior_edge_model_v2.stan
 two_step_edge_weight_vbasic.stan
 edge_binary_basic
 edge_binary_with_dyadicregression
+dyadic_regression
