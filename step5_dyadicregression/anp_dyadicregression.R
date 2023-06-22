@@ -17,7 +17,7 @@ library(brms, lib.loc = '../packages/')      # library(brms)
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 rm(edgelist, counts_df, edge_binary, nodes) ; gc()
 
-pdf('../outputs/anp1_dyadicregression_withmm_plots.pdf')
+pdf('../outputs/anp1_dyadicregression_plots.pdf')
 
 #### prior predictive check ####
 age_min <- 5:50
@@ -69,7 +69,7 @@ plot(mv_edge_samples[, 1], mv_edge_samples[, 2], col = rgb(0,0,1,0.05), las = 1,
      main = "Covariance between edges 1 & 2", xlab = "Edge 1 samples", ylab = "Edge 2 samples")
 
 # save image so far
-save.image('anpshort1_dyadicregression_withmm.RData')
+save.image('anpshort1_dyadicregression.RData')
 
 #### fit dyadic regression ####
 ### identify older and younger of dyad
