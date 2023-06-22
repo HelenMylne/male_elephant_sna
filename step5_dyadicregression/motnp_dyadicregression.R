@@ -13,7 +13,7 @@ library(brms, lib.loc = '../packages/')      # library(brms)
 
 #set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
 
-load('motnp_bisonr_edgescalculated_strongprior.RData')
+load('motnp_edgeweights_conditionalprior.RData')
 rm(counts_df_model, motnp_edges_null_strongpriors) ; gc()
 
 #pdf('../outputs/motnp_dyadicregression_plots.pdf')
