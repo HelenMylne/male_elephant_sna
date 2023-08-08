@@ -13,10 +13,8 @@ library(raster, lib.loc = '../packages/')
 library(bisonR, lib.loc = '../packages/')
 library(terra, lib.loc = '../packages/')
 
-load('motnp_bisonr_edgescalculated_strongprior.RData')
-rm(list = ls()[! ls() %in% c('motnp_edge_weights_strongpriors', 'counts_df')]) ; gc()
-
 #### generate gbi_matrix ####
+counts_df <- read_csv('../data_processed/motnp_binomialpairwiseevents_malesonly.csv')
 eles <- read_csv('../data_processed/motnp_eles_long.csv')
 eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_')       # make single variable for unique locations
 eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]                  # rearrange variables
@@ -136,7 +134,7 @@ rhat <- function(gbi) {                                                         
   return(rhat)
 }
 
-#### run initial permutation ####
+#### run initial permutation -- OLD METHOD, COMMENTED OUT ####
 #set.seed(1)
 #permute <- aninet::gbi_MCMC(data = gbi_males,
 #                            ind_constraint = NULL, group_constraint = NULL,
@@ -149,7 +147,7 @@ rhat <- function(gbi) {                                                         
 ##permute_gbi[,,1,1] <- permute$permuted_data[[1]]
 ##permute_gbi[,,1,2] <- permute$permuted_data[[2]]
 
-#### extend as far as necessary ####
+#### extend as far as necessary -- OLD METHOD, COMMENTED OUT ####
 #for(seed in seeds){
 #  print(paste0('start seed number ', seed, ' at ', Sys.time()))
 #  set.seed(seed)
@@ -175,11 +173,9 @@ ids <- unique(c(counts_df$id_1, counts_df$id_2))            # IDs of elephants
 num_eles <- length(ids)                                     # number of elephants
 m_mat <- diag(nrow = num_eles)                              # matrix of males -- NxN to fill with SRI
 colnames(m_mat) <- ids ; rownames(m_mat) <- ids             # dimnames = elephant IDs
-print('matrix generated')
 
 # obtain SRI
 counts_df$sri <- counts_df$event_count / counts_df$count_dyad
-print('SRI calculated')
 
 # populate matrix with SRI values
 for( i in 1:num_eles ) {                                    # rows
@@ -200,20 +196,22 @@ asnipe_seeds <- 2:(num_permute/chain_length)
 obs <- nrow(gbi_males)
 
 ### set up output data frame
-outputs <- data.frame(permutation = c(0,seq(from = chain_length, to = num_permute, by = chain_length)),
-                      cv = NA, mean = NA, stdev = NA, rhat = NA, p = NA)
+outputs <- data.frame(permutation = c(0,seq(from = chain_length,
+                                            to = num_permute,
+                                            by = chain_length)),
+                      cv = NA, mean = NA, stdev = NA, rhat = NA, p_value = NA)
 
 ### fill in data for first row
 outputs$cv[outputs$permutation == 0]    <- raster::cv(m_mat)
 outputs$mean[outputs$permutation == 0]  <- mean(m_mat)
 outputs$stdev[outputs$permutation == 0] <- sd(m_mat)
 outputs$rhat[outputs$permutation == 0]  <- rhat(m_mat)
-outputs$p[outputs$permutation == 0]     <- length(which(outputs$cv[outputs$permutation == 0] >= outputs$cv[outputs$permutation == 0]))/1 # for all others will be divided by outputs$permutation
+outputs$p_value[outputs$permutation == 0]     <- length(which(outputs$cv[outputs$permutation == 0] >= outputs$cv[outputs$permutation == 0]))/1 # for all others will be divided by outputs$permutation
 
 ### create vector of days for each sighting
 sightings <- eles[,c('elephant','encounter','date')] %>%  # set up dataframe of actual encounters
   filter(elephant %in% ids) %>%                           # remove encounters that only include females, youngsters, or dead males
-  dplyr::select(-elephant) %>%                                   # remove ID column
+  dplyr::select(-elephant) %>%                            # remove ID column
   distinct()                                              # cut down to one row per encounter
 
 ### run network permutations
@@ -230,25 +228,25 @@ cv_random_networks <- rep(0,chain_length) ; for (i in c(1:chain_length)) {   # s
   cv_random_networks[i] <- raster::cv(net_rand)                              # calculate CV and save into vector
 }
 
+# extract final network for continuation of chain
 mat_new <- random_networks[chain_length,,]
-outputs$cv[outputs$permutation == chain_length]    <- raster::cv(mat_new)
-outputs$mean[outputs$permutation == chain_length]  <- mean(mat_new)
-outputs$stdev[outputs$permutation == chain_length] <- sd(mat_new)
-outputs$rhat[outputs$permutation == chain_length]  <- rhat(mat_new)
-outputs$p[outputs$permutation == chain_length]     <- length(which(outputs$cv[outputs$permutation == chain_length] >= cv_random_networks))/outputs$permutation[outputs$permutation == chain_length]
 
-# save every 1000th network
-saved_networks <- array(NA, dim = c(nrow(outputs)-1, num_eles, num_eles),
-                        dimnames = list(NULL, ids, ids))
-saved_networks[1,,] <- mat_new
+# fill in outputs data frame with information on 1000th permutation
+permute_num <- which(outputs$permute_num == chain_length)
+outputs$cv[permute_num]    <- raster::cv(mat_new)
+outputs$mean[permute_num]  <- mean(mat_new)
+outputs$stdev[permute_num] <- sd(mat_new)
+outputs$rhat[permute_num]  <- rhat(mat_new)
+outputs$p_value[permute_num] <- length(which(outputs$cv[permute_num] >= cv_random_networks))/outputs$permutation[permute_num]
 
+#### generate for loop to continue ####
 for(seed in asnipe_seeds){
   permutation <- chain_length*seed
   set.seed(seed)
   ### run network permutations
   random_networks <- asnipe::network_permutation(association_data = gbi_males,   # permute network -- raw data = gbi_matrix
-                                                 association_matrix = mat_new,   # SRI matrix
-                                                 permutations = chain_length,    # 100 times
+                                                 association_matrix = mat_new,   # SRI matrix = already randomised association matrix
+                                                 permutations = chain_length,    # 1000 times
                                                  days = sightings$date,          # permute within day only
                                                  within_day = TRUE)              # permute within day only
   
@@ -259,20 +257,21 @@ for(seed in asnipe_seeds){
     cv_random_networks[(permutation+i)-chain_length] <- raster::cv(net_rand)     # calculate CV and save into vector
   }
   
+  # extract final network for continuation of chain
   mat_new <- random_networks[chain_length,,]
-  outputs$cv[outputs$permutation == permutation]    <- raster::cv(mat_new)
-  outputs$mean[outputs$permutation == permutation]  <- mean(mat_new)
-  outputs$stdev[outputs$permutation == permutation] <- sd(mat_new)
-  outputs$rhat[outputs$permutation == permutation]  <- rhat(mat_new)
-  outputs$p[outputs$permutation == permutation]     <- length(which(outputs$cv[outputs$permutation == permutation] >= cv_random_networks))/outputs$permutation[outputs$permutation == permutation]
   
-  ### save every 1000th network
-  saved_networks <- array(NA, dim = c(nrow(outputs)-1, num_eles, num_eles), dimnames = list(NULL, ids, ids))
-  saved_networks[seed,,] <- mat_new
+  # fill in outputs data frame with information on 1000th permutation
+  permute_num <- which(outputs$permutation == permutation)
+  outputs$cv[permute_num]    <- raster::cv(mat_new)
+  outputs$mean[permute_num]  <- mean(mat_new)
+  outputs$stdev[permute_num] <- sd(mat_new)
+  outputs$rhat[permute_num]  <- rhat(mat_new)
+  outputs$p_value[permute_num] <- length(which(outputs$cv[permute_num] >= cv_random_networks))/outputs$permutation[permute_num]
   
   ### save workspace every 10000th network
   if(seed %% 10 == 0) {
     saveRDS(cv_random_networks, '../data_processed/motnp_cv_permutations.csv')
     save.image('motnp_permutations.RData')
+    print(paste0(permutation,'permutations done'))
     }
 }
