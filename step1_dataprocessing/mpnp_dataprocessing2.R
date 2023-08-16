@@ -3,6 +3,7 @@
 # Data collected by Elephants for Africa (EfA) 2012-2021
 # Data supplied by Dr Kate Evans
 #### Set up ####
+# library(tidyverse) ; library(janitor) ; library(hms) ; library(dplyr) ; library(lubridate) ; library(readxl)
 library(tidyverse, lib.loc = '../packages/')   # library(tidyverse)
 library(janitor, lib.loc = '../packages/')     # library(janitor)
 library(hms, lib.loc = '../packages/')         # library(hms)
@@ -27,7 +28,7 @@ for(i in 2:length(data_files)){
 length(unique(all$obs_id))          # 1438 -- this was the correct number as produced in the GBI matrix
 
 # clean environment
-rm(data_files) ; gc()
+rm(data_files, i) ; gc()
 
 #### recreate how data were produced to match up obs_id to actual encounters ####
 # sightings data
@@ -280,6 +281,11 @@ windows$period_start[5]+(windows$period_days[6]-windows$period_days[5])
 data <- left_join(x = data, y = windows, by = 'period')  # merge time window ID with event data
 head(data)
 
+check <- as.data.frame(table(data$dyad))
+unique(check$Freq)
+
+df <- data
+
 ## clean environment
 rm(df, dyads, efa, periods) ; gc()
 
@@ -497,7 +503,7 @@ cumsum(1:length(unique(data$id_1)))[length(unique(data$id_1))] == length(unique(
 
 #### cut out last time window
 table(data$period)
-mpnp_long <- data[data$period < 6, c(1:4,6:8)] %>% distinct()
+mpnp_long <- data[data$period < 6,]
 rm(data) ; gc()
 
 ## insert column for sighting period
@@ -533,12 +539,10 @@ rm(individual, i) ; gc()
 summary(counts$count)      # check output
 
 # join counts data frame with dyad data
-colnames(counts)[1] <- 'id_1'                                              # rename ID column for merging
+colnames(counts) <- c('id_1','count_1')                                    # rename for merging
 data <- left_join(x = mpnp_long, y = counts, by = 'id_1') ; rm(mpnp_long)  # add id1 count data
-colnames(data)[8] <- 'count_1'                                             # rename post merging
-colnames(counts)[1] <- 'id_2'                                              # rename ID column for merging
-data <- left_join(x = data, y = counts, by = 'id_2')                       # add id2 count data for 1st time window
-colnames(data)[9] <- 'count_2'                                             # rename post merging
+colnames(counts) <- c('id_2','count_2')                                    # rename for merging
+data <- left_join(x = data, y = counts, by = 'id_2')                       # add id2 count data
 
 rm(counts,sightings) ; gc()
 
@@ -551,6 +555,30 @@ unique(data$id_2[which(is.na(data$count_2) == TRUE)])
 
 data <- data[!is.na(data$count_1),]
 data <- data[!is.na(data$count_2),]
+
+### combine event count scores
+event_counts <- data %>% select(-period, -period_start, -period_days, -event_count) %>% distinct()
+event_counts$event_count <- NA
+for(i in 1:length(unique(event_counts$dyad_id))){
+  event_counts$event_count[i] <- sum(data$event_count[data$dyad_id == i])
+}
+
+
+
+
+
+
+
+dyad1 <- data[data$dyad_id == 1,]
+
+df <- data %>% select(-period, - period_start, -period_days) %>% distinct()
+df
+
+check <- as.data.frame(table(df$dyad)) %>% 
+  filter(Freq > 1)
+
+df_check <- df[]
+
 
 #### add variable for sightings apart ####
 data$count_dyad <- (data$count_1 + data$count_2) - data$event_count   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
