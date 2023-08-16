@@ -149,7 +149,7 @@ for(i in 1:length(plot_dyads)){                                                 
 }
 
 #### check outputs: plot network ####
-### create plotting function
+### create custom network plotting function
 plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
                                      label.colour = 'transparent', label.font = 'Helvetica', 
                                      node.size = 4, node.colour = 'seagreen1',
@@ -232,13 +232,13 @@ plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, thresh
 }
 
 ### create single matrix of edge samples
-edge_samples <- matrix(data = NA, nrow = n_samples*n_chains, ncol = n_dyads)
-for(j in 1:n_dyads){
+edge_samples <- matrix(data = NA, nrow = n_samples*n_chains, ncol = n_dyads)   # matrix for storing edge samples
+for(j in 1:n_dyads){                                                           # for every dyad, fill matrix with weights (currently 4 columns per dyad as saved each chain separately)
   edge_samples[,j] <- edge_weights_matrix[,,j]
 }
-colnames(edge_samples) <- cdf_1$dyad_id
+colnames(edge_samples) <- cdf_1$dyad_id                                        # match to dyad ID numbers
 
-### plot network
+### plot network across 6 different threshold values for comparison to other networks
 plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.05,
                            node.size = nodes, node.colour = nodes, lwd = 15)
 plot_network_threshold_anp(edge_samples = edge_samples, dyad_data = cdf_1, threshold = 0.10,
@@ -264,7 +264,7 @@ save.image('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 #load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 
 ### create data frame with SRI and bison weights in it
-make_edgelist <- function (edge_samples, dyad_data)
+make_edgelist <- function (edge_samples, dyad_data) # function pulled directly from BISoN for extracting edge lists
 {
   dyad_name <- do.call(paste, c(dyad_data[c("node_1", "node_2")], sep=" <-> "))
   edge_lower <- apply(edge_samples, 2, function(x) quantile(x, probs=0.025))
@@ -372,7 +372,7 @@ for(time_window in 2:n_windows){
     together   = cdf$event_count,        # count number of sightings seen together
     count_dyad = cdf$period_count_dyad)  # count total number of times seen
   
-  #### run model on real standardised data -- period 1 ####
+  #### run model on real standardised data ####
   ### Fit model
   fit_edges_anp <- edge_binary$sample(
     data = counts_ls, 
@@ -572,7 +572,7 @@ for(time_window in 1:n_windows){
     together   = cdf$event_count,        # count number of sightings seen together
     count_dyad = cdf$period_count_dyad)  # count total number of times seen
   
-  #### run model on real standardised data -- period 1 ####
+  #### run model on real standardised data ####
   ### Fit model
   fit_edges_anp <- edge_binary$sample(
     data = counts_ls, 

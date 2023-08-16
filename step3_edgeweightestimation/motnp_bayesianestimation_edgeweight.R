@@ -208,7 +208,7 @@ write_csv(counts_df, '../data_processed/motnp_binomialpairwiseevents_malesonly.c
 ### add time marker
 print(paste0('data read in at ', Sys.time()))
 
-##### create data list ####
+#### create data list ####
 ### create nodes data frame
 nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
                    node = NA, age = NA, sightings = NA)                  # data needed on each
@@ -259,13 +259,13 @@ posterior_samples <- fit_edges_motnp$draws()
 edge_weights_matrix <- posterior_samples[,,2:(nrow(counts_df)+1)]
 rm(posterior_samples) ; gc()
 
-### save edge samples
-edges <- as.data.frame(edge_weights_matrix[,,1])
-colnames(edges) <- c('chain1','chain2','chain3','chain4')
-edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')
-edges$dyad <- counts_ls$dyad_ids[1]
-edges$position <- rep(1:n_samples, each = n_chains)
-for(i in 2:n_dyads){
+### save edge samples -- convert from being an array where each layer is a set of 4 chains, to a data frame where all chains are saved toghether in long format
+edges <- as.data.frame(edge_weights_matrix[,,1])                                          # extract matrix for first dyad
+colnames(edges) <- c('chain1','chain2','chain3','chain4')                                 # rename columns so know which chain is which
+edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')   # convert to long format
+edges$dyad <- counts_ls$dyad_ids[1]                                                       # add dyad ID for first dyad
+edges$position <- rep(1:n_samples, each = n_chains)                                       # add chain position for each dyad
+for(i in 2:n_dyads){                                                                      # repeat for all other dyads and append
   x <- as.data.frame(edge_weights_matrix[,,i])
   colnames(x) <- c('chain1','chain2','chain3','chain4')
   x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
@@ -273,20 +273,20 @@ for(i in 2:n_dyads){
   x$position <- rep(1:n_samples, each = n_chains)
   edges <- rbind(edges, x)
 }
-saveRDS(edges, '../data_processed/motnp_edgedistributions_conditionalprior.RDS')
+saveRDS(edges, '../data_processed/motnp_edgedistributions_conditionalprior.RDS')          # save output
 #edges <- readRDS('../data_processed/motnp_edgedistributions_conditionalprior.RDS')
 
-##### check outputs: edge weights ####
-### Assign random set of columns to check
-if(length(which(counts_df$event_count >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(counts_df$event_count >= 1)) }
-plot_dyads <- c(sample(counts_df$dyad_id[counts_df$event_count >= 1], size = n_test, replace = F),
-                sample(counts_df$dyad_id[counts_df$event_count == 0], size = n_test, replace = F))
-plot_edges <- edges[edges$dyad %in% plot_dyads,]
-plot_edges$seen_together <- NA ; for(i in 1:length(plot_dyads)){
+#### check outputs: edge weights ####
+### Assign random set of columns to check -- maximum 200 of each type, but with same number of 'zero' dyads as 'non-zeroes'
+if(length(which(counts_df$event_count >= 1)) >= 200) { n_test <- 200 } else { n_test <- length(which(counts_df$event_count >= 1)) } # identify number of samples to include
+plot_dyads <- c(sample(counts_df$dyad_id[counts_df$event_count >= 1], size = n_test, replace = F),    # sample 'non-zero' dyads
+                sample(counts_df$dyad_id[counts_df$event_count == 0], size = n_test, replace = F))    # sample 'zero' dyads
+plot_edges <- edges[edges$dyad %in% plot_dyads,]                                                      # extract edges for sampled dyads
+plot_edges$seen_together <- NA ; for(i in 1:length(plot_dyads)){                                      # set up loop to make 0/1 dummy variable for seen vs not seen together
   plot_edges$seen_together[plot_edges$dyad == plot_dyads[i]] <- ifelse(counts_df$event_count[counts_df$dyad_id == plot_dyads[i]] > 0, 1, 0)
 }
 
-### build traceplots
+### build traceplots -- split seen and not seen to check they are different and look for anomalies
 ggplot(data = plot_edges[plot_edges$seen_together == 1,], aes(y = edge_draw, x = position, colour = chain))+
   geom_line()+
   facet_wrap(. ~ dyad)+
@@ -298,7 +298,7 @@ ggplot(data = plot_edges[plot_edges$seen_together == 0,], aes(y = edge_draw, x =
   theme_classic()+
   theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
 
-#### density plots
+#### density plots -- split seen and not seen to check they are different and look for anomalies
 plot(NULL, xlim = c(0,1), ylim = c(0,30), las = 1, xlab = 'edge weight', ylab = 'density')
 for(i in 1:length(plot_dyads)){
   x <- plot_edges[plot_edges$dyad == plot_dyads[i],]
@@ -306,7 +306,7 @@ for(i in 1:length(plot_dyads)){
 }
 
 #### check outputs: plot network ####
-### create plotting function
+### create custom network plotting function
 plot_network_threshold <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
                                     label.colour = 'transparent', label.font = 'Helvetica', 
                                     node.size = 4, node.colour = 'seagreen1',
@@ -388,13 +388,13 @@ plot_network_threshold <- function (edge_samples, dyad_data, lwd = 2, threshold 
 }
 
 ### create single matrix of edge samples
-edge_samples <- matrix(data = NA, nrow = n_samples*n_chains, ncol = n_dyads)
-for(j in 1:n_dyads){
+edge_samples <- matrix(data = NA, nrow = n_samples*n_chains, ncol = n_dyads)   # matrix for storing edge samples
+for(j in 1:n_dyads){                                                           # for every dyad, fill matrix with weights (currently 4 columns per dyad as saved each chain separately)
   edge_samples[,j] <- edge_weights_matrix[,,j]
 }
-colnames(edge_samples) <- counts_df$dyad_id
+colnames(edge_samples) <- counts_df$dyad_id                                    # match to dyad ID numbers
 
-### plot network
+### plot network across 6 different threshold values for comparison to other networks
 plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.05,
                        node.size = nodes, node.colour = nodes, lwd = 15)
 plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.10,
@@ -413,11 +413,11 @@ rm(counts_ls, x, edge_weights_matrix, i, j) ; gc()
 
 ### save image
 save.image('motnp_edgeweights_conditionalpriors.RData')
-#load('motnp_edgeweights_conditionalpriors.RData')
 
 #### check outputs: compare to simple SRI ####
+#load('motnp_edgeweights_conditionalpriors.RData')
 ### extract edgelist and calculate SRI
-make_edgelist <- function (edge_samples, dyad_data)
+make_edgelist <- function (edge_samples, dyad_data) # function pulled directly from BISoN for extracting edge lists
 {
   dyad_name <- do.call(paste, c(dyad_data[c("node_1", "node_2")], sep=" <-> "))
   edge_lower <- apply(edge_samples, 2, function(x) quantile(x, probs=0.025))
@@ -440,7 +440,7 @@ head(edgelist)                                                                  
 colnames(edgelist)[1:2] <- c('node_1','node_2')                                     # rename for join function
 edgelist$node_1 <- as.integer(edgelist$node_1)                                      # convert to integers
 edgelist$node_2 <- as.integer(edgelist$node_2)                                      # convert to integers
-summary <- left_join(edgelist, counts_df, by = c('node_1','node_2'))              # combine distribution data with raw counts
+summary <- left_join(edgelist, counts_df, by = c('node_1','node_2'))                # combine distribution data with raw counts
 summary$sri <- summary$event_count / summary$count_dyad                             # calculate basic SRI
 
 ### plot median vs SRI
