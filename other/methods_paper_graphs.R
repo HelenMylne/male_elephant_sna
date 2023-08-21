@@ -177,6 +177,23 @@ rm(edge_binary, edge_samples, edgelist, edges, fit_edges_motnp)
 # calculate sri
 counts_df$sri <- counts_df$event_count / counts_df$count_dyad
 
+# calculate percentages of 0s and 1s using SRI
+( length(which(counts_df$sri==0))/length(counts_df$sri) ) * 100
+( length(which(counts_df$sri==1))/length(counts_df$sri) ) * 100
+length(unique(c(counts_df$id_1, counts_df$id_2)))
+
+# calculate percentages of 0s and 1s using SRI, assuming a 5 sighting threshold per elephant
+subset5 <- counts_df %>% filter(count_1 >= 5 & count_2 >= 5)
+( length(which(subset5$sri==0))/length(subset5$sri) ) * 100
+( length(which(subset5$sri==1))/length(subset5$sri) ) * 100
+length(unique(c(subset5$id_1, subset5$id_2)))
+
+# calculate percentages of 0s and 1s using SRI, assuming a 10 sighting threshold per elephant
+subset10 <- counts_df %>% filter(count_1 >= 10 & count_2 >= 10)
+( length(which(subset10$sri==0))/length(subset10$sri) ) * 100
+length(unique(c(subset10$id_1, subset10$id_2)))
+100-(( length(unique(c(subset10$id_1, subset10$id_2))) / length(unique(c(counts_df$id_1, counts_df$id_2))) )*100)
+
 # histogram posterior distributions
 (figure2d <- ggplot(counts_df)+
     geom_histogram(aes(x = sri), bins = 100, fill = rgb(33/255, 145/255, 140/255))+
