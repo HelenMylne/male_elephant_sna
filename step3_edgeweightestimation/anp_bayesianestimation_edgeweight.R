@@ -104,7 +104,7 @@ edges <- pivot_longer(edge_samples, cols = everything(),
   mutate(dyad_rank = as.integer(as.factor(parameter))) %>% 
   left_join(cdf_1[,c('dyad_id','dyad_rank')], by = 'dyad_rank') %>% 
   mutate(chain = rep(1:n_chains, each = n_samples*n_dyads),
-         position <- rep(rep(1:n_samples, each = n_dyads), n_chains))
+         position = rep(rep(1:n_samples, each = n_dyads), n_chains))
 
 ### save edge samples for use in dyadic/nodal regressions 
 saveRDS(edges, '../data_processed/anpshort1_edgedistributions_conditionalprior.RDS')
