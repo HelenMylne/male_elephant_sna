@@ -46,7 +46,7 @@ edge_binary                                                     # check model pr
 
 #### import data ####
 ### import aggregated counts of sightings together and apart, and info about individuals
-counts_df <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows_impossiblepairsremoved.csv')  # counts_df = data frame of all dyad information, spceifically including aggregated counts of together vs apart
+counts_df <- read_csv('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows_impossiblepairsremoved.csv')  # counts_df = data frame of all dyad information, specifically including aggregated counts of together vs apart
 
 ### set up values for running loop
 periods <- sort(unique(c(counts_df$period_start, counts_df$period_end)))  # dates  of short time windows in ANP data
@@ -92,26 +92,19 @@ fit_edges_anp1 <- edge_binary$sample(
 fit_edges_anp1
 
 ### Extract posterior samples
-posterior_samples <- fit_edges_anp1$draws()
+edge_samples <- fit_edges_anp1$draws("edge_weight", format = "df")
 
-### extract edge weights
-edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf_1)+1)]  # remove column of intercepts
-rm(posterior_samples, x, i) ; gc()                             # clean workspace
+### remove .chain .iteration .draw to just leave draws
+edge_samples <- as.data.frame(edge_samples[, 1:(ncol(edge_samples)-3)])
 
-### convert edge samples to data frame, putting all chains into 1 column
-edges <- as.data.frame(edge_weights_matrix[,,1])               # convert draws for first dyad to data frame
-colnames(edges) <- c('chain1','chain2','chain3','chain4')      # rename columns
-edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain') # tidy draws for first dyad
-edges$dyad <- counts_ls$dyad_ids[1]                            # add dyad id column
-edges$position <- rep(1:n_samples, each = n_chains)            # position within chain for traceplots
-for(i in 2:n_dyads){                                           # repeat for the rest of the dyads
-  x <- as.data.frame(edge_weights_matrix[,,i])
-  colnames(x) <- c('chain1','chain2','chain3','chain4')
-  x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
-  x$dyad <- counts_ls$dyad_ids[i]
-  x$position <- rep(1:n_samples, each = n_chains)
-  edges <- rbind(edges, x)                                     # append each to the last to create a single dataframe with all dyads
-}
+### convert to desired format
+cdf_1$dyad_rank <- as.integer(as.factor(cdf_1$dyad_id))
+edges <- pivot_longer(edge_samples, cols = everything(),
+                      values_to = 'edge_draw', names_to = 'parameter' ) %>% 
+  mutate(dyad_rank = as.integer(as.factor(parameter))) %>% 
+  left_join(cdf_1[,c('dyad_id','dyad_rank')], by = 'dyad_rank') %>% 
+  mutate(chain = rep(1:n_chains, each = n_samples*n_dyads),
+         position <- rep(rep(1:n_samples, each = n_dyads), n_chains))
 
 ### save edge samples for use in dyadic/nodal regressions 
 saveRDS(edges, '../data_processed/anpshort1_edgedistributions_conditionalprior.RDS')
@@ -384,27 +377,20 @@ for(time_window in 2:n_windows){
   ### check model
   fit_edges_anp
   
-  # Extract posterior samples
-  posterior_samples <- fit_edges_anp$draws()
+  ### extract posterior samples
+  edge_samples <- fit_edges_anp$draws("edge_weight", format = "df")
   
-  # Convert the array to a matrix -- save for eigenvector centralities
-  edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf)+1)]
-  rm(posterior_samples, x, i) ; gc()
+  ### remove .chain .iteration .draw to just leave draws
+  edge_samples <- as.data.frame(edge_samples[, 1:(ncol(edge_samples)-3)])
   
-  # convert matrix to data frame -- save samples and plot outputs
-  edges <- as.data.frame(edge_weights_matrix[,,1])
-  colnames(edges) <- c('chain1','chain2','chain3','chain4')
-  edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')
-  edges$dyad <- counts_ls$dyad_ids[1]
-  edges$position <- rep(1:n_samples, each = n_chains)
-  for(i in 2:n_dyads){
-    x <- as.data.frame(edge_weights_matrix[,,i])
-    colnames(x) <- c('chain1','chain2','chain3','chain4')
-    x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
-    x$dyad <- counts_ls$dyad_ids[i]
-    x$position <- rep(1:n_samples, each = n_chains)
-    edges <- rbind(edges, x)
-  }
+  ### convert to desired format
+  cdf$dyad_rank <- as.integer(as.factor(cdf$dyad_id))
+  edges <- pivot_longer(edges, cols = everything(),
+                        values_to = 'edge_draw', names_to = 'parameter' ) %>% 
+    mutate(dyad_rank = as.integer(as.factor(parameter))) %>% 
+    left_join(cdf[,c('dyad_id','dyad_rank')], by = 'dyad_rank') %>% 
+    mutate(chain = rep(1:n_chains, each = n_samples*n_dyads),
+           position <- rep(rep(1:n_samples, each = n_dyads), n_chains))
   
   ### save data 
   saveRDS(edges, paste0('../data_processed/anpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
@@ -584,27 +570,20 @@ for(time_window in 1:n_windows){
   ### check model
   fit_edges_anp
   
-  # Extract posterior samples
-  posterior_samples <- fit_edges_anp$draws()
+  ### extract posterior samples
+  edge_samples <- fit_edges_anp$draws("edge_weight", format = "df")
   
-  # Convert the array to a matrix -- save for eigenvector centralities
-  edge_weights_matrix <- posterior_samples[,,2:(nrow(cdf)+1)]
-  rm(posterior_samples, x, i) ; gc()
+  ### remove .chain .iteration .draw to just leave draws
+  edge_samples <- as.data.frame(edge_samples[, 1:(ncol(edge_samples)-3)])
   
-  # convert matrix to data frame -- save samples and plot outputs
-  edges <- as.data.frame(edge_weights_matrix[,,1])
-  colnames(edges) <- c('chain1','chain2','chain3','chain4')
-  edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')
-  edges$dyad <- counts_ls$dyad_ids[1]
-  edges$position <- rep(1:n_samples, each = n_chains)
-  for(i in 2:n_dyads){
-    x <- as.data.frame(edge_weights_matrix[,,i])
-    colnames(x) <- c('chain1','chain2','chain3','chain4')
-    x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
-    x$dyad <- counts_ls$dyad_ids[i]
-    x$position <- rep(1:n_samples, each = n_chains)
-    edges <- rbind(edges, x)
-  }
+  ### convert to desired format
+  cdf$dyad_rank <- as.integer(as.factor(cdf$dyad_id))
+  edges <- pivot_longer(edges, cols = everything(),
+                        values_to = 'edge_draw', names_to = 'parameter' ) %>% 
+    mutate(dyad_rank = as.integer(as.factor(parameter))) %>% 
+    left_join(cdf[,c('dyad_id','dyad_rank')], by = 'dyad_rank') %>% 
+    mutate(chain = rep(1:n_chains, each = n_samples*n_dyads),
+           position <- rep(rep(1:n_samples, each = n_dyads), n_chains))
   
   ### save data 
   saveRDS(edges, paste0('../data_processed/anplong',time_window,'_edgedistributions_conditionalprior.RDS'))
