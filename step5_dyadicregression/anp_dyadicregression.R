@@ -13,7 +13,7 @@ library(car, lib.loc = '../packages/')       # library(car)
 #set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
 
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
-rm(edgelist, counts_df, edge_binary, nodes) ; gc()
+# rm(edgelist, edge_binary, nodes) ; gc()
 
 pdf('../outputs/anp1_dyadicregression_plots.pdf')
 
@@ -42,32 +42,50 @@ par(mfrow = c(1,1))
 print(paste0('prior predictive check completed at ', Sys.time()))
 
 #### fit multivariate Gaussian distribution to output of edge weight model ####
-# edge weights from beta() model stored in edge_samples, where column is dyad and row is edge draw (1:4000)
-# note in bison papers, Jordan calculated edges under a logit-normal model
-trfm_edges <- (edge_samples)^(1/3)                   # transform edges to be more normal: log transform takes too left skewed, plogis doesn't change shape at all
-plot(density(edge_samples[, 1]), lwd = 2, las = 1,
-     main = "edge transformation: black = edges, blue = cube root edges", xlab = "edge weight", xlim = c(0,1))
-lines(density(trfm_edges[, 1]), col = rgb(0,0,1,0.5), lwd = 2)
+# To parameterise the multivariate normal approximation, we use the sample mean and covariance matrix, calculated from the posterior edge weight samples using the following code:
+### get the weights on the logit scale (they are not currently because we used a beta prior and identity link here rather than logistic link)
+logit_weights <- apply(edge_samples, 2, qlogis)
 
-# calculate mean of logit edge samples
-edge_mu <- apply(trfm_edges, 2, mean)
+### fit a multivariate normal dist to the edges -- quantities will be given to Stan model as data to model joint posteriors of edge weight in the regression
+logit_edge_draws_mu <- apply(logit_weights, 2, mean)
+logit_edge_draws_cov <- cov(logit_weights)
 
-# calculate covariance of logit edge samples
-edge_cov <- cov(trfm_edges)
+#### plot to see how well the approximation is working ####
+### Randomly selecting samples to examine
+num_check <- 20
+selected_samples <- sample(1:n_dyads, num_check, replace = FALSE)
 
-# compute multivariate Gaussian approximation
-mv_edge_samples <- MASS::mvrnorm(1e5, edge_mu, edge_cov)
+### Setting grid layout
+rows <- floor(sqrt(num_check))
+cols <- ceiling(num_check / rows)
+par(mfrow=c(rows, cols), mar=c(2,2,2,1))
 
-# plot edge weight vs normal approximation
-par(mai = c(1,1,1.2,0.4))
-plot(density(edge_samples[, 1]), lwd = 2, las = 1, xlim = c(0,1), ylim = c(0,5), xlab = "edge weight",
-     main = "normal approximation of edges:\nblack = raw edge weights\nred = cube root edge weights\nblue = mvnorm approximation")
-lines(density(trfm_edges[, 1]), col = 'red', lwd = 2)
-lines(density(mv_edge_samples[, 1]), col = 'blue', lwd = 2)
+### plot
+for (i in selected_samples) {
+  mu <- logit_edge_draws_mu[i]
+  sd <- sqrt(logit_edge_draws_cov[i,i])
+  
+  fitted_values_logit <- rnorm(1e5, mean = mu, sd = sd)
+  fitted_values_original <- plogis(fitted_values_logit)
+  
+  hist(unlist(edge_samples[,i]), probability = TRUE, las = 1,
+       main = paste("Dyad", i), xlab = "Value", breaks = 50)
+  lines(density(fitted_values_original), col="blue", lw=1.5)
+}
 
-# plot covariance of edges
-plot(mv_edge_samples[, 1], mv_edge_samples[, 2], col = rgb(0,0,1,0.05), las = 1,
-     main = "Covariance between edges 1 & 2", xlab = "Edge 1 samples", ylab = "Edge 2 samples")
+for (i in selected_samples) {
+  mu <- logit_edge_draws_mu[i]
+  sd <- sqrt(logit_edge_draws_cov[i,i])
+  
+  fitted_values_logit <- rnorm(1e5, mean = mu, sd = sd)
+  fitted_values_original <- plogis(fitted_values_logit)
+  
+  plot(unlist(edge_samples[,i]), unlist(edge_samples[,i+1]), col = rgb(0,0,1,0.05), las = 1,
+       main = paste("cov ", i ,"&",i+1))
+}
+
+### reset plot window
+par(mfrow=c(1,1))
 
 # save image so far
 save.image('anpshort1_dyadicregression.RData')
@@ -85,29 +103,26 @@ for(i in 1:nrow(cdf_1)){
 }
 
 ## convert node IDs to values 1:52 not numbers based on casename
-eles <- cdf_1[,c('id_1','node_1')] %>% distinct()
-ele2 <- cdf_1[,c('id_2','node_2')] %>% distinct() %>% filter(!(id_2 %in% eles$id_1))
-colnames(eles) <- c('id','node_original') ; colnames(ele2) <- c('id','node_original')
-eles <- rbind(eles, ele2) ; rm(ele2) ; gc()
-eles$id_1 <- eles$id ; eles$id_2 <- eles$id
-eles$node_1_dyadreg <- as.integer(as.factor(eles$node_original))
-eles$node_2_dyadreg <- eles$node_1_dyadreg
+all_node_IDs <- unique(c(cdf_1$id_1, cdf_1$id_2))
+n_nodes <- length(all_node_IDs)
 cdf_1 <- cdf_1 %>% 
   rename(node_1_original = node_1,
          node_2_original = node_2) %>% 
-  left_join(eles[,c('id_1','node_1_dyadreg')], by = 'id_1') %>% 
-  left_join(eles[,c('id_2','node_2_dyadreg')], by = 'id_2')
+  mutate(node_1_period = as.integer(factor(id_1, levels = all_node_IDs)),
+         node_2_period = as.integer(factor(id_2, levels = all_node_IDs)),)
 
 ## create data list
 dyad_data <- list(
-  num_dyads = n_dyads,                                    # number of dyads
-  num_nodes = length(unique(c(cdf_1$id_1, cdf_1$id_2))),  # number of nodes
-  edge_mu = edge_mu,                                      # sample means of logit edge weights
-  edge_cov = edge_cov,                                    # sample covariance of logit edge weights
-  age_min = cdf_1$age_min,                                # age of younger dyad member
-  age_max = cdf_1$age_max,                                # age of  older  dyad member
-  node_1 = cdf_1$node_1_dyadreg,                          # node IDs for multimembership effects
-  node_2 = cdf_1$node_2_dyadreg                           # node IDs for multimembership effects
+  num_dyads = n_dyads,                      # number of dyads
+  num_nodes = n_nodes,                      # number of nodes
+  logit_edge_mu = logit_edge_draws_mu,      # sample means of the logit edge weights
+  logit_edge_cov = logit_edge_draws_cov,    # sample covariance of logit edge weights
+  age_min = cdf_1$age_min,                  # age of younger dyad member
+  #age_max = cdf_1$age_max,                  # age of  older  dyad member
+  age_diff = cdf_1$age_diff,                # age difference between dyad members
+  node_1 = cdf_1$node_1_period,             # node IDs for multimembership effects
+  node_2 = cdf_1$node_2_period,             # node IDs for multimembership effects
+  jitter = 1e-6                             # jitter to add to the diag of the cov matrix for numerical stability -- COME BACK TO THIS, MAY NEED TO ALTER THE MODEL TO ADD SIGMA BACK IN AND REMOVE JITTER
 )
 
 ## load dyadic regression model
@@ -136,20 +151,22 @@ fit_dyadreg_anp1$summary()
 draws <- fit_dyadreg_anp1$draws()
 
 ## extract dyadic regression slopes
-b_min <- draws[,,'b_min']
-b_max <- draws[,,'b_max']
-b_int <- draws[,,'b_int']
+b_diff <- draws[,,'beta_age_diff']
+b_min <- draws[,,'beta_age_min']
 sigma <- draws[,,'sigma']
 
-## extract overall age effects
-draws <- draws[,,5:length(draws[1,1,])]   # ONCE ADD INTERACTION, CHANGE TO: draws <- draws[,,6:length(draws[1,1,])]
-age_effects <- draws[,,1:n_dyads]
+#b_max <- draws[,,'b_max']
+#b_int <- draws[,,'b_int']
 
-## extract multimembership samples -- CHECK THIS IS IN THE RIGHT ORDER
-draws <- draws[,,(n_dyads+1):length(draws[1,1,])]
-mm_matrix <- draws[,,1:n_dyads]
-sigma_mm <- draws[,,(n_dyads+1)]
-length(draws[1,1,]) == length(mm_matrix[1,1,]) + length(sigma_mm[1,1,])
+## extract overall age effects
+dimnames(draws)$variable
+draws <- draws[,,4:length(draws[1,1,])]   # WILL CHANGE IF YOU ADD ANY MORE REGRESSION SLOPES
+
+## extract multi-membership samples -- CHECK THIS IS IN THE RIGHT ORDER
+mm_matrix <- draws[,,1:n_nodes]
+sigma_mm <- draws[,,n_nodes+2]
+predictor <- draws[,,(n_nodes+3):length(draws[1,1,])]
+length(draws[1,1,]) == length(mm_matrix[1,1,]) + length(sigma_mm[1,1,]) + length(sigma[1,1,]) + length(predictor[1,1,])
 rm(draws) ; gc()
 
 # add time marker
@@ -166,11 +183,12 @@ extract_slopes <- function(draws, n_samples = 1000, n_chains = 4){
   draws$draw_id <- draws$position + (draws$chain-1)*n_samples
   return(draws)
 }
+b_diff <- extract_slopes(b_diff)
 b_min <- extract_slopes(b_min)
-b_max <- extract_slopes(b_max)
+#b_max <- extract_slopes(b_max)
 sigma <- extract_slopes(sigma)
 #b_int <- extract_slopes(b_int)
-parameters <- rbind(b_min, b_max, #b_int,
+parameters <- rbind(b_min, b_diff, #b_max, #b_int,
                     sigma)
 
 ## save data 
@@ -185,7 +203,7 @@ ggplot(data = parameters)+
   theme_classic()+
   theme(legend.position = 'none')+
   scale_colour_viridis_d()+
-  facet_wrap( . ~ parameter )
+  facet_wrap( . ~ parameter , scales = 'free_y')
 
 # add time marker
 print(paste0('traceplots run at ', Sys.time()))
@@ -195,13 +213,13 @@ print(paste0('traceplots run at ', Sys.time()))
 
 ### create mean data frame to plot average values over full distribution
 mean_edges <- data.frame(dyad = cdf_1$dyad_id,
-                         node_1 = cdf_1$node_1, node_2 = cdf_1$node_2,
+                         node_1 = cdf_1$node_1_period, node_2 = cdf_1$node_2_period,
                          together = cdf_1$event_count, count_dyad = cdf_1$period_count_dyad,
                          age_1 = cdf_1$age_start_1, age_2 = cdf_1$age_start_2,
                          age_min = cdf_1$age_min, age_max = cdf_1$age_max, age_diff = cdf_1$age_diff,
                          edge_mean = NA)
 for(i in 1:nrow(mean_edges)) {
-  x <- edges[edges$dyad == mean_edges$dyad[i],]
+  x <- edges[edges$dyad_id == mean_edges$dyad[i],]
   mean_edges$edge_mean[i] <- mean(x$edge_draw)
 }
 
@@ -276,91 +294,247 @@ plot(density(edge_samples[1, ]), main = "Posterior predictive density of respons
      ylim = c(0, 12), col = rgb(0, 0, 0, 0.25))
 for (i in 1:100) {
   j <- sample(1:1000, 1)
-  lines(density(edge_samples[j, ]), col = rgb(0, 0, 0, 0.25))
-  mu_plot <- b_min$slope_draw[j]*dyad_data$age_min + b_max$slope_draw[j]*dyad_data$age_max
-  sigma_plot <- dyad_data$edge_cov + diag(rep(sigma$slope_draw[j], n_dyads))
+  mu_plot <- b_min$slope_draw[j]*dyad_data$age_min + b_diff$slope_draw[j]*dyad_data$age_diff
+  sigma_plot <- dyad_data$logit_edge_cov + diag(rep(sigma$slope_draw[j], n_dyads))
   mv_norm <- MASS::mvrnorm(1, mu_plot, sigma_plot)
-  lines(density(mv_norm^3), col = rgb(1, 0, 0, 0.25))
+  
+  lines(density(edge_samples[j, ]), col = rgb(0, 0, 0, 0.25)) # black lines for edge samples
+  lines(density(plogis(mv_norm)), col = rgb(1, 0, 0, 0.25))   # red lines for predictions
 }
 
+
+
+
+
+
+
+
+
+
+load('TESTING_DYADIC_REGRESSION_17THAUGUST2023.RData') # delete this once you've loaded it back in tomorrow!
+rm(counts_df, dyad_data, edge_binary, edgelist, fit_edges_anp1, parameters, sigma_plot, summary, x, all_node_IDs, i, j, mm_matrix, mu_plot, mv_norm, n_windows, periods, predictor, sigma_mm, extract_slopes, make_edgelist, plot_network_threshold_anp) ; gc
+
+
+
+
+
+
+
+
+
+
 # compute posterior means
-age_min <- seq(5,46,1)
-age_max <- seq(5,46,1)
-mu <- array(NA, dim = c(n_samples, length(age_min), length(age_max)), dimnames = list(1:n_samples, age_min, age_max))
-for(sample in 1:n_samples){
-  for(min in 1:length(age_min)){
-    for(max in 1:length(age_max)){
-      if( min <= max ){
-        mu[sample,min,max] <- b_min$slope_draw[sample]*age_min[min] + b_max$slope_draw[sample]*age_max[max]# + b_int$slope_draw[sample]*age_min[min]*age_max[max]
-      }
+ages <- min(nodes$age):max(nodes$age)
+age_differences <- 0:30
+mu <- array(NA, dim = c(n_samples, length(ages), length(age_differences)),
+            dimnames = list(1:n_samples, ages, age_differences))
+for(draw in 1:n_samples){
+  for(minimum in 1:length(ages)){
+    for(difference in 1:length(age_differences)){
+      #if( min <= diff ){
+        mu[draw,minimum,difference] <- b_min$slope_draw[draw]*ages[minimum] + b_diff$slope_draw[draw]*age_differences[difference]# + b_int$slope_draw[sample]*age_min[min]*age_max[max]
+      #}
     }
   }
 }
-#mu <- plogis(mu)     # ONLY NECESSARY IF PRODUCING VALUES ON LOGIT NORMAL SCALE RATHER THAN BETA??
-mu <- mu^3           # reverse data transformation
+mu <- plogis(mu)     # IS THIS ONLY NECESSARY IF PRODUCING VALUES ON LOGIT NORMAL SCALE RATHER THAN BETA?? DON'T THINK SO BEACUSE WORKING FROM THE APPROXIMATION NOT THE ACTUAL EDGE DISTRIBUTIONS
 
-mu_max_age <- function(edge_prediction_array, age_threshold){
-  minimum_ages <- as.numeric(colnames(edge_prediction_array[1,,]))
-  maximum_ages <- as.numeric(names(edge_prediction_array[1,1,]))
-  predictions <- edge_prediction_array[,which(minimum_ages <= age_threshold),which(maximum_ages == age_threshold)]
-  if(is.null(dim(predictions)) == TRUE) { mean_edge <- mean(predictions) } else { mean_edge <- apply(predictions, 2, mean) }
-  return(mean_edge)
-}
+mu[10,,] # 10th draw for all pairs of min and diff
+mu[,16,] # 16 years minimum age for all age differences (max age = 16-46)
+mu[,,25] # 25 years age difference (max age = 30-45)
 
-pi_max_age <- function(edge_prediction_array, age_threshold){
-  minimum_ages <- as.numeric(colnames(edge_prediction_array[1,,]))
-  maximum_ages <- as.numeric(names(edge_prediction_array[1,1,]))
-  predictions <- edge_prediction_array[,which(minimum_ages <= age_threshold),which(maximum_ages == age_threshold)]
+#mu_max_age <- function(edge_prediction_array, age_threshold){
+#  minimum_ages <- as.numeric(colnames(edge_prediction_array[1,,]))
+#  maximum_ages <- as.numeric(names(edge_prediction_array[1,1,]))
+#  predictions <- edge_prediction_array[,which(minimum_ages <= age_threshold),which(maximum_ages == age_threshold)]
+#  if(is.null(dim(predictions)) == TRUE) { mean_edge <- mean(predictions) } else { mean_edge <- apply(predictions, 2, mean) }
+#  return(mean_edge)
+#}
+
+#pi_max_age <- function(edge_prediction_array, age_threshold){
+#  minimum_ages <- as.numeric(colnames(edge_prediction_array[1,,]))
+#  maximum_ages <- as.numeric(names(edge_prediction_array[1,1,]))
+#  predictions <- edge_prediction_array[,which(minimum_ages <= age_threshold),which(maximum_ages == age_threshold)]
+#  if(is.null(dim(predictions)) == TRUE) { 
+#    mean_edge <- rethinking::HPDI(predictions) 
+#  } else { 
+#    mean_edge <- apply(predictions, 2, rethinking::HPDI) 
+#  }
+#  return(mean_edge)
+#}
+
+#mu_mean_max20 <- mu_max_age(mu, 20)
+#mu_mean_max25 <- mu_max_age(mu, 25)
+#mu_mean_max30 <- mu_max_age(mu, 30)
+#mu_mean_max35 <- mu_max_age(mu, 35)
+#mu_mean_max41 <- mu_max_age(mu, 41)
+#mu_mean_max46 <- mu_max_age(mu, 46)
+
+#pi_mean_max20 <- pi_max_age(mu, 20)
+#pi_mean_max25 <- pi_max_age(mu, 25)
+#pi_mean_max30 <- pi_max_age(mu, 30)
+#pi_mean_max35 <- pi_max_age(mu, 35)
+#pi_mean_max41 <- pi_max_age(mu, 41)
+#pi_mean_max46 <- pi_max_age(mu, 46)
+
+mu_diff_age <- function(edge_prediction_array, min_threshold, diff_threshold){
+  minimum_ages <- as.numeric(rownames(edge_prediction_array[1,,]))
+  difference_ages <- as.numeric(names(edge_prediction_array[1,1,]))
+  predictions <- edge_prediction_array[,which(minimum_ages <= min_threshold),
+                                       which(difference_ages == diff_threshold)]
   if(is.null(dim(predictions)) == TRUE) { 
-    mean_edge <- rethinking::HPDI(predictions) 
+    mean_edge <- mean(predictions) 
   } else { 
-    mean_edge <- apply(predictions, 2, rethinking::HPDI) 
-  }
+      mean_edge <- apply(predictions, 2, mean) 
+      }
   return(mean_edge)
 }
 
-ages <- c(20,25,30,35,41,46)
+pi_diff_age <- function(edge_prediction_array, min_threshold, diff_threshold){
+  minimum_ages <- as.numeric(rownames(edge_prediction_array[1,,]))
+  difference_ages <- as.numeric(names(edge_prediction_array[1,1,]))
+  predictions <- edge_prediction_array[,which(minimum_ages <= min_threshold),
+                                       which(difference_ages == diff_threshold)]
+  if(is.null(dim(predictions)) == TRUE) { 
+    hpdi_edge <- rethinking::HPDI(predictions) 
+  } else { 
+    hpdi_edge <- apply(predictions, 2, rethinking::HPDI) 
+  }
+  return(hpdi_edge)
+}
 
-mu_mean_max20 <- mu_max_age(mu, 20)
-mu_mean_max25 <- mu_max_age(mu, 25)
-mu_mean_max30 <- mu_max_age(mu, 30)
-mu_mean_max35 <- mu_max_age(mu, 35)
-mu_mean_max41 <- mu_max_age(mu, 41)
-mu_mean_max46 <- mu_max_age(mu, 46)
+mu_means_list <- data.frame(min_age = rep(ages, each = length(age_differences)),
+                            diff_age = rep(age_differences, length(ages)),
+                            mean = NA, hpdi = NA)
+for(i in 1:nrow(mu_means_list)){
+  mu_means_list$mean[i] <- list(mu_diff_age(edge_prediction_array = mu,
+                                            min_threshold = mu_means_list$min_age[i],
+                                            diff_threshold = mu_means_list$diff_age[i]))
+  mu_means_list$hpdi[i] <- list(pi_diff_age(edge_prediction_array = mu,
+                                            min_threshold = mu_means_list$min_age[i],
+                                            diff_threshold = mu_means_list$diff_age[i]))
+}
+hpdi <- as.data.frame(mu_means_list$hpdi[i])
+hpdi_lower <- hpdi[1,] %>% 
+  pivot_longer(everything(), names_to = 'x_min', values_to = 'lower_bound') %>% 
+  separate(x_min, into = c('x','min_age'), remove = T, sep = 1) %>% 
+  mutate(min_age = as.numeric(min_age)) %>% 
+  select(-x)
+hpdi_upper <- hpdi[2,] %>% 
+  pivot_longer(everything(), names_to = 'x_min', values_to = 'upper_bound') %>% 
+  separate(x_min, into = c('x','min_age'), remove = T, sep = 1) %>% 
+  mutate(min_age = as.numeric(min_age)) %>% 
+  select(-x)
+hpdi <- left_join(hpdi_lower, hpdi_upper, by = 'min_age') %>% 
+  mutate(diff_age = mu_means_list$diff_age[i]) %>% 
+  relocate(diff_age, .after = min_age)
 
-pi_mean_max20 <- pi_max_age(mu, 20)
-pi_mean_max25 <- pi_max_age(mu, 25)
-pi_mean_max30 <- pi_max_age(mu, 30)
-pi_mean_max35 <- pi_max_age(mu, 35)
-pi_mean_max41 <- pi_max_age(mu, 41)
-pi_mean_max46 <- pi_max_age(mu, 46)
+for(i in 1:nrow(mu_means_list)){
+  hpdi_loop <- as.data.frame(mu_means_list$hpdi[i])
+  if(ncol(hpdi_loop) > 1){
+    hpdi_loop_lower <- hpdi_loop[1,] %>% 
+      pivot_longer(everything(), names_to = 'x_min', values_to = 'lower_bound') %>% 
+      separate(x_min, into = c('x','min_age'), remove = T, sep = 1) %>% 
+      mutate(min_age = as.numeric(min_age)) %>% 
+      select(-x)
+    hpdi_loop_upper <- hpdi_loop[2,] %>% 
+      pivot_longer(everything(), names_to = 'x_min', values_to = 'upper_bound') %>% 
+      separate(x_min, into = c('x','min_age'), remove = T, sep = 1) %>% 
+      mutate(min_age = as.numeric(min_age)) %>% 
+      select(-x)
+    hpdi_loop <- left_join(hpdi_loop_lower, hpdi_loop_upper, by = 'min_age') %>% 
+      mutate(diff_age = mu_means_list$diff_age[i])
+  } else {
+    hpdi_loop <- data.frame(min_age = mu_means_list$min_age[i],
+                            diff_age = mu_means_list$diff_age[i],
+                            lower_bound = hpdi_loop[1,1],
+                            upper_bound = hpdi_loop[2,1])
+  }
+  hpdi <- rbind(hpdi, hpdi_loop)
+}
+
+mu_means <- hpdi %>% 
+  left_join(mu_means_list[,c('min_age','diff_age','mean')],
+            by = c('min_age','diff_age')) %>% 
+  unnest(cols = mean) %>% 
+  distinct()
+
+rm(hpdi, hpdi_loop, hpdi_loop_lower, hpdi_loop_upper, hpdi_lower, hpdi_upper) ; gc()
+
+for(difference in 1:length(age_differences)){
+  
+  ## simulate from posterior
+  sim_edges <- matrix(nrow = n_samples, ncol = length(ages))
+  for(draw in 1:nrow(sim_edges)){
+    for(minimum in 1:ncol(sim_edges)){
+      mean_sim <- b_min$slope_draw[draw]*ages[minimum] + b_diff$slope_draw[draw]*age_differences[difference]
+      sigma_sim <- sigma$slope_draw[draw]
+      sim_edges[draw,minimum] <- MASS::mvrnorm(n = 1, mu = mean_sim, Sigma = sigma_sim)
+      #sim_edges[i,j] <- LaplacesDemon::rmvnc(n = 1, mu = mean_sim, U = sigma_sim)
+    }
+  }
+  
+  hist(sim_edges)  # almost entirely equal
+  sim_mu <- apply(sim_edges, 2, mean)
+  sim_pi <- apply(sim_edges, 2, rethinking::HPDI, prob = 0.95)
+  
+  # plot
+  plot(data = mean_edges[mean_edges$age_diff == age_differences[difference],],
+       edge_mean ~ age_min, col = rgb(0,0,1,0.5), # raw sightings
+       pch = 19, las = 1, xlim = c(5,45), ylim = c(0,1),
+       xlab = 'minimum age', ylab = 'edge weight',
+       main = paste0('difference = ',age_differences[difference],' years'))
+  #rethinking::shade(pi_list[[i]],
+  #                  age_min[which(age_min <= ages[i])],
+  #                  lwd = 2, col = rgb(0.5,0,1,0.2))      # add mean shading
+  #polygon(y = plogis(sim_pi),
+  #        x = c(ages,ages),
+  #        lwd = 1, col = rgb(0.5,0,1,0.2))      # add mean shading
+  polygon(y = c(plogis(sim_pi[1,]),plogis(sim_pi[2,])),
+          x = c(rev(ages),ages),
+          lwd = 1, col = rgb(0.5,0,1,0.2))       # add mean shading
+  lines(x = ages,
+        y = plogis(sim_mu), lwd = 2, col = 'purple')   # add mean line
+  #rethinking::shade(sim_pi, age_min)             # add predictions
+}
+
+
+
 
 ## simulate from posterior -- IS THIS RIGHT??
 sim_edges <- matrix(nrow = n_samples, ncol = length(age_min))
 for(i in 1:nrow(sim_edges)){
   for(j in 1:ncol(sim_edges)){
-    mean_sim <- b_min$slope_draw[i]*age_min[j] + b_max$slope_draw[i]*age_max[j]
+    mean_sim <- b_min$slope_draw[i]*age_min[j] + b_diff$slope_draw[i]*age_diff[j]
     sigma_sim <- sigma$slope_draw[i]
-    x <- MASS::mvrnorm(n = 1, mu = (mean_sim^3), Sigma = sigma_sim)
-    sim_edges[i,j] <- x#^3
+    sim_edges[i,j] <- MASS::mvrnorm(n = 1, mu = mean_sim, Sigma = sigma_sim)
+    #sim_edges[i,j] <- LaplacesDemon::rmvnc(n = 1, mu = mean_sim, U = sigma_sim)
   }
 }
 hist(sim_edges)  # almost entirely equal
 sim_pi <- apply(sim_edges, 2, rethinking::HPDI, prob = 0.95)
 
 # plot
-par(mfrow = c(3,2))
-mu_list <- list(mu_mean_max20, mu_mean_max25, mu_mean_max30, mu_mean_max35, mu_mean_max41, mu_mean_max46)
-pi_list <- list(pi_mean_max20, pi_mean_max25, pi_mean_max30, pi_mean_max35, pi_mean_max41, pi_mean_max46)
-par(mai = c(0.6,0.6,0.6,0.4))
-for(i in 1:6){
-  plot(edge_mean ~ age_min, data = mean_edges[mean_edges$age_max == ages[i],], col = rgb(0,0,1,0.5), # raw sightings
+par(mfrow = c(length(unique(mu_means$min_age)),length(unique(mu_means$diff_age))))
+par(mai = c(1,1,1,0.6))
+for(i in 1:length(ages)){
+  plot(data = mean_edges[mean_edges$age_min == ages[i],],
+       edge_mean ~ age_diff, col = rgb(0,0,1,0.5), # raw sightings
        pch = 19, las = 1, xlim = c(5,45), ylim = c(0,0.5),
-       xlab = 'age of younger dyad member', ylab = 'edge weight',
-       main = paste0('older = ',ages[i],' years old'))
-  rethinking::shade(pi_list[[i]], age_min[which(age_min <= ages[i])], lwd = 2, col = rgb(0.5,0,1,0.2))      # add mean line
-  lines(age_min[which(age_min <= ages[i])], mu_list[[i]], lwd = 2, col = 'purple')                          # add mean shading
-  rethinking::shade(sim_pi, age_min)                                                                   # add predictions
+       xlab = 'age difference', ylab = 'edge weight',
+       main = paste0('younger = ',ages[i],' years old'))
+  #rethinking::shade(pi_list[[i]],
+  #                  age_min[which(age_min <= ages[i])],
+  #                  lwd = 2, col = rgb(0.5,0,1,0.2))      # add mean shading
+  polygon(y = sim_pi[,i],
+                    x = 0:30,
+                    lwd = 2, col = rgb(0.5,0,1,0.2))      # add mean shading
+  #polygon(x = age_diff, y = 
+  #                  age_min[which(age_min <= ages[i])],
+  #                  lwd = 2, col = rgb(0.5,0,1,0.2))      # add mean shading
+  lines(age_min[which(age_min <= age_min[i])],
+        mu_list[[i]], lwd = 2, col = 'purple')            # add mean line
+  rethinking::shade(sim_pi, age_min)                      # add predictions
 }
 par(mfrow = c(1,1))
 
