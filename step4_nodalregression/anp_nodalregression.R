@@ -8,6 +8,7 @@
 #### set up ####
 options(future.globals.maxSize = 10000*(1024^2))   # running model with full age distributions = 5.01GB of globals, which exceeds default maximum allowed size. Set to allow up to 10 GB to allow model to run
 
+# library(tidyverse) ; library(cmdstanr) ; library(brms) ; library(Rcpp) ; library(ggdist) ; library(posterior) ; library(bayesplot) ; library(igraph) ; library(LaplacesDemon) ; library(bisonR) ; library(janitor)
 library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
 library(cmdstanr, lib.loc = '../packages/')        # library(cmdstanr)
 library(brms, lib.loc = '../packages/')            # library(brms)
@@ -20,9 +21,11 @@ library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
 library(bisonR, lib.loc = '../packages/')          # library(bisonR)
 library(janitor, lib.loc = '../packages/')         # library(janitor)
 
+## set cmdstan path
+set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
+
 ## load work space from calculating edge weights
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
-rm(counts_df, x, i, males, counts_ls, plot_edges) ; gc()
 
 ## define PDF output
 pdf('../outputs/anpshort1_nodalregression_conditionalprior.pdf')
@@ -142,37 +145,48 @@ for( time_window in 1:36) {
 
 #### nodal regression -- time window 1 only, not using bisonR ####
 ### extract eigenvector centralities
-eigen <- array(data = NA, dim = c(n_eles, 4, n_samples*n_chains),
-               dimnames = list(nodes$node, c('node','age','sightings','eigenvector'), 1:(n_samples*n_chains)))
-edges$chain <- ifelse(edges$chain == 'chain1', 1, ifelse(edges$chain == 'chain2', 2, ifelse(edges$chain == 'chain3', 3, 4)))
+ele_ids <- unique(c(cdf_1$id_1, cdf_1$id_2))
+n_eles <- length(ele_ids)
+edges$chain <- ifelse(edges$chain == 'chain1', 1,
+                      ifelse(edges$chain == 'chain2', 2,
+                             ifelse(edges$chain == 'chain3', 3, 4)))
 edges$draw_id <- edges$position + (edges$chain-1) * 1000
-colnames(edges)[3] <- 'dyad_id'
 edges <- left_join(edges, cdf_1[,c('dyad_id','node_1','node_2','id_1','id_2')], by = 'dyad_id')
+
+adj_tensor <- array(NA, c(length(unique(cdf_1$id_1))+1,
+                         length(unique(cdf_1$id_2))+1,
+                         nrow(edge_samples)),
+                    dimnames = list(ele_ids, ele_ids, NULL))
+for (i in 1:n_dyads) {
+  dyad_row <- counts_df[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- edge_samples[,i]
+}
+adj_tensor[,,1]
+
+## create array for eigen values to be saved into
+eigen <- array(data = NA, dim = c(n_eles, 4, n_samples*n_chains),
+               dimnames = list(nodes$node,
+                               c('node','age','sightings','eigenvector'),
+                               1:(n_samples*n_chains)))
+eigen[,1,] <- nodes$node
+eigen[,2,] <- nodes$age
+eigen[,3,] <- nodes$sightings
+
+## fill array
 for(draw in 1:(n_samples*n_chains)){
-  eigen[,1,draw] <- nodes$node
-  eigen[,2,draw] <- nodes$age
-  eigen[,3,draw] <- nodes$sightings
-  edges_drawn <- edges[edges$draw_id == draw,]
-  adj_mat <- matrix(data = NA, nrow = n_eles, ncol = n_eles, dimnames = list(nodes$id, nodes$id))
-  for(i in 1:n_eles){
-    for(j in 1:n_eles){
-      if(i == j) {
-        adj_mat[i,j] <- 0
-      } else {
-        adj_mat[i,j] <- edges_drawn$edge_draw[which(edges_drawn$id_1 == rownames(adj_mat)[i] &
-                                                      edges_drawn$id_2 == colnames(adj_mat)[j] |
-                                                      edges_drawn$id_1 == rownames(adj_mat)[j] &
-                                                      edges_drawn$id_2 == colnames(adj_mat)[i])]
-      }
-    }
-  }
-  network <- igraph::graph_from_adjacency_matrix(adjmatrix = adj_mat, diag = FALSE, mode = 'undirected', weighted = TRUE)
+  network <- graph_from_adjacency_matrix(adjmatrix = adj_tensor[,,draw],
+                                         diag = FALSE, mode = 'undirected', weighted = TRUE)
   eigen_values <- as.matrix(igraph::eigen_centrality(network, directed = FALSE)$vector)
   eigen[,4,draw] <- eigen_values[,1]
 }
 
+## save workspace for future
+rm(dyad_row, edge_binary, edgelist, eigen_values, network, adj_tensor, draw, i, j) ; gc()
+save.image('anpshort1_nodalregression_conditionaledge.RData')
+
 ## check eigenvector against sightings
-plot(NULL, xlim = c(0,max(nodes$sightings)), ylim = c(0,1), las = 1, xlab = 'sightings', ylab = 'eigenvector')
+plot(NULL, xlim = c(0,max(nodes$sightings)), ylim = c(0,1),
+     las = 1, xlab = 'sightings', ylab = 'eigenvector')
 for(i in 1:n_samples){
   points(eigen[,4,i] ~ eigen[,3,i], pch = 19, col = rgb(0.5,0,1,0.1))
 }
@@ -181,16 +195,18 @@ for(i in 1:n_eles){
   points(mean(x[4,]) ~ x[3,1], pch = 19, col = 'yellow')
 }
 
-## run model ####
-library(brms)
+## run model -- brms multiple ####
+## create data list
 eigen_list <- list()
 for(i in 1:(n_chains*n_samples)){
   eigen_list[[i]] <- eigen[,,i]
 }
 
+# set prior
 prior_slope <- set_prior(prior = 'normal(0, 0.005)')
 #prior_intercept <- set_prior(prior = 'beta(2, 2)')
 
+## run model
 anp_eigen <- brm_multiple(
   formula = bf(eigenvector ~ age),
   data = eigen_list,
@@ -203,7 +219,7 @@ anp_eigen <- brm_multiple(
 summary(anp_eigen)
 
 ## save output
-save.image('anpshort1_nodalregression_conditionaledge.RData')
+save.image('anpshort1_nodalregression_conditionaledge_brmsmultiple.RData')
 
 ## posterior check ####
 # plot
@@ -256,3 +272,123 @@ ppc_ecdf_overlay(y, yrep[1:50,]) + xaxis_text()            # also no idea...
 save.image(paste0('anp_edgecalculations/anpshort1_nodalregression.RData'))
 dev.off()
 
+
+## run model -- cmdstanr ####
+## create data list
+#load('anpshort1_nodalregression_conditionaledge.RData')
+eigen_all <- eigen[,,1]
+for(i in 2:(n_samples*n_chains)){
+  eigen_all <- rbind(eigen_all, eigen[,,i])
+}
+eigen_all <- as.data.frame(eigen_all) %>% 
+  left_join(nodes, by = c('node','age','sightings'))
+eigen_wide <- matrix(NA, nrow = n_samples*n_chains, ncol = n_eles,
+                     dimnames = list(1:(n_samples*n_chains),
+                                     ele_ids))
+for(i in 1:n_eles){
+  node_eigen <- eigen_all %>%
+    filter(id == colnames(eigen_wide)[i])
+  eigen_wide[,i] <- node_eigen$eigenvector
+}
+rm(node_eigen) ; gc()
+mean_eigen <- apply(eigen_wide, 2, mean) %>% 
+  as.data.frame()
+mean_eigen$id <- rownames(mean_eigen)
+colnames(mean_eigen)[1] <- 'mean_eigen'
+nodes <- nodes %>% left_join(mean_eigen,  by = 'id')
+
+stdv_eigen <- apply(eigen_wide, 2, sd) %>% 
+  as.data.frame()
+stdv_eigen$id <- rownames(stdv_eigen)
+colnames(stdv_eigen)[1] <- 'stdv_eigen'
+nodes <- nodes %>% left_join(stdv_eigen,  by = 'id')
+
+eigen_list <- list(num_nodes = nrow(nodes),
+                   nodes = nodes$node,
+                   centrality_mu = nodes$mean_eigen,
+                   centrality_sd = nodes$stdv_eigen,
+                   node_age = nodes$age,
+                   node_age2 = (nodes$age)^2)
+
+# set prior
+nodal_regression <- cmdstan_model('models/eigen_regression.stan')
+
+## run model
+fit_anp1_eigen <- nodal_regression$sample(
+  data = eigen_list,
+  chains = n_chains,
+  parallel_chains = n_chains
+)
+
+## save output
+save.image('anpshort1_nodalregression_conditionaledge_cmdstan.RData')
+
+## posterior check ####
+# extract draws
+post_eigen <- as.data.frame(as_draws_df(fit_anp1_eigen)) %>% 
+  clean_names() %>% 
+  select(-lp) %>% 
+  pivot_longer(cols = 1:last_col(3))
+
+# traceplot linear effect size
+b_age <- post_eigen %>% filter(name == 'beta_age')
+plot(data = b_age[b_age$chain == 1,], value ~ iteration, col = 'purple',
+     type = 'l', xlim = c(0,1000))
+lines(data = b_age[b_age$chain == 2,], value ~ iteration, col = 'red')
+lines(data = b_age[b_age$chain == 3,], value ~ iteration, col = 'blue')
+lines(data = b_age[b_age$chain == 4,], value ~ iteration, col = 'green')
+
+# traceplot quadratic effect size
+b_age2 <- post_eigen %>% filter(name == 'beta_age2')
+plot(data = b_age2[b_age2$chain == 1,], value ~ iteration, col = 'purple',
+     type = 'l', xlim = c(0,1000))
+lines(data = b_age2[b_age2$chain == 2,], value ~ iteration, col = 'red')
+lines(data = b_age2[b_age2$chain == 3,], value ~ iteration, col = 'blue')
+lines(data = b_age2[b_age2$chain == 4,], value ~ iteration, col = 'green')
+
+hist(b_age$value)   # natural scale? should it be: hist(plogis(b_age$value))
+hist(b_age2$value)  # hist(plogis(b_age2$value))
+
+# plot raw data
+ggplot()+
+  geom_point(data = eigen_all, mapping = aes(x = age, y = eigenvector),
+             colour = rgb(0,0,1,0.01))+
+  geom_point(data = nodes, mapping = aes(x = age, y = mean_eigen),
+             colour = 'white')+
+  scale_x_continuous('age (years)')+
+  scale_y_continuous('eigenvector centrality')+
+  theme_classic()
+ggplot(nodes)+
+  geom_point(aes(x = age, y = mean_eigen, colour = sightings))+
+  scale_x_continuous('age (years)')+
+  scale_y_continuous('eigenvector centrality')+
+  theme_classic()
+
+# compare empirical distribution to posterior predictive distribution
+nodes$node_rank <- as.integer(as.factor(nodes$node))
+mean_predict <- post_eigen %>% 
+  filter(name != 'beta_age') %>% filter(name != 'beta_age2') %>% 
+  filter(name != 'sigma') %>% 
+  group_by(name) %>% 
+  mutate(mean_predict = mean(value)) %>% 
+  ungroup() %>% 
+  separate(name, into = c('predictor','node_rank'), remove = F) %>% 
+  select(-predictor) %>% 
+  mutate(node_rank = as.integer(node_rank)) %>% 
+  rename(predicted_eigen = value) %>% 
+  left_join(nodes, by = 'node_rank')
+ggplot(mean_predict)+
+  geom_point(aes(x = mean_eigen, y = mean_predict, colour = age))+
+  scale_x_continuous('mean calculated eigenvector')+
+  scale_y_continuous('mean predicted eigenvector')+
+  theme_classic()
+ggplot(mean_predict)+
+  geom_point(aes(x = mean_eigen, y = predicted_eigen), colour = rgb(0,0,1,0.01))+
+  geom_point(aes(x = mean_eigen, y = mean_predict), colour = 'white')+
+  scale_x_continuous('mean calculated eigenvector')+
+  scale_y_continuous('mean predicted eigenvector')+
+  theme_classic()
+
+## save output
+save.image(paste0('anp_edgecalculations/anpshort1_nodalregression.RData'))
+dev.off()
