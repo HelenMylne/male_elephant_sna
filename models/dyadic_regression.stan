@@ -3,11 +3,10 @@ data {
   int num_nodes;                               // Number of nodes
   vector[num_dyads] logit_edge_mu;             // Means of Gaussian approximation of logit edge weights
   matrix[num_dyads, num_dyads] logit_edge_cov; // Covariance matrix of Gaussian approximation of logit edge weights
-  real age_min[num_dyads];                     // age of younger dyad member
-  real<lower=0> age_diff[num_dyads];           // difference in age between dyad members
-  int node_1[num_dyads];                       // Node 1 IDs for multimembership terms
-  int node_2[num_dyads];                       // Node 2 IDs for multimembership terms
-  //real jitter;                                 // jitter to add to the diag of the cov matrix for numerical stability -- TRY TO REMOVE WHEN YOU PUT SIGMA BACK IN PLACE
+  array[num_dyads] real age_min;               // age of younger dyad member
+  array[num_dyads] real<lower=0> age_diff;     // difference in age between dyad members
+  array[num_dyads] int node_1;                 // Node 1 IDs for multimembership terms
+  array[num_dyads] int node_2;                 // Node 2 IDs for multimembership terms
 }
 
 parameters {
