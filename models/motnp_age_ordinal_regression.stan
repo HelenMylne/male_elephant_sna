@@ -40,6 +40,7 @@ transformed parameters {
   thresholds[5] = 25;
   thresholds[6] = 40;
   thresholds[7] = 60;
+  
   // Non-centred age. The same as observed_age ~ normal(true_age,sigma_age)
   observed_age = true_age + sigma_age*observed_age_std; // if one sigma for all
   
