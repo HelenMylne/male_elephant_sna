@@ -10,7 +10,7 @@ library(car, lib.loc = '../packages/')       # library(car)
 #library(bisonR, lib.loc = '../packages/')    # library(bisonR)
 #library(brms, lib.loc = '../packages/')      # library(brms)
 
-#set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
+set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
 
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 # rm(edgelist, edge_binary, nodes) ; gc()
@@ -219,6 +219,8 @@ saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS
 
 # add time marker
 print(paste0('parameters saved to file at ', Sys.time()))
+
+pdf('../outputs/anp1_dyadicregression_plots2.pdf')
 
 ## traceplots
 ggplot(data = parameters)+
