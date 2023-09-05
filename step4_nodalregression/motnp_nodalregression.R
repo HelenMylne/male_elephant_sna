@@ -24,11 +24,8 @@ library(bisonR, lib.loc = '../packages/')          # library(bisonR)
 library(janitor, lib.loc = '../packages/')         # library(janitor)
 
 # load edge weight model and data frames
-load('motnp_bisonr_edgescalculated_strongprior.RData')
+load('motnp_edgeweights_conditionalprior.RData')
 #rm(counts_df_model, edgelist, females_df, motnp_edges_null_strongpriors) ; gc()
-
-# define PDF output
-pdf('../outputs/motnp_nodalregression_plots_meanage.pdf')
 
 ##### read in data ####
 df_nodal <- distinct(counts_df[,c('node_1_males','id_1')])
@@ -50,8 +47,67 @@ for(i in 1:nrow(mean_motnp_ages)){
   rm(x)
 }
 
-##### eigenvector only ####
+### extract eigenvector centralities ####
+ele_ids <- unique(c(counts_df$id_1, counts_df$id_2))
+n_eles <- length(ele_ids)
+edges$chain <- ifelse(edges$chain == 'chain1', 1,
+                      ifelse(edges$chain == 'chain2', 2,
+                             ifelse(edges$chain == 'chain3', 3, 4)))
+edges$draw_id <- edges$position + (edges$chain-1) * 1000
+
+edges <- edges %>% 
+  rename(dyad_id = dyad) %>% 
+  left_join(counts_df[,c('dyad_id','node_1','node_2','id_1','id_2',
+                         'count_1','count_2','event_count','count_dyad')],
+            by = 'dyad_id')
+
+adj_tensor <- array(NA, c(n_eles, n_eles, n_samples*n_chains),
+                    dimnames = list(ele_ids, ele_ids, NULL))
+for (i in 1:n_dyads) {
+  dyad_row <- counts_df[i, ]
+  adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- edge_samples[,i]
+}
+adj_tensor[,,1]
+
+## create array for eigen values to be saved into
+eigen <- array(data = NA, dim = c(n_eles, 4, n_samples*n_chains),
+               dimnames = list(nodes$node,
+                               c('node','age','sightings','eigenvector'),
+                               1:(n_samples*n_chains)))
+eigen[,1,] <- nodes$node
+eigen[,2,] <- nodes$age
+eigen[,3,] <- nodes$sightings
+
+## fill array
+for(draw in 1:(n_samples*n_chains)){
+  network <- graph_from_adjacency_matrix(adjmatrix = adj_tensor[,,draw],
+                                         diag = FALSE, mode = 'undirected', weighted = TRUE)
+  eigen_values <- as.matrix(igraph::eigen_centrality(network, directed = FALSE)$vector)
+  eigen[,4,draw] <- eigen_values[,1]
+}
+
+## save workspace for future
+rm(dyad_row, edge_binary, edgelist, eigen_values, network, adj_tensor, draw, i) ; gc()
+save.image('motnp_nodalregression_conditionaledge.RData')
+
+## check eigenvector against sightings
+pdf('../outputs/motnp_nodalregression_extracteigen.pdf')
+plot(NULL, xlim = c(0,max(nodes$sightings)), ylim = c(0,1),
+     las = 1, xlab = 'sightings', ylab = 'eigenvector',
+     main = 'time window = 1')
+for(i in 1:n_samples){
+  points(eigen[,4,i] ~ eigen[,3,i], pch = 19, col = rgb(0.5,0,1,0.1))
+}
+for(i in 1:n_eles){
+  x <- eigen[i,,]
+  points(mean(x[4,]) ~ x[3,1], pch = 19, col = 'yellow')
+}
+dev.off()
+
 ### set priors ####
+# define PDF output
+pdf('../outputs/motnp_nodalregression_plots_meanage.pdf')
+
 # prior predictive check
 priors <- get_default_priors('binary')
 priors$fixed
