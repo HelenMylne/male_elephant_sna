@@ -10,7 +10,7 @@ library(car, lib.loc = '../packages/')       # library(car)
 #library(bisonR, lib.loc = '../packages/')    # library(bisonR)
 #library(brms, lib.loc = '../packages/')      # library(brms)
 
-#set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
+set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
 
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 # rm(edgelist, edge_binary, nodes) ; gc()
@@ -18,21 +18,41 @@ load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 pdf('../outputs/anp1_dyadicregression_plots.pdf')
 
 #### prior predictive check ####
+#age_min <- 5:50
+#age_max <- seq(10, 50, length.out = 12)
+#par(mfrow = c(4,3))
+#for(age in age_max){
+#  plot(NULL, xlim = c(5,50), ylim = c(0,1), las = 1,
+#       xlab = 'age of younger', ylab = 'edge weight', main = paste0('oldest = ',round(age)))
+#  for(i in 1:100){
+#    beta_min <- rnorm(1, 0, 0.1)
+#    beta_max <- rnorm(1, 0, 0.1)
+#    #beta_int <- rnorm(1, 0, 0.005)
+#    min_new <- age_min[age > age_min]
+#    lines(x = min_new, y = plogis(min_new*beta_min + 
+#                                    #min_new*age*beta_int + 
+#                                    age*beta_max), 
+#          col = rgb(0,0,1,0.2))
+#  }
+#}
+#rm(age, age_min, age_max, beta_max, beta_min, i, min_new) ; gc()
+#par(mfrow = c(1,1))
+
 age_min <- 5:50
-age_max <- seq(10, 50, length.out = 12)
-par(mfrow = c(4,3))
-for(age in age_max){
-  plot(NULL, xlim = c(5,50), ylim = c(0,1), las = 1,
-       xlab = 'age of younger', ylab = 'edge weight', main = paste0('oldest = ',round(age)))
+age_diff <- c(0,2,5,10,15,20,25,30)
+par(mfrow = c(4,2), mai = c(0.3,0.3,0.3,0.1))
+for(age in age_diff){
+  plot(NULL, xlim = range(age_min), ylim = c(0,1), las = 1,
+       xlab = 'age of younger', ylab = 'edge weight',
+       main = paste0('diff = ',age))
   for(i in 1:100){
     beta_min <- rnorm(1, 0, 0.1)
-    beta_max <- rnorm(1, 0, 0.1)
-    #beta_int <- rnorm(1, 0, 0.005)
-    min_new <- age_min[age > age_min]
-    lines(x = min_new, y = plogis(min_new*beta_min + 
-                                    #min_new*age*beta_int + 
-                                    age*beta_max), 
+    beta_diff <- rnorm(1, 0, 0.1)
+    lines(x = age_min, y = plogis(age_min*beta_min + 
+                                    age*beta_diff), 
           col = rgb(0,0,1,0.2))
+    lines(x = age_min, y = age_min*beta_min + age*beta_diff, 
+          col = rgb(1,0,0,0.2))
   }
 }
 rm(age, age_min, age_max, beta_max, beta_min, i, min_new) ; gc()
@@ -121,8 +141,8 @@ dyad_data <- list(
   #age_max = cdf_1$age_max,                  # age of  older  dyad member
   age_diff = cdf_1$age_diff,                # age difference between dyad members
   node_1 = cdf_1$node_1_period,             # node IDs for multimembership effects
-  node_2 = cdf_1$node_2_period,             # node IDs for multimembership effects
-  jitter = 1e-6                             # jitter to add to the diag of the cov matrix for numerical stability -- COME BACK TO THIS, MAY NEED TO ALTER THE MODEL TO ADD SIGMA BACK IN AND REMOVE JITTER
+  node_2 = cdf_1$node_2_period              # node IDs for multimembership effects
+  #jitter = 1e-6                             # jitter to add to the diag of the cov matrix for numerical stability -- COME BACK TO THIS, MAY NEED TO ALTER THE MODEL TO ADD SIGMA BACK IN AND REMOVE JITTER
 )
 
 ## load dyadic regression model
@@ -145,10 +165,13 @@ print(paste0('finish model run at ', Sys.time()))
 
 #### check outputs ####
 #load('anpshort1_dyadicregression.RData')
+rm(cdf_1, counts_df, dyad_data, edge_binary, edgelist, edges, i, x, make_edgelist, plot_network_threshold_anp) ; gc()
+
+# obtain summary
 fit_dyadreg_anp1$summary()
 
 ## extract draws
-draws <- fit_dyadreg_anp1$draws()
+draws <- fit_dyadreg_anp1$draws(format = 'df')
 
 ## extract dyadic regression slopes
 b_diff <- draws[,,'beta_age_diff']
@@ -196,6 +219,8 @@ saveRDS(parameters, '../data_processed/anp1_dyadicregression_slopeparameters.RDS
 
 # add time marker
 print(paste0('parameters saved to file at ', Sys.time()))
+
+pdf('../outputs/anp1_dyadicregression_plots2.pdf')
 
 ## traceplots
 ggplot(data = parameters)+
