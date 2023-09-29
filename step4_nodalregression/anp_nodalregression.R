@@ -726,6 +726,7 @@ fit_anp1_eigen <- nodal_regression$sample(
 save.image('anp_nodalregression/anpshort1_nodalregression_conditionaledge_cmdstan.RData')
 
 ## posterior check ####
+# load('anp_nodalregression/anpshort1_nodalregression_conditionaledge_cmdstan.RData')
 # extract draws
 post_eigen <- as.data.frame(as_draws_df(fit_anp1_eigen)) %>% 
   janitor::clean_names() %>% 
