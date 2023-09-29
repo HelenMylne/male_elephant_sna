@@ -14,6 +14,8 @@ library(rstan, lib.loc = '../packages')
 library(igraph, lib.loc = '../packages')
 library(LaplacesDemon, lib.loc = '../packages')
 
+set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
+
 #### load model ####
 # read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
 latent_age_ordinal_model <- cmdstan_model("models/motnp_age_ordinal_regression.stan")
@@ -89,7 +91,7 @@ plot_data %>%
   xlab("Assigned age") + ylab("Modelled age")
 
 #### load MOTNP data ####
-motnp_males <- read_csv('../data_processed/motnp_elenodes.csv') %>% filter(sex == 'M')  # select male nodes only 
+motnp_males <- read_csv('../data_processed/step1_dataprocessing/motnp_elenodes.csv') %>% filter(sex == 'M')  # select male nodes only 
 unique(motnp_males$age_category)
 motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1,     # standardise calf categories
                                  ifelse(motnp_males$age_category == "3-4", 1,
@@ -201,7 +203,7 @@ colnames(true_ages) <- motnp_males$id
 saveRDS(true_ages, file = '../data_processed/motnp_ageestimates_mcmcoutput.rds')          # save output for next steps
 save.image('motnp_ageestimation.RData')
 
-### extract probability distributions ####
+#### extract probability distributions ####
 age_probs <- age_motnp_fit$draws(format = 'df')
 colnames(age_probs)
 age_probs <- age_probs[,c('a0','a0_std','a1','a1_std',
@@ -216,9 +218,15 @@ for(i in 1:ncol(age_probs)){
        main = colnames(age_probs)[i],
        xlab = 'parameter value')
 }
+par(mfrow = c(1,1))
 
 # draw new output curves
 max_age <- 60                             # maximum realistic age of males in the population
+gompertz_bt <- function(a0, a1, c, b0, b1, age){  # create custom function for mortality distribution
+  gompertz <- exp(b0 + b1*age)
+  bathtub <- exp(a0 - a1*age) + c + gompertz
+  return(bathtub)
+}
 mortality <- gompertz_bt(a0 = mean(age_probs$a0),
                          a1 = mean(age_probs$a1),
                          c  = mean(age_probs$c),
@@ -229,43 +237,16 @@ plot(mortality)                           # plot mortality curve
 probs <- 1 - (mortality/max(mortality))   # survival = 1-mortality
 plot(probs)                               # plot probability of survival
 
+#### plot distribution per elephant ####
+rm(list = ls()) ; gc() ; load('motnp_edgeweights_conditionalprior.RData') ; rm(list = ls()[ ! ls() %in% 'counts_df']) ; gc() ; load('motnp_ageestimation.RData')
+eles <- unique(c(counts_df$id_1, counts_df$id_2))
 
-
-gompertz_bt <- function(a0, a1, c, b0, b1, age){  # create custom function for mortality distribution
-  gompertz <- exp(b0 + b1*age)
-  bathtub <- exp(a0 - a1*age) + c + gompertz
-  return(bathtub)
+df <- df %>% 
+  filter(ID %in% eles)
+par(mfrow = c(5,4))
+for(i in 1:length(eles)){
+  x <- df %>% 
+    filter(ID == eles[i])
+  hist(x$value)
 }
-
-
-
-
-age_probs$a0_test <- age_probs$a0_std*0.720- 5.13
-age_probs$a1_test <- age_probs$a1_std*0.100 + 3.0
-age_probs$c_test  <- age_probs$c_std*0.0060 + 0.026
-age_probs$b0_test <- age_probs$b0_std*0.560 - 5.08
-age_probs$b1_test <- age_probs$b1_std*0.018 + 0.09
-
-check <- age_probs[which(round(age_probs$a0_test,3) != round(age_probs$a0,3)),c('a0','a0_std','a0_test')]
-check <- age_probs[which(round(age_probs$a1_test,3) != round(age_probs$a1,3)),c('a1','a1_std','a1_test')]
-check <- age_probs[which(round(age_probs$c_test, 3) != round(age_probs$c, 3)),c('c','c_std','c_test')]
-check <- age_probs[which(round(age_probs$b0_test,3) != round(age_probs$b0,3)),c('b0','b0_std','b0_test')]
-check <- age_probs[which(round(age_probs$b1_test,3) != round(age_probs$b1,3)),c('b1','b1_std','b1_test')]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+par(mfrow = c(1,1))
