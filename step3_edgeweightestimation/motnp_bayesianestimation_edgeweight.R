@@ -75,11 +75,11 @@ rm(binom)
 
 #### complete data processing ####
 ### load in age data
-motnp_ages <- readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds') %>%
+motnp_ages <- readRDS('../data_processed/step2_ageestimation/motnp_ageestimates_mcmcoutput.rds') %>%
   pivot_longer(cols = everything(), names_to = 'id', values_to = 'age')
 
 ### import data for aggregated model (binomial) -- counts of positive associations and total sightings
-counts_df <- read_csv('../data_processed/motnp_bayesian_binomialpairwiseevents.csv')
+counts_df <- read_csv('../data_processed/step1_dataprocessing/motnp_bayesian_binomialpairwiseevents.csv')
 
 ### correct sex_1, which has loaded in as a logical vector not a character/factor
 unique(counts_df$sex_1) # FALSE or NA
@@ -202,8 +202,8 @@ counts_df$node_2_males <- as.integer(as.factor(counts_df$node_2_nogaps))+1
 counts_df$dyad_males <- as.integer(as.factor(counts_df$dyad_id))
 
 ### write out data as ready to go into model
-write_csv(counts_df, '../data_processed/motnp_binomialpairwiseevents_malesonly.csv')
-# counts_df <- read_csv('../data_processed/motnp_binomialpairwiseevents_malesonly.csv')
+write_csv(counts_df, '../data_processed/step1_dataprocessing/motnp_binomialpairwiseevents_malesonly.csv')
+# counts_df <- read_csv('../data_processed/step1_dataprocessing/motnp_binomialpairwiseevents_malesonly.csv')
 
 ### add time marker
 print(paste0('data read in at ', Sys.time()))
@@ -259,7 +259,7 @@ posterior_samples <- fit_edges_motnp$draws()
 edge_weights_matrix <- posterior_samples[,,2:(nrow(counts_df)+1)]
 rm(posterior_samples) ; gc()
 
-### save edge samples -- convert from being an array where each layer is a set of 4 chains, to a data frame where all chains are saved toghether in long format
+### save edge samples -- convert from being an array where each layer is a set of 4 chains, to a data frame where all chains are saved together in long format
 edges <- as.data.frame(edge_weights_matrix[,,1])                                          # extract matrix for first dyad
 colnames(edges) <- c('chain1','chain2','chain3','chain4')                                 # rename columns so know which chain is which
 edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')   # convert to long format
