@@ -34,7 +34,7 @@ pdf('../outputs/anpshort1_nodalregression_conditionalprior_bisonR.pdf')
 ## simulate
 age <- 1:60
 beta_mu <- 0
-beta_sigma <- 0.005
+beta_sigma <- 0.02
 mean_age <- mean(nodes$age)
 plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
      xlab = 'age', ylab = 'eigenvector centrality')
@@ -677,7 +677,7 @@ dev.off()
 
 ## run model -- cmdstanr ####
 ## create data list
-#load('anp_nodalregression/anpshort1_nodalregression_conditionaledge.RData')
+#load('anp_nodalregression/anpshort1_nodalregression_conditionaledge_cmdstan.RData')
 eigen_all <- eigen[,,1]
 for(i in 2:(n_samples*n_chains)){
   eigen_all <- rbind(eigen_all, eigen[,,i])
@@ -728,7 +728,7 @@ save.image('anp_nodalregression/anpshort1_nodalregression_conditionaledge_cmdsta
 ## posterior check ####
 # load('anp_nodalregression/anpshort1_nodalregression_conditionaledge_cmdstan.RData')
 # extract draws
-post_eigen <- as.data.frame(as_draws_df(fit_anp1_eigen)) %>% 
+post_eigen <- as.data.frame(brms::as_draws_df(fit_anp1_eigen)) %>% 
   janitor::clean_names() %>% 
   select(-lp) %>% 
   pivot_longer(cols = 1:last_col(3))
@@ -749,8 +749,8 @@ lines(data = b_age2[b_age2$chain == 2,], value ~ iteration, col = 'red')
 lines(data = b_age2[b_age2$chain == 3,], value ~ iteration, col = 'blue')
 lines(data = b_age2[b_age2$chain == 4,], value ~ iteration, col = 'green')
 
-hist(b_age$value)   # natural scale? should it be: hist(plogis(b_age$value))
-hist(b_age2$value)  # hist(plogis(b_age2$value))
+hist(b_age$value)   # natural scale? should it be: hist(qlogis(b_age$value))
+hist(b_age2$value)  # hist(qlogis(b_age2$value))
 
 # plot raw data
 ggplot()+
@@ -765,32 +765,71 @@ ggplot()+
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 16))
 
-# compare empirical distribution to posterior predictive distribution
+# compare empirical distribution to posterior predictive distribution -- 'PREDICTOR' VALUES ARE ONLY THE OUTCOME OF AGE*DRAW, NOT ACTUAL PREDICTIONS FROM THE MODEL
 nodes$node_rank <- as.integer(as.factor(nodes$node))
-mean_predict <- post_eigen %>% 
+predict <- post_eigen %>% 
   filter(name != 'beta_age') %>% filter(name != 'beta_age2') %>% 
   filter(name != 'sigma') %>% 
+  #mutate(inv_logit = qlogis(value)) %>% 
   group_by(name) %>% 
   mutate(mean_predict = mean(value)) %>% 
+  #mutate(mean_predict = mean(inv_logit)) %>% 
   ungroup() %>% 
   separate(name, into = c('predictor','node_rank'), remove = F, sep = '_') %>% 
   select(-predictor) %>% 
   mutate(node_rank = as.integer(node_rank)) %>% 
   rename(predicted_eigen = value) %>% 
   left_join(nodes, by = 'node_rank')
-mean_predict %>% 
+mean_predict <- predict %>% 
   select(mean_eigen, mean_predict, age, sightings) %>% 
-  distinct() %>% 
-  ggplot()+
+  distinct()
+ggplot(mean_predict)+
   geom_point(aes(x = mean_eigen, y = mean_predict, colour = age, size = sightings))+
   scale_x_continuous('mean calculated eigenvector')+
   scale_y_continuous('mean predicted eigenvector')+
   theme_classic()
+ggplot()+
+  geom_point(data = predict, aes(x = mean_eigen, y = predicted_eigen), colour = rgb(0,0,1,0.01))+
+  geom_point(data = mean_predict, aes(x = mean_eigen, y = mean_predict), colour = 'white')+
+  geom_line(data = data.frame(x = c(0,0.5,1), y = c(0,0.5,1)), mapping = aes(x = x, y = y ))+
+  scale_x_continuous('mean calculated eigenvector', limits = c(0,1))+
+  scale_y_continuous('mean predicted eigenvector', limits = c(0,1))+
+  theme_classic()
+
+new_eigen_predictions <- matrix(NA, nrow = 1000, ncol = length(ele_ids))
+predictions <- unique(post_eigen$name[! post_eigen$name %in% c('beta_age', 'sigma')])
+par(mfrow = c(4,4))
+for(elephant in 1:ncol(new_eigen_predictions)){
+  for(draw in 1:nrow(new_eigen_predictions)){
+    prediction_values <- qlogis(post_eigen$value[post_eigen$name == predictions[elephant]])
+    sigma_value <- nodes$stdv_eigen[elephant]
+    new_eigen_predictions[draw,elephant] <- rnorm(1, prediction_values[draw], sigma_value)
+  }
+hist(new_eigen_predictions[,elephant])
+}
+
+colnames(new_eigen_predictions) <- ele_ids
+predict <- new_eigen_predictions %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything(), names_to = 'id', values_to = 'predicted_eigen') %>% 
+  group_by(id) %>% 
+  mutate(mean_predict = mean(predicted_eigen)) %>% 
+  ungroup() %>% 
+  left_join(nodes, by = 'id')
+mean_predict <- predict %>% 
+  select(mean_eigen, mean_predict, age, sightings) %>% 
+  distinct()
 ggplot(mean_predict)+
-  geom_point(aes(x = mean_eigen, y = predicted_eigen), colour = rgb(0,0,1,0.01))+
-  geom_point(aes(x = mean_eigen, y = mean_predict), colour = 'white')+
+  geom_point(aes(x = mean_eigen, y = mean_predict, colour = age, size = sightings))+
   scale_x_continuous('mean calculated eigenvector')+
   scale_y_continuous('mean predicted eigenvector')+
+  theme_classic()
+ggplot()+
+  geom_point(data = predict, aes(x = mean_eigen, y = predicted_eigen), colour = rgb(0,0,1,0.01))+
+  geom_point(data = mean_predict, aes(x = mean_eigen, y = mean_predict), colour = 'white')+
+  geom_line(data = data.frame(x = c(0,0.5,1), y = c(0,0.5,1)), mapping = aes(x = x, y = y ))+
+  scale_x_continuous('mean calculated eigenvector', limits = c(0,1))+
+  scale_y_continuous('mean predicted eigenvector', limits = c(0,1))+
   theme_classic()
 
 ## save output
