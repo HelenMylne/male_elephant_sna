@@ -34,14 +34,14 @@ pdf('../outputs/anpshort1_nodalregression_conditionalprior_bisonR.pdf')
 ## simulate
 age <- 1:60
 beta_mu <- 0
-beta_sigma <- 0.02
+beta_sigma <- 0.1
 mean_age <- mean(nodes$age)
 plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
      xlab = 'age', ylab = 'eigenvector centrality')
 for(i in 1:100){
-  intercept <- rbeta(1,2,2)   # is this right?? I've gone for a symmetrical one here that in itself explores most of the parameter space and allows it to see whether some of the lines are steep enough to go from top to bottom, but on the assumption that when combined, they will explore only the space relevant to their starting position
   beta <- rnorm(1, beta_mu, beta_sigma)
-  lines(x = age, y = intercept + (age - mean_age)*beta, col = rgb(0,0,1,0.5)) # vast majority come out somewhere sensible, and those that don't would if they started at a different value for age 10 so fine in combo with posterior intercept
+  y <- age*beta
+  lines(x = age, y = LaplacesDemon::invlogit(y), col = rgb(0,0,1,0.5)) # vast majority come out somewhere sensible, and those that don't would if they started at a different value for age 10 so fine in combo with posterior intercept
 }
 
 #### nodal regression -- bisonR, all time windows ####
@@ -705,12 +705,16 @@ stdv_eigen$id <- rownames(stdv_eigen)
 colnames(stdv_eigen)[1] <- 'stdv_eigen'
 nodes <- nodes %>% left_join(stdv_eigen,  by = 'id')
 
+nodes <- nodes %>% 
+  select(-mean_eigen.x, stdv_eigen.x) %>% 
+  rename(mean_eigen = mean_eigen.y,
+         stdv_eigen = stdv_eigen.y)
+
 eigen_list <- list(num_nodes = nrow(nodes),
                    nodes = nodes$node,
                    centrality_mu = nodes$mean_eigen,
                    centrality_sd = nodes$stdv_eigen,
-                   node_age = nodes$age,
-                   node_age2 = (nodes$age)^2)
+                   node_age = nodes$age)
 
 # set prior
 nodal_regression <- cmdstan_model('models/eigen_regression.stan')
@@ -741,16 +745,8 @@ lines(data = b_age[b_age$chain == 2,], value ~ iteration, col = 'red')
 lines(data = b_age[b_age$chain == 3,], value ~ iteration, col = 'blue')
 lines(data = b_age[b_age$chain == 4,], value ~ iteration, col = 'green')
 
-# traceplot quadratic effect size
-b_age2 <- post_eigen %>% filter(name == 'beta_age2')
-plot(data = b_age2[b_age2$chain == 1,], value ~ iteration, col = 'purple',
-     type = 'l', xlim = c(0,1000))
-lines(data = b_age2[b_age2$chain == 2,], value ~ iteration, col = 'red')
-lines(data = b_age2[b_age2$chain == 3,], value ~ iteration, col = 'blue')
-lines(data = b_age2[b_age2$chain == 4,], value ~ iteration, col = 'green')
-
-hist(b_age$value)   # natural scale? should it be: hist(qlogis(b_age$value))
-hist(b_age2$value)  # hist(qlogis(b_age2$value))
+library(LaplacesDemon)
+hist(invlogit(b_age$value))
 
 # plot raw data
 ggplot()+
@@ -762,21 +758,28 @@ ggplot()+
   scale_x_continuous('age (years)')+
   scale_y_continuous('eigenvector centrality')+
   theme_bw()+
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 16))
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 22),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 22))#+
+  #geom_smooth(data = nodes,
+  #            mapping = aes(x = age, y = mean_eigen),
+  #            colour = rgb(33/255, 145/255, 140/255),
+  #            linewidth = 2, method = 'loess', formula = 'y ~ x')
 
 # compare empirical distribution to posterior predictive distribution -- 'PREDICTOR' VALUES ARE ONLY THE OUTCOME OF AGE*DRAW, NOT ACTUAL PREDICTIONS FROM THE MODEL
 nodes$node_rank <- as.integer(as.factor(nodes$node))
 predict <- post_eigen %>% 
-  filter(name != 'beta_age') %>% filter(name != 'beta_age2') %>% 
+  filter(name != 'beta_age') %>% 
   filter(name != 'sigma') %>% 
   #mutate(inv_logit = qlogis(value)) %>% 
   group_by(name) %>% 
   mutate(mean_predict = mean(value)) %>% 
   #mutate(mean_predict = mean(inv_logit)) %>% 
   ungroup() %>% 
-  separate(name, into = c('predictor','node_rank'), remove = F, sep = '_') %>% 
-  select(-predictor) %>% 
+  separate(name, into = c('predictor_centrality','node_rank'), remove = F, sep = '_') %>% 
+  filter(predictor_centrality != 'centrality') %>% 
+  select(-predictor_centrality) %>% 
   mutate(node_rank = as.integer(node_rank)) %>% 
   rename(predicted_eigen = value) %>% 
   left_join(nodes, by = 'node_rank')
@@ -801,9 +804,9 @@ predictions <- unique(post_eigen$name[! post_eigen$name %in% c('beta_age', 'sigm
 par(mfrow = c(4,4))
 for(elephant in 1:ncol(new_eigen_predictions)){
   for(draw in 1:nrow(new_eigen_predictions)){
-    prediction_values <- qlogis(post_eigen$value[post_eigen$name == predictions[elephant]])
+    prediction_values <- invlogit(post_eigen$value[post_eigen$name == predictions[elephant]])
     sigma_value <- nodes$stdv_eigen[elephant]
-    new_eigen_predictions[draw,elephant] <- rnorm(1, prediction_values[draw], sigma_value)
+    new_eigen_predictions[draw,elephant] <- invlogit(rnorm(1, prediction_values[draw], sigma_value))
   }
 hist(new_eigen_predictions[,elephant])
 }
