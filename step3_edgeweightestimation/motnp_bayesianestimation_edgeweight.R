@@ -343,7 +343,7 @@ plot_network_threshold <- function (edge_samples, dyad_data, lwd = 2, threshold 
       nodes_list$node <- unique(nodes_all)
       nodes_list$sightings[i] <- nodes$sightings[which(nodes$node == nodes_list$node[i])]
     }
-    node_sightings <- nodes_list$sightings*8 #log(nodes_list$sightings)*5
+    node_sightings <- nodes_list$sightings #log(nodes_list$sightings)*5
   } else { node_sightings <- node.size }
   
   if(is.data.frame(node.colour) == TRUE ) {
@@ -374,18 +374,21 @@ plot_network_threshold <- function (edge_samples, dyad_data, lwd = 2, threshold 
                                             ifelse(node_age < 20, '#55C667FF',
                                                    ifelse(node_age < 30, '#1F968BFF', 
                                                           ifelse(node_age < 40, '#39568CFF', '#440154FF')))), 
-                      vertex.size = log(node_sightings)*5,
+                      vertex.size = log(node_sightings*3)*4,
                       frame.color = NA, frame.width = 0,
                       edge.color = NA, edge.arrow.size = 0, edge.width = 0)
   igraph::plot.igraph(net, layout = coords, add = TRUE,
                       vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
                       frame.color = NA, frame.width = 0,
-                      edge.color = link.colour1, edge.arrow.size = 0, edge.width = md * lwd)
+                      edge.color = link.colour1, edge.arrow.size = 0, edge.width = md * lwd * 1.5)
   igraph::plot.igraph(net, layout = coords, add = TRUE,
                       vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
                       frame.color = NA, frame.width = 0,
-                      edge.color = link.colour2, edge.arrow.size = 0, edge.width = ub * lwd)
+                      edge.color = link.colour2, edge.arrow.size = 0, edge.width = ub * lwd * 1.5)
 }
+plot_network_threshold(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.15,
+                       node.size = nodes, node.colour = nodes, lwd = 15)
+
 
 ### create single matrix of edge samples
 edge_samples <- matrix(data = NA, nrow = n_samples*n_chains, ncol = n_dyads)   # matrix for storing edge samples
