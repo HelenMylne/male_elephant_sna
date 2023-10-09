@@ -44,12 +44,6 @@ transformed parameters {
   // Non-centred age. The same as observed_age ~ normal(true_age,sigma_age)
   observed_age = true_age + sigma_age*observed_age_std; // if one sigma for all
   
-  // In a loop to have a different sigma for each individual
-  //for(i in 1:N) {
-  //  observed_age[i] = true_age[i] + sigma_age[i]*observed_age_std[i];
-  //}
-  // Non-centred shape. 
-
   // non-centred estimates (i.e. a0 = -5.13 + 0.72*a0_std is the same as a0 = normal(-5.13, 0.72))
   // estimates and standard errors from basta model of Amboseli population
   a0 = -5.13 + 0.72*a0_std;
@@ -73,16 +67,3 @@ model {
   c_std ~ std_normal();
 }
 
-
-
-
-//functions {
-  // 1 - gompertz to give survival to an age
-  // a is the asymtote
-  // b shifts x axis
-  // c + number, 'growth' rate
-  // t number of years (first parameter is response)
-//  real gompertz_lpdf(vector t, real a, real b, real c) {
-//    return sum(log(1-(a * exp(-b*exp(-c*t)))));
-//  }
-//}
