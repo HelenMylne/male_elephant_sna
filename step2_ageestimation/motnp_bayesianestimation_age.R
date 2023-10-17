@@ -28,15 +28,19 @@ gompertz_bt <- function(a0, a1, c, b0, b1, age){  # create custom function for m
 }
 
 # draw new output curves
-max_age <- 60                                     # maximum realistic age of males in the population
-mortality <- gompertz_bt(a0 = -5.13,              # set priors
-                         a1 = 3.00,
-                         c  = 0.026,
-                         b0 = -5.08,
-                         b1 = 0.09, 1:max_age)
-plot(mortality)                                   # plot mortality curve
-probs <- 1 - (mortality/max(mortality))           # survival = 1-mortality
-plot(probs)                                       # plot probability of survival
+max_age <- 70                                                     # maximum realistic age of males in the population
+mortality <- data.frame(age = seq(from = 10, to = max_age, length.out = 100),
+                        mort = NA) %>% 
+  mutate(mort = gompertz_bt(a0 = -5.13,                           # set priors
+                            a1 = 3.00,
+                            c  = 0.026,
+                            b0 = -5.08,
+                            b1 = 0.09, age)) %>% 
+  mutate(mortality = mort/max(mort)) %>% 
+  mutate(survival = 1 - mortality)
+plot(mortality ~ age, data = mortality, type = 'l', ylim = c(0,1.2))   # plot mortality curve
+abline(h = c(0.25,1), lty = 2)
+plot(survival ~ age, data = mortality, type = 'l')                   # plot probability of survival
 
 # create a fictional population with ages selected from that distribution
 N <- 200                # number of eles in fictional population
@@ -170,7 +174,7 @@ df$age_cat_centre <- ifelse(df$age_cat == 1, (0+5)/2,              # for plot ON
                                                         ifelse(df$age_cat == 6, (25+40)/2, 45))))))
 
 df %>% ggplot(aes(x=age_cat_centre, y=value, group=factor(ID))) +  # plot intervals for each category against values set above
-  geom_point(size=2,col = 'blue', alpha=0.1) +
+  geom_point(size=2,col = 'blue', alpha = 1) +
   geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add vertical lines at category boundaries
   geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +     # add horizontal lines at category boundaries
   theme_bw() + 
