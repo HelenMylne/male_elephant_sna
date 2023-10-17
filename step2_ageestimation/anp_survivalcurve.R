@@ -17,11 +17,11 @@ library(bayesplot)
 #library(data.table)
 
 #### read in Amboseli data ####
-sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/anp_sightings_updated.csv') # updated sightings = new data sheet sent over by Vicki Fishlock with corrections to old observations
+sightings <- read_csv('../data_processed/step1_dataprocessing/anp_sightings_updated.csv') # updated sightings = new data sheet sent over by Vicki Fishlock with corrections to old observations
 sightings$year <- lubridate::year(sightings$obs_date)      # fix date variable
 sightings <- sightings[,c('casename','year')]              # select only ID and year of sighting variables
 
-males <- readxl::read_excel('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_raw/Raw_ATE_Males_Lee220121.xlsx') %>%                                                # information about individual males
+males <- readxl::read_excel('../data_raw/Raw_ATE_Males_Lee220121.xlsx') %>%                                                # information about individual males
   janitor::clean_names() %>%                               # clean up 
   select(casename, byr, dyr)                               # select birth and death years for each individual
 str(males)
@@ -93,27 +93,29 @@ gompertz_bt <- function(a0, a1, c, b0, b1, age){          # create function for 
   return(bathtub)
 }
 
-a0 <- -4 ; a1 <- 3 ; c <- 1 ; b0 <- -6 ; b1 <- 0.05       # set prior values
-mortality <- gompertz_bt(a0 = a0, a1 = a1, c = c, b0 = b0 , b1 = b1, 1:50) ; plot(mortality)  # plot distribution
-to.plot <- data.frame(a0 = c(rep(a0, 50), rep(NA,4950)),  # create data frame with 100x1:50 year old elephants and priors 
-                      a1 = c(rep(a1, 50), rep(NA,4950)),
-                      c  = c(rep(c,  50), rep(NA,4950)),
-                      b0 = c(rep(b0, 50), rep(NA,4950)),
-                      b1 = c(rep(b1, 50), rep(NA,4950)),
-                      age = rep(1:50,100),
-                      y = rep(NA,5000),
-                      iter = rep(1:100, each = 50))
+a0 <- -5 ; a1 <- 1 ; c <- 2 ; b0 <- -4 ; b1 <- 0       # set prior values
+max_age <- 70
+mortality <- gompertz_bt(a0 = a0, a1 = a1, c = c, b0 = b0 , b1 = b1, 1:max_age) ; plot(mortality/max(mortality))  # plot distribution
+to.plot <- data.frame(a0 = c(rep(a0, max_age), rep(NA,99*max_age)),  # create data frame with 100x1:50 year old elephants and priors 
+                      a1 = c(rep(a1, max_age), rep(NA,99*max_age)),
+                      c  = c(rep(c,  max_age), rep(NA,99*max_age)),
+                      b0 = c(rep(b0, max_age), rep(NA,99*max_age)),
+                      b1 = c(rep(b1, max_age), rep(NA,99*max_age)),
+                      age = rep(1:max_age,100),
+                      y = rep(NA,100*max_age),
+                      iter = rep(1:100, each = max_age))
 for(i in 1:99){ # populate rest of data frame with other prior values around those set out above
-  to.plot$a0[(i*50+1):(i*50+50)] <- rep(rnorm(1, a0, 1),    50)
-  to.plot$a1[(i*50+1):(i*50+50)] <- rep(rnorm(1, a1, 0.1),  50)
-  to.plot$c[ (i*50+1):(i*50+50)] <- rep(rnorm(1, c,  0.4), 50)
-  to.plot$b0[(i*50+1):(i*50+50)] <- rep(rnorm(1, b0, 2),    50)
-  to.plot$b1[(i*50+1):(i*50+50)] <- rep(rnorm(1, b1, 0.01), 50)
+  to.plot$a0[(i*max_age+1):(i*max_age+max_age)] <- rep(rnorm(1, a0, 4),   max_age)
+  to.plot$a1[(i*max_age+1):(i*max_age+max_age)] <- rep(rnorm(1, a1, 0.5), max_age)
+  to.plot$c[ (i*max_age+1):(i*max_age+max_age)] <- rep(rnorm(1, c,  1), max_age)
+  to.plot$b0[(i*max_age+1):(i*max_age+max_age)] <- rep(rnorm(1, b0, 2),   max_age)
+  to.plot$b1[(i*max_age+1):(i*max_age+max_age)] <- rep(rnorm(1, b1, 0.1),max_age)
 }
+
 to.plot$y  <- gompertz_bt(a0 = to.plot$a0, a1 = to.plot$a1, c = to.plot$c, b0 = to.plot$b0, b1 = to.plot$b1,
                           age = to.plot$age)  # calculate curves indicating the probability of survival for 100 draws from the prior distribution
 to.plot$y_std <- to.plot$y / max(to.plot$y)   # standardised output
-plot(NULL, xlab = 'age', ylab = 'mortality probability', xlim = c(0,50), ylim = c(0,1), las = 1) # create plot window
+plot(NULL, xlab = 'age', ylab = 'mortality probability', xlim = c(0,max_age), ylim = c(0,1), las = 1) # create plot window
 for(i in 1:100){                              # plot distribution lines
   data <- to.plot[to.plot$iter == i,]
   lines(data$y_std ~ data$age, col = rgb(0,0,1,0.2))
@@ -343,6 +345,95 @@ plot_data %>%
   xlab("Assigned age") + ylab("Modelled age")
 
 #### run on MOTNP elephants -- THIS WORKS PERFECTLY ####
+motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
+  #filter(dem_class == 'AM' | dem_class == 'PM') %>% 
+  filter(sex == 'M')               # read in MOTNP individual data and select only males
+unique(motnp_males$age_category)   # check age categories
+motnp_males$age_cat_id <- ifelse(motnp_males$age_category == "0-3", 1,  # standardise age categories -- all <6 = category 1
+                                 ifelse(motnp_males$age_category == "3-4", 1,
+                                        ifelse(motnp_males$age_category == "1-2", 1,
+                                               ifelse(motnp_males$age_category == "7-8", 1,
+                                                      ifelse(motnp_males$age_category == "4-5", 1, 
+                                                             ifelse(motnp_males$age_category ==  "6-7", 1,
+                                                                    ifelse(motnp_males$age_category == "8-9", 1, 
+                                                                           ifelse(motnp_males$age_category == "5-6", 1, NA))))))))
+motnp_males$age_cat_id <- ifelse(motnp_males$age_category == '9-10', 2, # standardise age categories
+                                 ifelse(motnp_males$age_category == '10-15', 3,
+                                        ifelse(motnp_males$age_category == '15-19', 4,
+                                               ifelse(motnp_males$age_category == '20-25', 5,
+                                                      ifelse(motnp_males$age_category == '25-40', 6,
+                                                             ifelse(motnp_males$age_category == '40+', 7,
+                                                                    motnp_males$age_cat_id))))))
+
+N_motnp <- nrow(motnp_males)        # number of males in data set
+K <- 8                              # number of age categories + 1
+motnp_ls <- list(                   # list of elephants
+  N = N_motnp,
+  K = K,
+  age_category_index = motnp_males$age_cat_id)
+hist(motnp_ls$age_category_index)   # plot ages
+#hist(elephants_ls$age_category_index)
+
+# read in Stan model to estimate ages based on Gompertz bathtub distribution from ANP
+latent_age_ordinal_model <- cmdstan_model("models/motnp_age_ordinal_regression.stan")  # read in model
+
+#Fit model with cmdstanr
+age_motnp_fit <- latent_age_ordinal_model$sample(   # fit model
+  data = motnp_ls,                                  # data list
+  chains = 4,                                       # number of MCMC chains
+  parallel_chains = 4,                              # run all chains at same time
+  iter_sampling = 2000)                             # length of chains
+
+# Examine the estimates
+age_est_mat <- age_motnp_fit$summary()[(N_motnp+2):(N_motnp*2+1), ] # select individuals
+summary(age_est_mat)                                                # summarise
+hist(age_est_mat$mean)                                              # plot mean estimates
+hist(age_est_mat$rhat, breaks = 20)                                 # plot convergence estimates
+
+plot_data <- data.frame(age = ifelse(motnp_ls$age == 1, 3,          # set "true age" to value in the middle of each category for comparison -- NOT TO BE USED FOR AY ACTUAL ANALYSIS, JUST CHECKING MODEL FIT
+                                     ifelse(motnp_ls$age == 2, 8,
+                                            ifelse(motnp_ls$age == 3, 12,
+                                                   ifelse(motnp_ls$age == 4, 18,
+                                                          ifelse(motnp_ls$age == 5, 22, 
+                                                                 ifelse(motnp_ls$age == 6, 32, 45)))))),
+                        model_age = age_est_mat$mean)               # mean modelled age
+
+plot_data %>%
+  ggplot(aes(x = factor(age), y = model_age)) +     # plot "true age" assigned above against modelled age
+  geom_point(size = 4, col = 'blue', alpha = 0.6) +
+  geom_vline(xintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
+  geom_hline(yintercept = c(5, 10, 15, 20, 25, 40, 60), linetype = "dashed", alpha = 0.6) +
+  #geom_abline(slope = 1, intercept = 0)+
+  scale_y_continuous(limits = c(0,60))+
+  theme_minimal() + 
+  xlab("Assigned age") + ylab("Modelled age")
+
+# Now an equivalent posterior predictive plot from draws from the distribution to show uncertainty around the mean age (then need to do it with full uncertainty).
+true_ages <- age_motnp_fit$draws("true_age", format = "df")  # extract actual draw values from model output
+#mcmc_dens(true_ages)
+true_ages <- true_ages[1:100,1:N_motnp]                      # first 100 draws for all elephants
+
+df <- as.data.frame(do.call(rbind, true_ages)) %>%           # convert data frame format
+  mutate(age_cat = motnp_ls$age) %>% relocate(age_cat) %>%
+  mutate(ID = motnp_males$id) %>% relocate(ID)
+df <- df %>% pivot_longer(cols = 3:102) %>% select(-name)    # make long format
+
+df$true_age <- ifelse(df$age_cat == 1, 3,                    # set "true age" to value in the middle of each category for comparison -- NOT TO BE USED FOR AY ACTUAL ANALYSIS, JUST CHECKING MODEL FIT
+                      ifelse(df$age_cat == 2, 8,
+                             ifelse(df$age_cat == 3, 12,
+                                    ifelse(df$age_cat == 4, 18,
+                                           ifelse(df$age_cat == 5, 22, 
+                                                  ifelse(df$age_cat == 6, 32, 45))))))
+
+df %>% ggplot(aes(x = true_age, y = value, group = factor(ID))) +   # plot "true age" assigned above against modelled age
+  geom_point(size = 2,col = 'blue', alpha = 0.1) +
+  #stat_halfeye() +
+  geom_vline(xintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+  geom_hline(yintercept = c(5,10,15,20,25,40,60), linetype = "dashed", alpha = 0.6) +
+  theme_bw() + 
+  xlab("Assigned age") + ylab("Modelled age")
+
+#### run on ANP elephants to test if it can accurately predict the ages of ANP ####
 motnp_males <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/motnp_elenodes.csv') %>% 
   #filter(dem_class == 'AM' | dem_class == 'PM') %>% 
   filter(sex == 'M')               # read in MOTNP individual data and select only males
