@@ -21,15 +21,8 @@ model {
   // priors
   beta_age ~ normal(0, 0.1);
   
-  // prior for sigma -- is sigma actually necessary here?? for dyadic it was part of the covariance matrix, but here there is no covariance matrix involved so I think it only needs the standard deviation of the centrality?
-  //sigma ~ exponential(1);
-  
   // likelihood
-  logit(centrality_mu) ~ normal(predictor, centrality_sd);//sigma);
-  // for( i in 1:num_nodes ){
-  //  inv_logit(centrality[i]) ~ normal(centrality_mu[i], centrality_sd[i]);
-  //  centrality_mu[i] ~ normal(predictor[i], sigma);
-  // }
-  
+  logit(centrality_mu) ~ normal(predictor, centrality_sd);
+
   
 }
