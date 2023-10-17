@@ -3,3 +3,5 @@ two_step_edge_weight_vbasic.stan
 edge_binary_basic
 edge_binary_with_dyadicregression
 dyadic_regression
+motnp_age_ordinal_regression
+eigen_regression
