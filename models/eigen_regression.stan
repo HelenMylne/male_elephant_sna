@@ -9,7 +9,6 @@ data {
 parameters {
   real beta_age;
   real<lower=0> sigma;
-  real centrality[num_nodes];
 }
 
 transformed parameters {
