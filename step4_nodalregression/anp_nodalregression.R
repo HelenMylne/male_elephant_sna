@@ -6,51 +6,67 @@
 # 5) use MOTNP age distributions to predict network centrality (third part of this script)
 
 ##### set up ####
-options(future.globals.maxSize = 10000*(1024^2))   # running model with full age distributions = 5.01GB of globals, which exceeds default maximum allowed size. Set to allow up to 10 GB to allow model to run
+#options(future.globals.maxSize = 10000*(1024^2))   # running model with full age distributions = 5.01GB of globals, which exceeds default maximum allowed size. Set to allow up to 10 GB to allow model to run
 
-# library(tidyverse) ; library(cmdstanr) ; library(brms) ; library(Rcpp) ; library(ggdist) ; library(posterior) ; library(bayesplot) ; library(igraph) ; library(LaplacesDemon) ; library(bisonR) ; library(janitor)
-library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
-library(cmdstanr, lib.loc = '../packages/')        # library(cmdstanr)
-library(brms, lib.loc = '../packages/')            # library(brms)
-library(Rcpp, lib.loc = '../packages/')            # library(Rcpp)
-library(ggdist, lib.loc = '../packages/')          # library(ggdist)
-library(posterior, lib.loc = '../packages/')       # library(posterior)
-library(bayesplot, lib.loc = '../packages/')       # library(bayesplot)
+# library(rstan) ; library(igraph) ; library(tidyverse) ; library(LaplacesDemon) ; library(MASS)
+library(rstan, lib.loc = '../packages/')
 library(igraph, lib.loc = '../packages/')          # library(igraph)
+library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
 library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
-library(bisonR, lib.loc = '../packages/')          # library(bisonR)
-library(janitor, lib.loc = '../packages/')         # library(janitor)
+library(MASS, lib.loc = '../packages/')            # library(MASS)
+#library(cmdstanr, lib.loc = '../packages/')        # library(cmdstanr)
+#library(brms, lib.loc = '../packages/')            # library(brms)
+#library(Rcpp, lib.loc = '../packages/')            # library(Rcpp)
+#library(ggdist, lib.loc = '../packages/')          # library(ggdist)
+#library(posterior, lib.loc = '../packages/')       # library(posterior)
+#library(bayesplot, lib.loc = '../packages/')       # library(bayesplot)
+#library(bisonR, lib.loc = '../packages/')          # library(bisonR)
+#library(janitor, lib.loc = '../packages/')         # library(janitor)
 
 ## set cmdstan path
-set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
+#set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
 
-## load work space from calculating edge weights
-load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
+## set seed for reproducibility
+set.seed(12345)
 
 ##### prior predictive check ####
 ## define PDF output
-pdf('../outputs/anpshort1_nodalregression_conditionalprior_bisonR.pdf')
+pdf('../outputs/anp_nodalregression_priorcheck.pdf')
 
 ## simulate
-age <- 1:60
-beta_mu <- 0
-beta_sigma <- 0.1
-mean_age <- mean(nodes$age)
-plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
-     xlab = 'age', ylab = 'eigenvector centrality')
-for(i in 1:100){
-  beta <- rnorm(1, beta_mu, beta_sigma)
-  y <- age*beta
-  lines(x = age, y = LaplacesDemon::invlogit(y), col = rgb(0,0,1,0.5)) # vast majority come out somewhere sensible, and those that don't would if they started at a different value for age 10 so fine in combo with posterior intercept
+age <- 10:60
+mu_mean <- 0
+mu_stdv <- 0.1
+mu <- rnorm(100, mu_mean, mu_stdv)
+mu <- sort(mu)
+mu_mtrx <- matrix(NA, nrow = length(mu), ncol = length(age))
+for(i in 1:nrow(mu_mtrx)){
+  mu_mtrx[i,] <- mu[i]*age
 }
+sigma_range <- rexp(25, 2)
+sigma_range <- sort(sigma_range)
+par(mfrow = c(5,5), mai = c(0.2,0.2,0.2,0.2))
+for(j in 1:25){
+  plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
+       xlab = '', ylab = '')
+  sigma <- diag(rep(sigma_range[j], length(age)))
+  for(i in 1:length(mu)){
+  predictor <- mu_mtrx[i,]
+  y <- MASS::mvrnorm(1, predictor, sigma)
+  lines(x = age, y = invlogit(y), col = rgb(0,0,1,1))
+  }
+}
+par(mfrow = c(1,1))
+dev.off()
+rm(list = ls())
 
 ##### run model with rstan -- time window 1 ####
-library(rstan) ; library(igraph) ; library(tidyverse) ; library(LaplacesDemon)
-set.seed(12345)
-
-# load data and remove additional data
+## load data and remove additional data
 load('anp_nodalregression/anpshort1_nodalregression_conditionaledge.RData')
-rm(counts_df, adj_mat, edges, ele_obs, obs, summary, x, make_edgelist, plot_network_threshold_anp) ; gc()
+rm(counts_df, adj_mat, edges, ele_obs, obs, summary, make_edgelist, plot_network_threshold_anp) ; gc()
+
+## set up pdf
+pdf('../outputs/anpshort1_nodalregression.pdf')
 
 ### extract centralities ####
 ## build adjacency tensor
@@ -85,7 +101,7 @@ df_long <- pivot_longer(df_wide, cols = everything(),
 df_long %>% 
   mutate(nodes_reordered = fct_reorder(.f = as.factor(node_rank), .x = age, .desc = T)) %>% 
   ggplot(aes(x = centrality, fill = age)) +
-  geom_density(size = 0.4) +
+  geom_density(linewidth = 0.4) +
   facet_grid(rows = vars(as.factor(nodes_reordered)), scales = "free") +
   labs(x = "Eigenvector centrality (standardised)") + 
   theme_void() + 
@@ -234,6 +250,10 @@ for(time_window in 2:36){
   # load data and remove additional data
   load(paste0('anp_nodalregression/anpshort',time_window,'_nodalregression_conditionaledge.RData'))
   rm(counts_df, adj_mat, edges, ele_obs, obs, summary, x, make_edgelist, plot_network_threshold_anp) ; gc()
+  pdf(paste0('../outputs/anpshort',time_window,'_nodalregression.pdf'))
+  
+  ## add progress marker
+  print(paste0('start window ',time_window,' at ',Sys.time()))
   
   ### extract centralities ####
   ## build adjacency tensor
@@ -277,6 +297,9 @@ for(time_window in 2:36){
           axis.title.x = element_text(size = 12),
           plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
   
+  ## add progress marker
+  print('eigen values extracted')
+  
   ### compute normal approximation ####
   ## check covariance
   plot(centrality_samples_std[, 1], centrality_samples_std[, 2],
@@ -292,6 +315,9 @@ for(time_window in 2:36){
   
   plot(density(centrality_samples_std[, 1]), lwd = 2, main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
   lines(density(centrality_samples_sim[, 1]), col = rgb(0,0,1,0.5), lwd = 2)
+  
+  ## add progress marker
+  print('normal approximation computed')
   
   ### run model ####
   ## create data list
@@ -314,6 +340,9 @@ for(time_window in 2:36){
   rm(g, edge_samples, adj_tensor, i) ; gc()
   save.image(paste0('anp_nodalregression/anpshort',time_window,'_nodalregression_conditionaledge_rstan.RData'))
   
+  ## add progress marker
+  print('model run')
+  
   ### posterior check ####
   # load(paste0('anp_nodalregression/anpshort',time_window,'_nodalregression_conditionaledge_rstan.RData'))
   ## traceplot linear effect size
@@ -329,6 +358,9 @@ for(time_window in 2:36){
     sigma <- centrality_cov + diag(rep(params$sigma[j], n_eles))
     lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
   }
+  
+  ## add progress marker
+  print('posterior predictive check complete')
   
   ## interpret model
   plot(density(params$beta_age), # don't need to do the contrast because continuous -- is there an equivalent using the do operator? by standardising have we already dealt with the logit transformation?
@@ -402,13 +434,16 @@ for(time_window in 2:36){
           axis.title = element_text(size = 22),
           legend.text = element_text(size = 18),
           legend.title = element_text(size = 22))
-  ggsave(filename = '../outputs/anpshort',time_window,'_nodalregression.png', device = 'png',
-         plot = last_plot())
+  ggsave(filename = paste0('../outputs/anpshort',time_window,'_nodalregression.png'), 
+         device = 'png',plot = last_plot())
   
   ## save output ####
   save.image(paste0('anp_nodalregression/anpshort',time_window,'_nodalregression_conditionaledge_rstan.RData'))
   dev.off()
   rm(list = ls()[! ls() %in% c('time_window','nodal_regression')])
+  
+  ## add progress marker
+  print(paste0('time window ',time_window,' complete'))
   
 }
   
@@ -419,6 +454,10 @@ for(time_window in 1:7){
   # load data and remove additional data
   load(paste0('anp_nodalregression/anplong',time_window,'_nodalregression_conditionaledge.RData'))
   rm(counts_df, adj_mat, edges, ele_obs, obs, summary, x, make_edgelist, plot_network_threshold_anp) ; gc()
+  pdf(paste0('../outputs/anplong',time_window,'_nodalregression.pdf'))
+  
+  ## add progress marker
+  print(paste0('start window ',time_window,' at ',Sys.time()))
   
   ### extract centralities ####
   ## build adjacency tensor
@@ -462,6 +501,9 @@ for(time_window in 1:7){
           axis.title.x = element_text(size = 12),
           plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
   
+  ## add progress marker
+  print('eigen values extracted')
+  
   ### compute normal approximation ####
   ## check covariance
   plot(centrality_samples_std[, 1], centrality_samples_std[, 2],
@@ -477,6 +519,9 @@ for(time_window in 1:7){
   
   plot(density(centrality_samples_std[, 1]), lwd = 2, main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
   lines(density(centrality_samples_sim[, 1]), col = rgb(0,0,1,0.5), lwd = 2)
+  
+  ## add progress marker
+  print('normal approximation computed')
   
   ### run model ####
   ## create data list
@@ -499,6 +544,9 @@ for(time_window in 1:7){
   rm(g, edge_samples, adj_tensor, i) ; gc()
   save.image(paste0('anp_nodalregression/anplong',time_window,'_nodalregression_conditionaledge_rstan.RData'))
   
+  ## add progress marker
+  print('model run')
+  
   ### posterior check ####
   # load(paste0('anp_nodalregression/anplong',time_window,'_nodalregression_conditionaledge_rstan.RData'))
   ## traceplot linear effect size
@@ -519,6 +567,9 @@ for(time_window in 1:7){
   plot(density(params$beta_age), # don't need to do the contrast because continuous -- is there an equivalent using the do operator? by standardising have we already dealt with the logit transformation?
        main = "Posterior difference between node types")
   abline(v = 0, lty = 2)
+  
+  ## add progress marker
+  print('posterior predictive check complete')
   
   ### predict from model ####
   (summary <- as.data.frame(round(summary(fit_anp_eigen)$summary[1:2, c(1, 4, 8)], 3)))
@@ -587,12 +638,15 @@ for(time_window in 1:7){
           axis.title = element_text(size = 22),
           legend.text = element_text(size = 18),
           legend.title = element_text(size = 22))
-  ggsave(filename = '../outputs/anplong',time_window,'_nodalregression.png', device = 'png',
+  ggsave(filename = paste0('../outputs/anplong',time_window,'_nodalregression.png'), device = 'png',
          plot = last_plot())
   
   ## save output ####
   save.image(paste0('anp_nodalregression/anplong',time_window,'_nodalregression_conditionaledge_rstan.RData'))
   dev.off()
   rm(list = ls()[! ls() %in% c('time_window','nodal_regression')])
+  
+  ## add progress marker
+  print(paste0('time window ',time_window,' complete'))
   
 }
