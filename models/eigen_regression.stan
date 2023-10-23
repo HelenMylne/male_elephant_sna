@@ -20,7 +20,7 @@ transformed parameters {
 model {
   // priors
   beta_age ~ normal(0, 0.1);
-  sigma ~ normal(0, 1); // exponential(1)??
+  sigma ~ exponential(2);
   
   // likelihood
   centrality_mu ~ multi_normal(predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
