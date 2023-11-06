@@ -218,16 +218,16 @@ df_long <- df_long %>%
   ungroup() %>% 
   left_join(nodes[,c('node_rank','sightings')], by = 'node_rank')
 ggplot()+
-  geom_ribbon(data = sim_summary, aes(x = age, ymin = lwr, ymax = upr),       # shade simulations
-              colour = 'transparent', fill = rgb(0,0,0,0.1))+
-  geom_ribbon(data = mod_mu, aes(x = age, ymin = lwr, ymax = upr),            # shade mean distribution
-              colour = 'transparent', fill = rgb(33/255, 145/255, 140/255, 0.5))+
+  # geom_ribbon(data = sim_summary, aes(x = age, ymin = lwr, ymax = upr),       # shade simulations
+  #             colour = 'transparent', fill = rgb(0,0,0,0.1))+
+  # geom_ribbon(data = mod_mu, aes(x = age, ymin = lwr, ymax = upr),            # shade mean distribution
+  #             colour = 'transparent', fill = rgb(33/255, 145/255, 140/255, 0.5))+
   geom_point(data = df_long, aes(x = age, y = centrality),                    # all eigenvector draws
              colour = rgb(253/255, 231/255, 37/255, 0.01))+
   geom_point(data = df_long, aes(x = age, y = mean_eigen, size = sightings),  # mean eigenvector
              colour = rgb(68/255, 1/255, 84/255))+
-  geom_line(data = mod_mu, aes(x = age, y = mid),                             # mean line
-            colour = rgb(33/255, 145/255, 140/255), linewidth = 1)+
+  # geom_line(data = mod_mu, aes(x = age, y = mid),                             # mean line
+  #           colour = rgb(33/255, 145/255, 140/255), linewidth = 1)+
   scale_x_continuous('age (years)')+
   scale_y_continuous('eigenvector centrality (standardised)')+
   theme_classic()+
@@ -235,7 +235,7 @@ ggplot()+
         axis.title = element_text(size = 22),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 22))
-ggsave(filename = '../outputs/anpshort1_nodalregression.png', device = 'png',
+ggsave(filename = '../outputs/anpshort1_nodalregression_raw.png', device = 'png',
        plot = last_plot())
 
 ## save output
