@@ -53,8 +53,9 @@ print(paste0('model loaded in at ', Sys.time()))
 
 #### import data ####
 ### import aggregated counts of sightings together and apart, and info about individuals
-counts_df <- read_csv('../data_processed/mpnp_longtimewindow_pairwiseevents.csv') %>%   # counts_df = data frame of all dyad information, specifically including aggregated counts of together vs apart
+counts_df <- read_csv('../data_processed/step1_dataprocessing/mpnp_longtimewindow_pairwiseevents.csv') %>%   # counts_df = data frame of all dyad information, specifically including aggregated counts of together vs apart
   distinct()
+nrow(counts_df) - length(unique(counts_df$dyad_id)) # 0
 
 ### create nodes data frame for period 1
 nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),    # all unique individuals
@@ -117,7 +118,7 @@ rm(posterior_samples, x, i) ; gc()                                 # clean works
 saveRDS(edge_weights_matrix, '../data_processed/mpnplong_edgedistributions_conditionalprior_wideformat.RDS')
 save.image('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData')
 #load('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData')
-#edge_weights_matrix <- readRDS('../data_processed/mpnplong_edgedistributions_conditionalprior_wideformat.RDS')
+#edge_weights_matrix <- readRDS('../data_processed/step3_edgeweightestimation/mpnplong_edgedistributions_conditionalprior_wideformat.RDS')
 
 ### convert edge samples to data frame, putting all chains into 1 column
 #edges <- as.data.frame(edge_weights_matrix[,,1])               # convert draws for first dyad to data frame
@@ -164,25 +165,29 @@ for(i in 2:length(plot_dyads)){                                                 
   x$position <- rep(1:n_samples, each = n_chains)
   plot_edges <- rbind(plot_edges, x)                                                                 # append each to the last to create a single dataframe with all dyads
 }
+plot_edges <- plot_edges %>% 
+  rename(dyad_id = dyad) %>% 
+  left_join(counts_df[,c('dyad_id','count_dyad','together','apart')]) %>% 
+  mutate(seen_together = ifelse(together > 0, 1, 0))
 
 ### build traceplots
 ggplot(data = plot_edges[plot_edges$seen_together == 1,],   # plot only dyads that have been seen together
        aes(y = edge_draw, x = position, colour = chain))+   # plot all chains over each other for each dyad to check mixing
   geom_line()+                                              # draw as line plot
-  facet_wrap(. ~ dyad)+                                     # new panel per dyad as each pair has own edge weight parameter
+  facet_wrap(. ~ dyad_id)+                                     # new panel per dyad as each pair has own edge weight parameter
   theme_classic()+                                          # make it look nicer
   theme(legend.position = 'none',                           # remove legend
         strip.background = element_blank(), strip.text = element_blank())    # remove facet strips
 ggplot(data = plot_edges[plot_edges$seen_together == 0,],   # repeat for dyads that have never been seen together
        aes(y = edge_draw, x = position, colour = chain))+
   geom_line()+
-  facet_wrap(. ~ dyad)+
+  facet_wrap(. ~ dyad_id)+
   theme_classic() + theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
 
 ### density plots
 plot(NULL, xlim = c(0,1), ylim = c(0,30), las = 1, xlab = 'edge weight', ylab = 'density')         # set up plot window
 for(i in 1:length(plot_dyads)){                                                                    # plot randomly sampled dyads
-  x <- plot_edges[plot_edges$dyad == plot_dyads[i],]                                               # select data to plot
+  x <- plot_edges[plot_edges$dyad_id == plot_dyads[i],]                                               # select data to plot
   lines(density(x$edge_draw), col = ifelse(x$seen_together == 1, rgb(0,0,1,0.1), rgb(1,0,0,0.1)))  # draw edge weight probability plot. blue = seen together at least once, red = never seen together
 }
 
@@ -228,7 +233,7 @@ plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, thres
       nodes_list$node <- unique(nodes_all)
       nodes_list$sightings[i] <- nodes$sightings[which(nodes$node == nodes_list$node[i])]
    }
-    node_sightings <- log(nodes_list$sightings)*5
+    node_sightings <- nodes_list$sightings
   } else { node_sightings <- node.size }
   
   if(is.data.frame(node.colour) == TRUE ) {
@@ -278,6 +283,8 @@ for(j in 1:n_dyads){                                                           #
   edge_samples[,j] <- edge_weights_matrix[,,j]
 }
 colnames(edge_samples) <- counts_df$dyad_id                                    # match to dyad ID numbers
+
+edge_weights_matrix[1,1,]
 
 ### plot network across 6 different threshold values for comparison to other networks
 plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.05,
@@ -336,9 +343,9 @@ plot(density(summary$sri), main = 'red = SRI, blue = BISoN', col = 'red', lwd = 
 lines(density(summary$median), col = 'blue', lwd = 2)                                       # distribution of median estimates
 
 ### plot a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
-plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
-draws <- left_join(plot_edges, summary, by = 'dyad_id') %>%                     # combine to add node and median value data
-  select(-dyad.x) %>% rename(dyad = dyad.y)                                     # clean up names
+#plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
+draws <- left_join(plot_edges, summary, by = 'dyad_id')# %>%                     # combine to add node and median value data
+  #select(-dyad.x) %>% rename(dyad = dyad.y)                                     # clean up names
 which(is.na(draws) == TRUE)                                                     # check fully merged
    
 draws$dyad_id <- reorder(draws$dyad_id, draws$count_dyad)                       # order data frame based on total sightings per pair
@@ -382,7 +389,7 @@ for(time_window in 1:n_windows){
   
   #### import data ####
   ### subset by time window
-  counts_df <- read_csv(paste0('../data_processed/mpnp_period',time_window,'_pairwiseevents.csv'))
+  counts_df <- read_csv(paste0('../data_processed/step1_dataprocessing/mpnp_period',time_window,'_pairwiseevents.csv'))
   
   ### create nodes data frame
   nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
@@ -390,8 +397,8 @@ for(time_window in 1:n_windows){
   for(i in 1:nrow(nodes)){
     # extract data about individual from counts_df data frame
     if(nodes$id[i] %in% counts_df$id_1) {
-      x <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','node_1','count_1')] %>% distinct()
-    } else { x <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','node_2','count_2')] %>% distinct() }
+      x <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','node_1','count_period_1')] %>% distinct()
+    } else { x <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','node_2','count_period_2')] %>% distinct() }
     colnames(x) <- c('id','node','count')
     # add individual data
     nodes$node[i] <- x$node          # node ID number
@@ -399,7 +406,7 @@ for(time_window in 1:n_windows){
   }
   
   ### import age data
-  eles <- readRDS(paste0('../data_processed/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+  eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
   mean_ages <- data.frame(id = colnames(eles),
                           age = apply(eles, 2, mean))
   
