@@ -18,7 +18,7 @@ library(readxl, lib.loc = '../packages/')      # library(readxl)
 
 ########## Create initial data ###########
 #### read in processed data files ####
-data_files <- lapply(Sys.glob("../data_processed/mpnp_pairwiseevents/*.RDS"), readRDS)
+data_files <- lapply(Sys.glob("../data_processed/step1_dataprocessing/mpnp_pairwiseevents/*.RDS"), readRDS)
 all <- as.data.frame(data_files[1])
 for(i in 2:length(data_files)){
   new_data <- as.data.frame(data_files[i])
@@ -496,7 +496,7 @@ rm(list=ls()[ls()!= 'windows']) ; gc()
 
 ########## Long time window -- first 5 short windows (can't just combine as have removed all where one or another was absent, so total count will be wrong) ##########
 #### remove sightings outside long window ####
-data <- readRDS('../data_processed/mpnp_bayesian_pairwiseevents.RDS')
+data <- readRDS('../data_processed/step1_dataprocessing/mpnp_bayesian_pairwiseevents.RDS')
 
 nrow(data)/length(unique(data$period))
 cumsum(1:length(unique(data$id_1)))[length(unique(data$id_1))] == length(unique(data$dyad_id)) # correct number of IDs and dyads
@@ -508,7 +508,7 @@ rm(data) ; gc()
 
 ## insert column for sighting period
 #sightings <- read_csv('../../../../Google Drive/Shared drives/Helen PhD/chapter1_age/data_processed/mpnp_eles_long.csv')
-sightings <- read_csv('../data_processed/mpnp_eles_long_Jan23check.csv')
+sightings <- read_csv('../data_processed/step1_dataprocessing/mpnp_eles_long_Jan23check.csv')
 sightings <- sightings[!is.na(sightings$elephant),c(2,3)]  # select only elephant ID and date columns
 sightings$date <- as.Date(sightings$date, '%d/%m/%Y')      # numeric date
 sightings$day <- as.numeric(sightings$date)                # numeric date
@@ -549,46 +549,30 @@ rm(counts,sightings) ; gc()
 table(data$count_1)  # check id1 counts for 1st time window
 table(data$count_2)  # check id2 counts for 1st time window
 length(which(is.na(data$count_1) == TRUE))
-unique(data$id_1[which(is.na(data$count_1) == TRUE)])
+unique(data$id_1[which(is.na(data$count_1) == TRUE)]) # B2198 and B2199
 length(which(is.na(data$count_2) == TRUE))
-unique(data$id_2[which(is.na(data$count_2) == TRUE)])
+unique(data$id_2[which(is.na(data$count_2) == TRUE)]) # B2198 and B2199
+data <- data[!is.na(data$count_1),] ; data <- data[!is.na(data$count_2),]
 
-data <- data[!is.na(data$count_1),]
-data <- data[!is.na(data$count_2),]
-
-### combine event count scores
-event_counts <- data %>% select(-period, -period_start, -period_days, -event_count) %>% distinct()
-event_counts$event_count <- NA
-for(i in 1:length(unique(event_counts$dyad_id))){
-  event_counts$event_count[i] <- sum(data$event_count[data$dyad_id == i])
-}
-
-
-
-
-
-
-
-dyad1 <- data[data$dyad_id == 1,]
-
-df <- data %>% select(-period, - period_start, -period_days) %>% distinct()
-df
-
-check <- as.data.frame(table(df$dyad)) %>% 
-  filter(Freq > 1)
-
-df_check <- df[]
-
+#### amalgamate event counts ####
+data <- data %>% 
+  group_by(dyad_id) %>% 
+  mutate(together = sum(event_count)) %>% 
+  ungroup() %>% 
+  select(-period, -period_start, -period_days, -event_count) %>% 
+  distinct()
+length(unique(data$dyad)) ; nrow(data)
 
 #### add variable for sightings apart ####
-data$count_dyad <- (data$count_1 + data$count_2) - data$event_count   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
-data$apart <- data$count_dyad - data$event_count                      # seen apart = total sightings - seen together
-colnames(data)[5] <- 'together'                                       # rename variable
+data$count_dyad <- (data$count_1 + data$count_2) - data$together   # total sightings = total of both but remove duplicates where seen together (A + B - AB)
+data$apart <- data$count_dyad - data$together                      # seen apart = total sightings - seen together
+#colnames(data)[which(colnames(data) == 'event_count')] <- 'together'  # rename variable
 table(data$together)                                                  # check values
 table(data$apart)                                                     # check values
 
 #### save data #####
-data <- data[,c(6,7,1:5,11,8:10)]  # rearrange
+data <- data[,c('dyad_id','dyad','id_1','id_2','node_1','node_2',
+                'count_1','count_2','count_dyad','together','apart')]  # rearrange
 
 # write data files
-write_csv(data,'../data_processed/mpnp_longtimewindow_pairwiseevents.csv')
+write_csv(data,'../data_processed/step1_dataprocessing/mpnp_longtimewindow_pairwiseevents.csv')
