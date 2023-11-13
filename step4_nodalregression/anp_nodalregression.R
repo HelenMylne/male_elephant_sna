@@ -60,6 +60,93 @@ par(mfrow = c(1,1))
 dev.off()
 rm(list = ls())
 
+##### simulate model to check it's working ####
+## simulate means
+n_nodes <- 100
+min_age <- 11
+max_age <- 60
+
+sim <- data.frame(node = 1:n_nodes,
+                  age = rep(min_age:max_age, each = (n_nodes/(max_age - min_age)) ),
+                  mu = NA,
+                  sd = NA)
+sim_slope <- 0.4
+sim$mu <- sim$age * sim_slope
+sim$sd <- 0.1
+plot(sim$mu ~ sim$age)
+
+## simulate full distribution
+sim_dat <- matrix(data = NA, nrow = 1000, ncol = n_nodes)
+for(j in 1:n_nodes){
+  sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])
+}
+
+sim_dat_std <- sim_dat
+for(i in 1:nrow(sim_dat_std)){
+  sim_dat_std[i,] <- (sim_dat[i,] - mean(sim_dat[i,]) ) / sd(sim_dat[i,])
+}
+
+## visualise
+df_wide <- data.frame(sim_dat_std)
+colnames(df_wide) <- 1:n_nodes
+df_long <- pivot_longer(df_wide, cols = everything(),
+                        names_to = "node", values_to = "centrality") %>% 
+  mutate(node = as.integer(node)) %>% 
+  left_join(sim[,c('node','age')], by = 'node')
+df_long %>% 
+  filter(node %in% seq(2, 100, by = 2)) %>% 
+  ggplot(aes(x = centrality, fill = age)) +
+  geom_density(linewidth = 0.4) +
+  facet_grid(rows = vars(as.factor(node)), scales = "free") +
+  labs(x = "Eigenvector centrality (standardised)") + 
+  theme_void() + 
+  theme(strip.text.y = element_text(size = 12),
+        axis.text.x = element_text(angle = 0, size = 12, debug = FALSE),
+        axis.title.x = element_text(size = 12),
+        plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
+
+## normal approximation
+centrality_mu <- apply(sim_dat_std, 2, mean)
+centrality_cov <- cov(sim_dat_std)
+
+## create data
+eigen_list <- list(num_nodes = n_nodes,
+                   nodes = sim$node,
+                   centrality_mu = centrality_mu,
+                   centrality_cov = centrality_cov,
+                   node_age = sim$age)
+
+# load model
+nodal_regression <- stan_model('models/eigen_regression.stan')
+n_chains <- 4
+n_samples <- 250
+
+## run model
+fit_sim <- sampling(nodal_regression, data = eigen_list,
+                    cores = n_chains, chains = n_chains)
+
+## save output
+save.image('simulate_nodalregression_conditionaledge_rstan.RData')
+
+## traceplot linear effect size
+traceplot(fit_sim, pars = c('beta_age','sigma','predictor[1]','predictor[2]','predictor[3]','predictor[4]','predictor[5]','predictor[6]','predictor[7]','predictor[8]','predictor[9]','predictor[10]'))
+
+## posterior predictive check
+params <- rstan::extract(fit_sim)
+plot(density(sim_dat_std[1, ]), main="Posterior predictive density of responses (standardised centrality)", col=rgb(0, 0, 0, 0.25), ylim=c(0, 1))
+for (i in 1:100) {
+  j <- sample(1:(n_chains*n_samples), 1)
+  lines(density(sim_dat_std[j, ]), col=rgb(0, 0, 0, 0.25))
+  mu <- params$beta_age[j]*eigen_list$node_age
+  sigma <- centrality_cov + diag(rep(params$sigma[j], n_nodes))
+  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
+}
+
+## interpret model
+plot(density(invlogit(params$beta_age)), main = "Posterior difference between node types")
+abline(v = 0, lty = 2)
+
+#
 ##### run model with rstan -- time window 1 ####
 ## load data and remove additional data
 load('anp_nodalregression/anpshort1_nodalregression_conditionaledge.RData')
