@@ -11,7 +11,7 @@ library(car, lib.loc = '../packages/')       # library(car)
 #library(brms, lib.loc = '../packages/')      # library(brms)
 library(LaplacesDemon, lib.loc = '../packages/')
 
-set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
+set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan2/cmdstan-2.33.1/')
 
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 # rm(edgelist, edge_binary, nodes) ; gc()
@@ -19,45 +19,45 @@ load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 pdf('../outputs/anp1_dyadicregression_plots.pdf')
 
 #### prior predictive check ####
-#age_min <- 5:50
-#age_max <- seq(10, 50, length.out = 12)
-#par(mfrow = c(4,3))
-#for(age in age_max){
-#  plot(NULL, xlim = c(5,50), ylim = c(0,1), las = 1,
-#       xlab = 'age of younger', ylab = 'edge weight', main = paste0('oldest = ',round(age)))
-#  for(i in 1:100){
-#    beta_min <- rnorm(1, 0, 0.1)
-#    beta_max <- rnorm(1, 0, 0.1)
-#    #beta_int <- rnorm(1, 0, 0.005)
-#    min_new <- age_min[age > age_min]
-#    lines(x = min_new, y = plogis(min_new*beta_min + 
-#                                    #min_new*age*beta_int + 
-#                                    age*beta_max), 
-#          col = rgb(0,0,1,0.2))
-#  }
-#}
-#rm(age, age_min, age_max, beta_max, beta_min, i, min_new) ; gc()
-#par(mfrow = c(1,1))
-
 age_min <- 5:50
-age_diff <- c(0,2,5,10,15,20,25,30)
-par(mfrow = c(4,2), mai = c(0.3,0.3,0.3,0.1))
-for(age in age_diff){
-  plot(NULL, xlim = range(age_min), ylim = c(0,1), las = 1,
-       xlab = 'age of younger', ylab = 'edge weight',
-       main = paste0('diff = ',age))
-  for(i in 1:100){
-    beta_min <- rnorm(1, 0, 0.1)
-    beta_diff <- rnorm(1, 0, 0.1)
-    lines(x = age_min, y = plogis(age_min*beta_min + 
-                                    age*beta_diff), 
-          col = rgb(0,0,1,0.2))
-    lines(x = age_min, y = age_min*beta_min + age*beta_diff, 
-          col = rgb(1,0,0,0.2))
-  }
+age_max <- seq(10, 50, length.out = 12)
+par(mfrow = c(4,3))
+for(age in age_max){
+ plot(NULL, xlim = c(5,50), ylim = c(0,1), las = 1,
+      xlab = 'age of younger', ylab = 'edge weight', main = paste0('oldest = ',round(age)))
+ for(i in 1:100){
+   beta_min <- rnorm(1, 0, 0.1)
+   beta_max <- rnorm(1, 0, 0.1)
+   #beta_int <- rnorm(1, 0, 0.005)
+   min_new <- age_min[age > age_min]
+   lines(x = min_new, y = plogis(min_new*beta_min +
+                                   #min_new*age*beta_int +
+                                   age*beta_max),
+         col = rgb(0,0,1,0.2))
+ }
 }
 rm(age, age_min, age_max, beta_max, beta_min, i, min_new) ; gc()
 par(mfrow = c(1,1))
+# 
+# age_min <- 5:50
+# age_diff <- c(0,2,5,10,15,20,25,30)
+# par(mfrow = c(4,2), mai = c(0.3,0.3,0.3,0.1))
+# for(age in age_diff){
+#   plot(NULL, xlim = range(age_min), ylim = c(0,1), las = 1,
+#        xlab = 'age of younger', ylab = 'edge weight',
+#        main = paste0('diff = ',age))
+#   for(i in 1:100){
+#     beta_min <- rnorm(1, 0, 0.1)
+#     beta_diff <- rnorm(1, 0, 0.1)
+#     lines(x = age_min, y = plogis(age_min*beta_min + 
+#                                     age*beta_diff), 
+#           col = rgb(0,0,1,0.2))
+#     lines(x = age_min, y = age_min*beta_min + age*beta_diff, 
+#           col = rgb(1,0,0,0.2))
+#   }
+# }
+# rm(age, age_min, age_max, beta_max, beta_min, i, min_new) ; gc()
+# par(mfrow = c(1,1))
 
 # add time marker
 print(paste0('prior predictive check completed at ', Sys.time()))
@@ -139,10 +139,10 @@ dyad_data <- list(
   logit_edge_mu = logit_edge_draws_mu,      # sample means of the logit edge weights
   logit_edge_cov = logit_edge_draws_cov,    # sample covariance of logit edge weights
   age_min = cdf_1$age_min,                  # age of younger dyad member
-  #age_max = cdf_1$age_max,                  # age of  older  dyad member
-  age_diff = cdf_1$age_diff,                # age difference between dyad members
-  node_1 = cdf_1$node_1,             # node IDs for multimembership effects
-  node_2 = cdf_1$node_2              # node IDs for multimembership effects
+  age_max = cdf_1$age_max,                  # age of  older  dyad member
+  #age_diff = cdf_1$age_diff,                # age difference between dyad members
+  node_1 = cdf_1$node_1_period,             # node IDs for multimembership effects
+  node_2 = cdf_1$node_2_period              # node IDs for multimembership effects
   #jitter = 1e-6                             # jitter to add to the diag of the cov matrix for numerical stability -- COME BACK TO THIS, MAY NEED TO ALTER THE MODEL TO ADD SIGMA BACK IN AND REMOVE JITTER
 )
 
@@ -159,13 +159,13 @@ fit_dyadreg_anp1 <- dyadic_regression$sample(
   parallel_chains = n_chains)
 
 # save image so far
-save.image('anpshort1_dyadicregression.RData')
+save.image('anpshort1_dyadicregression_minmax.RData')
 
 # add time marker
 print(paste0('finish model run at ', Sys.time()))
 
 #### check outputs ####
-#load('anpshort1_dyadicregression.RData')
+#load('anpshort1_dyadicregression_minmax.RData')
 rm(counts_df, dyad_data, edge_binary, edgelist, edges, i, x, make_edgelist, plot_network_threshold_anp) ; gc()
 
 # obtain summary
@@ -402,7 +402,7 @@ ggplot()+
 ggsave('../outputs/anpshort1_dyadicregression_conditionalprior.png')
 
 
-save.image('anpshort1_dyadicregression_plotting.RData')
+save.image('anpshort1_dyadicregression_plotting_minmax.RData')
 
 
 
@@ -417,7 +417,7 @@ save.image('anpshort1_dyadicregression_plotting.RData')
 
 
 #################
-load('TESTING_DYADIC_REGRESSION_17THAUGUST2023.RData') # delete this once you've loaded it back in tomorrow!
+load('TESTING_DYADIC_REGRESSION_17THAUGUST2023_minmax.RData') # delete this once you've loaded it back in tomorrow!
 rm(counts_df, dyad_data, edge_binary, edgelist, fit_edges_anp1, parameters, sigma_plot, summary, x, all_node_IDs, i, j, mm_matrix, mu_plot, mv_norm, n_windows, periods, predictor, sigma_mm, extract_slopes, make_edgelist, plot_network_threshold_anp) ; gc
 
 
@@ -713,7 +713,7 @@ ggplot()+
 dev.off()
 
 # save image
-save.image('anpshort1_dyadicregression.RData')
+save.image('anpshort1_dyadicregression_minmax.RData')
 
 ### clear workspace
 rm(cdf_1, n_dyads, counts_ls, n_eles, fit_edges_anp1, edges, plot_dyads, plot_edges, nodes, edge_weights_matrix, edge_samples)
