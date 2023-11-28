@@ -19,7 +19,7 @@ transformed parameters {
 
 model {
   // priors
-  beta_age ~ normal(0, 0.1);
+  beta_age ~ normal(0, 0.5);
   sigma ~ exponential(2);
   
   // likelihood
