@@ -1,4 +1,4 @@
-#### Bayesian analysis of ATE data ####
+  #### Bayesian analysis of ATE data ####
 # Script to process association data from Amboseli National Park, Kenya
 # Data collected: 1972-2021 by Amboseli Trust for Elephants
 # Data supplied by: Vicki Fishlock (March 2022) and Phyllis Lee (December 2021)
