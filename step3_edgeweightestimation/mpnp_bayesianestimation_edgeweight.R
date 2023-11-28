@@ -7,18 +7,20 @@
 
 #### set up ####
 ### install packages
-# install.packages('tidyverse')
-# install.packages('dplyr')
+#install.packages('tidyverse', lib = '../packages/')
+#install.packages('dplyr', lib = '../packages/')
 # install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 # install.packages(c("StanHeaders","rstan"),type="source")
-# install.packages("remotes") ; remotes::install_github("stan-dev/cmdstanr") ## OR USE # install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+#install.packages("remotes", lib = '../packages/')
+#remotes::install_github("stan-dev/cmdstanr", lib = '../packages/') ## OR USE # install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 # install.packages('rethinking')
-# install.packages('igraph')
-# install.packages('dagitty')
-# install.packages('janitor')
-# install.packages('lubridate')
-# install.packages('hms')
-# install.packages('readxl')
+#install.packages('igraph', lib = '../packages/')
+#install.packages('dagitty', lib = '../packages/')
+#install.packages('janitor', lib = '../packages/')
+#install.packages('lubridate', lib = '../packages/')
+#install.packages('hms', lib = '../packages/')
+#install.packages('readxl', lib = '../packages/')
+#install.packages('LaplacesDemon', lib = '../packages/')
 
 ### load packages
 # library(tidyverse) ; library(dplyr) ; library(cmdstanr) ; library(igraph) ; library(janitor) ; library(lubridate) ; library(hms) ; library(readxl)
@@ -33,7 +35,7 @@ library(readxl, lib.loc = '../packages/')      # library(readxl)
 
 ### set stan path
 #set_cmdstan_path('/Users/helen/.cmdstan/cmdstan-2.32.1')
-#set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0')
+set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0')
 
 ### set seed
 set.seed(12345)
@@ -72,7 +74,7 @@ for(i in 1:nrow(nodes)){
 }
 
 ### import age data
-eles <- readRDS('../data_processed/mpnp_longwindow_ageestimates_mcmcoutput.rds')
+eles <- readRDS('../data_processed/step2_ageestimation/mpnp_longwindow_ageestimates_mcmcoutput.rds')
 mean_ages <- data.frame(id = colnames(eles),
                         age = apply(eles, 2, mean))
 
@@ -115,7 +117,7 @@ edge_weights_matrix <- posterior_samples[,,2:(nrow(counts_df)+1)]  # remove colu
 
 ### clean up and save workspace
 rm(posterior_samples, x, i) ; gc()                                 # clean workspace
-saveRDS(edge_weights_matrix, '../data_processed/mpnplong_edgedistributions_conditionalprior_wideformat.RDS')
+saveRDS(edge_weights_matrix, '../data_processed/step3_edgeweightestimation/mpnplong_edgedistributions_conditionalprior_wideformat.RDS')
 save.image('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData')
 #load('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData')
 #edge_weights_matrix <- readRDS('../data_processed/step3_edgeweightestimation/mpnplong_edgedistributions_conditionalprior_wideformat.RDS')
@@ -136,8 +138,8 @@ save.image('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData')
 #}
 
 ### save edge samples for use in dyadic/nodal regressions
-#saveRDS(edges, '../data_processed/mpnplong_edgedistributions_conditionalprior.RDS')
-#edges <- readRDS('../data_processed/mpnplong_edgedistributions_conditionalprior.RDS')
+#saveRDS(edges, '../data_processed/step3_edgeweightestimation/mpnplong_edgedistributions_conditionalprior.RDS')
+#edges <- readRDS('../data_processed/step3_edgeweightestimation/mpnplong_edgedistributions_conditionalprior.RDS')
 
 ### add progress marker
 print(paste0('edge values extracted at ', Sys.time()))
@@ -154,7 +156,7 @@ plot_dyads <- c(sample(counts_df$dyad_id[counts_df$together >= 1], size = n_test
 
 plot_edges <- as.data.frame(edge_weights_matrix[,,which(counts_df$dyad_id == plot_dyads[1])])        # convert draws for first dyad to data frame
 colnames(plot_edges) <- c('chain1','chain2','chain3','chain4')                                       # rename columns
-plot_edges <- pivot_longer(plot_edges, everything(), values_to = 'edge_draw', names_to = 'chain')    # tidy draws for first dyad
+plot_edges <- pivot_longer(data = plot_edges, cols = everything(), values_to = 'edge_draw', names_to = 'chain')    # tidy draws for first dyad
 plot_edges$dyad <- plot_dyads[1]                                                                     # add dyad id column
 plot_edges$position <- rep(1:n_samples, each = n_chains)                                             # position within chain for traceplots
 for(i in 2:length(plot_dyads)){                                                                      # repeat for the rest of the dyads
@@ -299,7 +301,7 @@ plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, 
                            node.size = nodes, node.colour = nodes, lwd = 15)
 
 ### clean workspace
-rm(counts_ls, x, edge_weights_matrix, i, j) ; gc()
+rm(x, edge_weights_matrix, i, j) ; gc()
 
 ### save image
 save.image('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData')
@@ -345,10 +347,10 @@ lines(density(summary$median), col = 'blue', lwd = 2)                           
 ### plot a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
 #plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
 draws <- left_join(plot_edges, summary, by = 'dyad_id')# %>%                     # combine to add node and median value data
-  #select(-dyad.x) %>% rename(dyad = dyad.y)                                     # clean up names
+#  select(-dyad.x) %>% rename(dyad = dyad.y)                                     # clean up names
 which(is.na(draws) == TRUE)                                                     # check fully merged
    
-draws$dyad_id <- reorder(draws$dyad_id, draws$count_dyad)                       # order data frame based on total sightings per pair
+#draws$dyad_id <- reorder(draws$dyad_id, draws$count_dyad)                       # order data frame based on total sightings per pair
 ggplot(data = draws, mapping = aes(x = edge_draw)) +                            # plot data frame
   geom_density(colour = 'blue') +                                               # plot density plots of probability distributions output per dyad
   facet_wrap(. ~ dyad_id, nrow = 20) +                                          # split by dyad, allow to vary height depending on dyad
@@ -356,15 +358,15 @@ ggplot(data = draws, mapping = aes(x = edge_draw)) +                            
   geom_vline(mapping = aes(xintercept = sri), colour = 'red') +                 # add line showing where the SRI value is
   theme(strip.text.x = element_blank(), strip.background = element_blank())     # remove facet labels so plots can be bigger
 
-draws$dyad_id <- reorder(draws$dyad_id, draws$sri)                              # order dataframe based on SRI
+#draws$dyad_id <- reorder(draws$dyad_id, draws$sri)                              # order dataframe based on SRI
 ggplot(data = draws, mapping = aes(x = edge_draw))+                             # plot dataframe
-  geom_density(colour = 'blue')+                                                # plot density plots of probability distirbtuions output per dyad
+  geom_density(colour = 'blue')+                                                # plot density plots of probability distributions output per dyad
   facet_wrap(. ~ dyad_id, nrow = 5)+                                            # split by dyad, allow to vary height depending on dyad
   geom_vline(mapping = aes(xintercept = median), colour = 'blue', lty = 3)+     # add line showing where the median estimate is
   geom_vline(mapping = aes(xintercept = sri), colour = 'red') +                 # add line showing where the SRI value is
   theme(strip.text.x = element_blank(), strip.background = element_blank())     # remove facet labels so plots can be bigger
 
-write_csv(draws, '../data_processed/mpnplong_sampledyads_conditionalprior.csv') # save output for future reference
+write_csv(draws, '../data_processed/step3_edgeweightestimation/mpnplong_sampledyads_conditionalprior.csv') # save output for future reference
 
 ### clean environment
 rm(draws, plot_edges, n_test, plot_dyads) ; gc()
@@ -375,11 +377,11 @@ rm(counts_df, edge_samples, edgelist, edges, fit_edges_mpnp1, nodes, summary, n_
 ### add progress marker
 print(paste0('long window completed at ', Sys.time()))
 
-################ generate loop to run through short windows 2:end ################
+################ generate loop to run through short windows 3 to end (1 and 2 to be run separately using rstan instead of cmdstanr) ################
 ### set up values for running loop
 n_windows <- 5      # number of short time windows in mpnp data
 
-for(time_window in 1:n_windows){
+for(time_window in 3:n_windows){
   #### set up ####
   ### set seed
   set.seed(12345)
@@ -393,7 +395,7 @@ for(time_window in 1:n_windows){
   
   ### create nodes data frame
   nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
-                      node = NA, age = NA, sightings = NA)                  # data needed on each
+                      node = NA, sightings = NA)                  # data needed on each
   for(i in 1:nrow(nodes)){
     # extract data about individual from counts_df data frame
     if(nodes$id[i] %in% counts_df$id_1) {
@@ -437,11 +439,17 @@ for(time_window in 1:n_windows){
     iter_warmup = n_samples,
     iter_sampling = n_samples)
   
+  ### save model
+  save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  
   ### check model
   fit_edges_mpnp
   
   ### add progress marker
   print(paste0('model run for time window ',time_window,' at ', Sys.time()))
+  
+  # view summary
+  fit_edges_mpnp$summary()
   
   # Extract posterior samples
   posterior_samples <- fit_edges_mpnp$draws()
@@ -466,7 +474,7 @@ for(time_window in 1:n_windows){
   }
   
   ### save data 
-  saveRDS(edges, paste0('../data_processed/mpnpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
+  saveRDS(edges, paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
   
   ### add progress marker
   print(paste0('edges extracted for time window ',time_window,' at ', Sys.time()))
@@ -485,12 +493,12 @@ for(time_window in 1:n_windows){
   ### build traceplots -- split seen and not seen to check they are different and look for anomalies
   ggplot(data = plot_edges[plot_edges$seen_together == 1,], aes(y = edge_draw, x = position, colour = chain))+
     geom_line()+
-    facet_wrap(. ~ dyad)+
+    facet_wrap(. ~ dyad_id)+
     theme_classic()+
     theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
   ggplot(data = plot_edges[plot_edges$seen_together == 0,], aes(y = edge_draw, x = position, colour = chain))+
     geom_line()+
-    facet_wrap(. ~ dyad)+
+    facet_wrap(. ~ dyad_id)+
     theme_classic()+
     theme(legend.position = 'none', strip.background = element_blank(), strip.text = element_blank())
   
@@ -512,6 +520,8 @@ for(time_window in 1:n_windows){
   }
   colnames(edge_samples) <- counts_df$dyad_id                                    # match to dyad ID numbers
   
+  save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  
   ### plot network across 6 different threshold values for comparison to other networks
   plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.05,
                              node.size = nodes, node.colour = nodes, lwd = 15)
@@ -521,8 +531,8 @@ for(time_window in 1:n_windows){
                              node.size = nodes, node.colour = nodes, lwd = 15)
   plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.20,
                              node.size = nodes, node.colour = nodes, lwd = 15)
-  plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.25,
-                             node.size = nodes, node.colour = nodes, lwd = 15)
+  #plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.25,
+  #                           node.size = nodes, node.colour = nodes, lwd = 15)
   
   ### clean workspace
   rm(counts_ls, x, edge_weights_matrix, i, j) ; gc()
@@ -575,7 +585,7 @@ for(time_window in 1:n_windows){
     geom_vline(mapping = aes(xintercept = sri), colour = 'red')+               # add line showing where the SRI value is
     theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
   
-  write_csv(draws, paste0('../data_processed/mpnpshort',time_window,'_sampledyads_conditionalprior.csv')) # save output for future reference
+  write_csv(draws, paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_sampledyads_conditionalprior.csv')) # save output for future reference
   
   ### add progress marker
   print(paste0('time window ',time_window,' completed at ', Sys.time()))
@@ -584,6 +594,6 @@ for(time_window in 1:n_windows){
   rm(draws, plot_edges, n_test, plot_dyads) ; gc()
   save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
   dev.off()
-  rm(counts_df, edge_samples, edgelist, edges, fit_edges_mpnp1, nodes, summary, n_dyads) ; gc()
+  rm(counts_df, edge_samples, edgelist, edges, fit_edges_mpnp, nodes, summary, n_dyads) ; gc()
   
 }
