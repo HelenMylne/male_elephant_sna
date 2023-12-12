@@ -27,15 +27,15 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 # data files
-.csv
-.rds
-.xlsx
+*.csv
+*.rds
+*.xlsx
 *.exe
 # DS Store files for Mac Finder navigation
 *.DS_Store
-.DS_Store
+*.DS_Store
 # R markdown files -- currently don't need them
-.Rmd
+*.Rmd
 # produced images
 *.png
 *.svg
@@ -46,4 +46,4 @@ vignettes/*.pdf
 *.docx
 *.db
 *.pdf
-.DS_Store
+*.exec
