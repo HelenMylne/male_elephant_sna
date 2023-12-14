@@ -15,6 +15,7 @@ parameters {
   vector[num_nodes] mm_nodes;
   real<lower=0> sigma;
   real<lower=0> sigma_mm;
+  real intercept;
 }
 
 transformed parameters {
@@ -25,17 +26,18 @@ transformed parameters {
   // regression equation
   vector[num_dyads] predictor;
   for (i in 1:num_dyads) {
-    predictor[i] =  beta_age_min * age_min[i] + beta_age_max * age_max[i] + mm_nodes[node_1[i]] + mm_nodes[node_2[i]];
+    predictor[i] = intercept + beta_age_min * age_min[i] + beta_age_max * age_max[i] + mm_nodes[node_1[i]] + mm_nodes[node_2[i]];
   }
 }
 
 model {
   // priors
-  beta_age_max ~ normal(0,0.1);
-  beta_age_min ~ normal(0,0.1);
+  beta_age_max ~ normal(0,1);
+  beta_age_min ~ normal(0,1);
   mm_nodes ~ normal(0, sigma_mm);
   sigma ~ exponential(1);
   sigma_mm ~ exponential(1);
+  intercept ~ normal(0,1);
 
   // likelihood using Cholesky decomposition
   logit_edge_mu ~ multi_normal_cholesky(predictor, L_cov);
