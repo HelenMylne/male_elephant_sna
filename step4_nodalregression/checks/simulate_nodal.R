@@ -11,9 +11,9 @@ sim <- data.frame(node = 1:n_nodes,                          # create data frame
                   mu = NA, sd = NA)
 
 ## simulate age effect
-sim_slope <- 1                     # set age effect -- smaller = bigger impact on invlogit scale as values large
-sim_intcp <- 5
-sim$mu <- sim_intcp + sim$age * sim_slope        # simulate mean centrality on normal scale
+sim_slope <- 0.8                     # set age effect -- smaller = bigger impact on invlogit scale as values large
+sim_intcp <- -3
+sim$mu <- sim$age * sim_slope + sim_intcp       # simulate mean centrality on normal scale
 plot(sim$mu ~ sim$age)               # plot
 
 ## simulate full distribution of samples per node
@@ -24,10 +24,14 @@ for(j in 1:n_nodes){
 }
 plot(sim_dat[1,] ~ sim$age)          # plot simulated values against age
 
+## convert to 0-1 bounded scale
+sim_invlogit <- invlogit(sim_dat)    # convert to probability scale
+plot(sim_invlogit[1,] ~ sim$age)     # plot simulated values against age
+
 ## standardise
 sim_dat_std <- sim_dat               # create matrix to fill
 for(i in 1:nrow(sim_dat_std)){
-  sim_dat_std[i,] <- (sim_dat[i,] - mean(sim_dat[i,]) ) / sd(sim_dat[i,]) # standardise values
+  sim_dat_std[i,] <- (sim_invlogit[i,] - mean(sim_invlogit[i,]) ) / sd(sim_invlogit[i,]) # standardise values
 }
 plot(sim_dat_std[1,] ~ sim$age)      # plot simulated values against age
 
@@ -81,7 +85,7 @@ traceplot(fit_sim, pars = c('intercept','beta_age','sigma','predictor[1]','predi
 
 ## posterior predictive check
 params <- rstan::extract(fit_sim)
-plot(density(sim_dat_std[1, ]), las = 1, #ylim = c(0,1), xlim = c(-5,5),
+plot(density(sim_dat_std[1, ]), las = 1, ylim = c(0,1),
      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
      col=rgb(0, 0, 0, 0.25))
 for (i in 1:100) {
@@ -94,13 +98,15 @@ for (i in 1:100) {
 
 ## extract slope parameter
 plot(density(params$beta_age), las = 1,                # plot slope draws
-     main = "Posterior slope draws", xlim = c(0.065,0.07))
+     main = "Posterior slope draws", xlim = c(-0.2, 0.2))
 lines(density(rnorm(1e5,0,0.1)), col = 'blue')         # prior slope as defined in model code = normal(0,0.1)
 abline(v = sim_slope, lty = 2)                         # true slope
 ( age_slope <- round(quantile(params$beta_age, probs = c(0.5, 0.025, 0.975)), 2) )
 
 ## compare to raw data
-sim$predict <- sim$age * mean(params$beta_age)  + mean(params$intercept)                   # mean prediction = age * mean slope
-plot(sim$predict ~ sim$age, type = 'l', las = 1)   # plot against age
-points(sim$mu ~ sim$age)                                           # add raw points
-
+sim$mean_predict <- invlogit(sim$age * mean(params$beta_age) + mean(params$intercept))           # mean prediction = age * mean slope
+sim$lwr_predict <- invlogit(sim$age * quantile(params$beta_age, probs = 0.025) + quantile(params$intercept, probs = 0.025))
+sim$upr_predict <- invlogit(sim$age * quantile(params$beta_age, probs = 0.975) + quantile(params$intercept, probs = 0.975))
+plot(sim$mean_predict ~ sim$age, type = 'l', ylim = c(0,1), las = 1)    # plot against age
+points(invlogit(sim$mu) ~ sim$age)                                 # add raw points
+polygon(y = c(sim$lwr_predict, rev(sim$upr_predict)), x = c(sim$age, rev(sim$age)), col = rgb(1,1,0,0.5), border = NA)
