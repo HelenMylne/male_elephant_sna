@@ -1,0 +1,631 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{\vspace{-2.5em}}
+
+\begin{document}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(dplyr)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'dplyr'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(cmdstanr)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Can't find CmdStan makefile to detect version number. Path may not
+## point to valid installation.
+\end{verbatim}
+
+\begin{verbatim}
+## This is cmdstanr version 0.5.3
+\end{verbatim}
+
+\begin{verbatim}
+## - CmdStanR documentation and vignettes: mc-stan.org/cmdstanr
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Can't find CmdStan makefile to detect version number. Path may not
+## point to valid installation.
+\end{verbatim}
+
+\begin{verbatim}
+## - CmdStan path: /userfs/hkm513/w2k/.cmdstan/cmdstan-2.32.2
+\end{verbatim}
+
+\begin{verbatim}
+## - CmdStan version:
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{set\_cmdstan\_path}\NormalTok{(}\StringTok{\textquotesingle{}../../../packages/.cmdstan/cmdstan{-}2.31.0/\textquotesingle{}}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## CmdStan path set to: R:/rsrch/df525/phd/hkm513/chapter1/step5_dyadicregression/dan/../../../packages/.cmdstan/cmdstan-2.31.0
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# set seed}
+\FunctionTok{set.seed}\NormalTok{(}\DecValTok{12345}\NormalTok{)}
+
+\DocumentationTok{\#\#\#\# create model inputs \#\#\#\#}
+\DocumentationTok{\#\#\# import data for aggregated model (binomial) {-}{-} counts of positive associations and total sightings}
+\NormalTok{counts\_df }\OtherTok{\textless{}{-}}\NormalTok{ readr}\SpecialCharTok{::}\FunctionTok{read\_csv}\NormalTok{(}\StringTok{\textquotesingle{}../../../data\_processed/motnp\_binomialpairwiseevents\_malesonly.csv\textquotesingle{}}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Rows: 22578 Columns: 33
+## -- Column specification --------------------------------------------------------
+## Delimiter: ","
+## chr (15): id_1, id_2, id_pad_1, id_pad_2, name_1, name_2, age_class_1, age_c...
+## dbl (18): dyad_id, node_1, node_2, event_count, count_1, count_2, age_cat_id...
+## 
+## i Use `spec()` to retrieve the full column specification for this data.
+## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{counts\_df\_model }\OtherTok{\textless{}{-}}\NormalTok{ counts\_df[, }\FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}node\_1\_males\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}node\_2\_males\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}event\_count\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}count\_dyad\textquotesingle{}}\NormalTok{)] }\SpecialCharTok{\%\textgreater{}\%} \FunctionTok{distinct}\NormalTok{()}
+\FunctionTok{colnames}\NormalTok{(counts\_df\_model) }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}node\_1\_id\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}node\_2\_id\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}event\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}duration\textquotesingle{}}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+*** \emph{Next we reduce the data for the purposes of testing only} ***
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{counts\_df }\OtherTok{\textless{}{-}}\NormalTok{ counts\_df[}\DecValTok{1}\SpecialCharTok{:}\DecValTok{500}\NormalTok{,]}
+\end{Highlighting}
+\end{Shaded}
+
+Fitting the edge weight model
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\DocumentationTok{\#\#\# create data list for Stan model}
+\NormalTok{edge\_list }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{(}
+  \AttributeTok{N =} \FunctionTok{nrow}\NormalTok{(counts\_df),}
+  \CommentTok{\#dyad\_ids = counts\_df$dyad\_males,}
+  \AttributeTok{together =}\NormalTok{ counts\_df}\SpecialCharTok{$}\NormalTok{event\_count,     }\CommentTok{\# count of sightings seen together}
+  \AttributeTok{count\_dyad =}\NormalTok{ counts\_df}\SpecialCharTok{$}\NormalTok{count\_dyad     }\CommentTok{\# count of sightings seen}
+\NormalTok{)}
+
+\NormalTok{edge\_model }\OtherTok{\textless{}{-}} \FunctionTok{cmdstan\_model}\NormalTok{(}\StringTok{"edge\_binary.stan"}\NormalTok{)}
+
+\NormalTok{fit }\OtherTok{\textless{}{-}}\NormalTok{ edge\_model}\SpecialCharTok{$}\FunctionTok{sample}\NormalTok{(}
+  \AttributeTok{data =}\NormalTok{ edge\_list,}
+  \AttributeTok{iter\_warmup =} \DecValTok{1000}\NormalTok{,}
+  \AttributeTok{iter\_sampling =} \DecValTok{2000}\NormalTok{,}
+  \AttributeTok{chains =} \DecValTok{1}\NormalTok{,}
+  \AttributeTok{parallel\_chains =} \DecValTok{8}
+\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Running MCMC with 1 chain...
+## 
+## Chain 1 Iteration:    1 / 3000 [  0%]  (Warmup) 
+## Chain 1 Iteration:  100 / 3000 [  3%]  (Warmup) 
+## Chain 1 Iteration:  200 / 3000 [  6%]  (Warmup) 
+## Chain 1 Iteration:  300 / 3000 [ 10%]  (Warmup) 
+## Chain 1 Iteration:  400 / 3000 [ 13%]  (Warmup) 
+## Chain 1 Iteration:  500 / 3000 [ 16%]  (Warmup) 
+## Chain 1 Iteration:  600 / 3000 [ 20%]  (Warmup) 
+## Chain 1 Iteration:  700 / 3000 [ 23%]  (Warmup) 
+## Chain 1 Iteration:  800 / 3000 [ 26%]  (Warmup) 
+## Chain 1 Iteration:  900 / 3000 [ 30%]  (Warmup) 
+## Chain 1 Iteration: 1000 / 3000 [ 33%]  (Warmup) 
+## Chain 1 Iteration: 1001 / 3000 [ 33%]  (Sampling) 
+## Chain 1 Iteration: 1100 / 3000 [ 36%]  (Sampling) 
+## Chain 1 Iteration: 1200 / 3000 [ 40%]  (Sampling) 
+## Chain 1 Iteration: 1300 / 3000 [ 43%]  (Sampling) 
+## Chain 1 Iteration: 1400 / 3000 [ 46%]  (Sampling) 
+## Chain 1 Iteration: 1500 / 3000 [ 50%]  (Sampling) 
+## Chain 1 Iteration: 1600 / 3000 [ 53%]  (Sampling) 
+## Chain 1 Iteration: 1700 / 3000 [ 56%]  (Sampling) 
+## Chain 1 Iteration: 1800 / 3000 [ 60%]  (Sampling) 
+## Chain 1 Iteration: 1900 / 3000 [ 63%]  (Sampling) 
+## Chain 1 Iteration: 2000 / 3000 [ 66%]  (Sampling) 
+## Chain 1 Iteration: 2100 / 3000 [ 70%]  (Sampling) 
+## Chain 1 Iteration: 2200 / 3000 [ 73%]  (Sampling) 
+## Chain 1 Iteration: 2300 / 3000 [ 76%]  (Sampling) 
+## Chain 1 Iteration: 2400 / 3000 [ 80%]  (Sampling) 
+## Chain 1 Iteration: 2500 / 3000 [ 83%]  (Sampling) 
+## Chain 1 Iteration: 2600 / 3000 [ 86%]  (Sampling) 
+## Chain 1 Iteration: 2700 / 3000 [ 90%]  (Sampling) 
+## Chain 1 Iteration: 2800 / 3000 [ 93%]  (Sampling) 
+## Chain 1 Iteration: 2900 / 3000 [ 96%]  (Sampling) 
+## Chain 1 Iteration: 3000 / 3000 [100%]  (Sampling) 
+## Chain 1 finished in 12.6 seconds.
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{edge\_draws }\OtherTok{\textless{}{-}}\NormalTok{ fit}\SpecialCharTok{$}\FunctionTok{draws}\NormalTok{(}\StringTok{"edge\_weight"}\NormalTok{, }\AttributeTok{format =} \StringTok{"df"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{compute-normal-approximation}{%
+\section{Compute normal
+approximation}\label{compute-normal-approximation}}
+
+To parameterise the multivariate normal approximation, we use the sample
+mean and covariance matrix, calculated from the posterior edge weight
+samples using the following code:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# remove .chain .iteration .draw to just leave draws}
+\NormalTok{edge\_draws\_cols }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(edge\_draws[, }\DecValTok{1}\SpecialCharTok{:}\NormalTok{(}\FunctionTok{ncol}\NormalTok{(edge\_draws)}\SpecialCharTok{{-}}\DecValTok{3}\NormalTok{)])}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Dropping 'draws_df' class as required metadata was removed.
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{N }\OtherTok{\textless{}{-}} \FunctionTok{ncol}\NormalTok{(edge\_draws\_cols)}
+
+\CommentTok{\# get the weights on the logit scale (they are not currently because we used a beta prior and identity link here rather than logistic link)}
+\NormalTok{logit\_weights }\OtherTok{\textless{}{-}} \FunctionTok{apply}\NormalTok{(edge\_draws\_cols, }\DecValTok{2}\NormalTok{, qlogis)}
+\CommentTok{\# fit a multivariate normal dist to the edges}
+\NormalTok{logit\_edge\_draws\_mu }\OtherTok{\textless{}{-}} \FunctionTok{apply}\NormalTok{(logit\_weights, }\DecValTok{2}\NormalTok{, mean)}
+\NormalTok{logit\_edge\_draws\_cov }\OtherTok{\textless{}{-}} \FunctionTok{cov}\NormalTok{(logit\_weights)}
+\end{Highlighting}
+\end{Shaded}
+
+These quantities will be given to the Stan model as data to model joint
+posteriors of edge weight in the regression. We can run a few quick
+plots to see how well the approximation is working.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Randomly selecting samples to examine}
+\NormalTok{num\_samples }\OtherTok{\textless{}{-}} \DecValTok{20}
+\NormalTok{selected\_samples }\OtherTok{\textless{}{-}} \FunctionTok{sample}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{N, num\_samples, }\AttributeTok{replace =} \ConstantTok{FALSE}\NormalTok{)}
+
+\CommentTok{\# Setting grid layout}
+\NormalTok{rows }\OtherTok{\textless{}{-}} \FunctionTok{floor}\NormalTok{(}\FunctionTok{sqrt}\NormalTok{(num\_samples))}
+\NormalTok{cols }\OtherTok{\textless{}{-}} \FunctionTok{ceiling}\NormalTok{(num\_samples }\SpecialCharTok{/}\NormalTok{ rows)}
+\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow=}\FunctionTok{c}\NormalTok{(rows, cols), }\AttributeTok{mar=}\FunctionTok{c}\NormalTok{(}\DecValTok{2}\NormalTok{,}\DecValTok{2}\NormalTok{,}\DecValTok{2}\NormalTok{,}\DecValTok{1}\NormalTok{))}
+
+\ControlFlowTok{for}\NormalTok{ (i }\ControlFlowTok{in}\NormalTok{ selected\_samples) \{}
+\NormalTok{  mu }\OtherTok{\textless{}{-}}\NormalTok{ logit\_edge\_draws\_mu[i]}
+\NormalTok{  sd }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{(logit\_edge\_draws\_cov[i,i])}
+
+\NormalTok{  fitted\_values\_logit }\OtherTok{\textless{}{-}} \FunctionTok{rnorm}\NormalTok{(}\FloatTok{1e5}\NormalTok{, }\AttributeTok{mean=}\NormalTok{mu, }\AttributeTok{sd=}\NormalTok{sd)}
+\NormalTok{  fitted\_values\_original }\OtherTok{\textless{}{-}} \FunctionTok{plogis}\NormalTok{(fitted\_values\_logit)}
+
+  \FunctionTok{hist}\NormalTok{(}\FunctionTok{unlist}\NormalTok{(edge\_draws\_cols[,i]), }\AttributeTok{probability=}\ConstantTok{TRUE}\NormalTok{, }\AttributeTok{main=}\FunctionTok{paste}\NormalTok{(}\StringTok{"Dyad"}\NormalTok{, i), }\AttributeTok{xlab=}\StringTok{"Value"}\NormalTok{, }\AttributeTok{breaks=}\DecValTok{50}\NormalTok{)}
+  \FunctionTok{lines}\NormalTok{(}\FunctionTok{density}\NormalTok{(fitted\_values\_original), }\AttributeTok{col=}\StringTok{"blue"}\NormalTok{, }\AttributeTok{lw=}\FloatTok{1.5}\NormalTok{)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{elephant_network_code_Dan_HelenMessing_files/figure-latex/unnamed-chunk-6-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{par}\NormalTok{(}\AttributeTok{mfrow=}\FunctionTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{,}\DecValTok{1}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+Edge weight values (mu and cov) go into the regression model on the
+logit scale.
+
+\emph{Defining the model}
+
+The dyadic regression model we'll be using will predict the edge weight
+using a Gaussian family model where dyad type is the main effect, and
+multi-membership terms are included as random effects to account for
+non-independence between edges due to nodes. Since edge weights can
+co-vary, we need to model the joint posterior distributions over edge
+weights as the response variable in the regression model. This can be
+achieved by modelling the mean edge weights \texttt{y\_mu} as a
+multivariate normal with a covariance matrix \texttt{y\_sigma}
+calculated from the edge weight posterior. In Stan this looks like:
+
+\texttt{logit\_edge\_mu\ \textasciitilde{}\ multi\_normal(predictor,\ logit\_edge\_cov\ +\ diag\_matrix(rep\_vector(square(sigma),\ N)));}
+
+where \texttt{predictor} is the predictor term (like
+\texttt{a\ +\ b\ *\ x} in simple linear regression). Modelling edge
+weights with a multivariate normal allows the joint uncertainty over
+edge weights to be taken into account by the model. Weakly informative
+priors are used in this example, but in any real analysis they should be
+determined by domain knowledge and predictive checks.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{model\_dyadic }\OtherTok{\textless{}{-}} \FunctionTok{cmdstan\_model}\NormalTok{(}\StringTok{"dyadic\_regression.stan"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\emph{Fit the dyadic regression model}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{all\_node\_IDs }\OtherTok{\textless{}{-}} \FunctionTok{unique}\NormalTok{(}\FunctionTok{c}\NormalTok{(counts\_df}\SpecialCharTok{$}\NormalTok{id\_1, counts\_df}\SpecialCharTok{$}\NormalTok{id\_2))}
+
+\NormalTok{edge\_model\_list }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{(}
+  \AttributeTok{N =} \FunctionTok{length}\NormalTok{(}\FunctionTok{unique}\NormalTok{(counts\_df}\SpecialCharTok{$}\NormalTok{dyad\_id)),   }\CommentTok{\# Number of dyads}
+  \AttributeTok{K =} \FunctionTok{length}\NormalTok{(all\_node\_IDs),                }\CommentTok{\# Number of nodes}
+  \AttributeTok{logit\_edge\_mu =}\NormalTok{ logit\_edge\_draws\_mu,     }\CommentTok{\# Sample means of the logit edge weights}
+  \AttributeTok{logit\_edge\_cov =}\NormalTok{ logit\_edge\_draws\_cov,   }\CommentTok{\# Sample covariance of logit edge weights}
+  \AttributeTok{age\_diff =}\NormalTok{ counts\_df}\SpecialCharTok{$}\NormalTok{age\_diff,           }\CommentTok{\# Integer dyad types corresponding to "ll", "ld", and "dd"}
+  \AttributeTok{id\_1 =} \FunctionTok{as.integer}\NormalTok{(}\FunctionTok{factor}\NormalTok{(counts\_df}\SpecialCharTok{$}\NormalTok{id\_1, }\AttributeTok{levels =}\NormalTok{ all\_node\_IDs)), }\CommentTok{\# Node IDs for multimembership effects}
+  \AttributeTok{id\_2 =} \FunctionTok{as.integer}\NormalTok{(}\FunctionTok{factor}\NormalTok{(counts\_df}\SpecialCharTok{$}\NormalTok{id\_2, }\AttributeTok{levels =}\NormalTok{ all\_node\_IDs)),}
+  \AttributeTok{jitter =} \FloatTok{1e{-}6}                            \CommentTok{\# jitter to add to the diag of the cov matrix for numerical stability}
+\NormalTok{)}
+
+\NormalTok{fit\_dyadic }\OtherTok{\textless{}{-}}\NormalTok{ model\_dyadic}\SpecialCharTok{$}\FunctionTok{sample}\NormalTok{(}
+  \AttributeTok{data =}\NormalTok{ edge\_model\_list,}
+  \AttributeTok{iter\_warmup =} \DecValTok{1000}\NormalTok{,}
+  \AttributeTok{iter\_sampling =} \DecValTok{2000}\NormalTok{,}
+  \AttributeTok{chains =} \DecValTok{4}\NormalTok{,}
+  \AttributeTok{parallel\_chains =} \DecValTok{8}
+\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Running MCMC with 4 chains, at most 8 in parallel...
+## 
+## Chain 1 Iteration:    1 / 3000 [  0%]  (Warmup)
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 1 Exception: normal_lpdf: Scale parameter is 0, but must be positive! (in 'C:/Users/hkm513/AppData/Local/Temp/Rtmpk1OBf4/model-2778765e27.stan', line 36, column 2 to column 33)
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 1
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 2 Iteration:    1 / 3000 [  0%]  (Warmup) 
+## Chain 3 Iteration:    1 / 3000 [  0%]  (Warmup) 
+## Chain 4 Iteration:    1 / 3000 [  0%]  (Warmup)
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 4 Exception: normal_lpdf: Scale parameter is 0, but must be positive! (in 'C:/Users/hkm513/AppData/Local/Temp/Rtmpk1OBf4/model-2778765e27.stan', line 36, column 2 to column 33)
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 4
+\end{verbatim}
+
+\begin{verbatim}
+## Chain 1 Iteration:  100 / 3000 [  3%]  (Warmup) 
+## Chain 2 Iteration:  100 / 3000 [  3%]  (Warmup) 
+## Chain 3 Iteration:  100 / 3000 [  3%]  (Warmup) 
+## Chain 4 Iteration:  100 / 3000 [  3%]  (Warmup) 
+## Chain 3 Iteration:  200 / 3000 [  6%]  (Warmup) 
+## Chain 1 Iteration:  200 / 3000 [  6%]  (Warmup) 
+## Chain 2 Iteration:  200 / 3000 [  6%]  (Warmup) 
+## Chain 4 Iteration:  200 / 3000 [  6%]  (Warmup) 
+## Chain 1 Iteration:  300 / 3000 [ 10%]  (Warmup) 
+## Chain 3 Iteration:  300 / 3000 [ 10%]  (Warmup) 
+## Chain 2 Iteration:  300 / 3000 [ 10%]  (Warmup) 
+## Chain 4 Iteration:  300 / 3000 [ 10%]  (Warmup) 
+## Chain 1 Iteration:  400 / 3000 [ 13%]  (Warmup) 
+## Chain 3 Iteration:  400 / 3000 [ 13%]  (Warmup) 
+## Chain 2 Iteration:  400 / 3000 [ 13%]  (Warmup) 
+## Chain 4 Iteration:  400 / 3000 [ 13%]  (Warmup) 
+## Chain 1 Iteration:  500 / 3000 [ 16%]  (Warmup) 
+## Chain 3 Iteration:  500 / 3000 [ 16%]  (Warmup) 
+## Chain 2 Iteration:  500 / 3000 [ 16%]  (Warmup) 
+## Chain 4 Iteration:  500 / 3000 [ 16%]  (Warmup) 
+## Chain 1 Iteration:  600 / 3000 [ 20%]  (Warmup) 
+## Chain 3 Iteration:  600 / 3000 [ 20%]  (Warmup) 
+## Chain 2 Iteration:  600 / 3000 [ 20%]  (Warmup) 
+## Chain 4 Iteration:  600 / 3000 [ 20%]  (Warmup) 
+## Chain 1 Iteration:  700 / 3000 [ 23%]  (Warmup) 
+## Chain 3 Iteration:  700 / 3000 [ 23%]  (Warmup) 
+## Chain 2 Iteration:  700 / 3000 [ 23%]  (Warmup) 
+## Chain 4 Iteration:  700 / 3000 [ 23%]  (Warmup) 
+## Chain 3 Iteration:  800 / 3000 [ 26%]  (Warmup) 
+## Chain 1 Iteration:  800 / 3000 [ 26%]  (Warmup) 
+## Chain 2 Iteration:  800 / 3000 [ 26%]  (Warmup) 
+## Chain 4 Iteration:  800 / 3000 [ 26%]  (Warmup) 
+## Chain 1 Iteration:  900 / 3000 [ 30%]  (Warmup) 
+## Chain 3 Iteration:  900 / 3000 [ 30%]  (Warmup) 
+## Chain 2 Iteration:  900 / 3000 [ 30%]  (Warmup) 
+## Chain 4 Iteration:  900 / 3000 [ 30%]  (Warmup) 
+## Chain 2 Iteration: 1000 / 3000 [ 33%]  (Warmup) 
+## Chain 1 Iteration: 1000 / 3000 [ 33%]  (Warmup) 
+## Chain 2 Iteration: 1001 / 3000 [ 33%]  (Sampling) 
+## Chain 1 Iteration: 1001 / 3000 [ 33%]  (Sampling) 
+## Chain 3 Iteration: 1000 / 3000 [ 33%]  (Warmup) 
+## Chain 3 Iteration: 1001 / 3000 [ 33%]  (Sampling) 
+## Chain 4 Iteration: 1000 / 3000 [ 33%]  (Warmup) 
+## Chain 4 Iteration: 1001 / 3000 [ 33%]  (Sampling) 
+## Chain 2 Iteration: 1100 / 3000 [ 36%]  (Sampling) 
+## Chain 1 Iteration: 1100 / 3000 [ 36%]  (Sampling) 
+## Chain 3 Iteration: 1100 / 3000 [ 36%]  (Sampling) 
+## Chain 4 Iteration: 1100 / 3000 [ 36%]  (Sampling) 
+## Chain 2 Iteration: 1200 / 3000 [ 40%]  (Sampling) 
+## Chain 1 Iteration: 1200 / 3000 [ 40%]  (Sampling) 
+## Chain 3 Iteration: 1200 / 3000 [ 40%]  (Sampling) 
+## Chain 4 Iteration: 1200 / 3000 [ 40%]  (Sampling) 
+## Chain 2 Iteration: 1300 / 3000 [ 43%]  (Sampling) 
+## Chain 1 Iteration: 1300 / 3000 [ 43%]  (Sampling) 
+## Chain 3 Iteration: 1300 / 3000 [ 43%]  (Sampling) 
+## Chain 4 Iteration: 1300 / 3000 [ 43%]  (Sampling) 
+## Chain 2 Iteration: 1400 / 3000 [ 46%]  (Sampling) 
+## Chain 1 Iteration: 1400 / 3000 [ 46%]  (Sampling) 
+## Chain 3 Iteration: 1400 / 3000 [ 46%]  (Sampling) 
+## Chain 4 Iteration: 1400 / 3000 [ 46%]  (Sampling) 
+## Chain 2 Iteration: 1500 / 3000 [ 50%]  (Sampling) 
+## Chain 1 Iteration: 1500 / 3000 [ 50%]  (Sampling) 
+## Chain 3 Iteration: 1500 / 3000 [ 50%]  (Sampling) 
+## Chain 4 Iteration: 1500 / 3000 [ 50%]  (Sampling) 
+## Chain 2 Iteration: 1600 / 3000 [ 53%]  (Sampling) 
+## Chain 1 Iteration: 1600 / 3000 [ 53%]  (Sampling) 
+## Chain 3 Iteration: 1600 / 3000 [ 53%]  (Sampling) 
+## Chain 4 Iteration: 1600 / 3000 [ 53%]  (Sampling) 
+## Chain 1 Iteration: 1700 / 3000 [ 56%]  (Sampling) 
+## Chain 2 Iteration: 1700 / 3000 [ 56%]  (Sampling) 
+## Chain 3 Iteration: 1700 / 3000 [ 56%]  (Sampling) 
+## Chain 4 Iteration: 1700 / 3000 [ 56%]  (Sampling) 
+## Chain 1 Iteration: 1800 / 3000 [ 60%]  (Sampling) 
+## Chain 2 Iteration: 1800 / 3000 [ 60%]  (Sampling) 
+## Chain 3 Iteration: 1800 / 3000 [ 60%]  (Sampling) 
+## Chain 4 Iteration: 1800 / 3000 [ 60%]  (Sampling) 
+## Chain 1 Iteration: 1900 / 3000 [ 63%]  (Sampling) 
+## Chain 2 Iteration: 1900 / 3000 [ 63%]  (Sampling) 
+## Chain 3 Iteration: 1900 / 3000 [ 63%]  (Sampling) 
+## Chain 4 Iteration: 1900 / 3000 [ 63%]  (Sampling) 
+## Chain 1 Iteration: 2000 / 3000 [ 66%]  (Sampling) 
+## Chain 2 Iteration: 2000 / 3000 [ 66%]  (Sampling) 
+## Chain 3 Iteration: 2000 / 3000 [ 66%]  (Sampling) 
+## Chain 4 Iteration: 2000 / 3000 [ 66%]  (Sampling) 
+## Chain 1 Iteration: 2100 / 3000 [ 70%]  (Sampling) 
+## Chain 2 Iteration: 2100 / 3000 [ 70%]  (Sampling) 
+## Chain 3 Iteration: 2100 / 3000 [ 70%]  (Sampling) 
+## Chain 4 Iteration: 2100 / 3000 [ 70%]  (Sampling) 
+## Chain 1 Iteration: 2200 / 3000 [ 73%]  (Sampling) 
+## Chain 2 Iteration: 2200 / 3000 [ 73%]  (Sampling) 
+## Chain 3 Iteration: 2200 / 3000 [ 73%]  (Sampling) 
+## Chain 4 Iteration: 2200 / 3000 [ 73%]  (Sampling) 
+## Chain 1 Iteration: 2300 / 3000 [ 76%]  (Sampling) 
+## Chain 2 Iteration: 2300 / 3000 [ 76%]  (Sampling) 
+## Chain 3 Iteration: 2300 / 3000 [ 76%]  (Sampling) 
+## Chain 4 Iteration: 2300 / 3000 [ 76%]  (Sampling) 
+## Chain 1 Iteration: 2400 / 3000 [ 80%]  (Sampling) 
+## Chain 2 Iteration: 2400 / 3000 [ 80%]  (Sampling) 
+## Chain 3 Iteration: 2400 / 3000 [ 80%]  (Sampling) 
+## Chain 4 Iteration: 2400 / 3000 [ 80%]  (Sampling) 
+## Chain 1 Iteration: 2500 / 3000 [ 83%]  (Sampling) 
+## Chain 2 Iteration: 2500 / 3000 [ 83%]  (Sampling) 
+## Chain 3 Iteration: 2500 / 3000 [ 83%]  (Sampling) 
+## Chain 4 Iteration: 2500 / 3000 [ 83%]  (Sampling) 
+## Chain 1 Iteration: 2600 / 3000 [ 86%]  (Sampling) 
+## Chain 2 Iteration: 2600 / 3000 [ 86%]  (Sampling) 
+## Chain 3 Iteration: 2600 / 3000 [ 86%]  (Sampling) 
+## Chain 4 Iteration: 2600 / 3000 [ 86%]  (Sampling) 
+## Chain 1 Iteration: 2700 / 3000 [ 90%]  (Sampling) 
+## Chain 2 Iteration: 2700 / 3000 [ 90%]  (Sampling) 
+## Chain 3 Iteration: 2700 / 3000 [ 90%]  (Sampling) 
+## Chain 4 Iteration: 2700 / 3000 [ 90%]  (Sampling) 
+## Chain 1 Iteration: 2800 / 3000 [ 93%]  (Sampling) 
+## Chain 2 Iteration: 2800 / 3000 [ 93%]  (Sampling) 
+## Chain 3 Iteration: 2800 / 3000 [ 93%]  (Sampling) 
+## Chain 4 Iteration: 2800 / 3000 [ 93%]  (Sampling) 
+## Chain 1 Iteration: 2900 / 3000 [ 96%]  (Sampling) 
+## Chain 2 Iteration: 2900 / 3000 [ 96%]  (Sampling) 
+## Chain 3 Iteration: 2900 / 3000 [ 96%]  (Sampling) 
+## Chain 4 Iteration: 2900 / 3000 [ 96%]  (Sampling) 
+## Chain 1 Iteration: 3000 / 3000 [100%]  (Sampling) 
+## Chain 1 finished in 186.7 seconds.
+## Chain 2 Iteration: 3000 / 3000 [100%]  (Sampling) 
+## Chain 2 finished in 187.2 seconds.
+## Chain 3 Iteration: 3000 / 3000 [100%]  (Sampling) 
+## Chain 3 finished in 187.1 seconds.
+## Chain 4 Iteration: 3000 / 3000 [100%]  (Sampling) 
+## Chain 4 finished in 188.1 seconds.
+## 
+## All 4 chains finished successfully.
+## Mean chain execution time: 187.3 seconds.
+## Total execution time: 189.6 seconds.
+\end{verbatim}
+
+Next we look at the model fit. Remember that we have fitted this to the
+logit of the edge weight. When looking at marginal effects, etc., you
+might want to transform back to the original scale for better
+interpretability.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{fit\_dyadic}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##       variable    mean  median    sd   mad      q5     q95 rhat ess_bulk
+##  lp__          -290.42 -290.15 11.68 11.68 -310.20 -271.79 1.00     2345
+##  beta_age_diff   -0.46   -0.46  0.07  0.07   -0.58   -0.35 1.00     3566
+##  mm_nodes[1]     -3.04   -3.04  0.11  0.11   -3.22   -2.86 1.00     2362
+##  mm_nodes[2]     -3.22   -3.21  0.12  0.12   -3.42   -3.02 1.00     3410
+##  mm_nodes[3]     -2.79   -2.79  0.15  0.15   -3.05   -2.55 1.00     3931
+##  mm_nodes[4]     -0.54   -0.54  0.44  0.44   -1.27    0.17 1.00    10164
+##  mm_nodes[5]      0.39    0.39  0.35  0.35   -0.19    0.97 1.00    10877
+##  mm_nodes[6]      1.34    1.35  0.41  0.41    0.67    2.02 1.00    10397
+##  mm_nodes[7]     -0.04   -0.04  0.62  0.61   -1.05    0.99 1.00    11604
+##  mm_nodes[8]     -0.70   -0.71  0.61  0.61   -1.71    0.31 1.00    13969
+##  ess_tail
+##      3734
+##      5165
+##      3646
+##      5257
+##      5158
+##      5475
+##      5974
+##      6662
+##      6262
+##      6118
+## 
+##  # showing 10 of 717 rows (change via 'max_rows' argument or 'cmdstanr_max_rows' option)
+\end{verbatim}
+
+\end{document}
