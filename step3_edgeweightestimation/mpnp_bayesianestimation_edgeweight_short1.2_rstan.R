@@ -54,7 +54,7 @@ edge_binary                                                  # check model prior
 ### add progress marker
 print(paste0('model loaded in at ', Sys.time()))
 
-################ generate loop to run through short windows 1 and 2 ################
+#### loop to run models ####
 ### set up values for running loop
 for(time_window in 1:2 ){
   #### set up ####
@@ -63,19 +63,10 @@ for(time_window in 1:2 ){
    ### set seed
    set.seed(12345)
    
-   print(paste0('loop started at ', Sys.time()))
-
-   ### create file of output graphs
-   pdf(file = paste0('../outputs/mpnpshort',time_window,'_edgeweights_conditionalprior.pdf'), width = 20, height = 15)
-   
-   print(paste0('loop started at ', Sys.time()))
-
   #### import data ####
    ### subset by time window
    counts_df <- read_csv(paste0('../data_processed/step1_dataprocessing/mpnp_period',time_window,'_pairwiseevents.csv'))
    
-   print(paste0('counts_df read in at ', Sys.time()))
-
    ### create nodes data frame
    nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
                        node = NA, sightings = NA)                  # data needed on each
@@ -90,26 +81,19 @@ for(time_window in 1:2 ){
      nodes$sightings[i] <- x$count    # number of sightings within the time window
    }
    
-   print(paste0('nodes data created at ', Sys.time()))
-
-   ### import age data
-   eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
-   mean_ages <- data.frame(id = colnames(eles),
-                           age = apply(eles, 2, mean))
-   
-   print(paste0('age data read in at ', Sys.time()))
-
-   # combine node counts with age data
-   nodes <- left_join(nodes, mean_ages, by = 'id') # join age data to sightings
-   length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
-   
-   print(paste0('node ages produced at ', Sys.time()))
+   # ### import age data
+   # eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+   # mean_ages <- data.frame(id = colnames(eles),
+   #                         age = apply(eles, 2, mean))
+   # 
+   # # combine node counts with age data
+   # nodes <- left_join(nodes, mean_ages, by = 'id') # join age data to sightings
+   # length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
+   # 
 
    ### set values for model
    n_dyads <- nrow(counts_df)
    
-   print(paste0('n_dyads calculated at ', Sys.time()))
-
    ### create data list
    counts_ls <- list(
      n_dyads    = n_dyads,                  # total number of times one or other of the dyad was observed
@@ -158,14 +142,126 @@ for(time_window in 1:2 ){
   
   ### save data 
   saveRDS(edges, paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
+  save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
   
   ### add progress marker
   print(paste0('edges extracted for time window ',time_window,' at ', Sys.time()))
   
+  #### clean up ####
+  rm(list = ls()[! ls() %in% c('n_chains','n_samples','edge_binary','time_window')])
+}
+
+#### loop to produce plots ####
+### create custom network plotting function
+plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
+                                         label.colour = 'transparent', label.font = 'Helvetica', 
+                                         node.size = 4, node.colour = 'seagreen1',
+                                         link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
+{
+  dyad_name <- do.call(paste, c(dyad_data[c("node_1", "node_2")], sep=" <-> "))
+  edge_lower <- apply(edge_samples, 2, function(x) quantile(x, probs=0.025))
+  edge_upper <- apply(edge_samples, 2, function(x) quantile(x, probs=0.975))
+  edge_median <- apply(edge_samples, 2, function(x) quantile(x, probs=0.5))
+  edge_list <- cbind(
+    "median"=round(edge_median, 3), 
+    "2.5%"=round(edge_lower, 3), 
+    "97.5%"=round(edge_upper, 3)
+  )
+  rownames(edge_list) <- dyad_name
+  edgelist <- as.data.frame(edge_list)
+  edgelist$node_1 <- as.character(dyad_data$node_1)
+  edgelist$node_2 <- as.character(dyad_data$node_2)
+  edgelist <- edgelist[,c(4:5,1:3)]
+  #net_all <- igraph::graph_from_edgelist(as.matrix(edgelist[, 1:2]), directed = F)
+  threshold_edges <- edgelist[edgelist$median >= threshold,]
+  if(nrow(threshold_edges) == 0) { stop('No edges above threshold') }
+  net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]), directed = F)
+  
+  if(is.data.frame(node.size) == TRUE ) {
+    nodes_list <- data.frame(node = rep(NA, length(unique(c(threshold_edges$node_1, threshold_edges$node_2)))), #as.numeric(names(net_all[[1]])),
+                             sightings = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_all <- rep(NA, 2*nrow(threshold_edges))  
+      for(a in 1:2){
+        for(b in 1:nrow(threshold_edges)){
+          nodes_all[a + (b-1)*2] <- threshold_edges[b,a]
+        }
+      }
+      nodes_list$node <- unique(nodes_all)
+      nodes_list$sightings[i] <- nodes$sightings[which(nodes$node == nodes_list$node[i])]
+    }
+    node_sightings <- nodes_list$sightings
+  } else { node_sightings <- node.size }
+  
+  if(is.data.frame(node.colour) == TRUE ) {
+    nodes_list <- data.frame(node = rep(NA, length(unique(c(threshold_edges$node_1, threshold_edges$node_2)))), #as.numeric(names(net_all[[1]])),
+                             age = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_all <- rep(NA, 2*nrow(threshold_edges))  
+      for(a in 1:2){
+        for(b in 1:nrow(threshold_edges)){
+          nodes_all[a + (b-1)*2] <- threshold_edges[b,a]
+        }
+      }
+      nodes_list$node <- unique(nodes_all)
+      nodes_list$age[i] <- nodes$age[which(nodes$node == nodes_list$node[i])]
+    }
+    node_age <- nodes_list$age
+  } else { node_age <- node.colour }
+  
+  md <- threshold_edges[, 3]
+  ub <- threshold_edges[, 5]
+  coords <- igraph::layout_nicely(net)
+  igraph::plot.igraph(net, layout = coords,
+                      vertex.label.color = ifelse(is.null(label.colour) == TRUE,
+                                                  ifelse(node_age < 20, 'black', 'white'),
+                                                  label.colour),
+                      label.family = label.font,
+                      vertex.color = ifelse(node_age < 15, '#FDE725FF',
+                                            ifelse(node_age < 20, '#55C667FF',
+                                                   ifelse(node_age < 30, '#1F968BFF', 
+                                                          ifelse(node_age < 40, '#39568CFF', '#440154FF')))), 
+                      vertex.size = node_sightings,
+                      frame.color = NA, frame.width = 0,
+                      edge.color = NA, edge.arrow.size = 0, edge.width = 0)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour1, edge.arrow.size = 0, edge.width = md * lwd)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour2, edge.arrow.size = 0, edge.width = ub * lwd)
+}
+
+## make edgelist function
+make_edgelist <- function (edge_samples, dyad_data) # function pulled directly from BISoN for extracting edge lists
+{
+  dyad_name <- do.call(paste, c(dyad_data[c("node_1", "node_2")], sep=" <-> "))
+  edge_lower <- apply(edge_samples, 2, function(x) quantile(x, probs=0.025))
+  edge_upper <- apply(edge_samples, 2, function(x) quantile(x, probs=0.975))
+  edge_median <- apply(edge_samples, 2, function(x) quantile(x, probs=0.5))
+  edge_list <- cbind(
+    "median"=round(edge_median, 3), 
+    "2.5%"=round(edge_lower, 3), 
+    "97.5%"=round(edge_upper, 3)
+  )
+  rownames(edge_list) <- dyad_name
+  edgelist <- as.data.frame(edge_list)
+  edgelist$node_1 <- as.character(dyad_data$node_1)
+  edgelist$node_2 <- as.character(dyad_data$node_2)
+  edgelist <- edgelist[,c(4:5,1:3)]
+  return(edgelist)
+}
+
+### set up values for running loop
+for(time_window in 1:2 ){
+  ### create file of output graphs
+  pdf(file = paste0('../outputs/mpnpshort',time_window,'_edgeweights_conditionalprior.pdf'), width = 20, height = 15)
+  
   #### check outputs ####
-  #load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  #edges <- readRDS(paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
-   
+  load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  
   # Assign random set of columns to check -- maximum 200 of each type, but with same number of 'zero' dyads as 'non-zeroes'
   if(length(which(counts_df$together >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(counts_df$together >= 1)) } # identify number of samples to include
   plot_dyads <- c(sample(counts_df$dyad_id[counts_df$together >= 1], size = n_test, replace = F),    # sample 'non-zero' dyads
@@ -205,18 +301,18 @@ for(time_window in 1:2 ){
   #   edge_samples[,j] <- edge_weights_matrix[,,j]
   # }
   # colnames(edge_samples) <- counts_df$dyad_id                                    # match to dyad ID numbers
- 
+  
   save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-
+  
   ### plot network across 6 different threshold values for comparison to other networks
   plot_network_threshold_mpnp(edge_samples = edge_weights_matrix, dyad_data = counts_df, threshold = 0.05,
-                             node.size = nodes, node.colour = nodes, lwd = 15)
+                              node.size = nodes, node.colour = nodes, lwd = 15)
   plot_network_threshold_mpnp(edge_samples = edge_weights_matrix, dyad_data = counts_df, threshold = 0.10,
-                             node.size = nodes, node.colour = nodes, lwd = 15)
+                              node.size = nodes, node.colour = nodes, lwd = 15)
   plot_network_threshold_mpnp(edge_samples = edge_weights_matrix, dyad_data = counts_df, threshold = 0.15,
-                             node.size = nodes, node.colour = nodes, lwd = 15)
+                              node.size = nodes, node.colour = nodes, lwd = 15)
   plot_network_threshold_mpnp(edge_samples = edge_weights_matrix, dyad_data = counts_df, threshold = 0.20,
-                             node.size = nodes, node.colour = nodes, lwd = 15)
+                              node.size = nodes, node.colour = nodes, lwd = 15)
   #plot_network_threshold_mpnp(edge_samples = edge_weights_matrix, dyad_data = counts_df, threshold = 0.25,
   #                           node.size = nodes, node.colour = nodes, lwd = 15)
   
