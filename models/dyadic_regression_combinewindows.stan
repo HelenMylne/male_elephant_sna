@@ -25,7 +25,11 @@ parameters {
   real<lower=0> sigma_mm;
   // random effects
   vector[num_windows] rand_window;
+  real mu_window;
+  real sigma_window;
   vector[num_dyads] rand_dyad;
+  real mu_dyad;
+  real sigma_dyad;
 }
 
 transformed parameters {
@@ -48,9 +52,13 @@ model {
   sigma ~ exponential(1);
   sigma_mm ~ exponential(1);
   intercept ~ normal(0,1);
-  rand_window ~ normal(0,1);
-  rand_dyad ~ normal(0,1);
-
+  rand_window ~ normal(mu_window,sigma_window);
+  mu_window ~ normal(0,1);
+  sigma_window ~ exponential(1);
+  rand_dyad ~ normal(mu_dyad, sigma_dyad);
+  mu_dyad ~ normal(0,1);
+  sigma_dyad ~ exponential(1);
+  
   // likelihood using Cholesky decomposition
   logit_edge_mu ~ multi_normal_cholesky(predictor, L_cov);
 }
