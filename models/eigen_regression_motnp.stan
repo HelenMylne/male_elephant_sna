@@ -32,7 +32,7 @@ transformed parameters {
 
  model {
   // priors
-  intercept ~ normal(0,0.8);
+  intercept ~ normal(0,1);
   delta ~ dirichlet(prior_age);
   beta_age  ~ normal(0,1);
   sigma ~ exponential(2);
