@@ -376,15 +376,14 @@ polygon(y = c(sim$lwr_invlogit, rev(sim$upr_invlogit)), x = c(sim$age_cat, rev(s
         col = rgb(1,1,0,0.5), border = NA)
 
 ## extract slope estimates -- none of these match the original input, but the predictions work??!
-new_data$mean_predict[2] - new_data$mean_predict[1]
-new_data$mean_predict[3] - new_data$mean_predict[2]
-new_data$mean_predict[4] - new_data$mean_predict[3]
-new_data$mean_predict[5] - new_data$mean_predict[4]
-
-new_data$predict_ustd[2] - new_data$predict_ustd[1]
-new_data$predict_ustd[3] - new_data$predict_ustd[2]
-new_data$predict_ustd[4] - new_data$predict_ustd[3]
-new_data$predict_ustd[5] - new_data$predict_ustd[4]
+# original (true) slope value
+sim_slope
+# predicted (modelled) slope value = mean of differences bewteen categories, divided by the number of years each category represents
+mean( c( (new_data$predict_ustd[2] - new_data$predict_ustd[1]) / (16-10), 
+         (new_data$predict_ustd[3] - new_data$predict_ustd[2]) / (21-16), 
+         (new_data$predict_ustd[4] - new_data$predict_ustd[3]) / (26-21),
+         (new_data$predict_ustd[5] - new_data$predict_ustd[4]) / (40-26) )
+)
 
 ## extract model fit
 summary <- fit_sim$summary()
@@ -394,13 +393,3 @@ hist(summary$ess_bulk, breaks = 50)
 hist(summary$ess_tail, breaks = 50)
 par(mfrow = c(1,1))
 
-###### OLD ###### 
-## extract slope estimates
-( fit_slope <- params$beta_age * (sd(sim$mu)/sd(sim$age)) )
-paste0('true slope value = ', sim_slope, '; model slope value = ', round(mean(fit_slope),2) )
-
-( fit_intcp <- mean(sim$mu) - fit_slope * mean(sim$age) )
-paste0('true intercept value = ', sim_intcp, '; model intercept value = ', round(mean(fit_intcp),2) )
-
-plot( (sim$age*mean(fit_slope)+mean(fit_intcp)) ~ sim$mu)
-abline(a = 0, b = 1)
