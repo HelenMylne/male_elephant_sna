@@ -226,7 +226,7 @@ df %>% ggplot(aes(x=true_age, y=value, group=factor(ID))) +
 print('simulation without young males complete')
 
 #### load MPNP data ####
-mpnp_long <- read_csv('../data_processed/mpnp_eles_long_Jan23check.csv')
+mpnp_long <- read_csv('../data_processed/step1_dataprocessing/mpnp_eles_long_Jan23check.csv')
 
 # identify period 1 only
 periods <- seq(from = min(mpnp_long$date, na.rm = T),
@@ -267,6 +267,9 @@ ages1 <- ages1[ages1$age_mid_round < 10,]
 mpnp1_males <- ages1 %>%
   select(elephant_id, age_mid_round) %>% 
   distinct()
+
+## save ages for later
+write_csv(mpnp1_males, '../data_processed/step2_ageestimation/mpnp_ages_median_category.csv')
 
 #### create MPNP1 data list ####
 K <- 9
