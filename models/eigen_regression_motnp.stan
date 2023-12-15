@@ -3,7 +3,7 @@ data {
   int num_age_cat;                              // Number of unique age categories
   int length_dirichlet;                         // Number of unique age categories + 1
   vector[num_nodes] centrality_mu;              // Means of centrality estimates (0-1 bounded then standardised)
-  matrix[num_nodes, num_nodes] centrality_cov;  // standard deviations of centrality estimates
+  matrix[num_nodes, num_nodes] centrality_cov;  // Standard deviations of centrality estimates
   array[num_nodes] int node_age;                // Node ages (factor)
   vector[num_age_cat] prior_age;                // Dirichlet prior values
 }
