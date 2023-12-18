@@ -19,17 +19,21 @@ parameters {
   // exposure slopes
   real beta_age_max;
   real beta_age_min;
+  // Cholesky variance
+  real<lower=0> sigma;
   // multimembership effects
   vector[num_nodes] mm_nodes;
-  real<lower=0> sigma;
   real<lower=0> sigma_mm;
-  // random effects
+  // random effect of time window
   vector[num_windows] rand_window;
-  real mu_window;
-  real sigma_window;
+  real mu_window;                      // coefficients for each window
+  real sigma_window;                   // scale for correlation between windows
+  corr_matrix[num_dyads] omega_window; // correlation between time windows
+  // random effect of dyad ID
   vector[num_dyads] rand_dyad;
-  real mu_dyad;
-  real sigma_dyad;
+  real mu_dyad;                        // coefficients for each dyad
+  real sigma_dyad;                     // scale for correlation between dyads
+  corr_matrix[num_dyads] omega_dyad;   // correlation between dyads
 }
 
 transformed parameters {
@@ -40,24 +44,31 @@ transformed parameters {
   // regression equation
   vector[num_data] predictor;
   for (i in 1:num_data) {
-    predictor[i] = intercept + beta_age_min * age_min[i] + beta_age_max * age_max[i] + mm_nodes[node_1[i]] + mm_nodes[node_2[i]] + rand_window[window[i]] + rand_dyad[dyad_id[i]];
+    predictor[i] = intercept + (beta_age_min[dyad_id[i]]) * age_min[i] + (beta_age_max[dyad_id[i]]) * age_max[i] + mm_nodes[node_1[i]] + mm_nodes[node_2[i]] + rand_window[window[i]] + rand_dyad[dyad_id[i]];
   }
 }
 
 model {
-  // priors
+  // intercept prior
+  intercept ~ normal(0,1);
+  // slope priors
   beta_age_max ~ normal(0,1);
   beta_age_min ~ normal(0,1);
-  mm_nodes ~ normal(0, sigma_mm);
+  // Cholesky variance
   sigma ~ exponential(1);
+  // multimembership priors
+  mm_nodes ~ normal(0, sigma_mm);
   sigma_mm ~ exponential(1);
-  intercept ~ normal(0,1);
-  rand_window ~ normal(mu_window,sigma_window);
+  // random effect of window 
+  rand_window ~ multi_normal(mu_window, quad_form_diag(omega_window, sigma_window));
   mu_window ~ normal(0,1);
   sigma_window ~ exponential(1);
-  rand_dyad ~ normal(mu_dyad, sigma_dyad);
+  omega_window ~ lkj_corr(1);
+  // random effect of dyad ID
+  rand_window ~ multi_normal(mu_dyad, quad_form_diag(omega_dyad, sigma_dyad));
   mu_dyad ~ normal(0,1);
   sigma_dyad ~ exponential(1);
+  omega_dyad ~ lkj_corr(1);
   
   // likelihood using Cholesky decomposition
   logit_edge_mu ~ multi_normal_cholesky(predictor, L_cov);
