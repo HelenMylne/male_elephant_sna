@@ -324,8 +324,10 @@ ggplot()+
                  y = mean_eigen, 
                  size = sightings),  # mean eigenvector
              colour = rgb(68/255, 1/255, 84/255))+
-  geom_line(data = sum_mean_pred, aes(x = age, y = mid),                                # mean line
-            colour = rgb(33/255, 145/255, 140/255), linewidth = 1)+
+  geom_line(data = sum_mean_pred,
+            aes(x = age, y = mid),                                # mean line
+            colour = rgb(33/255, 145/255, 140/255),
+            linewidth = 1)+
   # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
   #                                   y = mean_eigen, group = node_rank),
   #           colour = rgb(68/255, 1/255, 84/255), linewidth = 0.5, width = 0)+
