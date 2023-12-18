@@ -1,4 +1,4 @@
-#### Bayesian analysis of ATE data ####
+#### Bayesian analysis of EFA data ####
 # Script to process association data from Makgadikgadi Pans National Park, Botswana.
 # Data collected: 1st November 2019 to 5th August 2021
 # Collected by: Elephants for Africa (Dr Kate Evans)
@@ -54,103 +54,103 @@ edge_binary                                                  # check model prior
 ### add progress marker
 print(paste0('model loaded in at ', Sys.time()))
 
-#### loop to run models ####
-### set up values for running loop
-for(time_window in 1:2 ){
-  #### set up ####
-   print(paste0('loop started at ', Sys.time()))
-
-   ### set seed
-   set.seed(12345)
-   
-  #### import data ####
-   ### subset by time window
-   counts_df <- read_csv(paste0('../data_processed/step1_dataprocessing/mpnp_period',time_window,'_pairwiseevents.csv'))
-   
-   ### create nodes data frame
-   nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
-                       node = NA, sightings = NA)                  # data needed on each
-   for(i in 1:nrow(nodes)){
-     # extract data about individual from counts_df data frame
-     if(nodes$id[i] %in% counts_df$id_1) {
-       x <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','node_1','count_period_1')] %>% distinct()
-     } else { x <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','node_2','count_period_2')] %>% distinct() }
-     colnames(x) <- c('id','node','count')
-     # add individual data
-     nodes$node[i] <- x$node          # node ID number
-     nodes$sightings[i] <- x$count    # number of sightings within the time window
-   }
-   
-   # ### import age data
-   # eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
-   # mean_ages <- data.frame(id = colnames(eles),
-   #                         age = apply(eles, 2, mean))
-   # 
-   # # combine node counts with age data
-   # nodes <- left_join(nodes, mean_ages, by = 'id') # join age data to sightings
-   # length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
-   # 
-
-   ### set values for model
-   n_dyads <- nrow(counts_df)
-   
-   ### create data list
-   counts_ls <- list(
-     n_dyads    = n_dyads,                  # total number of times one or other of the dyad was observed
-     dyad_ids   = counts_df$dyad_id,        # identifier for each dyad
-     together   = counts_df$together,       # count number of sightings seen together
-     count_dyad = counts_df$count_dyad      # count total number of times seen
-   )
-   
-   ### add progress marker
-   print(paste0('data imported for time window ',time_window,' at ', Sys.time()))
-   
-  #### run model on real standardised data ####
-   ### Fit model
-   fit_edges_mpnp <- sampling(
-     edge_binary, data = counts_ls, 
-     chains = n_chains, cores = n_chains,
-     warmup = n_samples/2, iter = n_samples)
- 
-   ### save model
-   save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  
-  ### add progress marker
-  print(paste0('model run for time window ',time_window,' at ', Sys.time()))
-  
-  ### check model
-  fit_edges_mpnp
-  
-  # Extract posterior samples
-  posterior_samples <- fit_edges_mpnp %>% 
-    as.data.frame()
-  
-  # Convert the array to a matrix -- save for eigenvector centralities
-  edge_weights_matrix <- as.matrix(posterior_samples)
-  
-  # convert matrix to data frame -- save samples and plot outputs
-  edges <- posterior_samples %>%
-    pivot_longer(cols = everything(), values_to = 'edge_draw', names_to = 'edge_id')
-  ref_dyads <- data.frame(edge_id = colnames(posterior_samples)[1:n_dyads],
-                          dyad_id = counts_ls$dyad_ids)
-  edges <- edges %>% 
-    left_join(ref_dyads, by = 'edge_id')
-  
-  n_dyads <- length(unique(edges$edge_id))
-  edges$position <- rep(rep(1:(n_samples/2), each = n_dyads), n_chains)
-  edges$chain <- rep(1:n_chains, each = (n_samples/2)*n_dyads)
-  
-  ### save data 
-  saveRDS(edges, paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
-  save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  
-  ### add progress marker
-  print(paste0('edges extracted for time window ',time_window,' at ', Sys.time()))
-  
-  #### clean up ####
-  rm(list = ls()[! ls() %in% c('n_chains','n_samples','edge_binary','time_window')])
-}
-
+# #### loop to run models ####
+# ### set up values for running loop
+# for(time_window in 1:2 ){
+#   #### set up ####
+#    print(paste0('loop started at ', Sys.time()))
+# 
+#    ### set seed
+#    set.seed(12345)
+#    
+#   #### import data ####
+#    ### subset by time window
+#    counts_df <- read_csv(paste0('../data_processed/step1_dataprocessing/mpnp_period',time_window,'_pairwiseevents.csv'))
+#    
+#    ### create nodes data frame
+#    nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
+#                        node = NA, sightings = NA)                  # data needed on each
+#    for(i in 1:nrow(nodes)){
+#      # extract data about individual from counts_df data frame
+#      if(nodes$id[i] %in% counts_df$id_1) {
+#        x <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','node_1','count_period_1')] %>% distinct()
+#      } else { x <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','node_2','count_period_2')] %>% distinct() }
+#      colnames(x) <- c('id','node','count')
+#      # add individual data
+#      nodes$node[i] <- x$node          # node ID number
+#      nodes$sightings[i] <- x$count    # number of sightings within the time window
+#    }
+#    
+#    # ### import age data
+#    # eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+#    # mean_ages <- data.frame(id = colnames(eles),
+#    #                         age = apply(eles, 2, mean))
+#    # 
+#    # # combine node counts with age data
+#    # nodes <- left_join(nodes, mean_ages, by = 'id') # join age data to sightings
+#    # length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
+#    # 
+# 
+#    ### set values for model
+#    n_dyads <- nrow(counts_df)
+#    
+#    ### create data list
+#    counts_ls <- list(
+#      n_dyads    = n_dyads,                  # total number of times one or other of the dyad was observed
+#      dyad_ids   = counts_df$dyad_id,        # identifier for each dyad
+#      together   = counts_df$together,       # count number of sightings seen together
+#      count_dyad = counts_df$count_dyad      # count total number of times seen
+#    )
+#    
+#    ### add progress marker
+#    print(paste0('data imported for time window ',time_window,' at ', Sys.time()))
+#    
+#   #### run model on real standardised data ####
+#    ### Fit model
+#    fit_edges_mpnp <- sampling(
+#      edge_binary, data = counts_ls, 
+#      chains = n_chains, cores = n_chains,
+#      warmup = n_samples/2, iter = n_samples)
+#  
+#    ### save model
+#    save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+#   
+#   ### add progress marker
+#   print(paste0('model run for time window ',time_window,' at ', Sys.time()))
+#   
+#   ### check model
+#   fit_edges_mpnp
+#   
+#   # Extract posterior samples
+#   posterior_samples <- fit_edges_mpnp %>% 
+#     as.data.frame()
+#   
+#   # Convert the array to a matrix -- save for eigenvector centralities
+#   edge_weights_matrix <- as.matrix(posterior_samples)
+#   
+#   # convert matrix to data frame -- save samples and plot outputs
+#   edges <- posterior_samples %>%
+#     pivot_longer(cols = everything(), values_to = 'edge_draw', names_to = 'edge_id')
+#   ref_dyads <- data.frame(edge_id = colnames(posterior_samples)[1:n_dyads],
+#                           dyad_id = counts_ls$dyad_ids)
+#   edges <- edges %>% 
+#     left_join(ref_dyads, by = 'edge_id')
+#   
+#   n_dyads <- length(unique(edges$edge_id))
+#   edges$position <- rep(rep(1:(n_samples/2), each = n_dyads), n_chains)
+#   edges$chain <- rep(1:n_chains, each = (n_samples/2)*n_dyads)
+#   
+#   ### save data 
+#   saveRDS(edges, paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_edgedistributions_conditionalprior.RDS'))
+#   save.image(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+#   
+#   ### add progress marker
+#   print(paste0('edges extracted for time window ',time_window,' at ', Sys.time()))
+#   
+#   #### clean up ####
+#   rm(list = ls()[! ls() %in% c('n_chains','n_samples','edge_binary','time_window')])
+# }
+# 
 #### loop to produce plots ####
 ### create custom network plotting function
 plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
@@ -188,9 +188,9 @@ plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, thres
         }
       }
       nodes_list$node <- unique(nodes_all)
-      nodes_list$sightings[i] <- nodes$sightings[which(nodes$node == nodes_list$node[i])]
+      nodes_list$sightings[i] <- node.size$sightings[which(node.size$node == nodes_list$node[i])]
     }
-    node_sightings <- nodes_list$sightings
+    node_sightings <- nodes_list$sightings*2
   } else { node_sightings <- node.size }
   
   if(is.data.frame(node.colour) == TRUE ) {
@@ -204,7 +204,7 @@ plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, thres
         }
       }
       nodes_list$node <- unique(nodes_all)
-      nodes_list$age[i] <- nodes$age[which(nodes$node == nodes_list$node[i])]
+      nodes_list$age[i] <- node.colour$age[which(node.colour$node == nodes_list$node[i])]
     }
     node_age <- nodes_list$age
   } else { node_age <- node.colour }
@@ -217,10 +217,12 @@ plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, thres
                                                   ifelse(node_age < 20, 'black', 'white'),
                                                   label.colour),
                       label.family = label.font,
-                      vertex.color = ifelse(node_age < 15, '#FDE725FF',
-                                            ifelse(node_age < 20, '#55C667FF',
-                                                   ifelse(node_age < 30, '#1F968BFF', 
-                                                          ifelse(node_age < 40, '#39568CFF', '#440154FF')))), 
+                      vertex.color = ifelse(node_age == 1, 'white',
+                                     ifelse(node_age == 2, '#FDE725FF',
+                                     ifelse(node_age == 3, '#55C667FF',
+                                     ifelse(node_age == 4, '#1F968BFF', 
+                                     ifelse(node_age == 5, '#39568CFF', 
+                                     ifelse(node_age == 6, '#440154FF', 'black')))))), 
                       vertex.size = node_sightings,
                       frame.color = NA, frame.width = 0,
                       edge.color = NA, edge.arrow.size = 0, edge.width = 0)
@@ -262,15 +264,50 @@ for(time_window in 1:2 ){
   #### check outputs ####
   load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
   
+  if('lp__' %in% colnames(edge_weights_matrix) ) {
+    edge_weights_matrix <- edge_weights_matrix %>% 
+      as.data.frame() %>% 
+      dplyr::select(-'lp__') %>% 
+      as.matrix()
+  }
+  
+  # ### import age data -- doing weirdly because seem to have lost the raw data but this will produce exactly the same outputs. Would be good to go back and do this properly later when you get a chance.
+  # eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+  # mean_ages <- data.frame(id = colnames(eles),
+  #                         age = apply(eles, 2, mean)) %>% 
+  #   mutate(age_cat = ifelse(age < 10, 1,
+  #                           ifelse(age < 16, 2,
+  #                                  ifelse(age < 21, 3,
+  #                                         ifelse(age < 26, 4,
+  #                                                ifelse(age < 36, 5, 6))))))
+  # 
+  # # combine node counts with age data
+  # nodes <- left_join(nodes, mean_ages, by = 'id') # join age data to sightings
+  # length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
+  # nodes <- nodes %>% 
+  #   select(-age) %>% 
+  #   rename(age = age_cat)
+   
+  ### import age data 
+  ages <- read_csv('../data_processed/step2_ageestimation/mpnp_ages_median_category.csv') %>% 
+    rename(id = elephant_id,
+           age = age_mid_round)
+  
+  # combine node counts with age data
+  nodes <- left_join(nodes, ages, by = 'id') # join age data to sightings
+  length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
+  
   # Assign random set of columns to check -- maximum 200 of each type, but with same number of 'zero' dyads as 'non-zeroes'
   if(length(which(counts_df$together >= 1)) >= 200){ n_test <- 200 } else { n_test <- length(which(counts_df$together >= 1)) } # identify number of samples to include
   plot_dyads <- c(sample(counts_df$dyad_id[counts_df$together >= 1], size = n_test, replace = F),    # sample 'non-zero' dyads
                   sample(counts_df$dyad_id[counts_df$together == 0], size = n_test, replace = F))    # sample 'zero' dyads
   plot_edges <- edges[edges$dyad_id %in% plot_dyads,]                                                   # extract edges for sampled dyads
   plot_edges$seen_together <- NA
+  
   for(i in 1:length(plot_dyads)){                                      # set up loop to make 0/1 dummy variable for seen vs not seen together
     plot_edges$seen_together[plot_edges$dyad_id == plot_dyads[i]] <- ifelse(counts_df$together[counts_df$dyad_id == plot_dyads[i]] > 0, 1, 0)
   }
+  
   
   ### build traceplots -- split seen and not seen to check they are different and look for anomalies
   ggplot(data = plot_edges[plot_edges$seen_together == 1,], aes(y = edge_draw, x = position, colour = chain))+
@@ -340,7 +377,7 @@ for(time_window in 1:2 ){
   lines(density(summary$median), col = 'blue', lwd = 2)                                       # distribution of median estimates
   
   ### plot a subset with facets showing the draw distributions and lines indicating the position of standard SRI calculation
-  plot_edges$dyad_id <- as.numeric(plot_edges$dyad)
+  plot_edges$dyad_id <- as.numeric(plot_edges$dyad_id)
   draws <- left_join(plot_edges, summary, by = 'dyad_id') %>%                  # combine to add node and median value data
     select(-dyad.x) %>% rename(dyad = dyad.y)                                  # clean up names
   which(is.na(draws) == TRUE)                                                  # check fully merged
@@ -367,7 +404,7 @@ for(time_window in 1:2 ){
     geom_vline(mapping = aes(xintercept = sri), colour = 'red')+               # add line showing where the SRI value is
     theme(strip.text.x = element_blank(), strip.background = element_blank())  # remove facet labels so plots can be bigger
   
-  write_csv(draws, paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_sampledyads_conditionalprior.csv')) # save output for future reference
+  saveRDS(draws, paste0('../data_processed/step3_edgeweightestimation/mpnpshort',time_window,'_sampledyads_conditionalprior.RDS')) # save output for future reference
   
   ### add progress marker
   print(paste0('time window ',time_window,' completed at ', Sys.time()))
