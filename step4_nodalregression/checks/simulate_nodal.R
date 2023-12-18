@@ -334,7 +334,10 @@ predict <- matrix(data = NA, nrow = length(params$beta_age), ncol = nrow(new_dat
                                   1:length(unique(sim$age_cat))))
 for(i in 1:nrow(predict)){
   for(j in 1:ncol(predict)){
-    predict[i,j] <- params$intercept[i] + params$beta_age[i] * sum(delta_j[i,(1:j)])
+    predict[i,j] <- MASS::mvnorm(n = 1,
+                                 mu = params$intercept[i] + params$beta_age[i] * sum(delta_j[i,(1:j)]),
+                                 Sigma = params$sigma[i])
+    #predict[i,j] <- params$intercept[i] + params$beta_age[i] * sum(delta_j[i,(1:j)])
   }
 }
 new_data$mean_predict <- apply(predict, 2, mean)
