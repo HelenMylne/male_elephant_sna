@@ -47,9 +47,9 @@ for(i in 1:nrow(sim_dyads)){
 n_dyads <- nrow(sim_dyads)
 
 ## simulate age effect
-sim_min <- 1
-sim_max <- 0.5
-sim_int <- -3
+sim_min <- -0.2
+sim_max <- 0.8
+sim_int <- 5
 sim_dyads$mu <- sim_int + sim_dyads$age_min * sim_min + sim_dyads$age_max * sim_max   # simulate mean centrality on normal scale
 plot(sim_dyads$mu ~ sim_dyads$age_min)               # plot
 plot(sim_dyads$mu ~ sim_dyads$age_max)               # plot
@@ -190,6 +190,13 @@ fit_dyadreg_sim$summary() %>%
   filter(variable %in% c('beta_age_max','beta_age_min','intercept',
                          'delta_min[1]','delta_min[2]','delta_min[3]','delta_min[4]','delta_min[5]',
                          'delta_max[1]','delta_max[2]','delta_max[3]','delta_max[4]','delta_max[5]'))
+## extract model fit
+summary <- fit_dyadreg_sim$summary()
+par(mfrow = c(3,1))
+hist(summary$rhat, breaks = 50)
+hist(summary$ess_bulk, breaks = 50)
+hist(summary$ess_tail, breaks = 50)
+par(mfrow = c(1,1))
 
 ## extract draws
 draws <- fit_dyadreg_sim$draws(format = 'df')
@@ -365,7 +372,7 @@ raw_summary <- sim_dyads %>%
   select(-mu, -mu_std) %>% 
   distinct() %>% 
   mutate(age_pair = paste0(age_min, '_', age_max))
-compare <- pred_summary %>% 
+compare <- pred_summary_possible %>% 
   mutate(age_pair = paste0(age_min, '_', age_max)) %>% 
   left_join(raw_summary[,c('mu_mean','mu_std_mean','age_pair')], by = 'age_pair') %>% 
   rename(raw_unstd = mu_mean, raw_std = mu_std_mean) %>% 
@@ -423,14 +430,6 @@ mean(c(contrasts$diff_1_2_min_year,contrasts$diff_2_3_min_year,contrasts$diff_3_
 sim_max  # original (true) slope value
 mean(c(contrasts$diff_1_2_max_year,contrasts$diff_2_3_max_year,contrasts$diff_3_4_max_year, contrasts$diff_4_5_max_year))
 
-## extract model fit
-summary <- fit_dyadreg_sim$summary()
-par(mfrow = c(3,1))
-hist(summary$rhat, breaks = 50)
-hist(summary$ess_bulk, breaks = 50)
-hist(summary$ess_tail, breaks = 50)
-par(mfrow = c(1,1))
-
 ## summarise predictions
 sum_pred <- pred %>% 
   group_by(age_min, age_max) %>% 
@@ -440,4 +439,36 @@ sum_pred <- pred %>%
   distinct()
 ggplot(sum_pred)+
   geom_point(aes(x = age_min, y = mean_std, colour = as.factor(age_max)))
+
+
+
+
+
+
+
+n = 4
+(mat <- matrix(data = invlogit(rnorm(n = 10*n, mean = -3, sd = 5)),
+              ncol = n, byrow = F))
+cov(mat)
+
+for(i in 1:ncol(mat)){
+  for(j in 2:(ncol(mat)-1)){
+    print(cov(mat[,c(i,j)]))
+  }
+}
+
+cov <- matrix(NA, ncol = n, nrow = n)
+for(i in 1:nrow(cov)){
+  for(j in 1:ncol(cov)){
+    section <- cov(mat[,c(i,j)])
+    if(i < j){
+      cov[i,j] <- section[]
+    }
+  }
+}
+
+
+
+
+
 
