@@ -155,7 +155,7 @@ for(i in 1:length(to_plot)){
 }
 par(mfrow = c(1,1), mai = c(1,1,1,1))
 
-save.image('motnp_nodalregression_conditionaledge.RData')
+save.image('motnp_nodalregression.RData')
 
 ##### prior predictive check ####
 ## prior predictive check
@@ -178,7 +178,7 @@ for(i in 1:n){
 rm(n, beta_age, intercept, age_dirichlet, sigma, x, y, df_plot, df_wide) ; gc()
 
 #### run model -- using ordered categorical exposure ####
-#load('motnp_nodalregression_conditionaledge.RData')
+#load('motnp_nodalregression.RData')
 
 # ## extract age distributions (using a normal for now)
 # motnp_ages <- readRDS('../data_processed/step2_ageestimation/motnp_ageestimates_mcmcoutput.rds')
@@ -301,10 +301,14 @@ sim_df <- as.data.frame(sim_full) %>%
 points(sim_df$eigen_sim ~ sim_df$age, col = rgb(0,0,0,0.01), pch = 19, cex = 0.5)
 
 ## plot raw with model output
-df_long_ <- df_long %>%
+df_long_mean <- df_long %>%
   group_by(node_rank) %>% 
   mutate(mean_eigen = mean(centrality)) %>% 
   ungroup() %>% 
+  left_join(nodes, by = 'node_rank') %>% 
+  dplyr::select(age_cat_fct, mean_eigen, sightings, node) %>% 
+  distinct()
+df_long_plot <- df_long %>%
   left_join(nodes, by = 'node_rank') %>% 
   dplyr::select(-age.x, -age.y)
 ggplot()+
@@ -315,11 +319,11 @@ ggplot()+
               aes(x = age, ymin = lwr, ymax = upr),          # shade mean distribution
               colour = 'transparent', 
               fill = rgb(33/255, 145/255, 140/255, 0.5))+
-  geom_point(data = df_long, 
+  geom_point(data = df_long_plot, 
              aes(x = as.numeric(age_cat_fct), 
                  y = centrality),                  # all eigenvector draws
              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-  geom_point(data = distinct(df_long[,c('node','age_cat_fct','mean_eigen','sightings')]),
+  geom_point(data = df_long_mean,
              aes(x = as.numeric(age_cat_fct), 
                  y = mean_eigen, 
                  size = sightings),  # mean eigenvector
@@ -347,12 +351,18 @@ ggplot()+
   geom_errorbar(data = sum_mean_pred, aes(x = age, ymin = lwr, ymax = upr),               # shade mean distribution
               colour = rgb(33/255, 145/255, 140/255),
               linewidth = 1.5, width = 0.5)+
-  geom_line(data = sum_mean_pred, aes(x = age, y = mid),                                # mean line
+  geom_line(data = sum_mean_pred,
+            aes(x = age,
+                y = mid),                                # mean line
             colour = rgb(33/255, 145/255, 140/255), linewidth = 1.5)+
-  geom_point(data = df_long, aes(x = as.numeric(age_cat_fct), y = centrality),                  # all eigenvector draws
+  geom_point(data = df_long_plot,
+             aes(x = as.numeric(age_cat_fct),
+                 y = centrality),                  # all eigenvector draws
              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-  geom_point(data = distinct(df_long[,c('node','age_cat_fct','mean_eigen','sightings')]),
-             aes(x = as.numeric(age_cat_fct), y = mean_eigen, size = sightings),  # mean eigenvector
+  geom_point(data = df_long_mean,
+             aes(x = as.numeric(age_cat_fct),
+                 y = mean_eigen,
+                 size = sightings),  # mean eigenvector
              colour = rgb(68/255, 1/255, 84/255))+
   # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
   #                                   y = mean_eigen, group = node_rank),
@@ -1013,7 +1023,7 @@ dev.off()
 # 
 # ## save workspace for future
 # rm(dyad_row, edge_binary, edgelist, eigen_values, network, adj_tensor, draw, i) ; gc()
-# save.image('motnp_nodalregression_conditionaledge.RData')
+# save.image('motnp_nodalregression.RData')
 # 
 # ## check eigenvector against sightings
 # plot(NULL, xlim = c(0,max(nodes$sightings)), ylim = c(0,1),
