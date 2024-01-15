@@ -1,126 +1,178 @@
-#### Information ####
+#### information ####
 # script takes data input from edge weight estimation for MOTNP population (input = 1000 draws for each of 4 chains per dyad posterior distribution)
 # runs through dyadic regression as specified by Jordan Hart in BISoN examples (https://github.com/JHart96/bison_examples/blob/main/examples/dyadic_regression_stan.md)
 
-#### Set up ####
-library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
-library(tidyverse, lib.loc = '../packages/') # library(tidyverse)
-library(car, lib.loc = '../packages/')       # library(car)
-library(bisonR, lib.loc = '../packages/')    # library(bisonR)
-library(brms, lib.loc = '../packages/')      # library(brms)
-#library(rstan, lib.loc = '../packages/')     # library(rstan)
-#library(Rcpp, lib.loc = '../packages/')      # library(Rcpp)
+#### set up ####
+# library(cmdstanr) ; library(tidyverse) ; library(car) ; library(LaplacesDemon)
+library(cmdstanr, lib.loc = '../packages/')      # library(cmdstanr)
+library(tidyverse, lib.loc = '../packages/')     # library(tidyverse)
+library(car, lib.loc = '../packages/')           # library(car)
+library(LaplacesDemon, lib.loc = '../packages/') # library(LaplacesDemon)
+#library(bisonR, lib.loc = '../packages/')        # library(bisonR)
+#library(brms, lib.loc = '../packages/')          # library(brms)
+#library(rstan, lib.loc = '../packages/')         # library(rstan)
+#library(Rcpp, lib.loc = '../packages/')          # library(Rcpp)
 
-#set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan/cmdstan-2.31.0')
+set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0')
 
 load('motnp_edgeweights_conditionalprior.RData')
-rm(counts_df_model, motnp_edges_null_strongpriors) ; gc()
+rm(edge_binary, fit_edges_motnp, edgelist, edges, motnp_ages, x, summary, i, make_edgelist, plot_network_threshold) ; gc()
 
-#pdf('../outputs/motnp_dyadicregression_plots.pdf')
+pdf('../outputs/motnp_dyadicregression.pdf')
+theme_set(theme_classic())
 
-#### create data frame of male ages ####
-## unique ids
-#ids <- counts_df[,c('id_1','node_1_males')] %>% distinct()
-#colnames(ids) <- c('id_2','node_2_males')
-#ids <- rbind(ids, counts_df[nrow(counts_df),c('id_2','node_2_males')])
-#colnames(ids) <- c('id','node_males')
+#### identify younger and older ####
+## categorise ages
+counts_df$age_cat_num_1 <- as.numeric(counts_df$age_cat_id_1)-2
+table(counts_df$age_cat_num_1, counts_df$age_category_1)
+counts_df$age_cat_num_2 <- as.numeric(counts_df$age_cat_id_2)-2
+table(counts_df$age_cat_num_2, counts_df$age_category_2)
 
-## male ages
-#motnp_ages <- as.data.frame(readRDS('../data_processed/motnp_ageestimates_mcmcoutput.rds'))
-#motnp_ages <- motnp_ages[,colnames(motnp_ages) %in% ids$id]
-#ids$mean_age <- NA
-#for(i in 1:nrow(ids)){
-#  ids$mean_age[i] <- mean(motnp_ages[,colnames(motnp_ages) == ids$id[i]])
-#}
-#motnp_ages <- motnp_ages %>%
-#  pivot_longer(cols = everything(), names_to = 'id', values_to = 'age') %>% 
-#  filter(id %in% ids$id) %>% 
-#  left_join(ids, by = 'id')
-#motnp_ages$draw <- rep(1:8000, each = length(ids$id))
+## identify younger and older
+counts_df$age_min <- NA ; counts_df$age_max <- NA
+for(i in 1:nrow(counts_df)){
+  counts_df$age_min[i] <- min(counts_df$age_cat_num_1[i], counts_df$age_cat_num_2[i])
+  counts_df$age_max[i] <- max(counts_df$age_cat_num_1[i], counts_df$age_cat_num_2[i])
+}
 
-## create data frame of ages
-#cdf_dyadic <- counts_df[,c('dyad_males','node_1_males','node_2_males')] # counts_df = data frame containing all information about dyad (inc. counts of sightings together/apart)
-#colnames(motnp_ages)[3] <- 'node_1_males'
-#cdf_dyadic <- left_join(cdf_dyadic,
-#                              distinct(motnp_ages[,c('id','node_1_males','mean_age')]),
-#                              by = 'node_1_males')
-#colnames(cdf_dyadic)[4:5] <- c('id_1','age_1')
-#colnames(motnp_ages)[3] <- 'node_2_males'
-#rm(counts_df) ; gc()
-#cdf_dyadic <- left_join(cdf_dyadic,
-#                              distinct(motnp_ages[,c('id','node_2_males','mean_age')]),
-#                              by = 'node_2_males')
-#colnames(cdf_dyadic)[6:7] <- c('id_2','age_2')
-#cdf_dyadic <- cdf_dyadic[,c(1:4,6,5,7)]
-#colnames(cdf_dyadic)[2:3] <- c('node_1_id','node_2_id')
+## clean up counts_df a bit
+counts_df <- counts_df %>% 
+  dplyr::select(dyad_id, id_1, id_2, node_1, node_2, node_1_males, node_2_males, age_category_1, age_category_2, age_cat_num_1, age_cat_num_2, age_min, age_max)
 
-#cdf_dyadic$min_age <- NA
-#cdf_dyadic$max_age <- NA
-#for(i in 1:nrow(cdf_dyadic)){
-#  cdf_dyadic$min_age[i] <- min(c(cdf_dyadic$age_1[i], cdf_dyadic$age_2[i]))
-#  cdf_dyadic$max_age[i] <- max(c(cdf_dyadic$age_1[i], cdf_dyadic$age_2[i]))
-#}
-#length(which(cdf_dyadic$min_age >= cdf_dyadic$max_age))
+#### summarise edges ####
+counts_df$mean_edge <- apply(edge_samples, 2, mean)
 
-#cdf_dyadic$age_difference <- cdf_dyadic$max_age - cdf_dyadic$min_age
+#### plot raw data ####
+ggplot()+
+  geom_jitter(data = counts_df,
+              aes(x = age_min, y = mean_edge,
+                  colour = as.factor(age_max)),
+              shape = 19, alpha = 0.2)+
+  scale_x_continuous('age category of younger dyad member')+
+  scale_y_continuous('mean estimated edge weight')+
+  labs(colour = 'age category \nof older \ndyad member')
 
-#head(cdf_dyadic)
+edges <- edge_samples %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything(), names_to = 'dyad_id', values_to = 'edge_draw') %>% 
+  mutate(dyad_id = as.numeric(dyad_id)) %>% 
+  left_join(counts_df, by = 'dyad_id')
+ggplot()+
+  geom_point(data = edges,
+             aes(x = age_min, y = edge_draw,
+                 colour = as.factor(age_max)),
+             shape = 19, alpha = 0.05)+
+  geom_point(data = counts_df, aes(x = age_min, y = mean_edge),
+             shape = 19, colour = 'white', size = 1)+
+  scale_x_continuous('age of younger dyad member')+
+  scale_y_continuous('mean estimated edge weight')
 
-#write_csv(cdf_dyadic, '../data_processed/motnp_dyadicregression_modeldata.csv')
-cdf_dyadic <- read_csv('../data_processed/motnp_dyadicregression_modeldata.csv')
+## heat map: x = min age, y = max age, colour = edge weight
+ggplot(counts_df)+
+  geom_tile(aes(x = age_min, y = age_max,
+                fill = mean_edge))+
+  scale_x_continuous('age of younger dyad member')+
+  scale_y_continuous('age of older dyad member')+
+  labs(fill = 'logit(mean edge weight)')
+
+#### fit multivariate Gaussian distribution to output of age model ####
+### quantities will be given to Stan model as data to model joint posteriors of edge weight in the regression
+logit_edge_draws <- logit(edge_samples)
+logit_edge_draws_mu <- apply(logit_edge_draws, 2, mean)
+logit_edge_draws_cov <- cov(logit_edge_draws)
+
+#### plot to check how well multivariate approximation is working ####
+### Randomly selecting samples to examine
+num_check <- 50
+selected_samples <- sample(1:(n_dyads-1), num_check, replace = FALSE)
+
+### Setting grid layout
+rows <- floor(sqrt(num_check))
+cols <- ceiling(num_check / rows)
+par(mfrow=c(rows, cols), mar=c(2,2,2,1))
+
+### plot
+for (i in selected_samples) {
+  mu <- logit_edge_draws_mu[i]
+  sd <- sqrt(logit_edge_draws_cov[i,i])
+  
+  fitted_values <- rnorm(1e5, mean = mu, sd = sd)
+  
+  hist(unlist(logit_edge_draws[,i]), probability = TRUE, las = 1,
+       main = paste("Dyad", i), xlab = "Value", breaks = 50)
+  lines(density(fitted_values), col="blue", lw=1.5)
+}
+
+for (i in selected_samples) {
+  mu <- logit_edge_draws_mu[i]
+  sd <- sqrt(logit_edge_draws_cov[i,i])
+  
+  fitted_values <- rnorm(1e5, mean = mu, sd = sd)
+  
+  plot(unlist(logit_edge_draws[,i]), unlist(logit_edge_draws[,i+1]),
+       col = rgb(0,0,1,0.05), las = 1, main = paste("cov ", i ,"&",i+1))
+}
+
+### reset plot window and clean up
+par(mfrow=c(1,1), mai = c(1,1,0.5,0.5))
+rm(cols, fitted_values, i, j, num_check, rows, sd, selected_samples) ; gc()
 
 #### prior predictive check ####
-# prior predictive check
-#priors <- get_default_priors('binary')
-#priors$fixed
-#prior_check(priors, 'binary')
-#
-#age_1 <- 10:60
-#age_2 <- 10:60
-#plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
-#     xlab = 'age', ylab = 'eigenvector centrality')
-#for(i in 1:100){
-#  intercept <- rbeta(1,1,1)
-#  beta <- rnorm(1, 0, 0.005)
-#  lines(x = age_1, y = intercept + age_1*beta + age_2*beta, col = 'blue')
-#}
-#
-#age_1 <- 10:60
-#plot(NULL, xlim = c(10,60), ylim = c(0,1), las = 1,
-#     xlab = 'age', ylab = 'eigenvector centrality')
-#for(j in 1:50) {
-#intercept <- rbeta(1,1,1)
-#beta <- rnorm(1, 0, 0.005)
-#  for(i in seq(10,60,by=10)){
-#    age_2 <- i
-#    lines(x = age_1, y = intercept + age_1*beta + age_2*beta, col = rgb(0,0,1,0.5))
-#  }
-#}
-#
-#prior <- bison_brm_get_prior(
-#  bison(edge_weight(node_1_males, node_2_males)) ~ age_1 + age_2 + (1 | mm(node_1_males, node_2_males)),
-#  list(motnp_edge_weights_strongpriors),
-#  list(cdf_dyadic)
-#)
-#brms::prior_draws(prior)
+n <- 100
+n_age_cat <- length(unique(counts_df$age_max))
+beta_age_min <- rnorm(n, 0, 1.5)
+beta_age_max <- rnorm(n, 0, 1.5)
+intercept <- rnorm(n, 0, 1)
+min_dirichlet <- rdirichlet(n, rep(1, n_age_cat))
+max_dirichlet <- rdirichlet(n, rep(1, n_age_cat))
+plot(NULL, las = 1, xlab = 'minimum age (standardised)', ylab = 'logit edge weight (standardised)',
+     ylim = c(min(logit_edge_draws_mu)-5, max(logit_edge_draws_mu)+5), xlim = c(1,n_age_cat))
+abline(h = min(logit_edge_draws_mu), lty = 2) ; abline(h = max(logit_edge_draws_mu), lty = 2)
+x <- 1:n_age_cat
+for(i in 1:n){
+  y <- rep(NA, length(x))
+  for(j in 1:length(x)){
+    y[j] <- intercept[i] + beta_age_min[i]*sum(min_dirichlet[i,][1:x[j]]) + beta_age_max[i]*sum(max_dirichlet[i,][1:x[j]])
+  }
+  lines(x = x, y = y, col = rgb(0,0,1,0.4))
+}
+rm(n, beta_age_max, beta_age_min, intercept, min_dirichlet, max_dirichlet, i, y, j, x) ; gc()
 
-#### fit model to mean age ####
-print('data ready for model')
-mean_age_dyadic <- bison_brm (
-#  bison(edge_weight(node_1_id, node_2_id)) ~ min_age + max_age + min_age:max_age + (1 | mm(node_1_id, node_2_id)),
-   bison(edge_weight(node_1_id, node_2_id)) ~ age_difference + (1 | mm(node_1_id, node_2_id)),
-  motnp_edge_weights_strongpriors,
-  cdf_dyadic,
-  #num_draws = 5, # Small sample size for demonstration purposes
-  #refresh = 0,
-  #cores = 4, 
-  chains = 4,
-  #control = list(max_treedepth = 20),
-  iter = 1000
+#### fit dyadic regression ####
+## create data list
+dyad_data <- list(
+  num_dyads = n_dyads,                      # number of dyads
+  num_nodes = n_nodes,                      # number of nodes
+  num_age_cat = n_age_cat,                  # number of unique age categories
+  length_dirichlet = n_age_cat + 1,         # number of unique age categories + 1
+  logit_edge_mu = logit_edge_draws_mu,      # sample means of the logit edge weights
+  logit_edge_cov = logit_edge_draws_cov,    # sample covariance of logit edge weights
+  age_min_cat = sim_dyads$age_min,          # age of younger dyad member
+  age_max_cat = sim_dyads$age_max,          # age of  older  dyad member
+  node_1 = sim_dyads$node_1,                # node IDs for multimembership effects
+  node_2 = sim_dyads$node_2,                # node IDs for multimembership effects
+  prior_min = rep(1, n_age_cat),            # prior for minimum age slope
+  prior_max = rep(1, n_age_cat)             # prior for maximum age slope
 )
-summary(mean_age_dyadic)
 
-hist(mean_age_dyadic$rhats[,2], las = 1, main = 'Rhat values for 100 imputed model runs', xlab = 'Rhat')
+## load dyadic regression model
+dyadic_regression <- cmdstan_model('models/dyadic_regression_motnp.stan')
+n_chains <- 4
+n_samples <- 1000
 
-save.image('motnp_dyadicregression_meanage.RData')
+## fit dyadic regression
+fit_dyadreg_motnp <- dyadic_regression$sample(
+  data = dyad_data,
+  iter_warmup = n_samples,
+  iter_sampling = n_samples,
+  chains = n_chains,
+  parallel_chains = n_chains)
+
+## save output
+save.image('motnp_dyadicregression.RData')
 dev.off()
+
+#### check outputs ####
+
+#### plot predictions ####
+
