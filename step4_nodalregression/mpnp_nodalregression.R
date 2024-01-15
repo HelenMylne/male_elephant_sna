@@ -281,11 +281,15 @@ sim_df <- as.data.frame(sim_full) %>%
 points(sim_df$eigen_sim ~ sim_df$age, col = rgb(0,0,0,0.01), pch = 19, cex = 0.5)
 
 ## plot raw with model output
-df_long_ <- df_long %>%
+df_long_mean <- df_long %>%
   group_by(node_rank) %>% 
   mutate(mean_eigen = mean(centrality)) %>% 
   ungroup() %>% 
   left_join(nodes_to_include, by = 'node_rank') %>% 
+  dplyr::select(age_cat,mean_eigen,sightings,node) %>%
+  distinct()
+df_long_plot <- df_long %>%
+  left_join(nodes_to_include, by = 'node_rank') %>%
   dplyr::select(-age.x, -age.y)
 ggplot()+
   geom_ribbon(data = sum_full_pred,
@@ -295,11 +299,11 @@ ggplot()+
               aes(x = age, ymin = lwr, ymax = upr),          # shade mean distribution
               colour = 'transparent', 
               fill = rgb(33/255, 145/255, 140/255, 0.5))+
-  geom_point(data = df_long, 
+  geom_point(data = df_long_plot,
              aes(x = as.numeric(age_cat), 
                  y = centrality),                  # all eigenvector draws
              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-  geom_point(data = distinct(df_long[,c('node','age_cat','mean_eigen','sightings')]),
+  geom_point(data = df_long_mean,
              aes(x = as.numeric(age_cat), 
                  y = mean_eigen, 
                  size = sightings),  # mean eigenvector
@@ -329,10 +333,11 @@ ggplot()+
                 linewidth = 1.5, width = 0.5)+
   geom_line(data = sum_mean_pred, aes(x = age, y = mid),                                # mean line
             colour = rgb(33/255, 145/255, 140/255), linewidth = 1.5)+
-  geom_point(data = df_long, aes(x = as.numeric(age_cat_fct), y = centrality),                  # all eigenvector draws
+  geom_point(data = df_long_plot,
+	     aes(x = as.numeric(age_cat), y = centrality),                  # all eigenvector draws
              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-  geom_point(data = distinct(df_long[,c('node','age_cat_fct','mean_eigen','sightings')]),
-             aes(x = as.numeric(age_cat_fct), y = mean_eigen, size = sightings),  # mean eigenvector
+  geom_point(data = df_long_mean,
+             aes(x = as.numeric(age_cat), y = mean_eigen, size = sightings),  # mean eigenvector
              colour = rgb(68/255, 1/255, 84/255))+
   # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
   #                                   y = mean_eigen, group = node_rank),
