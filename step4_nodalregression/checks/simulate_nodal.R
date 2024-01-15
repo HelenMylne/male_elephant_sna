@@ -43,7 +43,8 @@ n_windows <- length(unique(sim$window))
 ## simulate age effect
 sim_slope <- -0.3                     # set age effect -- smaller = bigger impact on invlogit scale as values large
 sim_intcp <- 2
-sim$mu <- sim$age * sim_slope + sim_intcp       # simulate mean centrality on normal scale
+sim_window_diff <- 1
+sim$mu <- sim$age * sim_slope + sim_intcp + (sim$window-1) *  sim_window_diff     # simulate mean centrality on normal scale
 plot(sim$mu ~ sim$age)               # plot
 sim$mu_std <- ( sim$mu - mean(sim$mu) ) / sd(sim$mu)
 
@@ -53,14 +54,20 @@ sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_data, dimnames = list(NULL, s
 for(j in 1:n_data){
   sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution
 }
-plot(sim_dat[1,] ~ sim$age)          # plot simulated values against age
+plot(sim_dat[1,1:(length(which(sim$window == 1)))] ~ sim$age[1:(length(which(sim$window == 1)))],
+     col = 'red', pch = 19)
+points(sim_dat[1,(length(which(sim$window == 1))+1):nrow(sim)] ~ sim$age[(length(which(sim$window == 1))+1):nrow(sim)],
+     col = 'blue', pch = 19)# plot simulated values against age
 
 ## standardise
 sim_dat_std <- sim_dat               # create matrix to fill
 for(i in 1:nrow(sim_dat_std)){
   sim_dat_std[i,] <- (sim_dat[i,] - mean(sim_dat[i,]) ) / sd(sim_dat[i,]) # standardise values
 }
-plot(sim_dat_std[1,] ~ sim$age)      # plot simulated values against age
+plot(sim_dat_std[1,1:(length(which(sim$window == 1)))] ~ sim$age[1:(length(which(sim$window == 1)))],
+     col = 'red', pch = 19)
+points(sim_dat_std[1,(length(which(sim$window == 1))+1):nrow(sim)] ~ sim$age[(length(which(sim$window == 1))+1):nrow(sim)],
+       col = 'blue', pch = 19)# plot simulated values against age
 
 ## visualise
 df_wide <- data.frame(sim_dat_std)
@@ -84,7 +91,7 @@ ggplot(data = df_plot, aes(x = centrality, fill = age, group = node_window)) +
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
 
 ## normal approximation ####
-## normal approximation
+## compute normal approximation
 plot(sim_dat_std[,1], sim_dat_std[,n_nodes])   # plot covariance (oldest and youngest to be sure it works for all pairs)
 sim_cent_mu <- apply(sim_dat_std, 2, mean)     # calculate means per node
 sim_cent_cov <- cov(sim_dat_std)               # calculate covariance matrix
@@ -136,6 +143,7 @@ n_samples <- 1000
 fit_sim <- nodal_regression$sample(data = eigen_list,
                                    chains = n_chains, parallel_chains = n_chains,
                                    iter_warmup = n_samples, iter_sampling = n_samples)
+# high level of divergent transitions
 
 ## check outputs ####
 ## view summary
@@ -146,7 +154,7 @@ fit_sim$summary()
 params <- fit_sim$draws(format = 'draws_df')
 rand_window <- params %>% 
   dplyr::select(`rand_window[1]`,`rand_window[2]`)
-rand_node <- params[,5:(n_nodes+4)]
+rand_node <- params[,7:(n_nodes+6)]
 
 ## traceplot linear effect size
 #traceplot(fit_sim, pars = c('intercept','beta_age','sigma','predictor[1]','predictor[50]','predictor[100]'))
@@ -156,14 +164,14 @@ params %>%
   mutate(chain_position = rep(rep(1:n_samples, each = 11,
   ), n_chains),
   chain = rep(1:n_chains, each = 11*n_samples)) %>% 
-  #filter(chain == 4) %>% 
+  #filter(chain == 4) %>% # inspect individual chains -- some are really bad and haven't explored at all or are very wandery
   ggplot(aes(x = chain_position, y = draw, colour = as.factor(chain)))+
   geom_line()+
   facet_wrap(. ~ parameter, scales = 'free_y')+
   theme_bw()+
   theme(legend.position = 'none')
 
-## posterior predictive check
+## posterior predictive check -- this looks great!
 plot(density(sim_dat_std[1, ]), las = 1, ylim = c(0,0.4),
      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
      col=rgb(0, 0, 0, 0.25))
@@ -179,12 +187,12 @@ for (i in 1:100) {
 }
 
 ## compare to raw data
-sim$mean_predict <- sim$age_std * mean(params$beta_age) + mean(params$intercept)
-sim$lwr_predict <- sim$age_std * quantile(params$beta_age, probs = 0.025) + quantile(params$intercept, probs = 0.025)
-sim$upr_predict <- sim$age_std * quantile(params$beta_age, probs = 0.975) + quantile(params$intercept, probs = 0.975)
+sim$mean_predict <- sim$age_std * mean(params$beta_age) + mean(params$intercept) + mean(unlist(rand_node[,sim$node])) + mean(unlist(rand_window[,sim$window]))
+sim$lwr_predict <- sim$age_std * quantile(params$beta_age, probs = 0.025) + quantile(params$intercept, probs = 0.025) + quantile(unlist(rand_node[,sim$node]), probs = 0.025) + quantile(unlist(rand_window[,sim$window]), probs = 0.025)
+sim$upr_predict <- sim$age_std * quantile(params$beta_age, probs = 0.975) + quantile(params$intercept, probs = 0.975) + quantile(unlist(rand_node[,sim$node]), probs = 0.975) + quantile(unlist(rand_window[,sim$window]), probs = 0.975)
 plot(sim$mean_predict ~ sim$age_std, las = 1, type = 'l')        # plot against age
-points(sim$mu_std ~ sim$age_std)                                 # add raw points -- pretty good
-polygon(y = c(sim$lwr_predict, rev(sim$upr_predict)), x = c(sim$age_std, rev(sim$age_std)),
+points(sim$mu_std ~ sim$age_std)                                 # add raw points -- very good
+polygon(y = c(sim$lwr_predict, rev(sim$upr_predict)), x = c(sim$age_std, rev(sim$age_std)), # add shading -- very wide
         col = rgb(1,1,0,0.5), border = NA)
 
 ## extract original values from output
@@ -196,7 +204,7 @@ abline(a = 0, b = 1)
 ( fit_slope <- params$beta_age * (sd(sim$mu)/sd(sim$age)) )
 paste0('true slope value = ', sim_slope, '; model slope value = ', round(mean(fit_slope),2) )
 
-( fit_intcp <- mean(sim$mu) - fit_slope * mean(sim$age) )
+( fit_intcp <- mean(sim$mu) - fit_slope * mean(sim$age) )  # this is for everything, not by window....
 paste0('true intercept value = ', sim_intcp, '; model intercept value = ', round(mean(fit_intcp),2) )
 
 plot( (sim$age*mean(fit_slope)+mean(fit_intcp)) ~ sim$mu)
@@ -208,9 +216,9 @@ sim$upr_ustd <- sim$age * quantile(fit_slope, probs = 0.975) + quantile(fit_intc
 plot(sim$predict_ustd ~ sim$age, type = 'l', las = 1, ylim = c(-16,-1))        # plot against age
 points(sim$mu ~ sim$age)                                 # add raw points -- generally fits very well, struggles more when true values are 0
 polygon(y = c(sim$lwr_ustd, rev(sim$upr_ustd)), x = c(sim$age, rev(sim$age)),
-        col = rgb(1,1,0,0.5), border = NA) # produces nothing because all are so close together 
+        col = rgb(1,1,0,0.5), border = NA)               # sometimes produces nothing because all are so close together
 
-## extract model fit
+## extract model fit -- bad
 summary <- fit_sim$summary()
 par(mfrow = c(3,1))
 hist(summary$rhat, breaks = 50)
@@ -223,10 +231,12 @@ sim$mean_predict_invlogit <- invlogit(sim$predict_ustd)
 sim$lwr_invlogit <- invlogit(sim$lwr_ustd)
 sim$upr_invlogit <- invlogit(sim$upr_ustd)
 sim$mu_invlogit <- invlogit(sim$mu)
-plot(sim$mu_invlogit ~ sim$age, ylim = c(0,1))
-lines(sim$mean_predict_invlogit ~ sim$age)
-polygon(y = c(sim$lwr_invlogit, rev(sim$upr_invlogit)), x = c(sim$age, rev(sim$age)),
-        col = rgb(1,1,0,0.5), border = NA)
+ggplot(sim)+
+  geom_ribbon(aes(x = age, ymin = lwr_invlogit, ymax = upr_invlogit),
+              fill = rgb(1,1,0,0.5))+
+  geom_point(aes(y = mu_invlogit, x = age))+
+  geom_line(aes(y = mean_predict_invlogit, x = age))+
+  theme_bw()
 
 ## run model -- age as an ordered categorical variable with 1 window: run all above as is but change definition of sim1 to sim and then don't rbind to sim2 ####
 ## categorise age
