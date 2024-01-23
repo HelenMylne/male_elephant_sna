@@ -13,8 +13,7 @@ n_nodes <- ((max_age+1) - min_age)                           # total nodes = 2 p
 
 ## simulate population for first time window
 sim <- data.frame(node = 1:n_nodes,                          # create data frame of individuals
-                  age = c(seq(min_age, max_age, by = 2),     # some present right up to max
-                          sample(min_age:max_age, n_nodes/2, prob = 1/(min_age:max_age), # more at lower ages
+                  age = c(sample(min_age:max_age, n_nodes, prob = 1/(min_age:max_age), # more at lower ages
                                  replace = T)),
                   mu = NA, sd = NA)
 
@@ -387,8 +386,8 @@ ggplot(sim)+
 
 ## plot on unstandardised scale ####
 ## revert predictions to unstandardised scale
-mu_ustd <- mu * sd(sim$mu) + mean(sim$mu)
-predictions_ustd <- predictions * sd(sim$mu) + mean(sim$mu)
+mu_ustd <- (mu * sd(sim$mu)) + mean(sim$mu)
+predictions_ustd <- (predictions * sd(sim$mu)) + mean(sim$mu)
 
 sim$mu_mean_ustd <- apply(mu_ustd, 2, mean)
 sim$mu_lwr_ustd <- NA ; sim$mu_upr_ustd <- NA
@@ -406,7 +405,79 @@ ggplot(sim)+
   geom_ribbon(aes(x = age, ymin = mu_lwr_ustd, ymax = mu_upr_ustd, fill = as.factor(window)),
               alpha = 0.4)+
   geom_line(aes(x = age, y = mu_mean_ustd, colour = as.factor(window)))+
-  geom_point(aes(x = age, y = mu, colour = as.factor(window)))+
+  geom_point(aes(x = age, y = mu), pch = 19, size = 0.8)+
+  scale_colour_viridis_d(begin = 0, end = 0.7)+
+  scale_fill_viridis_d(begin = 0, end = 0.7)+
+  facet_wrap(as.factor(node) ~ as.factor(window))+
+  theme_bw()+
+  theme(legend.position = 'bottom')+
+  labs(colour = 'time window', fill = 'time window',
+       y = 'eigenvector centrality', x = 'age (years)')
+
+## predict again, but first convert params to unstandardised scale
+# beta_slope_ustd = beta_slope_std * ( sd(sim$mu)/sd(sim$age) )
+# intcp_ustd = mean(sim$mu) - beta_slope_ustd * ( mean(sim$age)/sd(sim$age) )
+# sigma_ustd = sigma * sd(sim$mu)
+
+params_ustd <- params[,c('beta_age','intercept','sigma')]
+params_ustd$beta_age <- params$beta_age * ( sd(sim$mu)/sd(sim$age) )
+params_ustd$intercept <- mean(sim$mu) - params_ustd$beta_age * ( mean(sim$age)/sd(sim$age) )
+params_ustd$sigma <- params_ustd$sigma * sd(sim$mu)
+
+mu <- matrix(NA, nrow = nrow(params_ustd), ncol = nrow(sim), dimnames = list(NULL, sim$node_window))
+for(i in 1:nrow(mu)){
+  mu[i,] <- params_ustd$beta_age[i] * sim$age + params_ustd$intercept[i] + as.numeric(rand_window[i,sim$window]) + as.numeric(rand_node[i, sim$node])
+}
+sim$mu_mean <- apply(mu, 2, mean)
+
+sigma1 <- array(NA, dim = c(eigen_list$num_nodes_window1, eigen_list$num_nodes_window1, nrow(params_ustd)),
+                dimnames = list(eigen_list$nodes_window1, eigen_list$nodes_window1, NULL))
+sigma2 <- array(NA, dim = c(eigen_list$num_nodes_window2, eigen_list$num_nodes_window2, nrow(params_ustd)),
+                dimnames = list(eigen_list$nodes_window2, eigen_list$nodes_window2, NULL))
+sigma3 <- array(NA, dim = c(eigen_list$num_nodes_window3, eigen_list$num_nodes_window3, nrow(params_ustd)),
+                dimnames = list(eigen_list$nodes_window3, eigen_list$nodes_window3, NULL))
+for(i in 1:nrow(params)){
+  sigma1[,,i] <- sim_cent_cov_1 + diag(rep(params_ustd$sigma[i], eigen_list$num_nodes_window1))
+  sigma2[,,i] <- sim_cent_cov_2 + diag(rep(params_ustd$sigma[i], eigen_list$num_nodes_window2))
+  sigma3[,,i] <- sim_cent_cov_3 + diag(rep(params_ustd$sigma[i], eigen_list$num_nodes_window3))
+}
+
+predictions <- matrix(NA, nrow = nrow(params_ustd), ncol = nrow(sim), dimnames = list(NULL, sim$node_window))
+for(i in 1:nrow(predictions)){
+  predictions[i,sim$window == 1] <- MASS::mvrnorm(1, mu[i,sim$window == 1], sigma1[,,i])
+  predictions[i,sim$window == 2] <- MASS::mvrnorm(1, mu[i,sim$window == 2], sigma2[,,i])
+  predictions[i,sim$window == 3] <- MASS::mvrnorm(1, mu[i,sim$window == 3], sigma3[,,i])
+}
+
+pred_data <- sim
+pred_data$mu_model <- NA
+pred_data$prediction <- NA
+for(i in 1:nrow(pred_data)){
+  pred_data$mu_model[i] <- list(mu[,i])
+  pred_data$prediction[i] <- list(predictions[,i])
+}
+pred_data <- unnest(cols = prediction, data = pred_data)
+
+sim$mu_lwr <- NA ; sim$mu_upr <- NA
+sim$predict_lwr <- NA ; sim$predict_upr <- NA
+for( i in 1:nrow(sim) ){
+  sim$mu_lwr[i] <- rethinking::HPDI(mu[,i], prob = 0.95)[1]
+  sim$mu_upr[i] <- rethinking::HPDI(mu[,i], prob = 0.95)[2]
+  sim$predict_lwr[i] <- rethinking::HPDI(predictions[,i], prob = 0.95)[1]
+  sim$predict_upr[i] <- rethinking::HPDI(predictions[,i], prob = 0.95)[2]
+}
+
+## plot mean of model vs mean of raw data
+plot(sim$mu_mean ~ sim$mu, pch = 19, col = rgb(0,0,1,0.2)) ; abline(a = 0, b = 1, lwd = 2)
+
+## plot all predictions with points = mean of raw data
+ggplot(sim)+
+  geom_ribbon(aes(x = age, ymin = predict_lwr, ymax = predict_upr, fill = as.factor(window)),
+              alpha = 0.2)+
+  geom_ribbon(aes(x = age, ymin = mu_lwr, ymax = mu_upr, fill = as.factor(window)),
+              alpha = 0.4)+
+  geom_line(aes(x = age, y = mu_mean, colour = as.factor(window)))+
+  geom_point(aes(x = age, y = mu), pch = 19, size = 0.8)+
   scale_colour_viridis_d(begin = 0, end = 0.7)+
   scale_fill_viridis_d(begin = 0, end = 0.7)+
   facet_wrap(. ~ as.factor(window))+
@@ -415,9 +486,7 @@ ggplot(sim)+
   labs(colour = 'time window', fill = 'time window',
        y = 'eigenvector centrality', x = 'age (years)')
 
-## extract original values from output ####
-# CAN IT BE THAT I AM WORKING ON THE WRONG SCALE?? THE SIMULATED SLOPE IS USED TO CALCULATE THE UNSTANDARDISED CENTRALITIES BUT THEN THE MODEL IS WORKING WITH STANDARDISED, SO I NEED TO CONVERT ALL OF THE PREDICTIONS BACK TO THE UNSTANDARDISED SCALE AND THEN USE THOSE VALUES TO CALCULATE THE SLOPE COEFFICIENT
-
+## extract original values from output -- simulated slope value originally used produces an effect on the unstandardised scale. The model works on the standardised scale. Convert predictions to unstandardised scale and then run contrasts to calculate the slope coefficient. ####
 ## predict from model again, now using age_std + 1 stdev
 mu2 <- matrix(NA, nrow = nrow(params), ncol = nrow(sim), dimnames = list(NULL, sim$node_window))
 for(i in 1:nrow(mu2)){
@@ -468,16 +537,75 @@ head(contrast_ustd[,1:5])
 mean(contrast_ustd)
 sim_slope
 
+contrast_ustd <- contrast_std * sd(sim$mu) + mean(sim$mu)
 
 
+## final plots -- predict from hypothetical data to get straight line and smooth ribbons, rather than jagged ####
+pred_fake <- data.frame(age_std = rep(seq(min(sim$age_std), max(sim$age_std), length.out = 5), each = nrow(sim)),
+                        window = rep(sim$window,5),
+                        node = rep(sim$node,5),
+                        node_window = rep(sim$node_window, 5))
+mu_fake <- matrix(NA, nrow = nrow(params), ncol = nrow(pred_fake), dimnames = list(NULL, pred_fake$node_window))
+for(i in 1:nrow(mu_fake)){
+  mu_fake[i,] <- params$beta_age[i] * pred_fake$age_std + params$intercept[i] + as.numeric(rand_window[i,pred_fake$window]) + as.numeric(rand_node[i, pred_fake$node])
+}
+pred_fake$mu <- apply(mu_fake, 2, mean)
+pred_fake_summary <- pred_fake %>% 
+  group_by(age_std, window) %>% 
+  mutate(mu_mean = mean(mu),
+         mu_lwr = quantile(mu, 0.025),
+         mu_upr = quantile(mu, 0.975)) %>% 
+  select(age_std, window, mu_mean, mu_lwr, mu_upr) %>% 
+  distinct()
 
+predictions_fake <- matrix(NA, nrow = nrow(params), ncol = nrow(pred_fake), dimnames = list(NULL, pred_fake$node_window))
+for(i in 1:nrow(predictions)){
+  for(age in unique(pred_fake$age_std)){
+    predictions_fake[i,pred_fake$window == 1 & 
+                       pred_fake$age_std == age] <- MASS::mvrnorm(1,
+                                                                  mu_fake[i,pred_fake$window == 1 & 
+                                                                            pred_fake$age_std == age],
+                                                                  sigma1[,,i])
+    predictions_fake[i,pred_fake$window == 2 & 
+                       pred_fake$age_std == age] <- MASS::mvrnorm(1,
+                                                                  mu_fake[i,pred_fake$window == 2 & 
+                                                                            pred_fake$age_std == age],
+                                                                  sigma2[,,i])
+    predictions_fake[i,pred_fake$window == 3 & 
+                       pred_fake$age_std == age] <- MASS::mvrnorm(1,
+                                                                  mu_fake[i,pred_fake$window == 3 & 
+                                                                            pred_fake$age_std == age],
+                                                                  sigma3[,,i])
+  }
+}
+pred_fake_summary$pred_mean <- apply(predictions_fake, 2, mean)
 
+pred_fake_summary$age <- pred_fake_summary$age_std * sd(sim$age) + mean(sim$age)
+pred_fake_summary$mu_mean_ustd <- pred_fake_summary$mu_mean * sd(sim$mu) + mean(sim$mu)
+pred_fake_summary$mu_lwr_ustd <- pred_fake_summary$mu_lwr * sd(sim$mu) + mean(sim$mu)
+pred_fake_summary$mu_upr_ustd <- pred_fake_summary$mu_upr * sd(sim$mu) + mean(sim$mu)
 
+ggplot()+
+  geom_ribbon(data = pred_fake_summary, aes(x = age, ymin = pred_lwr_ustd, ymax = pred_upr_ustd, fill = as.factor(window)),
+              alpha = 0.2)+
+  geom_ribbon(data = sim, aes(x = age, ymin = mu_lwr, ymax = mu_upr, fill = as.factor(window)),
+              alpha = 0.4)+
+  geom_line(data = pred_fake_summary, aes(x = age, y = pred_mean_ustd, colour = as.factor(window)))+
+  geom_point(data = sim, aes(x = age, y = mu), pch = 19, size = 0.8)+
+  scale_colour_viridis_d(begin = 0, end = 0.7)+
+  scale_fill_viridis_d(begin = 0, end = 0.7)+
+  facet_wrap(. ~ as.factor(window))+
+  theme_bw()+
+  theme(legend.position = 'bottom')+
+  labs(colour = 'time window', fill = 'time window',
+       y = 'eigenvector centrality', x = 'age (years)')
 
-
-
-
-# ## run model -- age as an ordered categorical variable with 1 window: run all above as is but change definition of sim1 to sim and then don't rbind to sim2 ####
+# ## run model -- age as an ordered categorical variable with 1 window ####
+## remove later windows
+# sim <- sim %>% 
+#   filter(window == 1) %>% 
+#   dplyr::select(-window, -node_window)
+# 
 # ## categorise age
 # sim$age_cat <- ifelse(sim$age <= 15, 1,
 #                       ifelse(sim$age <= 20, 2,
