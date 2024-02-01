@@ -39,11 +39,11 @@ transformed parameters {
   }
   vector[num_nodes_window2] predictor_window2;
   for(i in 1:num_nodes_window2) {
-    predictor_window2[i] = intercept + beta_age * node_age[i] + rand_window[2] + rand_node[nodes_window2[i]];
+    predictor_window2[i] = intercept + beta_age * node_age[i+num_nodes_window1] + rand_window[2] + rand_node[nodes_window2[i]];
   }
   vector[num_nodes_window3] predictor_window3;
   for(i in 1:num_nodes_window3) {
-    predictor_window3[i] = intercept + beta_age * node_age[i] + rand_window[3] + rand_node[nodes_window3[i]];
+    predictor_window3[i] = intercept + beta_age * node_age[i+num_nodes_window1+num_nodes_window2] + rand_window[3] + rand_node[nodes_window3[i]];
   }
 }
 
