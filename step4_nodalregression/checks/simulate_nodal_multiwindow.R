@@ -107,7 +107,7 @@ points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)         
 # points(mu_std ~ age_std, data = sim[sim$window == 3,], col = 'green', pch = 19)                        # plot
 
 ## simulate full distribution of samples per node
-sim$sd <- 5         # can be made to vary amongst nodes, currently all elephants have equal variance in centrality (not realistic given that in the real data some are seen more often than others)
+sim$sd <- (rpois(nrow(sim),lambda = 1)+1)/10         # can be made to vary amongst nodes, currently all elephants have equal variance in centrality (not realistic given that in the real data some are seen more often than others)
 sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_data, dimnames = list(NULL, sim$node_window))    # create matrix for full centrality distribution
 for(j in 1:n_data){
   sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution for each elephant
@@ -202,6 +202,9 @@ eigen_list <- list(num_data = n_data,
                    num_nodes_window1 = length(which(sim$window == 1)),
                    num_nodes_window2 = length(which(sim$window == 2)),
                    num_nodes_window3 = length(which(sim$window == 3)),
+                   num_nodes_prev_windows = c(0,
+                                              length(which(sim$window < 2)),
+                                              length(which(sim$window < 3))),
                    centrality_mu_1 = sim_cent_mu_1,
                    centrality_mu_2 = sim_cent_mu_2,
                    centrality_mu_3 = sim_cent_mu_3,
@@ -310,7 +313,7 @@ rm(plot_params) ; gc()
 par(mfrow = c(3,1))
 
 ## check on standardised scale
-plot(density(sim_dat[1, which(sim$window == 1)]), las = 1, ylim = c(0,0.2),
+plot(density(sim_dat[1, which(sim$window == 1)]), las = 1, ylim = c(0,1),
 #plot(density(sim_dat_std[1, which(sim$window == 1)]), las = 1, ylim = c(0,1),
      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
      col=rgb(0, 0, 0, 0.25))
@@ -333,7 +336,7 @@ for (i in 1:100) {
   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
 }
 
-plot(density(sim_dat[1, which(sim$window == 2)]), las = 1, ylim = c(0,0.2),
+plot(density(sim_dat[1, which(sim$window == 2)]), las = 1, ylim = c(0,1),
 #plot(density(sim_dat_std[1, which(sim$window == 2)]), las = 1, ylim = c(0,1),
      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
      col=rgb(0, 0, 0, 0.25))
@@ -356,7 +359,7 @@ for (i in 1:100) {
   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
 }
 
-plot(density(sim_dat[1, which(sim$window == 3)]), las = 1, ylim = c(0,0.2),
+plot(density(sim_dat[1, which(sim$window == 3)]), las = 1, ylim = c(0,1),
 #plot(density(sim_dat_std[1, which(sim$window == 3)]), las = 1, ylim = c(0,1),
      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
      col=rgb(0, 0, 0, 0.25))
@@ -570,10 +573,11 @@ quantile(contrast, prob = c(0.025, 0.975))            # very wide
 
 #### final "clean" plots using hypothetical data ####
 ## create dummy dataset
-newdat <- expand.grid(age_std = sort(unique(sim$age_std)),
-                      window = 1:n_windows)
+# newdat <- expand.grid(window = 1:n_windows,
+#                       age = sort(unique(sim$age))) %>% 
+#   left_join(distinct(sim[,c('age','age_std')]), by = 'age')
 newdat <- sim %>% 
-  select(node_random, age_std, window)
+  select(node_random, age, age_std, window)
 
 ## get mean predictions
 fake_mean <- get_mean_predictions(predict_df = newdat, parameters = params_std, include_window = TRUE, include_node = FALSE)
@@ -594,8 +598,6 @@ newdat$predict_pred_lwr <- apply(fake_pred, 2, quantile, prob = 0.025)
 newdat$predict_pred_upr <- apply(fake_pred, 2, quantile, prob = 0.975)
 
 ## plot predictions
-newdat <- newdat %>% 
-  left_join(distinct(sim[,c('age','age_std')]), by = 'age_std')
 newdat_summary <- newdat %>% 
   group_by(age, window) %>% 
   mutate(predict_pred_lwr = mean(predict_pred_lwr),
@@ -603,6 +605,7 @@ newdat_summary <- newdat %>%
   select(age, predict_pred_lwr, predict_pred_upr,window) %>% 
   distinct()
 
+## plot mean values
 ggplot()+
   geom_ribbon(data = newdat_summary,
               aes(x = age, ymin = predict_pred_lwr, ymax = predict_pred_upr, fill = as.factor(window)),
@@ -614,6 +617,35 @@ ggplot()+
             aes(x = age, y = predict_mean, colour = as.factor(window)))+  # line showing mean of predicted means
   geom_point(data = sim,
              aes(x = age, y = mu))+              # original data points (standardised centrality, actual age)
+  scale_colour_viridis_d(begin = 0, end = 0.7)+
+  scale_fill_viridis_d(begin = 0, end = 0.7)+
+  facet_wrap(. ~ as.factor(window))+             # separate plots per window
+  theme(legend.position = 'bottom')+
+  labs(colour = 'time window', fill = 'time window',
+       y = 'eigenvector centrality', x = 'age (years)')
+
+## convert full predictions to data frame
+sim_dat_df <- sim_dat %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything(), names_to = 'node_window', values_to = 'eigen') %>% 
+  left_join(sim[,c('node_window','age','window')], by = 'node_window')
+
+## plot full distribution
+ggplot()+
+  geom_ribbon(data = newdat_summary,
+              aes(x = age, ymin = predict_pred_lwr, ymax = predict_pred_upr, fill = as.factor(window)),
+              alpha = 0.2)+                      # background layer showing the 95% CI of all predictions
+  geom_ribbon(data = newdat,
+              aes(x = age, ymin = predict_mean_lwr, ymax = predict_mean_upr, fill = as.factor(window)),
+              alpha = 0.4)+                      # mid layer showing the 95% CI of predicted means
+  geom_point(data = sim_dat_df,
+             aes(x = age, y = eigen),
+             alpha = 0.01, size = 0.5)+         # original data points (standardised centrality, actual age)
+  geom_line(data = newdat,
+            aes(x = age, y = predict_mean, colour = as.factor(window)))+  # line showing mean of predicted means
+  geom_point(data = sim,
+             aes(x = age, y = mu),
+             size = 0.5, colour = 'white')+      # original mean data points (standardised centrality, actual age)
   scale_colour_viridis_d(begin = 0, end = 0.7)+
   scale_fill_viridis_d(begin = 0, end = 0.7)+
   facet_wrap(. ~ as.factor(window))+             # separate plots per window
