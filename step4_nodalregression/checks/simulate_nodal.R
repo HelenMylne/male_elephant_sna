@@ -5,26 +5,19 @@ library(cmdstanr)
 
 #set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
 
-## simulate population ####
+## simulate population for first time window ####
 ## define population parameters
 min_age <- 11                                                # youngest individual
 max_age <- 60                                                #  oldest  individual
 n_nodes <- ((max_age+1) - min_age)                           # total nodes = 2 per age
 
-## simulate population for first time window
-sim <- data.frame(node = 1:n_nodes,                          # create data frame of individuals
-                  age = c(sample(min_age:max_age, n_nodes, prob = 1/(min_age:max_age), # more at lower ages
-                                 replace = T)),
-                  mu = NA, sd = NA)
-
-## redefine parameters
-n_data <- nrow(sim)
-n_nodes <- length(unique(sim$node))
+## simulate data frame
+sim1 <- data.frame(node = 1:n_nodes,                          # create data frame of individuals
+                   age = c(sample(min_age:max_age, n_nodes,
+                                  prob = 1/(min_age:max_age), replace = T)), # more at lower ages
+                   mu = NA, sd = NA)
 
 ## add additional time windows ####
-## simulate population for first time window
-sim1 <- sim
-
 ## simulate population for second time window -- half the nodes resampled from window 1, half new
 sim2 <- data.frame(node = c(sample(1:n_nodes, n_nodes/2, replace = F),
                             (n_nodes+1):(n_nodes*2)),                          # create data frame of individuals
@@ -32,7 +25,7 @@ sim2 <- data.frame(node = c(sample(1:n_nodes, n_nodes/2, replace = F),
                    mu = NA, sd = NA)
 for(i in 1:nrow(sim2)){
   if(sim2$node[i] %in% sim1$node){
-    sim2$age[i] <- sim1$age[sim1$node == sim2$node[i]] + 2 # if present in 1st window, age = age in t1 + 2 y
+    sim2$age[i] <- sim1$age[sim1$node == sim2$node[i]] + 2 # if present in 1st window, age = age in t1 + 2yrs
   } else {
     sim2$age[i] <- sample(min_age:max_age, 1, prob = 1/(min_age:max_age)) # if not present, randomly assign a new age, more likely to be young than old
   }
@@ -46,12 +39,12 @@ sim3 <- data.frame(node = c(sample(1:n_nodes, n_nodes/2, replace = F),
                    mu = NA, sd = NA)
 for(i in 1:nrow(sim3)){
   if(sim3$node[i] %in% sim2$node){
-    sim3$age[i] <- sim2$age[sim2$node == sim3$node[i]] + 2
+    sim3$age[i] <- sim2$age[sim2$node == sim3$node[i]] + 2   # if present in 2nd window, age = age in t2 + 2yrs
   } else {
     if(sim3$node[i] %in% sim1$node){
-      sim3$age[i] <- sim1$age[sim1$node == sim3$node[i]] + 2
+      sim3$age[i] <- sim1$age[sim1$node == sim3$node[i]] + 4 # if present in 1st window, age = age in t1 + 4yrs
     } else {
-      sim3$age[i] <- sample(min_age:max_age, 1, prob = 1/(min_age:max_age)) #(min_age:max_age)[i-(n_nodes/2)]
+      sim3$age[i] <- sample(min_age:max_age, 1, prob = 1/(min_age:max_age)) # if new, randomly assign a new age, more likely to be young than old
     }
   }
 }
@@ -73,47 +66,62 @@ hist(sim$age)
 
 ## simulate centralities ####
 ## simulate age effect
-sim_slope <- -1                     # set age effect -- smaller = bigger impact on invlogit scale as values large
+sim_slope <- -1
+
+## simulate intercept
 sim_intcp <- 2
+
+## simulate random effects -- these are just random draws from a distribution centred on zero, but they do not have to have a mean of 0 between them. Should they? (i.e. if random effect of windows 1 and 2 are both positive, does window 3 need to be negative to counteract it?)
 sim_window_unique <- rnorm(n_windows, mean = 0, sd = 1)
 sim_node_unique <- rnorm(n_nodes, mean = 0, sd = 0.2)
-sim$mu <- sim$age_std * sim_slope + sim_intcp + sim_window_unique[sim$window] + sim_node_unique[sim$node]    # simulate mean centrality on normal scale
-plot(mu ~ age, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(0,5))            # plot
-points(mu ~ age, data = sim[sim$window == 2,], col = 'blue', pch = 19)                        # plot
-points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)                       # plot
+
+## calculate mean centrality per elephant
+sim$mu <- sim$age_std * sim_slope + sim_intcp + sim_window_unique[sim$window] + sim_node_unique[sim$node]    # simulate mean centrality on outcome scale -- NOTE: THIS IS PRODUCING AN EFFECT OF 1 INCREASE IN AGE STANDARD DEVIATION = -1 IN CENTRALITY OUTCOME SCALE. AGE IS STANDARDISED ALREADY, CENTRALITY IS NOT.
+
+## plot mean centrality against age
+plot(mu ~ age, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(0,5), las = 1)            # plot
+points(mu ~ age, data = sim[sim$window == 2,], col = 'blue', pch = 19)                                 # plot
+points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)                                # plot
+
+# standardise mean centrality
 sim$mu_std <- ( sim$mu - mean(sim$mu) ) / sd(sim$mu)
-plot(mu_std ~ age_std, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-5,5))   # plot
-points(mu_std ~ age_std, data = sim[sim$window == 2,], col = 'blue', pch = 19)                # plot
-points(mu_std ~ age_std, data = sim[sim$window == 3,], col = 'green', pch = 19)               # plot
+
+## plot mean standardised centrality against age
+plot(mu_std ~ age_std, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-3,3), las = 1)   # plot
+points(mu_std ~ age_std, data = sim[sim$window == 2,], col = 'blue', pch = 19)                         # plot
+points(mu_std ~ age_std, data = sim[sim$window == 3,], col = 'green', pch = 19)                        # plot
 
 ## simulate full distribution of samples per node
-sim$sd <- 1
-sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_data, dimnames = list(NULL, sim$node_window))    # create matrix
+sim$sd <- 1         # can be made to vary amongst nodes, currently all elephants have equal variance in centrality (not realistic given that in the real data some are seen more often than others)
+sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_data, dimnames = list(NULL, sim$node_window))    # create matrix for full centrality distribution
 for(j in 1:n_data){
-  sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution
+  sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution for each elephant
 }
-plot(sim_dat[1,1:(length(which(sim$window == 1)))] ~ sim$age[1:(length(which(sim$window == 1)))],
-     col = 'red', pch = 19, ylim = c(-1,6))       # plot simulated values against age for window 1
-points(sim_dat[1,(length(which(sim$window == 1))+1):(length(which(sim$window == 1 | sim$window == 2)))] ~ sim$age[(length(which(sim$window == 1))+1):(length(which(sim$window == 1 | sim$window == 2)))],
-       col = 'blue', pch = 19)    # plot simulated values against age for window 2
-points(sim_dat[1,(length(which(sim$window == 1 | sim$window == 2))+1):nrow(sim)] ~ sim$age[(length(which(sim$window == 1 | sim$window == 2))+1):nrow(sim)],
-       col = 'green', pch = 19)   # plot simulated values against age for window 3
 
-## standardise
-sim_dat_std <- sim_dat               # create matrix to fill
+## plot full unstandardised distribution
+plot(sim_dat[1,which(sim$window == 1)] ~ sim$age[which(sim$window == 1)],
+     col = 'red', pch = 19, ylim = c(-1,6))       # plot simulated values against age for window 1 (first row of simulated centralities only)
+points(sim_dat[1,which(sim$window == 2)] ~ sim$age[which(sim$window == 2)],
+       col = 'blue', pch = 19)                    # plot simulated values against age for window 2 (first row of simulated centralities only)
+points(sim_dat[1,which(sim$window == 3)] ~ sim$age[which(sim$window == 3)],
+       col = 'green', pch = 19)                   # plot simulated values against age for window 3 (first row of simulated centralities only)
+
+## standardise full set of centralities
+sim_dat_std <- sim_dat                            # create matrix to fill
 for(i in 1:nrow(sim_dat_std)){
-  sim_dat_std[i,] <- (sim_dat[i,] - mean(sim_dat[i,]) ) / sd(sim_dat[i,]) # standardise values
+  sim_dat_std[i,] <- (sim_dat[i,] - mean(sim_dat[i,]) ) / sd(sim_dat[i,]) # standardise values within each row of the matrix (1 row = 1 network -- taken from Jordan's code)
 }
+
+## plot full standardised distribution
 plot(sim_dat_std[1,which(sim$window == 1)] ~ sim$age[which(sim$window == 1)],
      col = 'red', pch = 19, ylim = c(-5,5))       # plot simulated values against age for window 1
 points(sim_dat_std[1,which(sim$window == 2)] ~ sim$age[which(sim$window == 2)],
-       col = 'blue', pch = 19)    # plot simulated values against age for window 2
+       col = 'blue', pch = 19)                    # plot simulated values against age for window 2
 points(sim_dat_std[1,which(sim$window == 3)] ~ sim$age[which(sim$window == 3)],
-       col = 'green', pch = 19)   # plot simulated values against age for window 3
+       col = 'green', pch = 19)                   # plot simulated values against age for window 3
 
 ## visualise
-df_wide <- data.frame(sim_dat_std)
-df_plot <- df_wide %>% 
+df_plot <- data.frame(sim_dat_std) %>% 
   pivot_longer(cols = everything(),
                names_to = "node", values_to = "centrality") %>% 
   separate(node, into = c('X','node_window'), remove = T, sep = 1) %>% 
@@ -163,6 +171,8 @@ plot(density(sim_dat_std[,node_id_sample]),          # plot true density curve
      lwd = 2, las = 1,
      main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
 lines(density(sim_cent_samples[, node_id_sample - length(which(sim$window < 3))]), col = rgb(0,0,1,0.5), lwd = 2)      # overlay normal approximation
+
+rm(sim_cent_samples, node_id_sample) ; gc()
 
 ## prep inputs ####
 ## create data
@@ -232,11 +242,13 @@ par(mfrow = c(1,1))
 #params <- rstan::extract(fit_sim)
 params <- fit_sim$draws(format = 'draws_df')
 colnames(params)
+
+## separate random effects from global parameters
 rand_window <- params %>% 
   dplyr::select(`rand_window[1]`,`rand_window[2]`,`rand_window[3]`)
 rand_node <- params[,8:(n_nodes+7)]
 
-## traceplot linear effect size
+## traceplot all parameters
 #traceplot(fit_sim, pars = c('intercept','beta_age','sigma','predictor[1]','predictor[50]','predictor[100]'))
 params %>% 
   select(intercept,beta_age,sigma,
@@ -255,7 +267,7 @@ params %>%
   theme_bw()+
   theme(legend.position = 'none')
 
-## posterior predictive check
+## posterior predictive check ####
 par(mfrow = c(3,1))
 plot(density(sim_dat_std[1, which(sim$window == 1)]), las = 1, ylim = c(0,1),
      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
@@ -322,12 +334,30 @@ for (i in 1:100) {
 par(mfrow = c(1,1))
 
 ## predict from model -- predict from raw data, not from hypothetical/counterfactual data ####
+## create empty matrix to fill with predictions of mean centrality per node
 mu <- matrix(NA, nrow = nrow(params), ncol = nrow(sim), dimnames = list(NULL, sim$node_window))
+
+## populate matrix = mean centrality values per node, predicting for real data
 for(i in 1:nrow(mu)){
   mu[i,] <- params$beta_age[i] * sim$age_std + params$intercept[i] + as.numeric(rand_window[i,sim$window]) + as.numeric(rand_node[i, sim$node])
 }
-sim$mu_mean <- apply(mu, 2, mean)
 
+## add mean and CI of predicted means to input data frame for comparison
+sim$mu_mean <- apply(mu, 2, mean)
+sim$mu_lwr <- NA ; sim$mu_upr <- NA
+for( i in 1:nrow(sim) ){
+  sim$mu_lwr[i] <- rethinking::HPDI(mu[,i], prob = 0.95)[1]
+  sim$mu_upr[i] <- rethinking::HPDI(mu[,i], prob = 0.95)[2]
+}
+
+## plot mean of model vs mean of raw data
+ggplot()+
+  geom_point(data = sim, aes(x = mu_std, y = mu_mean, colour = as.factor(window)))+
+  scale_colour_viridis_d()+
+  labs(colour = 'window', x = 'simulated mean (standardised)', y = 'predicted mean (standardised)')+
+  geom_abline(slope = 1, intercept = 0) # add line showing where points would lie if model fit was perfect
+
+## put together sigma arrays, separated by time window
 sigma1 <- array(NA, dim = c(eigen_list$num_nodes_window1, eigen_list$num_nodes_window1, nrow(params)),
                 dimnames = list(eigen_list$nodes_window1, eigen_list$nodes_window1, NULL))
 sigma2 <- array(NA, dim = c(eigen_list$num_nodes_window2, eigen_list$num_nodes_window2, nrow(params)),
@@ -340,27 +370,19 @@ for(i in 1:nrow(params)){
   sigma3[,,i] <- sim_cent_cov_3 + diag(rep(params$sigma[i], eigen_list$num_nodes_window3))
 }
 
+## create empty matrix to take full set of predicted values per elephant
 predictions <- matrix(NA, nrow = nrow(params), ncol = nrow(sim), dimnames = list(NULL, sim$node_window))
+
+## populate matrix using mean values in matrix mu, and sigma values based on time window
 for(i in 1:nrow(predictions)){
   predictions[i,sim$window == 1] <- MASS::mvrnorm(1, mu[i,sim$window == 1], sigma1[,,i])
   predictions[i,sim$window == 2] <- MASS::mvrnorm(1, mu[i,sim$window == 2], sigma2[,,i])
   predictions[i,sim$window == 3] <- MASS::mvrnorm(1, mu[i,sim$window == 3], sigma3[,,i])
 }
 
-pred_data <- sim
-pred_data$mu_model <- NA
-pred_data$prediction <- NA
-for(i in 1:nrow(pred_data)){
-  pred_data$mu_model[i] <- list(mu[,i])
-  pred_data$prediction[i] <- list(predictions[,i])
-}
-pred_data <- unnest(cols = prediction, data = pred_data)
-
-sim$mu_lwr <- NA ; sim$mu_upr <- NA
+## add CI of predicted data points to input data frame for comparison
 sim$predict_lwr <- NA ; sim$predict_upr <- NA
 for( i in 1:nrow(sim) ){
-  sim$mu_lwr[i] <- rethinking::HPDI(mu[,i], prob = 0.95)[1]
-  sim$mu_upr[i] <- rethinking::HPDI(mu[,i], prob = 0.95)[2]
   sim$predict_lwr[i] <- rethinking::HPDI(predictions[,i], prob = 0.95)[1]
   sim$predict_upr[i] <- rethinking::HPDI(predictions[,i], prob = 0.95)[2]
 }
@@ -383,6 +405,16 @@ ggplot(sim)+
   theme(legend.position = 'bottom')+
   labs(colour = 'time window', fill = 'time window',
        y = 'eigenvector centrality', x = 'age (years)')
+
+## create long format data frame containing all predictions for every elephant (mean and full variation)
+pred_data <- sim
+pred_data$mu_model <- NA
+pred_data$prediction <- NA
+for(i in 1:nrow(pred_data)){
+  pred_data$mu_model[i] <- list(mu[,i])
+  pred_data$prediction[i] <- list(predictions[,i])
+}
+pred_data <- unnest(cols = prediction, data = pred_data)
 
 ## plot on unstandardised scale ####
 ## revert predictions to unstandardised scale
