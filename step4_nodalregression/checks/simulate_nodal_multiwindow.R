@@ -306,27 +306,6 @@ params_std %>%
   theme(legend.position = 'none')
 rm(plot_params) ; gc()
 
-# ## UNSTANDARDISE PARAMETERS HERE AND THEN WORK ENTIRELY ON THE OUTPUT SCALE -- SUPPOSED TO TAKE THE METHOD FROM DAN'S ANT PAPER, BUT I CAN'T FIND HOW TO DO IT IN THERE -- IT SEEMS THAT HE DIDN'T UNSTANDARDISE FIRST, JUST WENT STRAIGHT TO PREDICTIONS. INSTEAD USING HIS EMAIL IN WHICH HE SAID: To back-transform a regression slope coefficient you'd do e.g.: beta_original = beta_std x (SD_y / SD_x). For the intercept I think you would use the following formula: alpha = Y_hat - beta * X_hat  ####
-# ## slope and global intercept
-# params_ustd <- params_std %>% 
-#   select(intercept, beta_age, sigma) %>% 
-#   #mutate(beta_age_ustd = beta_age * (sd(sim$mu)/sd(sim$age)) ) %>% 
-#   mutate(beta_age_ustd = beta_age / sd(sim$age) )# %>% # Dan used this formula for converting marginal effects
-#   mutate(intercept = mean(sim$mu) - beta_age_ustd * mean(sim$age))
-# 
-# ## window random effect
-# rand_window_ustd <- rand_window %>%
-#   mutate(w1_ustd = mean(sim$mu[sim$window == 1]) - params_ustd$beta_age_ustd * mean(sim$age[sim$window == 1]),
-#          w2_ustd = mean(sim$mu[sim$window == 2]) - params_ustd$beta_age_ustd * mean(sim$age[sim$window == 2]),
-#          w3_ustd = mean(sim$mu[sim$window == 3]) - params_ustd$beta_age_ustd * mean(sim$age[sim$window == 3]))
-# 
-# ## node random effect
-# rand_node_ustd <- rand_node
-# colnames(rand_node_ustd) <- paste0(colnames(rand_node_ustd),'_ustd')
-# for(i in 1:ncol(rand_node_ustd)){
-#   rand_node_ustd[,i] <- mean(sim$mu[sim$node_random == i]) - params_ustd$beta_age_ustd * mean(sim$age[sim$node_random == i])
-# }
-
 #### posterior predictive check ####
 par(mfrow = c(3,1))
 
@@ -558,90 +537,6 @@ ggplot(sim)+
   theme(legend.position = 'bottom')+
   labs(colour = 'time window', fill = 'time window',
        y = 'eigenvector centrality', x = 'age (years)')
-
-# #### predict from model -- unstandardised scale ####
-# ## revert predicted means and full predictions to unstandardised scale
-# mu_ustd <- (mu_std * sd(sim$mu)) + mean(sim$mu)
-# predictions_ustd <- (predictions_std * sd(sim$mu)) + mean(sim$mu)
-# 
-# ## insert all means and CIs to original data frame for comparison
-# sim$mu_mean_ustd <- apply(mu_ustd, 2, mean)
-# sim$mu_lwr_ustd <- NA ; sim$mu_upr_ustd <- NA
-# sim$predict_lwr_ustd <- NA ; sim$predict_upr_ustd <- NA
-# for( i in 1:nrow(sim) ){
-#   sim$mu_lwr_ustd[i] <- rethinking::HPDI(mu_ustd[,i], prob = 0.95)[1]
-#   sim$mu_upr_ustd[i] <- rethinking::HPDI(mu_ustd[,i], prob = 0.95)[2]
-#   sim$predict_lwr_ustd[i] <- rethinking::HPDI(predictions_ustd[,i], prob = 0.95)[1]
-#   sim$predict_upr_ustd[i] <- rethinking::HPDI(predictions_ustd[,i], prob = 0.95)[2]
-# }
-# 
-# ## plot on unstandardised scale
-# ggplot(sim)+
-#   geom_ribbon(aes(x = age, ymin = predict_lwr_ustd, ymax = predict_upr_ustd, fill = as.factor(window)),
-#               alpha = 0.2)+                      # background layer showing the 95% CI of all predictions
-#   geom_ribbon(aes(x = age, ymin = mu_lwr_ustd, ymax = mu_upr_ustd, fill = as.factor(window)),
-#               alpha = 0.4)+                      # mid layer showing the 95% CI of predicted means
-#   geom_line(aes(x = age, y = mu_mean_ustd, colour = as.factor(window)))+  # line showing mean of predicted means
-#   geom_point(aes(x = age, y = mu))+              # original data points (standardised centrality, actual age)
-#   scale_colour_viridis_d(begin = 0, end = 0.7)+
-#   scale_fill_viridis_d(begin = 0, end = 0.7)+
-#   facet_wrap(. ~ as.factor(window))+             # separate plots per window
-#   theme(legend.position = 'bottom')+
-#   labs(colour = 'time window', fill = 'time window',
-#        y = 'eigenvector centrality', x = 'age (years)')
-# 
-# 
-# 
-# 
-# ## get mean predictions
-# mu_ustd <- get_mean_predictions(predict_df = sim, parameters = params_ustd, include_random = TRUE)
-# 
-# ## add mean and CI of predicted means to input data frame for comparison
-# sim$mu_mean_ustd <- apply(mu_ustd, 2, mean)
-# sim$mu_lwr_ustd <- NA ; sim$mu_upr_ustd <- NA
-# for( i in 1:nrow(sim) ){
-#   sim$mu_lwr_ustd[i] <- rethinking::HPDI(mu_ustd[,i], prob = 0.95)[1]
-#   sim$mu_upr_ustd[i] <- rethinking::HPDI(mu_ustd[,i], prob = 0.95)[2]
-# }
-# 
-# ## plot mean of model vs mean of raw data
-# ggplot()+
-#   geom_point(data = sim, aes(x = mu, y = mu_mean_ustd, colour = as.factor(window)))+
-#   scale_colour_viridis_d()+
-#   labs(colour = 'window', x = 'simulated mean', y = 'predicted mean (unstandardised)')+
-#   geom_abline(slope = 1, intercept = 0) # add line showing where points would lie if model fit was perfect
-# 
-# ## create empty matrix to take full set of predicted values per elephant
-# predictions_ustd <- matrix(NA, nrow = nrow(params_ustd), ncol = nrow(sim), dimnames = list(NULL, sim$node_window))
-# 
-# ## populate matrix using mean values in matrix mu_std, and sigma values based on time window
-# for(i in 1:nrow(predictions_ustd)){
-#   predictions_ustd[i,sim$window == 1] <- MASS::mvrnorm(1, mu_ustd[i,sim$window == 1], sigma1[,,i])
-#   predictions_ustd[i,sim$window == 2] <- MASS::mvrnorm(1, mu_ustd[i,sim$window == 2], sigma2[,,i])
-#   predictions_ustd[i,sim$window == 3] <- MASS::mvrnorm(1, mu_ustd[i,sim$window == 3], sigma3[,,i])
-# }
-# 
-# ## add CI of predicted data points to input data frame for comparison
-# sim$predict_lwr_ustd <- NA ; sim$predict_upr_ustd <- NA
-# for( i in 1:nrow(sim) ){
-#   sim$predict_lwr_ustd[i] <- rethinking::HPDI(predictions_ustd[,i], prob = 0.95)[1]
-#   sim$predict_upr_ustd[i] <- rethinking::HPDI(predictions_ustd[,i], prob = 0.95)[2]
-# }
-# 
-# ## plot on unstandardised scale
-# ggplot(sim)+
-#   geom_ribbon(aes(x = age, ymin = predict_lwr_ustd, ymax = predict_upr_ustd, fill = as.factor(window)),
-#               alpha = 0.2)+                      # background layer showing the 95% CI of all predictions
-#   geom_ribbon(aes(x = age, ymin = mu_lwr_ustd, ymax = mu_upr_ustd, fill = as.factor(window)),
-#               alpha = 0.4)+                      # mid layer showing the 95% CI of predicted means
-#   geom_line(aes(x = age, y = mu_mean_ustd, colour = as.factor(window)))+  # line showing mean of predicted means
-#   geom_point(aes(x = age, y = mu))+              # original data points (standardised centrality, actual age)
-#   scale_colour_viridis_d(begin = 0, end = 0.7)+
-#   scale_fill_viridis_d(begin = 0, end = 0.7)+
-#   facet_wrap(. ~ as.factor(window))+             # separate plots per window
-#   theme(legend.position = 'bottom')+
-#   labs(colour = 'time window', fill = 'time window',
-#        y = 'eigenvector centrality', x = 'age (years)')
 
 #### extract original values from output -- simulated slope value originally used produces an effect on the unstandardised scale. The model works on the standardised scale. Convert predictions to unstandardised scale and then run contrasts to calculate the slope coefficient. ####
 ## predict means from model again, now using age_std + 1 stdev -- for now working with age_std+1SD not age+1yr because that's how I originally simulated the data. if change the simulation so that mean centrality = age*slope rather age_std*slope, then change this to extract the correct slope value
