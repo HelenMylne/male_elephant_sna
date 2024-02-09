@@ -6,72 +6,13 @@ library(cmdstanr) #set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
 theme_set(theme_bw())
 set.seed(2)
 
-#### simulate population ####
-## define population parameters
-min_age <- 11                                                # youngest individual
-max_age <- 60                                                #  oldest  individual
-n_nodes <- ((max_age+1) - min_age)                         # total nodes = 2 per possible age
+#### derive population information directly from ANP data ####
+sim <- read_csv('../data_processed/step4_nodalregression/anp_allnodes.csv') %>% 
+  select(-mean_eigen) %>% 
+  relocate(age_std, .after = age) %>% 
+  relocate(node_random, .after = node)
 
-all_nodes <- data.frame(node = 1:n_nodes,
-                        age = sample(min_age:max_age, n_nodes,
-                                     prob = 1/(min_age:max_age), replace = T)) # more at lower ages
-
-nodes1 <- sample(1:n_nodes, n_nodes/2, replace = F)
-nodes2 <- sample(1:n_nodes, n_nodes/2, replace = F)
-nodes3 <- sample(1:n_nodes, n_nodes/2, replace = F)
-
-length(unique(c(nodes1,nodes2,nodes3)))
-
-## simulate first half of each population -- all ages drawn from the same baseline data
-sim1.1 <- data.frame(node = nodes1) %>% 
-  left_join(all_nodes, by = 'node') %>% 
-  mutate(age = age - 2) %>% 
-  mutate(window = 1)
-sim2.1 <- data.frame(node = nodes2) %>% 
-  left_join(all_nodes, by = 'node') %>% 
-  mutate(window = 2)
-sim3.1 <- data.frame(node = nodes3) %>% 
-  left_join(all_nodes, by = 'node') %>% 
-  mutate(age = age + 2) %>% 
-  mutate(window = 3)
-
-## add second part of each population -- all ages drawn in the same way, but shifted so that average age of all time windows should be the same
-sim1.2 <- data.frame(node = (n_nodes+1):(2*n_nodes),
-                     age = sample(min_age:max_age, n_nodes,
-                                  prob = 1/(min_age:max_age), replace = T),
-                     window = 1) %>% 
-  mutate(age = age + 2)
-sim2.2 <- data.frame(node = ((2*n_nodes)+1):(3*n_nodes),
-                     age = sample(min_age:max_age, n_nodes,
-                                  prob = 1/(min_age:max_age), replace = T),
-                     window = 2)
-sim3.2 <- data.frame(node = ((3*n_nodes)+1):(4*n_nodes),
-                     age = sample(min_age:max_age, n_nodes,
-                                  prob = 1/(min_age:max_age), replace = T),
-                     window = 3) %>% 
-  mutate(age = age - 2)
-
-## combine populations into single data frame
-sim <- rbind(sim1.1, sim1.2,
-             sim2.1, sim2.2,
-             sim3.1, sim3.2)
-
-## check ages have similar average across time windows
-mean(sim$age[sim$window == 1])
-mean(sim$age[sim$window == 2])
-mean(sim$age[sim$window == 3])
-
-## randomise node ID to ensure there is no correlation between node and age
-random_nodes <- data.frame(node = unique(sim$node)) %>% 
-  mutate(node_random = sample(1:length(unique(sim$node)), replace = F))
-sim <- sim %>% left_join(random_nodes, by = 'node')
-sim$node_window <- paste0(sim$node_random, '_', sim$window)
-rm(sim1.1, sim1.2, sim2.1, sim2.2, sim3.1, sim3.2, nodes1, nodes2, nodes3, random_nodes) ; gc()
-
-## standardise age data
-sim$age_std <- ( sim$age - mean(sim$age) ) / sd(sim$age)
-
-## redefine parameters
+## define parameters
 n_data <- nrow(sim)
 n_nodes <- length(unique(sim$node))
 n_windows <- length(unique(sim$window))
@@ -81,10 +22,10 @@ hist(sim$age)
 
 #### simulate centralities ####
 ## simulate age effect
-sim_slope <- -0.2
+sim_slope <- -0.02
 
 ## simulate intercept
-sim_intcp <- 3
+sim_intcp <- -5
 
 ## simulate random effects -- these are just random draws from a distribution centred on zero, but they do not have to have a mean of 0 between them. Should they? (i.e. if random effect of windows 1 and 2 are both positive, does window 3 need to be negative to counteract it?)
 sim_window_unique <- rnorm(n_windows, mean = 0, sd = 1)
@@ -98,13 +39,16 @@ plot(mu ~ age, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-5,
 points(mu ~ age, data = sim[sim$window == 2,], col = 'blue', pch = 19)                                 # plot
 points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)                                # plot
 
-# # standardise mean centrality
-# sim$mu_std <- ( sim$mu - mean(sim$mu) ) / sd(sim$mu)
-# 
-# ## plot mean standardised centrality against age
-# plot(mu_std ~ age_std, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-3,3), las = 1)   # plot
-# points(mu_std ~ age_std, data = sim[sim$window == 2,], col = 'blue', pch = 19)                         # plot
-# points(mu_std ~ age_std, data = sim[sim$window == 3,], col = 'green', pch = 19)                        # plot
+## check inputs
+colour <- rep(c('red','orange','yellow','green','blue','purple'), each = 6)
+shapes <- rep(c(3,4,15,16,17,18),6)
+plot(mu ~ age_std, data = sim[sim$window == 1,],
+     pch = shapes[1], col = colour[1], las = 1,
+     ylim = c(-10,0), xlim = c(-2.5,5))
+for(i in 2:n_windows){
+  points(mu ~ age_std, data = sim[sim$window == i,],
+         pch = shapes[i], col = colour[i])
+}
 
 ## simulate full distribution of samples per node
 sim$sd <- 1#(rpois(nrow(sim),lambda = 1)+1)/10         # can be made to vary amongst nodes, currently all elephants have equal variance in centrality (not realistic given that in the real data some are seen more often than others)
@@ -113,31 +57,9 @@ for(j in 1:n_data){
   sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution for each elephant
 }
 
-## plot full unstandardised distribution
-plot(sim_dat[1,which(sim$window == 1)] ~ sim$age[which(sim$window == 1)],
-     col = 'red', pch = 19, ylim = c(-20,20))       # plot simulated values against age for window 1 (first row of simulated centralities only)
-points(sim_dat[1,which(sim$window == 2)] ~ sim$age[which(sim$window == 2)],
-       col = 'blue', pch = 19)                    # plot simulated values against age for window 2 (first row of simulated centralities only)
-points(sim_dat[1,which(sim$window == 3)] ~ sim$age[which(sim$window == 3)],
-       col = 'green', pch = 19)                   # plot simulated values against age for window 3 (first row of simulated centralities only)
-
-# ## standardise full set of centralities
-# sim_dat_std <- sim_dat                            # create matrix to fill
-# for(i in 1:nrow(sim_dat_std)){
-#   sim_dat_std[i,] <- (sim_dat[i,] - mean(sim_dat[i,]) ) / sd(sim_dat[i,]) # standardise values within each row of the matrix (1 row = 1 network -- taken from Jordan's code)
-# }
-# 
-# ## plot full standardised distribution
-# plot(sim_dat_std[1,which(sim$window == 1)] ~ sim$age[which(sim$window == 1)],
-#      col = 'red', pch = 19, ylim = c(-5,5))       # plot simulated values against age for window 1
-# points(sim_dat_std[1,which(sim$window == 2)] ~ sim$age[which(sim$window == 2)],
-#        col = 'blue', pch = 19)                    # plot simulated values against age for window 2
-# points(sim_dat_std[1,which(sim$window == 3)] ~ sim$age[which(sim$window == 3)],
-#        col = 'green', pch = 19)                   # plot simulated values against age for window 3
-
 ## visualise
 data.frame(sim_dat) %>% 
-  #data.frame(sim_dat_std) %>% 
+  select(sample(sim$node_random, 40, replace = F)) %>% 
   pivot_longer(cols = everything(),
                names_to = "node_random", values_to = "centrality") %>% 
   separate(node_random, into = c('X','node_window'), remove = T, sep = 1) %>% 
@@ -145,7 +67,6 @@ data.frame(sim_dat) %>%
   separate(node_window, into = c('node_random','window'), sep = '_', remove = F) %>% 
   mutate(node = as.integer(node_random)) %>% 
   left_join(sim[,c('node_window','age')], by = 'node_window') %>% 
-  filter(node_random %in% sample(node_random, 40)) %>% 
   ggplot(aes(x = centrality, fill = age, group = node_window)) +
   geom_density(linewidth = 0.4, alpha = 0.6) +
   facet_grid(rows = vars(as.factor(node)), scales = "free") +
@@ -157,91 +78,259 @@ data.frame(sim_dat) %>%
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
 
 #### prep inputs ####
-# compute normal approximation by window -- calculate means per node
-sim_cent_mu_1 <- apply(sim_dat[,which(sim$window == 1)], 2, mean) # sim_cent_mu_1 <- apply(sim_dat_std[,which(sim$window == 1)], 2, mean)
-sim_cent_mu_2 <- apply(sim_dat[,which(sim$window == 2)], 2, mean) # sim_cent_mu_2 <- apply(sim_dat_std[,which(sim$window == 2)], 2, mean)
-sim_cent_mu_3 <- apply(sim_dat[,which(sim$window == 3)], 2, mean) # sim_cent_mu_3 <- apply(sim_dat_std[,which(sim$window == 3)], 2, mean)
+eigen_means <- list()
+eigen_covs <- list()
 
-# compute normal approximation by window -- calculate covariance matrix
-sim_cent_cov_1 <- cov(sim_dat[,which(sim$window == 1)]) # sim_cent_cov_1 <- cov(sim_dat_std[,which(sim$window == 1)])
-sim_cent_cov_2 <- cov(sim_dat[,which(sim$window == 2)]) # sim_cent_cov_2 <- cov(sim_dat_std[,which(sim$window == 2)])
-sim_cent_cov_3 <- cov(sim_dat[,which(sim$window == 3)]) # sim_cent_cov_3 <- cov(sim_dat_std[,which(sim$window == 3)])
+# compute normal approximation by window -- calculate means per node
+for(time_window in 1:n_windows){
+  eigen_means[[time_window]] <- apply(sim_dat[,which(sim$window == time_window)], 2, mean)
+  eigen_covs[[time_window]] <- cov(sim_dat[,which(sim$window == time_window)])
+}
 
 ## check normal approximation -- simulate from combined mean and covariance, plot curve against relative node ID 
-par(mfrow = c(3,1))
-sim_cent_samples <- MASS::mvrnorm(1e5, sim_cent_mu_1, sim_cent_cov_1)     # simulate from multivariate normal
-node_id_sample <- sample(which(sim$window == 1),1)
-plot(density(sim_dat[,node_id_sample]), lwd = 2, las = 1,                         # plot true density curve
-     #plot(density(sim_dat_std[,node_id_sample]), lwd = 2, las = 1,                         # plot true density curve
-     main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
-lines(density(sim_cent_samples[, node_id_sample]), col = rgb(0,0,1,0.5), lwd = 2)      # overlay normal approximation
-
-sim_cent_samples <- MASS::mvrnorm(1e5, sim_cent_mu_2, sim_cent_cov_2)     # simulate from multivariate normal
-node_id_sample <- sample(which(sim$window == 2),1)
-plot(density(sim_dat[,node_id_sample]),          # plot true density curve
-     #plot(density(sim_dat_std[,node_id_sample]),          # plot true density curve
-     lwd = 2, las = 1,
-     main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
-lines(density(sim_cent_samples[, node_id_sample - length(which(sim$window == 1))]), col = rgb(0,0,1,0.5), lwd = 2)      # overlay normal approximation
-
-sim_cent_samples <- MASS::mvrnorm(1e5, sim_cent_mu_3, sim_cent_cov_3)     # simulate from multivariate normal
-node_id_sample <- sample(which(sim$window == 3),1)
-plot(density(sim_dat[,node_id_sample]),          # plot true density curve
-     #plot(density(sim_dat_std[,node_id_sample]),          # plot true density curve
-     lwd = 2, las = 1,
-     main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
-lines(density(sim_cent_samples[, node_id_sample - length(which(sim$window < 3))]), col = rgb(0,0,1,0.5), lwd = 2)      # overlay normal approximation
-
-par(mfrow = c(1,1))
-rm(sim_cent_samples, node_id_sample) ; gc()
+par(mfrow = c(6,6), mai = c(0.1,0.1,0.1,0.1))
+for(time_window in 1:n_windows){
+  ## simulate from multivariate normal
+  sim_cent_samples <- MASS::mvrnorm(1e5, eigen_means[[time_window]], eigen_covs[[time_window]])
+  
+  ## identify random node of interest
+  node_id_sample <- sample(which(sim$window == time_window),1)
+  nodes_timewindow <- sim %>%
+    filter(window == time_window)
+  node_id_check <- which(nodes_timewindow$node == sim$node[node_id_sample])
+  
+  ## plot true density curve
+  plot(density(sim_dat[,node_id_sample]), lwd = 2, las = 1,
+       main = paste0('time window ', time_window),
+       xlab = '', ylab = '')
+  
+  ## plot normal approximation
+  lines(density(sim_cent_samples[, node_id_check]),
+        col = rgb(0,0,1,0.5), lwd = 2)
+}
+par(mfrow = c(1,1), mai = c(0.5,0.5,0.5,0.5))
+rm(sim_cent_samples, node_id_sample, node_id_check, nodes_timewindow) ; gc()
 
 ## create data
-eigen_list <- list(num_data = n_data,
-                   num_nodes = n_nodes,
-                   num_windows = length(unique(sim$window)),
-                   num_nodes_window1 = length(which(sim$window == 1)),
-                   num_nodes_window2 = length(which(sim$window == 2)),
-                   num_nodes_window3 = length(which(sim$window == 3)),
-                   num_nodes_prev_windows = c(0,
-                                              length(which(sim$window < 2)),
-                                              length(which(sim$window < 3))),
-                   centrality_mu_1 = sim_cent_mu_1,
-                   centrality_mu_2 = sim_cent_mu_2,
-                   centrality_mu_3 = sim_cent_mu_3,
-                   centrality_cov_1 = sim_cent_cov_1,
-                   centrality_cov_2 = sim_cent_cov_2,
-                   centrality_cov_3 = sim_cent_cov_3,
-                   node_age = sim$age_std,
-                   window = sim$window,
-                   nodes = sim$node_random,
-                   nodes_window1 = sim$node_random[sim$window == 1],
-                   nodes_window2 = sim$node_random[sim$window == 2],
-                   nodes_window3 = sim$node_random[sim$window == 3])
+nodes_per_window <- as.data.frame(table(sim$window)) %>% 
+  rename(window = Var1,
+         node_count = Freq)
 
-## check inputs
-plot(eigen_list$centrality_mu_1 ~ eigen_list$node_age[eigen_list$window == 1], pch = 19, col = 'red', ylim = c(-5,1))
-points(eigen_list$centrality_mu_2 ~ eigen_list$node_age[eigen_list$window == 2], pch = 19, col = 'blue')
-points(eigen_list$centrality_mu_3 ~ eigen_list$node_age[eigen_list$window == 3], pch = 19, col = 'green')
+eigen_list <- list(
+  # global data size
+  num_data = n_data,
+  num_nodes = n_nodes,
+  num_windows = n_windows,
+  # per time window data size
+  num_nodes_window1 = nodes_per_window$node_count[1],
+  num_nodes_window2 = nodes_per_window$node_count[2],
+  num_nodes_window3 = nodes_per_window$node_count[3],
+  num_nodes_window4 = nodes_per_window$node_count[4],
+  num_nodes_window5 = nodes_per_window$node_count[5],
+  num_nodes_window6 = nodes_per_window$node_count[6],
+  num_nodes_window7 = nodes_per_window$node_count[7],
+  num_nodes_window8 = nodes_per_window$node_count[8],
+  num_nodes_window9 = nodes_per_window$node_count[9],
+  num_nodes_window10 = nodes_per_window$node_count[10],
+  num_nodes_window11 = nodes_per_window$node_count[11],
+  num_nodes_window12 = nodes_per_window$node_count[12],
+  num_nodes_window13 = nodes_per_window$node_count[13],
+  num_nodes_window14 = nodes_per_window$node_count[14],
+  num_nodes_window15 = nodes_per_window$node_count[15],
+  num_nodes_window16 = nodes_per_window$node_count[16],
+  num_nodes_window17 = nodes_per_window$node_count[17],
+  num_nodes_window18 = nodes_per_window$node_count[18],
+  num_nodes_window19 = nodes_per_window$node_count[19],
+  num_nodes_window20 = nodes_per_window$node_count[20],
+  num_nodes_window21 = nodes_per_window$node_count[21],
+  num_nodes_window22 = nodes_per_window$node_count[22],
+  num_nodes_window23 = nodes_per_window$node_count[23],
+  num_nodes_window24 = nodes_per_window$node_count[24],
+  num_nodes_window25 = nodes_per_window$node_count[25],
+  num_nodes_window26 = nodes_per_window$node_count[26],
+  num_nodes_window27 = nodes_per_window$node_count[27],
+  num_nodes_window28 = nodes_per_window$node_count[28],
+  num_nodes_window29 = nodes_per_window$node_count[29],
+  num_nodes_window30 = nodes_per_window$node_count[30],
+  num_nodes_window31 = nodes_per_window$node_count[31],
+  num_nodes_window32 = nodes_per_window$node_count[32],
+  num_nodes_window33 = nodes_per_window$node_count[33],
+  num_nodes_window34 = nodes_per_window$node_count[34],
+  num_nodes_window35 = nodes_per_window$node_count[35],
+  num_nodes_window36 = nodes_per_window$node_count[36],
+  # number of nodes in all preceding time windows for node age indexing
+  num_nodes_prev_windows = c(0,
+                             length(which(sim$window < 2)),
+                             length(which(sim$window < 3)),
+                             length(which(sim$window < 4)),
+                             length(which(sim$window < 5)),
+                             length(which(sim$window < 6)),
+                             length(which(sim$window < 7)),
+                             length(which(sim$window < 8)),
+                             length(which(sim$window < 9)),
+                             length(which(sim$window < 10)),
+                             length(which(sim$window < 11)),
+                             length(which(sim$window < 12)),
+                             length(which(sim$window < 13)),
+                             length(which(sim$window < 14)),
+                             length(which(sim$window < 15)),
+                             length(which(sim$window < 16)),
+                             length(which(sim$window < 17)),
+                             length(which(sim$window < 18)),
+                             length(which(sim$window < 19)),
+                             length(which(sim$window < 20)),
+                             length(which(sim$window < 21)),
+                             length(which(sim$window < 22)),
+                             length(which(sim$window < 23)),
+                             length(which(sim$window < 24)),
+                             length(which(sim$window < 25)),
+                             length(which(sim$window < 26)),
+                             length(which(sim$window < 27)),
+                             length(which(sim$window < 28)),
+                             length(which(sim$window < 29)),
+                             length(which(sim$window < 30)),
+                             length(which(sim$window < 31)),
+                             length(which(sim$window < 32)),
+                             length(which(sim$window < 33)),
+                             length(which(sim$window < 34)),
+                             length(which(sim$window < 35)),
+                             length(which(sim$window < 36))),
+  # centrality means per time window
+  centrality_mu_1 = eigen_means[[1]],
+  centrality_mu_2 = eigen_means[[2]],
+  centrality_mu_3 = eigen_means[[3]],
+  centrality_mu_4 = eigen_means[[4]],
+  centrality_mu_5 = eigen_means[[5]],
+  centrality_mu_6 = eigen_means[[6]],
+  centrality_mu_7 = eigen_means[[7]],
+  centrality_mu_8 = eigen_means[[8]],
+  centrality_mu_9 = eigen_means[[9]],
+  centrality_mu_10 = eigen_means[[10]],
+  centrality_mu_11 = eigen_means[[11]],
+  centrality_mu_12 = eigen_means[[12]],
+  centrality_mu_13 = eigen_means[[13]],
+  centrality_mu_14 = eigen_means[[14]],
+  centrality_mu_15 = eigen_means[[15]],
+  centrality_mu_16 = eigen_means[[16]],
+  centrality_mu_17 = eigen_means[[17]],
+  centrality_mu_18 = eigen_means[[18]],
+  centrality_mu_19 = eigen_means[[19]],
+  centrality_mu_20 = eigen_means[[20]],
+  centrality_mu_21 = eigen_means[[21]],
+  centrality_mu_22 = eigen_means[[22]],
+  centrality_mu_23 = eigen_means[[23]],
+  centrality_mu_24 = eigen_means[[24]],
+  centrality_mu_25 = eigen_means[[25]],
+  centrality_mu_26 = eigen_means[[26]],
+  centrality_mu_27 = eigen_means[[27]],
+  centrality_mu_28 = eigen_means[[28]],
+  centrality_mu_29 = eigen_means[[29]],
+  centrality_mu_30 = eigen_means[[30]],
+  centrality_mu_31 = eigen_means[[31]],
+  centrality_mu_32 = eigen_means[[32]],
+  centrality_mu_33 = eigen_means[[33]],
+  centrality_mu_34 = eigen_means[[34]],
+  centrality_mu_35 = eigen_means[[35]],
+  centrality_mu_36 = eigen_means[[36]],
+  # covariance matrix per time window
+  centrality_cov_1 = eigen_covs[[1]],
+  centrality_cov_2 = eigen_covs[[2]],
+  centrality_cov_3 = eigen_covs[[3]],
+  centrality_cov_4 = eigen_covs[[4]],
+  centrality_cov_5 = eigen_covs[[5]],
+  centrality_cov_6 = eigen_covs[[6]],
+  centrality_cov_7 = eigen_covs[[7]],
+  centrality_cov_8 = eigen_covs[[8]],
+  centrality_cov_9 = eigen_covs[[9]],
+  centrality_cov_10 = eigen_covs[[10]],
+  centrality_cov_11 = eigen_covs[[11]],
+  centrality_cov_12 = eigen_covs[[12]],
+  centrality_cov_13 = eigen_covs[[13]],
+  centrality_cov_14 = eigen_covs[[14]],
+  centrality_cov_15 = eigen_covs[[15]],
+  centrality_cov_16 = eigen_covs[[16]],
+  centrality_cov_17 = eigen_covs[[17]],
+  centrality_cov_18 = eigen_covs[[18]],
+  centrality_cov_19 = eigen_covs[[19]],
+  centrality_cov_20 = eigen_covs[[20]],
+  centrality_cov_21 = eigen_covs[[21]],
+  centrality_cov_22 = eigen_covs[[22]],
+  centrality_cov_23 = eigen_covs[[23]],
+  centrality_cov_24 = eigen_covs[[24]],
+  centrality_cov_25 = eigen_covs[[25]],
+  centrality_cov_26 = eigen_covs[[26]],
+  centrality_cov_27 = eigen_covs[[27]],
+  centrality_cov_28 = eigen_covs[[28]],
+  centrality_cov_29 = eigen_covs[[29]],
+  centrality_cov_30 = eigen_covs[[30]],
+  centrality_cov_31 = eigen_covs[[31]],
+  centrality_cov_32 = eigen_covs[[32]],
+  centrality_cov_33 = eigen_covs[[33]],
+  centrality_cov_34 = eigen_covs[[34]],
+  centrality_cov_35 = eigen_covs[[35]],
+  centrality_cov_36 = eigen_covs[[36]],
+  # node IDs for all time windows
+  nodes_window1 = sim$node_random[sim$window == 1],
+  nodes_window2 = sim$node_random[sim$window == 2],
+  nodes_window3 = sim$node_random[sim$window == 3],
+  nodes_window4 = sim$node_random[sim$window == 4],
+  nodes_window5 = sim$node_random[sim$window == 5],
+  nodes_window6 = sim$node_random[sim$window == 6],
+  nodes_window7 = sim$node_random[sim$window == 7],
+  nodes_window8 = sim$node_random[sim$window == 8],
+  nodes_window9 = sim$node_random[sim$window == 9],
+  nodes_window10 = sim$node_random[sim$window == 10],
+  nodes_window11 = sim$node_random[sim$window == 11],
+  nodes_window12 = sim$node_random[sim$window == 12],
+  nodes_window13 = sim$node_random[sim$window == 13],
+  nodes_window14 = sim$node_random[sim$window == 14],
+  nodes_window15 = sim$node_random[sim$window == 15],
+  nodes_window16 = sim$node_random[sim$window == 16],
+  nodes_window17 = sim$node_random[sim$window == 17],
+  nodes_window18 = sim$node_random[sim$window == 18],
+  nodes_window19 = sim$node_random[sim$window == 19],
+  nodes_window20 = sim$node_random[sim$window == 20],
+  nodes_window21 = sim$node_random[sim$window == 21],
+  nodes_window22 = sim$node_random[sim$window == 22],
+  nodes_window23 = sim$node_random[sim$window == 23],
+  nodes_window24 = sim$node_random[sim$window == 24],
+  nodes_window25 = sim$node_random[sim$window == 25],
+  nodes_window26 = sim$node_random[sim$window == 26],
+  nodes_window27 = sim$node_random[sim$window == 27],
+  nodes_window28 = sim$node_random[sim$window == 28],
+  nodes_window29 = sim$node_random[sim$window == 29],
+  nodes_window30 = sim$node_random[sim$window == 30],
+  nodes_window31 = sim$node_random[sim$window == 31],
+  nodes_window32 = sim$node_random[sim$window == 32],
+  nodes_window33 = sim$node_random[sim$window == 33],
+  nodes_window34 = sim$node_random[sim$window == 34],
+  nodes_window35 = sim$node_random[sim$window == 35],
+  nodes_window36 = sim$node_random[sim$window == 36],
+  # exposure variable
+  node_age = sim$age_std)
 
 #### prior predictive check ####
 n <- 100
-beta_age <- rnorm(n, 0, 0.8)   # beta_age <- rnorm(n, 0, 0.8)
-intercept  <- rnorm(n, -5, 1) #rnorm(n, logit(0.05), 2) # intercept  <- rnorm(n, 0, 0.8)
-plot(NULL, las = 1, xlab = 'age (standardised)', ylab = 'eigenvector (standardised)',
-     ylim = c(min(c(sim_cent_mu_1, sim_cent_mu_2))-2, max(c(sim_cent_mu_1, sim_cent_mu_2))+2),
-     xlim = c(min(sim$age_std), max(sim$age_std)))
-abline(h = min(c(sim_cent_mu_1, sim_cent_mu_2, sim_cent_mu_3)), lty = 2)
-abline(h = max(c(sim_cent_mu_1, sim_cent_mu_2, sim_cent_mu_3)), lty = 2)
+beta_age <- rnorm(n, 0, 0.6)   # beta_age <- rnorm(n, 0, 0.8)
+intercept  <- rnorm(n, -6, 2) #rnorm(n, LaplacesDemon::logit(0.05), 3) # taking the intercept from the logit of results from Chiyo 2011 (doesn't state mean/median centrality so estimated from graph based on where correlation line would cross x = 0)
+min_raw <- min(unlist(eigen_list[grep('centrality_mu', names(eigen_list))]))
+max_raw <- max(unlist(eigen_list[grep('centrality_mu', names(eigen_list))]))
+plot(NULL, las = 1, xlab = 'age (standardised)', ylab = 'eigenvector',
+     ylim = c(-15, 5),
+     xlim = c(min(eigen_list$node_age),
+              max(eigen_list$node_age)))
+abline(h = min_raw, lty = 2) ; abline(h = max_raw, lty = 2)
 for(i in 1:n){
   lines(x = seq(min(sim$age_std), max(sim$age_std), length.out = 2),
         y = intercept[i] + beta_age[i]*c(min(sim$age_std), max(sim$age_std)),
         col = rgb(0,0,1,0.4))
-} # HOW DO I DO THE PRIORS WHEN Y IS NOT STANDARDISED???
+}
+rm(n, max_raw, min_raw, beta_age, intercept) ; gc()
 
 #### run model -- age as a continuous variable with 2 windows ####
 ## load model
 #nodal_regression <- stan_model('models/eigen_regression_intercept.stan')
-nodal_regression <- cmdstan_model('models/eigen_regression_combinewindows.stan')
+nodal_regression <- cmdstan_model('models/eigen_regression_anp.stan')
 
 ## run model
 n_chains <- 4
