@@ -44,41 +44,6 @@ data {
   
   // number of nodes in all preceding time windows for node_age indexing
   array[num_windows] int num_nodes_prev_windows; // Number of rows in data in time window 2
-  // int num_nodes_1_to_2;
-  // int num_nodes_1_to_3;
-  // int num_nodes_1_to_4;
-  // int num_nodes_1_to_5;
-  // int num_nodes_1_to_6;
-  // int num_nodes_1_to_7;
-  // int num_nodes_1_to_8;
-  // int num_nodes_1_to_9;
-  // int num_nodes_1_to_10;
-  // int num_nodes_1_to_11;
-  // int num_nodes_1_to_12;
-  // int num_nodes_1_to_13;
-  // int num_nodes_1_to_14;
-  // int num_nodes_1_to_15;
-  // int num_nodes_1_to_16;
-  // int num_nodes_1_to_17;
-  // int num_nodes_1_to_18;
-  // int num_nodes_1_to_19;
-  // int num_nodes_1_to_20;
-  // int num_nodes_1_to_21;
-  // int num_nodes_1_to_22;
-  // int num_nodes_1_to_23;
-  // int num_nodes_1_to_24;
-  // int num_nodes_1_to_25;
-  // int num_nodes_1_to_26;
-  // int num_nodes_1_to_27;
-  // int num_nodes_1_to_28;
-  // int num_nodes_1_to_29;
-  // int num_nodes_1_to_30;
-  // int num_nodes_1_to_31;
-  // int num_nodes_1_to_32;
-  // int num_nodes_1_to_33;
-  // int num_nodes_1_to_34;
-  // int num_nodes_1_to_35;
-  // int num_nodes_1_to_36;
   
   // centrality means per time window
   vector[num_nodes_window1] centrality_mu_1;      // Means of centrality estimates (0-1 bounded then standardised), time window 1
@@ -94,29 +59,29 @@ data {
   vector[num_nodes_window11] centrality_mu_11;      // Means of centrality estimates (0-1 bounded then standardised), time window 11
   vector[num_nodes_window12] centrality_mu_12;      // Means of centrality estimates (0-1 bounded then standardised), time window 12
   vector[num_nodes_window13] centrality_mu_13;      // Means of centrality estimates (0-1 bounded then standardised), time window 13
-  vector[num_nodes_window13] centrality_mu_14;      // Means of centrality estimates (0-1 bounded then standardised), time window 13
-  vector[num_nodes_window13] centrality_mu_15;      // Means of centrality estimates (0-1 bounded then standardised), time window 13
-  vector[num_nodes_window13] centrality_mu_16;      // Means of centrality estimates (0-1 bounded then standardised), time window 13
-  vector[num_nodes_window13] centrality_mu_17;      // Means of centrality estimates (0-1 bounded then standardised), time window 13
-  vector[num_nodes_window13] centrality_mu_18;      // Means of centrality estimates (0-1 bounded then standardised), time window 13
-  vector[num_nodes_window13] centrality_mu_19;      // Means of centrality estimates (0-1 bounded then standardised), time window 13
+  vector[num_nodes_window14] centrality_mu_14;      // Means of centrality estimates (0-1 bounded then standardised), time window 14
+  vector[num_nodes_window15] centrality_mu_15;      // Means of centrality estimates (0-1 bounded then standardised), time window 15
+  vector[num_nodes_window16] centrality_mu_16;      // Means of centrality estimates (0-1 bounded then standardised), time window 16
+  vector[num_nodes_window17] centrality_mu_17;      // Means of centrality estimates (0-1 bounded then standardised), time window 17
+  vector[num_nodes_window18] centrality_mu_18;      // Means of centrality estimates (0-1 bounded then standardised), time window 18
+  vector[num_nodes_window19] centrality_mu_19;      // Means of centrality estimates (0-1 bounded then standardised), time window 19
   vector[num_nodes_window20] centrality_mu_20;      // Means of centrality estimates (0-1 bounded then standardised), time window 20
   vector[num_nodes_window21] centrality_mu_21;      // Means of centrality estimates (0-1 bounded then standardised), time window 21
   vector[num_nodes_window22] centrality_mu_22;      // Means of centrality estimates (0-1 bounded then standardised), time window 22
   vector[num_nodes_window23] centrality_mu_23;      // Means of centrality estimates (0-1 bounded then standardised), time window 23
-  vector[num_nodes_window23] centrality_mu_24;      // Means of centrality estimates (0-1 bounded then standardised), time window 23
-  vector[num_nodes_window23] centrality_mu_25;      // Means of centrality estimates (0-1 bounded then standardised), time window 23
-  vector[num_nodes_window23] centrality_mu_26;      // Means of centrality estimates (0-1 bounded then standardised), time window 23
-  vector[num_nodes_window23] centrality_mu_27;      // Means of centrality estimates (0-1 bounded then standardised), time window 23
-  vector[num_nodes_window23] centrality_mu_28;      // Means of centrality estimates (0-1 bounded then standardised), time window 23
-  vector[num_nodes_window23] centrality_mu_29;      // Means of centrality estimates (0-1 bounded then standardised), time window 23
+  vector[num_nodes_window24] centrality_mu_24;      // Means of centrality estimates (0-1 bounded then standardised), time window 24
+  vector[num_nodes_window25] centrality_mu_25;      // Means of centrality estimates (0-1 bounded then standardised), time window 25
+  vector[num_nodes_window26] centrality_mu_26;      // Means of centrality estimates (0-1 bounded then standardised), time window 26
+  vector[num_nodes_window27] centrality_mu_27;      // Means of centrality estimates (0-1 bounded then standardised), time window 27
+  vector[num_nodes_window28] centrality_mu_28;      // Means of centrality estimates (0-1 bounded then standardised), time window 28
+  vector[num_nodes_window29] centrality_mu_29;      // Means of centrality estimates (0-1 bounded then standardised), time window 29
   vector[num_nodes_window30] centrality_mu_30;      // Means of centrality estimates (0-1 bounded then standardised), time window 30
   vector[num_nodes_window31] centrality_mu_31;      // Means of centrality estimates (0-1 bounded then standardised), time window 31
   vector[num_nodes_window32] centrality_mu_32;      // Means of centrality estimates (0-1 bounded then standardised), time window 32
   vector[num_nodes_window33] centrality_mu_33;      // Means of centrality estimates (0-1 bounded then standardised), time window 33
-  vector[num_nodes_window33] centrality_mu_34;      // Means of centrality estimates (0-1 bounded then standardised), time window 33
-  vector[num_nodes_window33] centrality_mu_35;      // Means of centrality estimates (0-1 bounded then standardised), time window 33
-  vector[num_nodes_window33] centrality_mu_36;      // Means of centrality estimates (0-1 bounded then standardised), time window 33
+  vector[num_nodes_window34] centrality_mu_34;      // Means of centrality estimates (0-1 bounded then standardised), time window 34
+  vector[num_nodes_window35] centrality_mu_35;      // Means of centrality estimates (0-1 bounded then standardised), time window 35
+  vector[num_nodes_window36] centrality_mu_36;      // Means of centrality estimates (0-1 bounded then standardised), time window 36
   
   // covariance matrices per time window
   matrix[num_nodes_window1, num_nodes_window1] centrality_cov_1;  // standard deviations of centrality estimates, time window 1
@@ -361,9 +326,9 @@ transformed parameters {
 
  model {
   // priors
-  beta_age ~ normal(0, 0.8);
+  beta_age ~ normal(0,0.8);
   sigma ~ exponential(2);
-  intercept ~ normal(0,0.8);
+  intercept ~ normal(logit(0.05),2);
   rand_window ~ normal(0,1);
   rand_node ~ normal(0,1);
 
