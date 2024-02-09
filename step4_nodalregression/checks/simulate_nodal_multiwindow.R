@@ -81,10 +81,10 @@ hist(sim$age)
 
 #### simulate centralities ####
 ## simulate age effect
-sim_slope <- -0.02
+sim_slope <- -0.2
 
 ## simulate intercept
-sim_intcp <- -1
+sim_intcp <- 3
 
 ## simulate random effects -- these are just random draws from a distribution centred on zero, but they do not have to have a mean of 0 between them. Should they? (i.e. if random effect of windows 1 and 2 are both positive, does window 3 need to be negative to counteract it?)
 sim_window_unique <- rnorm(n_windows, mean = 0, sd = 1)
@@ -107,7 +107,7 @@ points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)         
 # points(mu_std ~ age_std, data = sim[sim$window == 3,], col = 'green', pch = 19)                        # plot
 
 ## simulate full distribution of samples per node
-sim$sd <- (rpois(nrow(sim),lambda = 1)+1)/10         # can be made to vary amongst nodes, currently all elephants have equal variance in centrality (not realistic given that in the real data some are seen more often than others)
+sim$sd <- 1#(rpois(nrow(sim),lambda = 1)+1)/10         # can be made to vary amongst nodes, currently all elephants have equal variance in centrality (not realistic given that in the real data some are seen more often than others)
 sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_data, dimnames = list(NULL, sim$node_window))    # create matrix for full centrality distribution
 for(j in 1:n_data){
   sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution for each elephant
@@ -226,7 +226,7 @@ points(eigen_list$centrality_mu_3 ~ eigen_list$node_age[eigen_list$window == 3],
 #### prior predictive check ####
 n <- 100
 beta_age <- rnorm(n, 0, 0.8)   # beta_age <- rnorm(n, 0, 0.8)
-intercept  <- rnorm(n, -2, 1) # intercept  <- rnorm(n, 0, 0.8)
+intercept  <- rnorm(n, -5, 1) #rnorm(n, logit(0.05), 2) # intercept  <- rnorm(n, 0, 0.8)
 plot(NULL, las = 1, xlab = 'age (standardised)', ylab = 'eigenvector (standardised)',
      ylim = c(min(c(sim_cent_mu_1, sim_cent_mu_2))-2, max(c(sim_cent_mu_1, sim_cent_mu_2))+2),
      xlim = c(min(sim$age_std), max(sim$age_std)))
@@ -253,12 +253,20 @@ fit_sim <- nodal_regression$sample(data = eigen_list,
 
 #### check outputs ####
 ## extract model fit -- very good!
-fit_sim$summary()
-summary <- fit_sim$summary()
+( summary <- fit_sim$summary() )
 par(mfrow = c(3,1))
-hist(summary$rhat, breaks = 50)
-hist(summary$ess_bulk, breaks = 50)
-hist(summary$ess_tail, breaks = 50)
+hist(summary$rhat,#[grep(pattern = 'chol_',
+                       #x = summary$variable,
+                       #invert = T)],
+     breaks = 50)
+hist(summary$ess_bulk,#[grep(pattern = 'chol_',
+                           #x = summary$variable,
+                           #invert = T)],
+     breaks = 50)
+hist(summary$ess_tail,#[grep(pattern = 'chol_',
+                           #x = summary$variable,
+                           #invert = T)],
+     breaks = 50)
 par(mfrow = c(1,1))
 
 ## extract posterior
@@ -313,74 +321,36 @@ rm(plot_params) ; gc()
 par(mfrow = c(3,1))
 
 ## check on standardised scale
-plot(density(sim_dat[1, which(sim$window == 1)]), las = 1, ylim = c(0,1),
-#plot(density(sim_dat_std[1, which(sim$window == 1)]), las = 1, ylim = c(0,1),
-     main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
-     col=rgb(0, 0, 0, 0.25))
-eigen_data1 <- list(num_nodes_window1 = length(which(sim$window == 1)),
-                    centrality_mu_1 = sim_cent_mu_1,
-                    centrality_cov_1 = sim_cent_cov_1,
-                    node_age = sim$age_std[sim$window == 1],
-                    window = 1,
-                    nodes = sim$node_random[sim$window == 1],
-                    nodes_window1 = sim$node_random[sim$window == 1])
-for (i in 1:100) {
-  j <- sample(1:length(params_std$beta_age), 1)
-  lines(density(sim_dat[j, which(sim$window == 1)]), col=rgb(0, 0, 0, 0.25))
-  #lines(density(sim_dat_std[j, which(sim$window == 1)]), col=rgb(0, 0, 0, 0.25))
-  mu <- params_std$beta_age[j]*eigen_data1$node_age + params_std$intercept[j]
-  for(k in 1:length(mu)) {
-    mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data1$window]) + as.numeric(rand_node[j,eigen_data1$nodes[k]])
+ppcheck <- function(eigen_mat, eigen_df, cent_cov, window, params, rand_node, rand_window){
+  plot(density(eigen_mat[1, which(eigen_df$window == window)]), las = 1, ylim = c(0,1),
+       main = "Posterior predictive check:\nblack = data, blue = predicted",
+       #main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
+       col=rgb(0, 0, 0, 0.25))
+  eigen_data <- list(num_nodes_window = length(which(eigen_df$window == window)),
+                      node_age = eigen_df$age_std[eigen_df$window == window],
+                      window = window,
+                      nodes = eigen_df$node_random[eigen_df$window == window],
+                      nodes_window = eigen_df$node_random[eigen_df$window == window])
+  for (i in 1:100) {
+    j <- sample(1:length(params$beta_age), 1)
+    lines(density(eigen_mat[j, which(eigen_df$window == window)]), col=rgb(0, 0, 0, 0.25))
+    mu <- params$beta_age[j]*eigen_data$node_age + params$intercept[j]
+    for(k in 1:length(mu)) {
+      mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data$window]) + as.numeric(rand_node[j,eigen_data$nodes[k]])
+    }
+    sigma <- cent_cov + diag(rep(params$sigma[j], eigen_data$num_nodes_window))
+    lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
   }
-  sigma <- sim_cent_cov_1 + diag(rep(params_std$sigma[j], eigen_list$num_nodes_window1))
-  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
 }
-
-plot(density(sim_dat[1, which(sim$window == 2)]), las = 1, ylim = c(0,1),
-#plot(density(sim_dat_std[1, which(sim$window == 2)]), las = 1, ylim = c(0,1),
-     main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
-     col=rgb(0, 0, 0, 0.25))
-eigen_data2 <- list(num_nodes_window2 = length(which(sim$window == 2)),
-                    centrality_mu_2 = sim_cent_mu_2,
-                    centrality_cov_2 = sim_cent_cov_2,
-                    node_age = sim$age_std[sim$window == 2],
-                    window = 2,
-                    nodes = sim$node_random[sim$window == 2],
-                    nodes_window2 = sim$node_random[sim$window == 2])
-for (i in 1:100) {
-  j <- sample(1:length(params_std$beta_age), 1)
-  lines(density(sim_dat[j, which(sim$window == 2)]), col=rgb(0, 0, 0, 0.25))
-  #lines(density(sim_dat_std[j, which(sim$window == 2)]), col=rgb(0, 0, 0, 0.25))
-  mu <- params_std$beta_age[j]*eigen_data2$node_age + params_std$intercept[j]
-  for(k in 1:length(mu)) {
-    mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data2$window]) + as.numeric(rand_node[j,eigen_data2$nodes[k]])
-  }
-  sigma <- sim_cent_cov_2 + diag(rep(params_std$sigma[j], eigen_list$num_nodes_window2))
-  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
-}
-
-plot(density(sim_dat[1, which(sim$window == 3)]), las = 1, ylim = c(0,1),
-#plot(density(sim_dat_std[1, which(sim$window == 3)]), las = 1, ylim = c(0,1),
-     main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
-     col=rgb(0, 0, 0, 0.25))
-eigen_data3 <- list(num_nodes_window3 = length(which(sim$window == 3)),
-                    centrality_mu_3 = sim_cent_mu_3,
-                    centrality_cov_3 = sim_cent_cov_3,
-                    node_age = sim$age_std[sim$window == 3],
-                    window = 3,
-                    nodes = sim$node_random[sim$window == 3],
-                    nodes_window3 = sim$node_random[sim$window == 3])
-for (i in 1:100) {
-  j <- sample(1:length(params_std$beta_age), 1)
-  lines(density(sim_dat[j, which(sim$window == 3)]), col=rgb(0, 0, 0, 0.25))
-  #lines(density(sim_dat_std[j, which(sim$window == 3)]), col=rgb(0, 0, 0, 0.25))
-  mu <- params_std$beta_age[j]*eigen_data3$node_age + params_std$intercept[j]
-  for(k in 1:length(mu)) {
-    mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data3$window]) + as.numeric(rand_node[j,eigen_data3$nodes[k]])
-  }
-  sigma <- sim_cent_cov_3 + diag(rep(params_std$sigma[j], eigen_list$num_nodes_window3))
-  lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
-}
+ppcheck(eigen_mat = sim_dat, eigen_df = sim,
+        cent_cov = sim_cent_cov_1, window = 1, 
+        params = params_std, rand_node = rand_node, rand_window = rand_window)
+ppcheck(eigen_mat = sim_dat, eigen_df = sim,
+        cent_cov = sim_cent_cov_1, window = 2, 
+        params = params_std, rand_node = rand_node, rand_window = rand_window)
+ppcheck(eigen_mat = sim_dat, eigen_df = sim,
+        cent_cov = sim_cent_cov_1, window = 3, 
+        params = params_std, rand_node = rand_node, rand_window = rand_window)
 
 # ## check on unstandardised scale
 # plot(density(sim_dat[1, which(sim$window == 1)]), las = 1, ylim = c(0,0.5),
@@ -564,7 +534,7 @@ mean(params_std$beta_age)                                 # output parameter dir
 mean(contrast_std)                                    # should be very similar to mean of output parameter
 quantile(contrast_std, prob = c(0.025, 0.975))        # very wide
 
-## contrast predictions on unstandardised scale -- check that this returns the marginal effect presented in the summary
+## contrast predictions on unstandardised scale
 contrast <- contrast_std / sd(sim$age)                # contrast between predicted values for raw data and all same data but add 1 to age
 head(contrast[,1:5])                                  # check matrix looks right
 sim_slope                                             # output parameter direct from model
