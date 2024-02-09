@@ -16,3 +16,4 @@ dyadic_regression_motnp
 eigen_regression_singlewindow
 eigen_regression_motnp_cholesky
 eigen_regression_combinewindows_cholesky
+eigen_regression_mpnp
