@@ -25,10 +25,10 @@ sim <- data.frame(node = 1:n_nodes,                          # create data frame
 
 ## simulate centralities ####
 ## simulate age effect
-sim_slope <- 0.1                     # set age effect -- smaller = bigger impact on invlogit scale as values large
+sim_slope <- 0.1 #c(-1.5,-0.5,0.5,1.5,2.5)                    # set age effect -- smaller = bigger impact on invlogit scale as values large
 sim_intcp <- -4
-sim$mu <- sim$age * sim_slope + sim_intcp       # simulate mean centrality on normal scale
-plot(sim$mu ~ sim$age)                # plot
+sim$mu <- sim$age * sim_slope + sim_intcp #sim$mu <- sim_slope[sim$age_cat] + sim_intcp       # simulate mean centrality on normal scale
+plot(sim$mu ~ sim$age) #plot(sim$mu ~ sim$age_cat)           # plot
 #sim$mu_std <- ( sim$mu - mean(sim$mu) ) / sd(sim$mu)
 
 ## simulate full distribution of samples per node
@@ -86,7 +86,8 @@ data.frame(sim_dat) %>%
 
 ## normal approximation ####
 ## normal approximation
-plot(sim_dat[,1], sim_dat[,n_nodes])   # plot covariance (oldest and youngest to be sure it works for all pairs)
+plot(sim_dat[,which(sim$age == min(sim$age))[1]],
+     sim_dat[,which(sim$age == max(sim$age))[1]])   # plot covariance (oldest and youngest to be sure it works for all pairs)
 sim_cent_mu <- apply(sim_dat, 2, mean)     # calculate means per node
 sim_cent_cov <- cov(sim_dat)               # calculate covariance matrix
 
@@ -309,7 +310,8 @@ ggplot(pred_data)+
   theme_classic()
 
 ## clean up
-rm(eigen_list, nodal_regression, predict_full_invlogit, predict_mu_invlogit, sigma, sim_cent_samples, summary, i, j, k, parameters_to_check) ; gc()
+rm(eigen_list, nodal_regression, predict_full_invlogit, predict_mu_invlogit,#predict_full,  predict_mu,
+   sigma, sim_cent_samples, summary, i, j, k, parameters_to_check) ; gc()
 
 ## extract original values from output -- NOTE: CURRENT METHOD WILL NOT WORK FOR REAL DATA AS I DON'T HAVE THE AGE VALUES IN YEARS TO GO ABOUT ADDING 1 YEAR TO EVERY ELEPHANT. WILL NEED TO COME UP WITH AN ALTERNATIVE OR JUST SHOW CONTRASTS BETWEEN AGE CATEGORIES FOR REAL DATA, BUT HERE CHECK THE EFFECT ON REAL AGE SCALE TO BE SURE THAT THE MODEL IS WORKING. ####
 ## set up objects to store predictions
