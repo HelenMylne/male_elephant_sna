@@ -3,17 +3,20 @@
 # runs through dyadic regression as specified by Jordan Hart in BISoN examples (https://github.com/JHart96/bison_examples/blob/main/examples/dyadic_regression_stan.md)
 
 #### set up ####
-# library(cmdstanr) ; library(tidyverse) ; library(car) ; library(LaplacesDemon)
-library(cmdstanr, lib.loc = '../packages/')      # library(cmdstanr)
+# library(StanHeaders) ; library(rstan)
+# library(cmdstanr)
+# library(tidyverse) ; library(car) ; library(LaplacesDemon)
+library(StanHeaders, lib.loc = '../packages/')         # library(rstan)
+library(rstan, lib.loc = '../packages/')         # library(rstan)
+#library(cmdstanr, lib.loc = '../packages/')      # library(cmdstanr)
 library(tidyverse, lib.loc = '../packages/')     # library(tidyverse)
 library(car, lib.loc = '../packages/')           # library(car)
 library(LaplacesDemon, lib.loc = '../packages/') # library(LaplacesDemon)
 #library(bisonR, lib.loc = '../packages/')        # library(bisonR)
 #library(brms, lib.loc = '../packages/')          # library(brms)
-#library(rstan, lib.loc = '../packages/')         # library(rstan)
 #library(Rcpp, lib.loc = '../packages/')          # library(Rcpp)
 
-set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0')
+#set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
 
 load('motnp_edgeweights_conditionalprior.RData')
 rm(edge_binary, fit_edges_motnp, edgelist, edges, motnp_ages, x, summary, i, make_edgelist, plot_network_threshold) ; gc()
@@ -21,7 +24,11 @@ rm(edge_binary, fit_edges_motnp, edgelist, edges, motnp_ages, x, summary, i, mak
 pdf('../outputs/motnp_dyadicregression.pdf')
 theme_set(theme_classic())
 
-#### identify younger and older ####
+#### create analysis data frame ####
+## calculate integer values
+n_dyads <- nrow(counts_df)
+n_nodes <- length(unique(c(counts_df$id_1, counts_df$id_2)))
+
 ## categorise ages
 counts_df$age_cat_num_1 <- as.numeric(counts_df$age_cat_id_1)-2
 table(counts_df$age_cat_num_1, counts_df$age_category_1)
@@ -147,32 +154,150 @@ dyad_data <- list(
   length_dirichlet = n_age_cat + 1,         # number of unique age categories + 1
   logit_edge_mu = logit_edge_draws_mu,      # sample means of the logit edge weights
   logit_edge_cov = logit_edge_draws_cov,    # sample covariance of logit edge weights
-  age_min_cat = sim_dyads$age_min,          # age of younger dyad member
-  age_max_cat = sim_dyads$age_max,          # age of  older  dyad member
-  node_1 = sim_dyads$node_1,                # node IDs for multimembership effects
-  node_2 = sim_dyads$node_2,                # node IDs for multimembership effects
+  age_min_cat = counts_df$age_min,          # age of younger dyad member
+  age_max_cat = counts_df$age_max,          # age of  older  dyad member
+  node_1 = counts_df$node_1,                # node IDs for multimembership effects
+  node_2 = counts_df$node_2,                # node IDs for multimembership effects
   prior_min = rep(1, n_age_cat),            # prior for minimum age slope
   prior_max = rep(1, n_age_cat)             # prior for maximum age slope
 )
 
 ## load dyadic regression model
-dyadic_regression <- cmdstan_model('models/dyadic_regression_motnp.stan')
+#dyadic_regression <- cmdstan_model('models/dyadic_regression_motnp.stan')
+dyadic_regression <- stan_model('models/dyadic_regression_motnp.stan')
 n_chains <- 4
 n_samples <- 1000
 
 ## fit dyadic regression
-fit_dyadreg_motnp <- dyadic_regression$sample(
+# fit_dyadreg_motnp <- dyadic_regression$sample(
+#   data = dyad_data,
+#   iter_warmup = n_samples,
+#   iter_sampling = n_samples,
+#   chains = n_chains,
+#   parallel_chains = n_chains)
+fit_dyadreg_motnp <- sampling(dyadic_regression,
   data = dyad_data,
-  iter_warmup = n_samples,
-  iter_sampling = n_samples,
-  chains = n_chains,
-  parallel_chains = n_chains)
+  iter = n_samples*2, warmup = n_samples,
+  chains = n_chains, cores = n_chains)
 
 ## save output
 save.image('motnp_dyadicregression.RData')
 dev.off()
 
-#### check outputs ####
+# #### check outputs ####
+# summary <- as.data.frame(fit_dyadreg_motnp$summary())
+# hist(summary$rhat)
+# hist(summary$ess_bulk)
+# hist(summary$ess_tail)
+# 
+# ## extract draws
+# draws <- fit_dyadreg_motnp$draws(format = 'df')
+# 
+# ## extract dyadic regression slopes
+# b_max <- draws$beta_age_max
+# b_min <- draws$beta_age_min
+# intercept <- draws$intercept
+# sigma <- draws$sigma
+# delta_min <- draws[,c('delta_min[1]','delta_min[2]','delta_min[3]','delta_min[4]','delta_min[5]')] ; colnames(delta_min) <- 1:n_age_cat
+# delta_max <- draws[,c('delta_max[1]','delta_max[2]','delta_max[3]','delta_max[4]','delta_max[5]')] ; colnames(delta_min) <- 1:n_age_cat
+# delta_j_min <- draws[,c('delta_j_min[1]','delta_j_min[2]','delta_j_min[3]','delta_j_min[4]','delta_j_min[5]','delta_j_min[6]')] ; colnames(delta_j_min) <- 1:(n_age_cat+1)
+# delta_j_max <- draws[,c('delta_j_max[1]','delta_j_max[2]','delta_j_max[3]','delta_j_max[4]','delta_j_max[5]','delta_j_max[6]')] ; colnames(delta_j_max) <- 1:(n_age_cat+1)
+# parameters <- data.frame(beta_age_max = b_max,
+#                          beta_age_min = b_min,
+#                          intercept = intercept,
+#                          sigma = sigma) %>% 
+#   mutate(chain = rep(1:4, each = 1000),
+#          position = rep(1:1000, 4)) %>% 
+#   pivot_longer(cols = c('beta_age_max','beta_age_min','sigma','intercept'),
+#                names_to = 'parameter', values_to = 'slope_draw')
+# 
+# ## traceplots -- quite wandery, but well mixed with one another -- not sure if this is a problem or not
+# ggplot(data = parameters)+
+#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+#   theme(legend.position = 'none')+
+#   scale_colour_viridis_d()+
+#   facet_wrap(. ~ parameter , scales = 'free_y')
+# delta_min %>%  as.data.frame() %>% 
+#   mutate(chain = rep(1:4, each = 1000),
+#          position = rep(1:1000, 4)) %>% 
+#   pivot_longer(cols = all_of(1:n_age_cat),
+#                names_to = 'parameter', values_to = 'slope_draw') %>% 
+#   ggplot()+
+#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+#   theme(legend.position = 'none')+
+#   scale_colour_viridis_d()+
+#   facet_wrap(. ~ parameter , scales = 'free_y')
+# delta_max %>% as.data.frame() %>% 
+#   mutate(chain = rep(1:4, each = 1000),
+#          position = rep(1:1000, 4)) %>% 
+#   pivot_longer(cols = all_of(1:n_age_cat),
+#                names_to = 'parameter', values_to = 'slope_draw') %>% 
+#   ggplot()+
+#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+#   theme(legend.position = 'none')+
+#   scale_colour_viridis_d()+
+#   facet_wrap(. ~ parameter , scales = 'free_y')
+# delta_j_min %>% as.data.frame() %>% 
+#   mutate(chain = rep(1:4, each = 1000),
+#          position = rep(1:1000, 4)) %>% 
+#   pivot_longer(cols = all_of(2:(n_age_cat+1)),
+#                names_to = 'parameter', values_to = 'slope_draw') %>% 
+#   ggplot()+
+#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+#   theme(legend.position = 'none')+
+#   scale_colour_viridis_d()+
+#   facet_wrap(. ~ parameter , scales = 'free_y')
+# delta_j_max %>% as.data.frame(delta_j_max) %>% 
+#   mutate(chain = rep(1:4, each = 1000),
+#          position = rep(1:1000, 4)) %>% 
+#   pivot_longer(cols = all_of(2:(n_age_cat+1)),
+#                names_to = 'parameter', values_to = 'slope_draw') %>% 
+#   ggplot()+
+#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+#   theme(legend.position = 'none')+
+#   scale_colour_viridis_d()+
+#   facet_wrap(. ~ parameter , scales = 'free_y')
+# 
+# #### plot predictions ####
+# ## posterior predictive check
+# plot(density(as.numeric(sim_dat[1, ])),
+#      main = "Posterior predictive density of edge weights:\nblack = measured edge, red = predicted edge",
+#      ylim = c(0, 1), col = rgb(0, 0, 0, 0.25), las = 1)
+# for (i in 1:100) {
+#   j <- sample(1:1000, 1)
+#   
+#   mu_plot <- rep(NA, n_dyads)
+#   for(k in 1:n_dyads){
+#     mu_plot[k] <- intercept[j] + b_min[j]*sum(delta_j_min[j,(1:dyad_data$age_min_cat[k])]) + b_max[j]*sum(delta_j_max[j,(1:dyad_data$age_max_cat[k])])
+#   }
+#   
+#   sigma_plot <- dyad_data$logit_edge_cov + diag(rep(sigma[j], n_dyads))
+#   mv_norm <- MASS::mvrnorm(1, mu_plot, sigma_plot)
+#   
+#   lines(density(as.numeric(sim_dat[j, ])), col = rgb(0, 0, 0, 0.25)) # black lines for edge samples
+#   lines(density(mv_norm), col = rgb(1, 0, 0, 0.25))                  # red lines for predictions
+#   
+# }
+# 
+# dev.off()
+# 
+# 
+# 
+# 
 
-#### plot predictions ####
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
