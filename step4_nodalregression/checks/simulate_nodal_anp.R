@@ -137,7 +137,7 @@ points(sim_dat[1,which(sim$window == 3)] ~ sim$age[which(sim$window == 3)],
 
 ## visualise
 data.frame(sim_dat) %>% 
-#data.frame(sim_dat_std) %>% 
+  #data.frame(sim_dat_std) %>% 
   pivot_longer(cols = everything(),
                names_to = "node_random", values_to = "centrality") %>% 
   separate(node_random, into = c('X','node_window'), remove = T, sep = 1) %>% 
@@ -172,14 +172,14 @@ par(mfrow = c(3,1))
 sim_cent_samples <- MASS::mvrnorm(1e5, sim_cent_mu_1, sim_cent_cov_1)     # simulate from multivariate normal
 node_id_sample <- sample(which(sim$window == 1),1)
 plot(density(sim_dat[,node_id_sample]), lwd = 2, las = 1,                         # plot true density curve
-#plot(density(sim_dat_std[,node_id_sample]), lwd = 2, las = 1,                         # plot true density curve
+     #plot(density(sim_dat_std[,node_id_sample]), lwd = 2, las = 1,                         # plot true density curve
      main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
 lines(density(sim_cent_samples[, node_id_sample]), col = rgb(0,0,1,0.5), lwd = 2)      # overlay normal approximation
 
 sim_cent_samples <- MASS::mvrnorm(1e5, sim_cent_mu_2, sim_cent_cov_2)     # simulate from multivariate normal
 node_id_sample <- sample(which(sim$window == 2),1)
 plot(density(sim_dat[,node_id_sample]),          # plot true density curve
-#plot(density(sim_dat_std[,node_id_sample]),          # plot true density curve
+     #plot(density(sim_dat_std[,node_id_sample]),          # plot true density curve
      lwd = 2, las = 1,
      main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
 lines(density(sim_cent_samples[, node_id_sample - length(which(sim$window == 1))]), col = rgb(0,0,1,0.5), lwd = 2)      # overlay normal approximation
@@ -187,7 +187,7 @@ lines(density(sim_cent_samples[, node_id_sample - length(which(sim$window == 1))
 sim_cent_samples <- MASS::mvrnorm(1e5, sim_cent_mu_3, sim_cent_cov_3)     # simulate from multivariate normal
 node_id_sample <- sample(which(sim$window == 3),1)
 plot(density(sim_dat[,node_id_sample]),          # plot true density curve
-#plot(density(sim_dat_std[,node_id_sample]),          # plot true density curve
+     #plot(density(sim_dat_std[,node_id_sample]),          # plot true density curve
      lwd = 2, las = 1,
      main = "Estimated standardised centrality vs normal approximation", xlab = "Logit edge weight")
 lines(density(sim_cent_samples[, node_id_sample - length(which(sim$window < 3))]), col = rgb(0,0,1,0.5), lwd = 2)      # overlay normal approximation
@@ -256,16 +256,16 @@ fit_sim <- nodal_regression$sample(data = eigen_list,
 ( summary <- fit_sim$summary() )
 par(mfrow = c(3,1))
 hist(summary$rhat,#[grep(pattern = 'chol_',
-                       #x = summary$variable,
-                       #invert = T)],
+     #x = summary$variable,
+     #invert = T)],
      breaks = 50)
 hist(summary$ess_bulk,#[grep(pattern = 'chol_',
-                           #x = summary$variable,
-                           #invert = T)],
+     #x = summary$variable,
+     #invert = T)],
      breaks = 50)
 hist(summary$ess_tail,#[grep(pattern = 'chol_',
-                           #x = summary$variable,
-                           #invert = T)],
+     #x = summary$variable,
+     #invert = T)],
      breaks = 50)
 par(mfrow = c(1,1))
 
@@ -327,10 +327,10 @@ ppcheck <- function(eigen_mat, eigen_df, cent_cov, window, params, rand_node, ra
        #main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
        col=rgb(0, 0, 0, 0.25))
   eigen_data <- list(num_nodes_window = length(which(eigen_df$window == window)),
-                      node_age = eigen_df$age_std[eigen_df$window == window],
-                      window = window,
-                      nodes = eigen_df$node_random[eigen_df$window == window],
-                      nodes_window = eigen_df$node_random[eigen_df$window == window])
+                     node_age = eigen_df$age_std[eigen_df$window == window],
+                     window = window,
+                     nodes = eigen_df$node_random[eigen_df$window == window],
+                     nodes_window = eigen_df$node_random[eigen_df$window == window])
   for (i in 1:100) {
     j <- sample(1:length(params$beta_age), 1)
     lines(density(eigen_mat[j, which(eigen_df$window == window)]), col=rgb(0, 0, 0, 0.25))
@@ -423,7 +423,7 @@ par(mfrow = c(1,1))
 get_mean_predictions <- function(predict_df, parameters, include_node = TRUE, include_window = TRUE){
   ## create empty matrix to fill with predictions
   mean_matrix <- matrix(NA, nrow = nrow(parameters), ncol = nrow(predict_df),
-                           dimnames = list(NULL, predict_df$node_window))
+                        dimnames = list(NULL, predict_df$node_window))
   
   ## populate matrix = mean centrality values per node, predicting for real data
   for(i in 1:nrow(mean_matrix)){
