@@ -78,6 +78,7 @@ ggplot(nodes_all)+
 ## clean up
 rm(nodes_random, nodes) ; gc()
 save.image('anp_nodalregression/anp_short_nodal_dataprep.RData')
+write_csv(nodes_all, '../data_processed/step4_nodalregression/anp_allnodes.csv')
 
 #### reimport data and calculate centrality #####
 # load('anp_nodalregression/anp_short_nodal_dataprep.RData')
