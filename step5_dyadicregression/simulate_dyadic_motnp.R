@@ -172,17 +172,21 @@ dyad_data <- list(
 )
 
 ## load dyadic regression model
-dyadic_regression <- cmdstan_model('models/dyadic_regression_motnp.stan')
+dyadic_regression <- stan_model('models/dyadic_regression_motnp.stan')
 n_chains <- 4
 n_samples <- 1000
 
 ## fit dyadic regression
-fit_dyadreg_sim <- dyadic_regression$sample(
-  data = dyad_data,
-  iter_warmup = n_samples,
-  iter_sampling = n_samples,
-  chains = n_chains,
-  parallel_chains = n_chains)
+# fit_dyadreg_sim <- dyadic_regression$sample(
+#   data = dyad_data,
+#   iter_warmup = n_samples,
+#   iter_sampling = n_samples,
+#   chains = n_chains,
+#   parallel_chains = n_chains)
+fit_dyadreg_sim <- sampling(dyadic_regression,
+                            data = dyad_data,
+                            iter = n_samples*2, warmup = n_samples,
+                            chains = n_chains, cores = n_chains)
 
 #### check outputs ####
 # obtain summary
@@ -190,6 +194,7 @@ fit_dyadreg_sim$summary() %>%
   filter(variable %in% c('beta_age_max','beta_age_min','intercept',
                          'delta_min[1]','delta_min[2]','delta_min[3]','delta_min[4]','delta_min[5]',
                          'delta_max[1]','delta_max[2]','delta_max[3]','delta_max[4]','delta_max[5]'))
+
 ## extract model fit
 summary <- fit_dyadreg_sim$summary()
 par(mfrow = c(3,1))
