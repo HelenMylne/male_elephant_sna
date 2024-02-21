@@ -324,6 +324,12 @@ transformed parameters {
   for(i in 1:num_nodes_window36) {
     predictor_window36[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[36])] + rand_window[36] + rand_node[nodes_window36[i]];
   }
+  
+  // random effects
+  vector[num_windows] window_random_effect;
+  window_random_effect = rand_window * sigma_window;
+  vector[num_nodes] node_random_effect;
+  node_random_effect = rand_node * sigma_node;
 }
 
  model {
@@ -331,10 +337,10 @@ transformed parameters {
   beta_age ~ normal(0,0.8);
   sigma ~ exponential(2);
   intercept ~ normal(logit(0.05),2);
-  rand_window ~ normal(0,sigma_window);
-  sigma_window ~ exponential(1);
-  rand_node ~ normal(0,sigma_node);
-  sigma_node ~ exponential(1);
+  rand_window ~ normal(0,1); // rand_window ~ normal(0,sigma_window);
+  sigma_window ~ exponential(2);
+  rand_node ~ normal(0,1);   // rand_node ~ normal(0,sigma_node);
+  sigma_node ~ exponential(2);
   
   // likelihood
   centrality_mu_1 ~ multi_normal(predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
