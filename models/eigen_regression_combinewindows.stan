@@ -51,9 +51,11 @@ transformed parameters {
   beta_age ~ normal(0, 0.8);
   sigma ~ exponential(2);
   intercept ~ normal(-2,1); //intercept ~ normal(0,0.8);
-  rand_window ~ normal(0,1);
-  rand_node ~ normal(0,1);
-
+  rand_window ~ normal(0,sigma_window);
+  sigma_window ~ exponential(1);
+  rand_node ~ normal(0,sigma_node);
+  sigma_node ~ exponential(1);
+  
   // likelihood
   centrality_mu_1 ~ multi_normal(predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
   centrality_mu_2 ~ multi_normal(predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
