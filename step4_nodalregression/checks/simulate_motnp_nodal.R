@@ -15,38 +15,30 @@ n_nodes <- 2*((max_age+1) - min_age)                         # total nodes = ave
 ## simulate population for first time window
 sim <- data.frame(node = 1:n_nodes,                          # create data frame of individuals
                   age = sample(x = min_age:max_age, size = n_nodes,
-                               replace = T, prob = 1/(min_age:max_age)),
-                  age_cat = NA,
-                  mu = NA, sd = NA) %>% 
+                               replace = T, prob = 1/(min_age:max_age))) %>% 
   mutate(age_cat = ifelse(age <= 15, 1,
                           ifelse(age <= 20, 2,
                                  ifelse(age <= 25, 3,
-                                        ifelse(age <= 40, 4, 5)))))
+                                        ifelse(age <= 40, 4, 5)))),
+         mu = NA,
+         sd = NA)
 
 ## simulate centralities ####
 ## simulate age effect
-sim_slope <- 0.1 #c(-1.5,-0.5,0.5,1.5,2.5)                    # set age effect -- smaller = bigger impact on invlogit scale as values large
+sim_slope <- 0.1 #c(-1.5,-0.5,0.5,1.5,2.5)
 sim_intcp <- -4
 sim$mu <- sim$age * sim_slope + sim_intcp #sim$mu <- sim_slope[sim$age_cat] + sim_intcp       # simulate mean centrality on normal scale
-plot(sim$mu ~ sim$age) #plot(sim$mu ~ sim$age_cat)           # plot
-#sim$mu_std <- ( sim$mu - mean(sim$mu) ) / sd(sim$mu)
+plot(sim$mu ~ sim$age) #plot(sim$mu ~ sim$age_cat)
 
 ## simulate full distribution of samples per node
-sim$sd <- 1#abs(sim_slope/3)           # make small to start with to be sure model should be able to detect difference
+sim$sd <- 1            # allow to vary amongst nodes once confident that it's working with the simple version
 sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_nodes, dimnames = list(NULL, sim$node_window))    # create matrix
 for(j in 1:n_nodes){
   sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution
 }
 plot(sim_dat[1,] ~ sim$age)          # plot simulated values against age
 
-# ## standardise
-# sim_dat_std <- sim_dat               # create matrix to fill
-# for(i in 1:nrow(sim_dat_std)){
-#   sim_dat_std[i,] <- (sim_dat[i,] - mean(sim_dat[i,]) ) / sd(sim_dat[i,]) # standardise values
-# }
-# plot(sim_dat_std[1,] ~ sim$age)      # plot simulated values against age
-
-## visualise
+## visualise -- centrality ~ age (years)
 data.frame(sim_dat) %>% 
   pivot_longer(cols = everything(),
                names_to = "node", values_to = "centrality") %>% 
@@ -65,6 +57,7 @@ data.frame(sim_dat) %>%
         axis.title.x = element_text(size = 12),
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
 
+## visualise -- centrality ~ age (category)
 data.frame(sim_dat) %>% 
   pivot_longer(cols = everything(),
                names_to = "node", values_to = "centrality") %>% 
@@ -85,9 +78,11 @@ data.frame(sim_dat) %>%
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
 
 ## normal approximation ####
-## normal approximation
+## plot covariance
 plot(sim_dat[,which(sim$age == min(sim$age))[1]],
-     sim_dat[,which(sim$age == max(sim$age))[1]])   # plot covariance (oldest and youngest to be sure it works for all pairs)
+     sim_dat[,which(sim$age == max(sim$age))[1]])   # oldest and youngest
+
+## calculate mean and covariance for all
 sim_cent_mu <- apply(sim_dat, 2, mean)     # calculate means per node
 sim_cent_cov <- cov(sim_dat)               # calculate covariance matrix
 
@@ -237,7 +232,7 @@ predict_full_centrality <- function(params, mu_matrix, cov_matrix){
 }
 
 ## create predictions data frame
-pred_data <- sim[order(sim$age_cat),]
+pred_data <- sim[order(sim$age_cat),] # ordered because otherwise a later plotting function was being super annoying about forming logical lines and which bits it connected
 
 ## predicted means
 predict_mu <- predict_mean_centrality(params = params, delta_j = delta_j, pred_data = pred_data)
@@ -263,31 +258,6 @@ ggplot(pred_data,
        aes(y = mu_mean_predict, x = mu))+
   geom_point()+
   geom_abline(slope = 1, intercept = 0)
-
-# ## unstandardise predictions
-# predict_mu_ustd <- predict_mu * sd(sim$mu) + mean(sim$mu)
-# predict_full_ustd <- predict_full * sd(sim$mu) + mean(sim$mu)
-# pred_data$mu_mean_predict_ustd <- apply(predict_mu_ustd, 2, mean)
-# pred_data$mu_lwr_predict_ustd <- apply(predict_mu_ustd, 2, quantile, probs = 0.025)
-# pred_data$mu_upr_predict_ustd <- apply(predict_mu_ustd, 2, quantile, probs = 0.975)
-# pred_data$full_lwr_predict_ustd <- apply(predict_full_ustd, 2, quantile, probs = 0.025)
-# pred_data$full_upr_predict_ustd <- apply(predict_full_ustd, 2, quantile, probs = 0.975)
-
-## check
-plot(pred_data$mu_mean_predict ~ pred_data$mu)
-abline(a = 0, b = 1)
-
-# ## compare to unstandardised raw data
-# plot(NULL, las = 1,  type = 'p', ylim = c(-15,2), xlim = c(1,5),
-#      xlab = 'age category', ylab = 'eigenvector centrality (unstd)')    # set up plot
-# polygon(y = c(pred_data$full_lwr_predict_ustd, rev(pred_data$full_upr_predict_ustd)),
-#         x = c(pred_data$age_cat, rev(pred_data$age_cat)),               # plot predicted full distribution
-#         col = rgb(1,1,0,0.4), border = NA)
-# polygon(y = c(pred_data$mu_lwr_predict_ustd, rev(pred_data$mu_upr_predict_ustd)),
-#         x = c(pred_data$age_cat, rev(pred_data$age_cat)),               # plot predicted means distribution
-#         col = rgb(1,0,0,0.4), border = NA)
-# points(sim$mu ~ sim$age_cat, col = rgb(0,0,1,0.2))                      # add raw points
-# points(pred_data$mu_mean_predict_ustd ~ pred_data$age_cat, pch = 19)    # add mean predicted points
 
 ## convert to invlogit scale
 predict_mu_invlogit <- invlogit(predict_mu)
@@ -358,40 +328,3 @@ contrasts_all <- contrasts_all %>%
 sim_slope
 mean(contrasts_all$mean_contrast)
 quantile(contrasts_all$mean_contrast, prob = c(0.025, 0.975))
-
-#### ignore below unless above method is actually wrong and need to come back to this
-# ## get mean predictions for altered age categories
-# sim2 <- sim %>% 
-#   mutate(age_cat = age_cat + 1) %>%                   # shift to new age category
-#   mutate(age_cat = ifelse(age_cat == 6, 1, age_cat))  # won't work with age category 6 so make these category 1 to fill in the gaps (can't actually use these)
-# sim2 <- sim2[order(sim2$age_cat),]
-# predict_mu2 <- predict_mean_centrality(params = params, delta_j = delta_j, pred_data = sim2)
-# sim2$mu_mean_plus1 <- apply(predict_mu2, 2, mean)
-# 
-# ## full distribution of predictions using age_cat + 1
-# predict_full2 <- predict_full_centrality(params = params, mu_matrix = predict_mu2, cov_matrix = sim_cent_cov)
-# 
-# ## contrast predictions on standardised scale -- check that this returns the marginal effect presented in the summary
-# contrast <- predict_full2 - predict_full              # contrast between predicted values
-# head(contrast[,1:5])                                  # check matrix looks right
-# sim_slope                                             # original input parameter
-# mean(contrast)                                        # that's not right
-# quantile(contrast, prob = c(0.025, 0.975))            # very wide
-# 
-# ## contrast per category
-# contrast_1_2 <- contrast[,sim2$age_cat == 2]
-# contrast_2_3 <- contrast[,sim2$age_cat == 3]
-# contrast_3_4 <- contrast[,sim2$age_cat == 4]
-# contrast_4_5 <- contrast[,sim2$age_cat == 5]
-# 
-# mean(contrast_1_2)/5                                      # difference per year between 10-15 and 16-20
-# quantile(contrast_1_2, prob = c(0.025, 0.975))            # very wide
-# 
-# mean(contrast_2_3)/5                                      # difference per year between 16-20 and 21-15
-# quantile(contrast_2_3, prob = c(0.025, 0.975))            # very wide
-# 
-# mean(contrast_3_4)/10                                     # difference per year between 21-25 and 26-40
-# quantile(contrast_3_4, prob = c(0.025, 0.975))            # very wide
-# 
-# mean(contrast_4_5)/10                                     # difference between 26-40 and 40+
-# quantile(contrast_4_5, prob = c(0.025, 0.975))            # very wide
