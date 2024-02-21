@@ -17,19 +17,14 @@ theme_set(theme_bw(base_size = 12))
 # define sequence over which to plot
 x <- seq(0, 1, length = 100)
 
-# identify probability of each value of x depending on shape of distributions -- I'VE CURRENTLY GONE WITH VALUES THAT LOOK GOOD IN THESE DISTIRBUTIONS, BUT SHOULD THESE BE PARTICULAR VALUES? I DON'T THINK THEY SHOULD BE BUT WANT TO CHECK
-rare2  <- dbeta(x = x, shape1 = 1.2, shape2 = 3)
-rare10 <- dbeta(x = x, shape1 = 1.9, shape2 = 10)
-sometimes2  <- dbeta(x = x, shape1 = 2, shape2 = 2)
-sometimes10 <- dbeta(x = x, shape1 = 10, shape2 = 10)
-usual2  <- dbeta(x = x, shape1 = 3, shape2 = 1.2)
-usual10 <- dbeta(x = x, shape1 = 10, shape2 = 1.9)
-
-# tidy
+# identify probability of each value of x depending on shape of distributions
 distributions <- data.frame(x = x,
-                            rare2 = rare2, rare10 = rare10,
-                            sometimes2 = sometimes2, sometimes10 = sometimes10,
-                            usual2 = usual2, usual10 = usual10) %>% 
+                            rare2 = dbeta(x = x, shape1 = 0.1, shape2 = 1.9),
+                            rare10 = dbeta(x = x, shape1 = 1, shape2 = 9),
+                            sometimes2 = dbeta(x = x, shape1 = 1, shape2 = 1),
+                            sometimes10 = dbeta(x = x, shape1 = 10, shape2 = 10),
+                            usual2 = dbeta(x = x, shape1 = 1.9, shape2 = 0.1),
+                            usual10 = dbeta(x = x, shape1 = 9, shape2 = 1)) %>% 
   pivot_longer(names_to = 'category', values_to = 'dbeta',
                cols = c("rare2", "rare10",
                         "sometimes2", "sometimes10",
@@ -98,20 +93,35 @@ true_values <- data.frame(x = rep(c(0.1,0.5,0.9), each = 2),
          labels_sightings = ifelse(sightings == 2, 'seen twice','seen 10 times'))
 
 (figure1 <- ggplot()+
-    geom_vline(data = true_values, aes(xintercept = x), linewidth = 1.2, colour = '#fde725')+
-    geom_line(data = distributions, aes(x = x, y = dbeta/max(dbeta)), linewidth = 1.2, colour = '#21918c')+
-    geom_line(data = sri, aes(x = x, y = y_value, group = pairing), linewidth = 1.2, colour = '#440154')+
+    geom_vline(data = true_values, aes(xintercept = x,
+                                       colour = 'True edge weight'),
+               linewidth = 1.2)+
+    geom_line(data = distributions, aes(x = x,
+                                        y = dbeta/max(dbeta[dbeta != 'Inf']),
+                                        colour = 'Bayesian posterior distribution'), 
+              linewidth = 1.2,
+              key_glyph = 'rect')+
+    geom_line(data = sri, aes(x = x, y = y_value, group = pairing,
+                              colour = 'SRI probability'),
+              linewidth = 1.2)+
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density', limits = c(0,1))+
-    facet_grid(labels_sightings ~ labels_together) )
+    facet_grid(labels_sightings ~ labels_together)+
+    scale_color_manual(name='Edge weight',
+                       breaks=c('True edge weight', 'SRI probability', 'Bayesian posterior distribution'),
+                       values=c('True edge weight'='#fde725',
+                                'SRI probability'='#440154',
+                                'Bayesian posterior distribution'='#21918c'))+
+    theme(legend.position = 'bottom')
+)
 ggsave(filename = 'figure1_example_sri_vs_bison.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure1, device = 'png', width = 4200, height = 2400, units = 'px')
+       plot = figure1, device = 'png', width = 2100, height = 1200, units = 'px')
 
 # clean up
 rm(distributions, sri, true_values, rare10, rare2, sometimes10, sometimes2, usual10, usual2) ; gc()
 
-#### Figure 2: 12 panel plots of SRI/default BISoN/right-skewed BISoN for prior/posterior/mean_edge_vs_sightings/eigenvector_vs_sightingss ####
+#### Figure 2: 3 panel plot of SRI/default BISoN/right-skewed BISoN for priors ####
 ## panel a: SRI, Prior distribution ####
 # calculate probability of all values of x assuming completely flat prior
 flat_prior <- dunif(x = x, min = 0, max = 1)
@@ -149,8 +159,8 @@ ggsave(filename = 'figure2b_prior_default.png',
 
 ## panel c: right-skewed, Prior distribution ####
 # calculate probability of all values of x assuming right skewed prior shape
-skewed_prior <- c(-2.5, 1.5)
-skewed_prior <- dnorm(x = logit(x), mean = skewed_prior[1], sd = skewed_prior[2])
+skewed_prior <- c(1, 5)
+skewed_prior <- dbeta(x = x, shape1 = skewed_prior[1], shape2 = skewed_prior[2])
 data <- data.frame(x = x, density = skewed_prior)
 
 # plot
@@ -158,7 +168,7 @@ data <- data.frame(x = x, density = skewed_prior)
     geom_line(aes(x = x, y = density), linewidth = 1.2, colour = rgb(33/255, 145/255, 140/255))+
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density',
-                       limits = c(0,0.3),
+                       #limits = c(0,0.3),
                        #limits = c(0,1),
                        expand = c(0,0))
   )
@@ -169,7 +179,40 @@ ggsave(filename = 'figure2c_prior_rightskewed.png',
 # clean up
 rm(list = ls()[!ls() %in% c('figure2a','figure2b','figure2c')]) ; gc()
 
-## panel d: SRI, Posterior distribution ####
+## merge ####
+(figure2a + figure2b + figure2c) +
+  plot_annotation(tag_levels = 'a')
+ggsave(filename = 'figure2.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 2400, height = 800, units = 'px')
+
+#### Figure 3: 1 panel plot of conditional prior ####
+# define sequence over which to plot
+x <- seq(0, 1, length = 100)
+
+# calculate probability of all values of x assuming completely flat prior
+conditional1 <- dbeta(x = x, shape1 = 0.7, shape2 = 10)
+conditional2 <- dbeta(x = x, shape1 = 1, shape2 = 5)
+data <- data.frame(x = x,
+                   density1 = conditional1,
+                   density2 = conditional2)
+# plot
+(figure3 <- ggplot(data)+
+    geom_line(aes(x = x, y = density1), linewidth = 1.2, linetype = 1, colour = rgb(33/255, 145/255, 140/255))+
+    geom_line(aes(x = x, y = density2), linewidth = 1.2, linetype = 2, colour = rgb(68/255,1/255,84/255,1))+
+    scale_x_continuous(name = 'edge weight')+
+    scale_y_continuous(name = 'density', expand = c(0,0))+
+    coord_cartesian(ylim = c(0,15))
+)
+ggsave(filename = 'prior_conditional.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure3, device = 'png', width = 1000, height = 800, units = 'px')
+
+# clean up
+rm(list = ls()) ; gc()
+
+#### Figure 4: SRI posterior/mean_edge_vs_sightings/eigenvector_vs_sightings ####
+## panel a: SRI, Posterior distribution ####
 # read in MOTNP data
 load('motnp_edgeweights_conditionalprior.RData')
 rm(edge_binary, edge_samples, edgelist, edges, fit_edges_motnp)
@@ -194,25 +237,8 @@ subset10 <- counts_df %>% filter(count_1 >= 10 & count_2 >= 10)
 length(unique(c(subset10$id_1, subset10$id_2)))
 100-(( length(unique(c(subset10$id_1, subset10$id_2))) / length(unique(c(counts_df$id_1, counts_df$id_2))) )*100)
 
-# histogram posterior distributions
-(figure2d <- ggplot(counts_df)+
-    geom_histogram(aes(x = sri), bins = 100, fill = rgb(33/255, 145/255, 140/255))+
-    scale_x_continuous(name = 'SRI value')+
-    scale_y_continuous(name = 'number of dyads',
-                       limits = c(0,20000),
-                       expand = c(0,0))
-  )
-(figure2d <- ggplot(counts_df)+
-    geom_histogram(aes(x = sri), bins = 100, fill = rgb(33/255, 145/255, 140/255))+
-    scale_x_continuous(name = 'SRI value')+
-    scale_y_continuous(name = 'number of dyads',
-                       #limits = c(0,1000),
-                       expand = c(0,0))+
-    coord_cartesian(ylim = c(0,1000))
-    )
-
 # bar plot
-(figure2d <- ggplot()+
+(figure4a <- ggplot()+
     geom_bar(data = counts_df, aes(x = round(sri, 3)), fill = rgb(33/255, 145/255, 140/255),
              colour = rgb(33/255, 145/255, 140/255), linewidth = 0.2)+
     #geom_bar(data = counts_df[counts_df$count_dyad > 10,], aes(x = round(sri, 3)), fill = '#fde725', colour = 'transparent')+
@@ -226,12 +252,12 @@ length(unique(c(subset10$id_1, subset10$id_2)))
              colour = rgb(33/255, 145/255, 140/255))+
     coord_cartesian(ylim = c(0,200))
 )
-ggsave(filename = 'figure2d_posterior_sri.png',
+ggsave(filename = 'figure4a_posterior_sri.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2d, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure4a, device = 'png', width = 1400, height = 800, units = 'px')
 
 # redo annotation on figure 2d so that size isn't too large for multi plot
-(figure2d <- ggplot()+
+(figure4a <- ggplot()+
     geom_bar(data = counts_df, aes(x = round(sri, 3)), fill = rgb(33/255, 145/255, 140/255),
              colour = rgb(33/255, 145/255, 140/255), linewidth = 0.2)+
     #geom_bar(data = counts_df[counts_df$count_dyad > 10,], aes(x = round(sri, 3)), fill = '#fde725', colour = 'transparent')+
@@ -250,174 +276,25 @@ ggsave(filename = 'figure2d_posterior_sri.png',
     coord_cartesian(ylim = c(0,200))
 )
 
-## panel e: default normal(0,2.5), Posterior distribution ####
-# compile edge model
-edge_binary_generic <- cmdstan_model('other/methods_paper/edge_binary_gaussian.stan')
-
-# load data
-counts_ls_default <- list(n_dyads = nrow(counts_df), 
-                          dyad_ids = counts_df$dyad_id,
-                          together = counts_df$event_count,
-                          count_dyad = counts_df$count_dyad,
-                          prior_mean = 0,
-                          prior_stdev = 2.5)
-
-# fit model
-fit_edges_default <- edge_binary_generic$sample(
-  data = counts_ls_default, 
-  chains = n_chains, 
-  parallel_chains = n_chains)
-
-# extract edges
-edge_samples <- fit_edges_default$draws() %>% as.data.frame()
-edge_samples <- edge_samples[,(n_chains+1):ncol(edge_samples)]
-edge_samples <- edge_samples[,seq(1,ncol(edge_samples)-3, by = 4)]
-edge_samples <- edge_samples %>% 
-  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
-
-# plot
-(figure2e <- ggplot(data = edge_samples)+
-    geom_density(aes(group = parameter, x = weight), colour = rgb(33/255, 145/255, 140/255, 0.1))+
-    scale_x_continuous(name = 'edge weight')+
-    scale_y_continuous(name = 'density')
-  )
-ggsave(filename = 'figure2e_posterior_default_alldyads.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2e, device = 'png', width = 1400, height = 800, units = 'px')
-
-edge_samples$dyad_males <- rep(1:nrow(counts_df), n_samples)
-edge_samples <- edge_samples %>% 
-  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
-            by = 'dyad_males') %>% 
-  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
-
-set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
-plot_dyad_ids <- unique(edge_samples$parameter)[plot_dyads]
-edges_subset <- edge_samples[edge_samples$parameter %in% plot_dyad_ids,]
-(figure2e <- ggplot(data = edges_subset)+
-    geom_density(aes(group = parameter, x = weight, colour = together0), show.legend = F)+#, colour = rgb(33/255, 145/255, 140/255, 0.1))+
-    stat_density(aes(group = parameter, x = weight, colour = together0),
-                 geom = "line", position = "identity", linewidth = 0)+
-    scale_x_continuous(name = 'edge weight')+
-    scale_y_continuous(name = 'density')+
-    scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5), rgb(68/255, 1/255, 84/255, 0.5)),
-                        aesthetics = 'colour')+
-    theme(legend.position = c(0.8,0.7),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
-          legend.key.height = unit(4, 'mm'),
-          legend.title = element_text(size = 10),
-          legend.text = element_text(size = 8))+
-    guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
-    labs(colour = 'sightings together')
-)
-ggsave(filename = 'figure2e_posterior_default_sampledyads.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2e, device = 'png', width = 1400, height = 800, units = 'px')
-
-# clean workspace
-save.image('../outputs/sparse_network_methods_figures/model_run_default.RData')
-
-# clean up
-rm(list = ls()[!ls() %in% c('figure2a','figure2b','figure2c',
-                            'figure2d','figure2e',
-                            'edge_binary_generic','counts_df','n_chains')]) ; gc()
-
-## panel f: right-skewed normal(-2.5, 1.5), Posterior distribution ####
-# compile edge model
-# respecify priors for skewed model
-counts_ls_skewed <- list(n_dyads = nrow(counts_df), 
-                         dyad_ids = counts_df$dyad_id,
-                         together = counts_df$event_count,
-                         count_dyad = counts_df$count_dyad,
-                         prior_mean = -2.5,
-                         prior_stdev = 1.5)
-
-# fit model
-fit_edges_skewed <- edge_binary_generic$sample(
-  data = counts_ls_skewed, 
-  chains = n_chains, 
-  parallel_chains = n_chains)
-
-# extract edges
-edge_samples <- fit_edges_skewed$draws() %>% as.data.frame()
-edge_samples <- edge_samples[,(n_chains+1):ncol(edge_samples)]
-edge_samples <- edge_samples[,seq(1,ncol(edge_samples)-3, by = 4)]
-edge_samples <- edge_samples %>% 
-  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
-
-# plot
-(figure2f <- ggplot(data = edge_samples)+
-    geom_density(aes(group = parameter, x = weight), colour = rgb(33/255, 145/255, 140/255, 0.1))+
-    scale_x_continuous(name = 'edge weight')+
-    scale_y_continuous(name = 'density')
-)
-ggsave(filename = 'figure2f_posterior_rightskewed.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2f, device = 'png', width = 1400, height = 800, units = 'px')
-
-edge_samples$dyad_males <- rep(1:nrow(counts_df), n_samples)
-edge_samples <- edge_samples %>% 
-  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
-            by = 'dyad_males') %>% 
-  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
-
-set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
-plot_dyad_ids <- unique(edge_samples$parameter)[plot_dyads]
-edges_subset <- edge_samples[edge_samples$parameter %in% plot_dyad_ids,]
-(figure2f <- ggplot(data = edges_subset)+
-    geom_density(aes(group = parameter, x = weight, colour = together0), show.legend = F)+#, colour = rgb(33/255, 145/255, 140/255, 0.1))+
-    stat_density(aes(group = parameter, x = weight, colour = together0),
-                 geom = "line", position = "identity", linewidth = 0)+
-    scale_x_continuous(name = 'edge weight')+
-    scale_y_continuous(name = 'density')+
-    scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5), rgb(68/255, 1/255, 84/255, 0.5)),
-                        aesthetics = 'colour')+
-    theme(legend.position = c(0.8,0.7),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
-          legend.key.height = unit(4, 'mm'),
-          legend.title = element_text(size = 10),
-          legend.text = element_text(size = 8))+
-    guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
-    labs(colour = 'sightings together')
-)
-ggsave(filename = 'figure2f_posterior_default_sampledyads.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2f, device = 'png', width = 1400, height = 800, units = 'px')
-
-
-# clean up and save
-rm(data, default_prior, flat_prior, elephants) ; gc()
-save.image('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
-
-# clean up
-rm(list = ls()[!ls() %in% c('figure2a','figure2b','figure2c','figure2d','figure2e','figure2f')]) ; gc()
-
-## panel g: SRI, mean edge weight vs dyad sighting count ####
-load('motnp_edgeweights_conditionalprior.RData')
-rm(edge_binary, edge_samples, edgelist, edges, fit_edges_motnp)
-
-# calculate sri
-counts_df$sri <- counts_df$event_count / counts_df$count_dyad
-
-# plot
-(figure2g.1 <- ggplot(counts_df, aes(x = count_dyad, y = sri))+
+## panel b: SRI, mean edge weight vs dyad sighting count ####
+(figure4b.1 <- ggplot(counts_df, aes(x = count_dyad, y = sri))+
    geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
    scale_x_continuous(name = 'total dyad sightings')+
    scale_y_continuous(name = 'SRI weight', limits = c(-0.02,1.02), expand = c(0,0))
 )
-ggsave(filename = 'figure2g_edgesightings_sri_noline.png',
+ggsave(filename = 'figure4b_edgesightings_sri_noline.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2g.1, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure4b.1, device = 'png', width = 1400, height = 800, units = 'px')
 
-(figure2g.2 <- ggplot(counts_df, aes(x = count_dyad, y = sri))+
+(figure4b.2 <- ggplot(counts_df, aes(x = count_dyad, y = sri))+
     geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'SRI weight', limits = c(-0.02,1.02), expand = c(0,0))
 )
-ggsave(filename = 'figure2g_edgesightings_sri_withline_changealpha.png',
+ggsave(filename = 'figure4b_edgesightings_sri_withline_changealpha.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2g.2, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure4b.2, device = 'png', width = 1400, height = 800, units = 'px')
 
 counts_df$sri_rank <- as.integer(as.factor(counts_df$sri))
 p7 <- as.data.frame(table(counts_df$count_dyad, counts_df$sri)) %>% 
@@ -425,7 +302,7 @@ p7 <- as.data.frame(table(counts_df$count_dyad, counts_df$sri)) %>%
          sri_rank = as.numeric(Var2)) %>% 
   filter(Freq > 0) %>% 
   left_join(distinct(counts_df[,c('sri','sri_rank')]), by = 'sri_rank')
-(figure2g.3 <- ggplot()+
+(figure4b.3 <- ggplot()+
     geom_point(data = p7, aes(x = count_dyad, y = sri, size = Freq),
                colour = rgb(33/255, 145/255, 140/255))+
     geom_smooth(data = counts_df, aes(x = count_dyad, y = sri),
@@ -440,11 +317,11 @@ p7 <- as.data.frame(table(counts_df$count_dyad, counts_df$sri)) %>%
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'SRI weight')
 )
-ggsave(filename = 'figure2g_edgesightings_sri_withline_changesize.png',
+ggsave(filename = 'figure4b_edgesightings_sri_withline_changesize.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2g.3, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure4b.3, device = 'png', width = 1400, height = 800, units = 'px')
 
-(figure2g.3 <- ggplot()+
+(figure4b.3 <- ggplot()+
     geom_point(data = p7, aes(x = count_dyad, y = sri, size = Freq),
                colour = rgb(33/255, 145/255, 140/255, 0.5))+
     geom_smooth(data = counts_df, aes(x = count_dyad, y = sri),
@@ -461,65 +338,181 @@ ggsave(filename = 'figure2g_edgesightings_sri_withline_changesize.png',
 )
 
 # clean up 
-rm(list = ls()[!ls() %in% c('figure2a', 'figure2b', 'figure2c',
-                            'figure2d', 'figure2e', 'figure2f',
-                            'figure2g.1','figure2g.2', 'figure2g.3')]) ; gc()
+rm(list = ls()[!ls() %in% c('figure4a', 'figure4b.2', 'counts_df')]) ; gc()
 
-## panel h: default, mean edge weight vs dyad sighting count ####
-load('../outputs/sparse_network_methods_figures/model_run_default.RData')
-means <- edge_samples %>% 
-  group_by(parameter) %>% 
-  mutate(mean = mean(weight)) %>% 
-  select(parameter, mean) %>% 
-  distinct()
-
-means$dyad_males <- 1:nrow(means)
-
-means <- means %>% 
-  left_join(counts_df[,c('dyad_id','node_1_males','node_2_males','event_count','count_dyad','count_1','count_2','dyad_males')],
-            by = 'dyad_males')
-
-(figure2h.1 <- ggplot(means, aes(x = count_dyad, y = mean))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'total dyad sightings')+
-    scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2h_edgesightings_default_noline.png',
+# ## panel c: SRI, eigenvector centrality vs individual sighting count ####
+# counts_df$sri <- counts_df$event_count / counts_df$count_dyad
+# elephants <- unique(c(counts_df$id_1, counts_df$id_2))
+# sri_adjmat <- matrix(NA, nrow = length(elephants), ncol = length(elephants), dimnames = list(x = elephants, y = elephants))
+# for(i in 1:nrow(sri_adjmat)){
+#   for(j in 1:ncol(sri_adjmat)){
+#     if(i <= j){
+#       sri_adjmat[i,j] <- ifelse(i == j, 0,
+#                                 counts_df$sri[which(counts_df$id_1 == rownames(sri_adjmat)[i] &
+#                                                       counts_df$id_2 == colnames(sri_adjmat)[j])])
+#     } else {
+#       sri_adjmat[i,j] <- sri_adjmat[j,i]
+#     }
+#   }
+# }
+# sri_net <- igraph::graph_from_adjacency_matrix(sri_adjmat, weighted = T, mode = 'undirected', diag = FALSE)
+# eigen_sri <- igraph::eigen_centrality(sri_net)$vector %>% 
+#   as.data.frame()
+# colnames(eigen_sri) <- 'eigen'
+# eigen_sri$id <- rownames(eigen_sri)
+# 
+# together0 <- counts_df %>% filter(event_count == 0)
+# eigen_sri$together0 <- NA ; for(i in 1:nrow(eigen_sri)) {
+#   x <- together0 %>%
+#     filter(id_1 == eigen_sri$id[i] | id_2 == eigen_sri$id[i])
+#   eigen_sri$together0[i] <- nrow(x)
+# }
+# 
+# counts <- data.frame(id = elephants, count = NA)
+# for(i in 1:nrow(counts)){
+#   counts$count[i] <- ifelse(i == nrow(counts),
+#                             unique(counts_df$count_2[which(counts_df$id_2 == counts$id[i])]),
+#                             unique(counts_df$count_1[which(counts_df$id_1 == counts$id[i])]))
+# }
+# 
+# eigen_sri <- eigen_sri %>% 
+#   left_join(counts, by = 'id')
+# 
+# (figure4c.1 <- ggplot(eigen_sri, aes(x = count, y = eigen))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure4c_eigensightings_sri_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure4c.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure4c.2 <- ggplot(eigen_sri, aes(x = count, y = eigen))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure4c_eigensightings_sri_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure4c.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# # clean up
+# rm(list = ls()[!ls() %in% c('figure4a', 'figure4b.2', 'figure4c.2',
+#                             'figure4c.2', 'eigen_sri')]) ; gc()
+# 
+# ## panel d: SRI, eigenvector centrality vs total number of dyads where together = 0 ####
+# (figure4d.1 <- ggplot(eigen_sri, aes(x = together0, y = eigen))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure4d_eigentogether0_sri_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure4d.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure4d.2 <- ggplot(eigen_sri, aes(x = together0, y = eigen))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure4d_eigentogether0_sri_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure4d.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+## merge ####
+(figure4a + figure4b.2)+# / (figure4c.2 + figure4d.2)+
+  plot_annotation(tag_levels = 'a')
+ggsave(filename = 'figure4.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2h.1, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = last_plot(), device = 'png', width = 2400, height = 800, units = 'px')
 
-(figure2h.2 <- ggplot(means, aes(x = count_dyad, y = mean))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
-    geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'total dyad sightings')+
-    scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
+#### Figure 5: BISoN posterior/mean_edge_vs_sightings/eigenvector_vs_sightings ####
+load('motnp_edgeweights_conditionalprior.RData')
+rm(list = ls()[! ls() %in% c('counts_df','n_chains','eigen_sri')])
+
+# calculate sri
+counts_df$sri <- counts_df$event_count / counts_df$count_dyad
+
+## uniform prior, Posterior distribution ####
+# compile edge model
+edge_binary_uniform <- cmdstan_model('other/methods_paper/edge_binary_uniform.stan')
+
+# respecify priors for uniform model
+counts_ls_uniform <- list(n_dyads = nrow(counts_df), 
+                          dyad_ids = counts_df$dyad_id,
+                          together = counts_df$event_count,
+                          count_dyad = counts_df$count_dyad,
+                          prior_mean = -2.5,
+                          prior_stdev = 1.5)
+
+# fit model
+fit_edges_uniform <- edge_binary_uniform$sample(
+  data = counts_ls_uniform, 
+  chains = n_chains, 
+  parallel_chains = n_chains)
+
+# extract edges
+edges <- fit_edges_uniform$draws() %>% as.data.frame()
+edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
+edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
+edge_names <- data.frame(name = colnames(edges1)) %>% 
+  separate(name, into = c('chain','weight'), sep = '.edge_')
+colnames(edges1) <- edge_names$weight
+edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
+edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
+edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
+edges <- rbind(edges1, edges2, edges3, edges4)
+n_samples <- nrow(edges)
+edge_samples1 <- edges1 %>% 
+  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
+rm(edges1, edges2, edges3, edges4) ; gc()
+
+# plot
+(figure_uniform_posterior <- ggplot(data = edge_samples1)+
+    geom_density(aes(group = parameter, x = weight), colour = rgb(33/255, 145/255, 140/255, 0.1))+
+    scale_x_continuous(name = 'edge weight')+
+    scale_y_continuous(name = 'density')
 )
-ggsave(filename = 'figure2h_edgesightings_default_withline.png',
+ggsave(filename = 'posterior_uniform_alldyads.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2h.2, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure_uniform_posterior, device = 'png', width = 1400, height = 800, units = 'px')
 
-(figure2h.3 <- ggplot()+
-    geom_point(data = edge_samples, aes(x = count_dyad, y = weight),
-               colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
-    geom_point(data = means, aes(x = count_dyad, y = mean),
-               colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
-    geom_smooth(data = means, aes(x = count_dyad, y = mean), colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'total dyad sightings')+
-    scale_y_continuous(name = 'edge weight', limits = c(-0.02,1.02), expand = c(0,0))
+edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+edge_samples1 <- edge_samples1 %>% 
+  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
+            by = 'dyad_males') %>% 
+  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
+
+set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
+plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
+edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
+(figure_uniform_posterior <- ggplot(data = edges_subset)+
+    geom_density(aes(group = parameter, x = weight, colour = together0), show.legend = F)+
+    stat_density(aes(group = parameter, x = weight, colour = together0),
+                 geom = "line", position = "identity", linewidth = 0)+
+    scale_x_continuous(name = 'edge weight')+
+    scale_y_continuous(name = 'density')+
+    scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5), rgb(68/255, 1/255, 84/255, 0.5)),
+                        aesthetics = 'colour')+
+    theme(legend.position = c(0.8,0.7),
+          legend.background = element_rect(fill = 'white', colour = 'black'),
+          legend.key.height = unit(4, 'mm'),
+          legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8))+
+    guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
+    labs(colour = 'sightings together')
 )
-ggsave(filename = 'figure2h_edgesightings_default_allpoints_withline.png',
+ggsave(filename = 'posterior_uniform_sampledyads.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2h.3, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure_uniform_posterior, device = 'png', width = 1400, height = 800, units = 'px')
 
-# clean up
-rm(list = ls()[!ls() %in% c('figure2a', 'figure2b', 'figure2c',
-                            'figure2d', 'figure2e', 'figure2f',
-                            'figure2g.1','figure2g.2','figure2g.3',
-                            'figure2h.1','figure2h.2','figure2h.3')]) ; gc()
+# clean up and save
+save.image('../outputs/sparse_network_methods_figures/model_run_uniform.RData')
 
-## panel i: right-skewed, mean edge weight vs dyad sighting count ####
-load('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
-means <- edge_samples %>% 
+## uniform prior, mean edge weight vs dyad sighting count ####
+means <- edge_samples1 %>% 
   group_by(parameter) %>% 
   mutate(mean = mean(weight)) %>% 
   select(parameter, mean) %>% 
@@ -531,18 +524,18 @@ means <- means %>%
   left_join(counts_df[,c('dyad_id','node_1_males','node_2_males','event_count','count_dyad','count_1','count_2','dyad_males')],
             by = 'dyad_males', multiple = 'all')
 
-(figure2i.1 <- ggplot(means, aes(x = count_dyad, y = mean))+
+(figure_uniform_edgesightings.1 <- ggplot(means, aes(x = count_dyad, y = mean))+
     geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1),
                size = 0.5,
                shape = 19)+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
 )
-ggsave(filename = 'figure2i_edgesightings_rightskewed_noline.png',
+ggsave(filename = 'uniform_edgesightings_noline.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2i.1, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure_uniform_edgesightings.1, device = 'png', width = 1400, height = 800, units = 'px')
 
-(figure2i.2 <- ggplot(means, aes(x = count_dyad, y = mean))+
+(figure_uniform_edgesightings.2 <- ggplot(means, aes(x = count_dyad, y = mean))+
     geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1),
                size = 0.5,
                shape = 19)+
@@ -550,12 +543,12 @@ ggsave(filename = 'figure2i_edgesightings_rightskewed_noline.png',
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
 )
-ggsave(filename = 'figure2i_edgesightings_rightskewed_withline.png',
+ggsave(filename = 'uniform_edgesightings_withline.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2i.2, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure_uniform_edgesightings.2, device = 'png', width = 1400, height = 800, units = 'px')
 
-(figure2i.3 <- ggplot()+
-    geom_point(data = edge_samples, aes(x = count_dyad, y = weight),
+(figure_uniform_edgesightings.3 <- ggplot()+
+    geom_point(data = edge_samples1, aes(x = count_dyad, y = weight),
                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
     geom_point(data = means, aes(x = count_dyad, y = mean),
                colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
@@ -563,569 +556,729 @@ ggsave(filename = 'figure2i_edgesightings_rightskewed_withline.png',
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'edge weight', limits = c(-0.02,1.02), expand = c(0,0))
 )
-ggsave(filename = 'figure2i_edgesightings_rightskewed_allpoints_withline.png',
+ggsave(filename = 'uniform_edgesightings_allpoints_withline.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2i.3, device = 'png', width = 1400, height = 800, units = 'px')
+       plot = figure_uniform_edgesightings.3, device = 'png', width = 1400, height = 800, units = 'px')
 
-# clean up
-rm(list = ls()[!ls() %in% c('counts_df',
-                            'figure2a', 'figure2b', 'figure2c',
-                            'figure2d', 'figure2e', 'figure2f',
-                            'figure2g.1','figure2g.2','figure2g.3',
-                            'figure2h.1','figure2h.2','figure2h.3',
-                            'figure2i.1','figure2i.2','figure2i.3')]) ; gc()
+save.image('../outputs/sparse_network_methods_figures/plots_bisonuniform.RData')
 
-## panel j: SRI, eigenvector centrality vs total number of dyads where together = 0 ####
-counts_df$sri <- counts_df$event_count / counts_df$count_dyad
-elephants <- unique(c(counts_df$id_1, counts_df$id_2))
-sri_adjmat <- matrix(NA, nrow = length(elephants), ncol = length(elephants), dimnames = list(x = elephants, y = elephants))
-for(i in 1:nrow(sri_adjmat)){
-  for(j in 1:ncol(sri_adjmat)){
-    if(i <= j){
-      sri_adjmat[i,j] <- ifelse(i == j, 0,
-                                counts_df$sri[which(counts_df$id_1 == rownames(sri_adjmat)[i] &
-                                                      counts_df$id_2 == colnames(sri_adjmat)[j])])
-    } else {
-      sri_adjmat[i,j] <- sri_adjmat[j,i]
-    }
-  }
-}
-sri_net <- igraph::graph_from_adjacency_matrix(sri_adjmat, weighted = T, mode = 'undirected', diag = FALSE)
-eigen_sri <- igraph::eigen_centrality(sri_net)$vector %>% 
-  as.data.frame()
-colnames(eigen_sri) <- 'eigen'
-eigen_sri$id <- rownames(eigen_sri)
+# ## uniform prior, eigenvector centrality vs individual sighting count ####
+# elephants <- sort(unique(c(counts_df$id_1, counts_df$id_2)))
+# uniform_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
+#                        dimnames = list(elephants, elephants, NULL))
+# N <- nrow(counts_df)
+# 
+# for (i in 1:N) {
+#   dyad_row <- counts_df[i, ]
+#   uniform_adjarr[dyad_row$id_1, dyad_row$id_2, ] <- edges[1:1000, i]
+# }
+# uniform_adjarr[,,1]
+# 
+# # make matrix to save eigenvector values to
+# eigen_uniform <- matrix(NA, nrow = 1000, ncol = length(elephants),
+#                        dimnames = list(1:1000, elephants))
+# 
+# # calculate eigenvector scores
+# for(i in 1:nrow(eigen_uniform)){
+#   uniform_net <- igraph::graph_from_adjacency_matrix(uniform_adjarr[,,i], weighted = T, mode = 'undirected', diag = FALSE)
+#   eigen <- as.data.frame(igraph::eigen_centrality(uniform_net)$vector)
+#   eigen_uniform[i,] <- eigen$`igraph::eigen_centrality(uniform_net)$vector`
+# }
+# eigen_uniform[,1]
+# eigen_uniform[1,]
+# 
+# eigen_uniform <- eigen_uniform %>% 
+#   as.data.frame() %>% 
+#   pivot_longer(cols = everything(), names_to = 'id', values_to = 'eigen') %>% 
+#   group_by(id) %>% 
+#   mutate(mean = mean(eigen)) %>% 
+#   left_join(eigen_sri[,c('id', 'together0', 'count')], by = 'id')
+# 
+# means <- eigen_uniform %>% 
+#   select(id, mean, together0, count) %>% 
+#   distinct()
+# 
+# (figure5k.1 <- ggplot()+
+#     geom_point(data = eigen_uniform, aes(x = count, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = count, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5k_eigensightings_uniform_allpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5k.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5k.2 <- ggplot()+
+#     geom_point(data = eigen_uniform, aes(x = count, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = count, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(data = eigen_uniform, aes(x = count, y = eigen),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5k_eigensightings_uniform_allpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5k.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5k.3 <- ggplot(data = means, aes(y = mean,
+#                                         #y = standardised,
+#                                         x = count))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'mean eigenvector centrality',
+#                        limits = c(0,1),
+#                        expand = c(0.02,0.02))
+# )
+# ggsave(filename = 'figure5k_eigensightings_uniform_meanpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5k.3, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5k.4 <- ggplot(data = means, aes(x = count, y = mean))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'mean eigenvector centrality',
+#                        limits = c(0,1),
+#                        expand = c(0,0))
+# )
+# ggsave(filename = 'figure5k_eigensightings_uniform_meanpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5k.4, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# # save for plotting
+# save.image('../outputs/sparse_network_methods_figures/figure5_plots.RData')
+# 
+# ## uniform prior, eigenvector centrality vs total number of dyads where together = 0 ####
+# (figure5l.1 <- ggplot()+
+#     geom_point(data = eigen_uniform, aes(x = together0, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = together0, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5l_eigentogether0_uniform_allpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5l.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5l.2 <- ggplot()+
+#     geom_point(data = eigen_uniform, aes(x = together0, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = together0, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(data = eigen_uniform, aes(x = together0, y = eigen),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5l_eigentogether0_uniform_allpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5l.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5l.3 <- ggplot(means)+
+#     geom_point(aes(x = together0, y = mean, colour = count),
+#                size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
+#     labs(colour = 'number of\nsightings')
+# )
+# ggsave(filename = 'figure5l_eigentogether0_uniform_meanpoints_noline_coloursightings.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5l.3, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5l.4 <- ggplot(means)+
+#     geom_point(aes(x = together0, y = mean, colour = count),
+#                size = 0.5, shape = 19)+
+#     geom_smooth(aes(x = together0, y = mean),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
+#     labs(colour = 'number of\nsightings')
+# )
+# ggsave(filename = 'figure5l_eigentogether0_uniform_meanpoints_withline_colourssightings.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5l.4, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# # save for plotting
+# save.image('../outputs/sparse_network_methods_figures/figure5_plots.RData')
+# 
 
-together0 <- counts_df %>% filter(event_count == 0)
-eigen_sri$together0 <- NA ; for(i in 1:nrow(eigen_sri)) {
-  x <- together0 %>%
-    filter(id_1 == eigen_sri$id[i] | id_2 == eigen_sri$id[i])
-  eigen_sri$together0[i] <- nrow(x)
-}
+## default normal(0,2.5), Posterior distribution ####
+rm(counts_ls_uniform, edge_binary_uniform, edge_samples1, edges, edges_subset, means) ; gc()
 
-(figure2j.1 <- ggplot(eigen_sri, aes(x = together0, y = eigen))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2j_eigentogether0_sri_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2j.1, device = 'png', width = 1400, height = 800, units = 'px')
+# compile edge model
+edge_binary_default <- cmdstan_model('other/methods_paper/edge_binary_gaussian.stan')
 
-(figure2j.2 <- ggplot(eigen_sri, aes(x = together0, y = eigen))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2j_eigentogether0_sri_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2j.2, device = 'png', width = 1400, height = 800, units = 'px')
+# load data
+counts_ls_default <- list(n_dyads = nrow(counts_df), 
+                          dyad_ids = counts_df$dyad_id,
+                          together = counts_df$event_count,
+                          count_dyad = counts_df$count_dyad)#, prior_mean = 0, prior_stdev = 2.5)
 
-## panel m: SRI, eigenvector centrality vs individual sighting count ####
-counts <- data.frame(id = elephants, count = NA)
-for(i in 1:nrow(counts)){
-  counts$count[i] <- ifelse(i == nrow(counts),
-                            unique(counts_df$count_2[which(counts_df$id_2 == counts$id[i])]),
-                            unique(counts_df$count_1[which(counts_df$id_1 == counts$id[i])]))
-}
+# fit model
+fit_edges_default <- edge_binary_default$sample(
+  data = counts_ls_default, 
+  chains = n_chains, 
+  parallel_chains = n_chains)
 
-eigen_sri <- eigen_sri %>% 
-  left_join(counts, by = 'id')
+# extract edges
+edges <- fit_edges_default$draws() %>% as.data.frame()
+edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
+edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
+edge_names <- data.frame(name = colnames(edges1)) %>% 
+  separate(name, into = c('chain','weight'), sep = '.edge_')
+colnames(edges1) <- edge_names$weight
+edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
+edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
+edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
+edges <- rbind(edges1, edges2, edges3, edges4)
+n_samples <- nrow(edges)
+edge_samples1 <- edges1 %>% 
+  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
+rm(edges1, edges2, edges3, edges4) ; gc()
 
-(figure2m.1 <- ggplot(eigen_sri, aes(x = count, y = eigen))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2m_eigensightings_sri_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2m.1, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2m.2 <- ggplot(eigen_sri, aes(x = count, y = eigen))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2m_eigensightings_sri_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2m.2, device = 'png', width = 1400, height = 800, units = 'px')
-
-# clean up
-rm(list = ls()[!ls() %in% c('figure2a', 'figure2b', 'figure2c',
-                            'figure2d', 'figure2e', 'figure2f',
-                            'figure2g.1','figure2g.2','figure2g.3',
-                            'figure2h.1','figure2h.2','figure2h.3',
-                            'figure2i.1','figure2i.2','figure2i.3',
-                            'figure2j.1','figure2j.2',
-                            'figure2m.1','figure2m.2', 'eigen_sri')]) ; gc()
-
-## panel k: default, eigenvector centrality vs total number of dyads where together = 0 ####
-load('../outputs/sparse_network_methods_figures/model_run_default.RData')
-rm(edge_binary_generic, make_edgelist, plot_network_threshold) ; gc()
-
-# extract edge samples as matrix
-edge_samples <- fit_edges_default$draws() %>% as.data.frame()
-edge_samples <- edge_samples[,(n_chains+1):ncol(edge_samples)]
-edge_samples <- edge_samples[,seq(1,ncol(edge_samples)-3, by = 4)]
-colnames(edge_samples) <- counts_df$dyad_id
-
-elephants <- sort(unique(c(counts_df$id_1, counts_df$id_2)))
-default_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
-                        dimnames = list(elephants, elephants, NULL))
-N <- nrow(counts_df)
-
-for (i in 1:N) {
-  dyad_row <- counts_df[i, ]
-  default_adjarr[dyad_row$id_1, dyad_row$id_2, ] <- edge_samples[, i]
-}
-default_adjarr[,,1]
-
-# make matrix to save eigenvector values to
-eigen_default <- matrix(NA, nrow = 1000, ncol = length(elephants),
-                        dimnames = list(1:1000, elephants))
-
-# calculate eigenvector scores
-for(i in 1:nrow(eigen_default)){
-  default_net <- igraph::graph_from_adjacency_matrix(default_adjarr[,,i], weighted = T, mode = 'undirected', diag = FALSE)
-  eigen <- as.data.frame(igraph::eigen_centrality(default_net)$vector)
-  eigen_default[i,] <- eigen$`igraph::eigen_centrality(default_net)$vector`
-}
-rm(default_net, dyad_row, eigen); gc()
-eigen_default[,1]
-eigen_default[1,]
-
-eigen_default <- eigen_default %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'id', values_to = 'eigen') %>% 
-  group_by(id) %>% 
-  mutate(mean = mean(eigen)) %>% 
-  left_join(eigen_sri[,c('id', 'together0', 'count')], by = 'id')
-
-means <- eigen_default %>% 
-  select(id, mean, together0, count) %>% 
-  distinct()
-
-(figure2k.1 <- ggplot()+
-    geom_point(data = eigen_default, aes(x = together0, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01),
-               #size = 0.5,
-               shape = 19)+
-    geom_point(data = means, aes(x = together0, y = mean, colour = count),
-               colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2k_eigentogether0_default_allpoints_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2k.1, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2k.2 <- ggplot()+
-    geom_point(data = eigen_default, aes(x = together0, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01),
-               #size = 0.5,
-               shape = 19)+
-    geom_point(data = means, aes(x = together0, y = mean),
-               colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    geom_smooth(data = eigen_default, aes(x = together0, y = eigen),
-                colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2k_eigentogether0_default_allpoints_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2k.2, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2k.3 <- ggplot(means)+
-    geom_point(aes(x = together0, y = mean, colour = count),
-               #size = 0.5,
-               shape = 19)+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
-    labs(colour = 'number of\nsightings')
-)
-ggsave(filename = 'figure2k_eigentogether0_default_meanpoints_noline_coloursightings.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2k.3, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2k.4 <- ggplot(means)+
-    geom_point(aes(x = together0, y = mean, colour = count),
-               #size = 0.5,
-               shape = 19)+
-    geom_smooth(aes(x = together0, y = mean),
-                colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
-    labs(colour = 'number of\nsightings')
-)
-ggsave(filename = 'figure2k_eigentogether0_default_meanpoints_withline_colourssightings.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2k.4, device = 'png', width = 1400, height = 800, units = 'px')
-
-## panel n: default, eigenvector centrality vs individual sighting count ####
-(figure2n.1 <- ggplot()+
-    geom_point(data = eigen_default, aes(x = count, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01),
-               #size = 0.5,
-               shape = 19)+
-    geom_point(data = means, aes(x = count, y = mean),
-               colour = rgb(33/255, 145/255, 140/255),
-               #size = 0.5,
-               shape = 19)+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-  )
-ggsave(filename = 'figure2n_eigensightings_default_allpoints_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2n.1, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2n.2 <- ggplot()+
-    geom_point(data = eigen_default, aes(x = count, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01),
-               #size = 0.5,
-               shape = 19)+
-    geom_point(data = means, aes(x = count, y = mean),
-               colour = rgb(33/255, 145/255, 140/255),
-               #size = 0.5,
-               shape = 19)+
-    geom_smooth(data = eigen_default, aes(x = count, y = eigen),
-                colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2n_eigensightings_default_allpoints_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2n.2, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2n.3 <- ggplot(data = means, aes(y = mean,
-                                        x = count))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255),
-               #size = 0.5,
-               shape = 19)+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'mean eigenvector centrality',
-                       limits = c(0, 1),
-                       expand = c(0.02,0.02))
-)
-ggsave(filename = 'figure2n_eigensightings_default_meanpoints_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2n.3, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2n.4 <- ggplot(data = means, aes(x = count, y = mean))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255),
-               #size = 0.5,
-               shape = 19)+
-    geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'mean eigenvector centrality',
-                       limits = c(0,1),
-                       expand = c(0.02,0.02))
-)
-ggsave(filename = 'figure2n_eigensightings_default_meanpoints_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2n.4, device = 'png', width = 1400, height = 800, units = 'px')
-
-# clean up
-rm(list = ls()[!ls() %in% c('figure2a','figure2b','figure2c',
-                            'figure2d','figure2e','figure2f',
-                            'figure2g.1','figure2g.2','figure2g.3',
-                            'figure2h.1','figure2h.2','figure2h.3',
-                            'figure2i.1','figure2i.2','figure2i.3',
-                            'figure2j.1','figure2j.2',
-                            'figure2k.1','figure2k.2','figure2k.3','figure2k.4',
-                            'figure2m.1','figure2m.2',
-                            'figure2n.1','figure2n.2','figure2n.3','figure2n.4',
-                            'eigen_sri')]) ; gc()
-
-## panel l: right-skewed, eigenvector centrality vs total number of dyads where together = 0 ####
-load('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
-
-# extract edge samples as matrix
-edge_samples <- fit_edges_skewed$draws() %>% as.data.frame()
-edge_samples <- edge_samples[,(n_chains+1):ncol(edge_samples)]
-edge_samples <- edge_samples[,seq(1,ncol(edge_samples)-3, by = 4)]
-colnames(edge_samples) <- counts_ls_skewed$dyad_ids
-
-elephants <- sort(unique(c(counts_df$id_1, counts_df$id_2)))
-skewed_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
-                       dimnames = list(elephants, elephants, NULL))
-N <- nrow(counts_df)
-
-for (i in 1:N) {
-  dyad_row <- counts_df[i, ]
-  skewed_adjarr[dyad_row$id_1, dyad_row$id_2, ] <- edge_samples[, i]
-}
-skewed_adjarr[,,1]
-
-# make matrix to save eigenvector values to
-eigen_skewed <- matrix(NA, nrow = 1000, ncol = length(elephants),
-                       dimnames = list(1:1000, elephants))
-
-# calculate eigenvector scores
-for(i in 1:nrow(eigen_skewed)){
-  skewed_net <- igraph::graph_from_adjacency_matrix(skewed_adjarr[,,i], weighted = T, mode = 'undirected', diag = FALSE)
-  eigen <- as.data.frame(igraph::eigen_centrality(skewed_net)$vector)
-  eigen_skewed[i,] <- eigen$`igraph::eigen_centrality(skewed_net)$vector`
-}
-eigen_skewed[,1]
-eigen_skewed[1,]
-
-eigen_skewed <- eigen_skewed %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'id', values_to = 'eigen') %>% 
-  group_by(id) %>% 
-  mutate(mean = mean(eigen)) %>% 
-  left_join(eigen_sri[,c('id', 'together0', 'count')], by = 'id')
-
-means <- eigen_skewed %>% 
-  select(id, mean, together0, count) %>% 
-  distinct()
-
-(figure2l.1 <- ggplot()+
-    geom_point(data = eigen_skewed, aes(x = together0, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
-    geom_point(data = means, aes(x = together0, y = mean),
-               colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2l_eigentogether0_skewed_allpoints_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2l.1, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2l.2 <- ggplot()+
-    geom_point(data = eigen_skewed, aes(x = together0, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
-    geom_point(data = means, aes(x = together0, y = mean),
-               colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    geom_smooth(data = eigen_skewed, aes(x = together0, y = eigen),
-                colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2l_eigentogether0_skewed_allpoints_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2l.2, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2l.3 <- ggplot(means)+
-    geom_point(aes(x = together0, y = mean, colour = count),
-               size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
-    labs(colour = 'number of\nsightings')
-)
-ggsave(filename = 'figure2l_eigentogether0_skewed_meanpoints_noline_coloursightings.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2l.3, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2l.4 <- ggplot(means)+
-    geom_point(aes(x = together0, y = mean, colour = count),
-               size = 0.5, shape = 19)+
-    geom_smooth(aes(x = together0, y = mean),
-                colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
-    labs(colour = 'number of\nsightings')
-)
-ggsave(filename = 'figure2l_eigentogether0_skewed_meanpoints_withline_colourssightings.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2l.4, device = 'png', width = 1400, height = 800, units = 'px')
-
-## panel o: right-skewed, eigenvector centrality vs individual sighting count ####
-(figure2o.1 <- ggplot()+
-    geom_point(data = eigen_skewed, aes(x = count, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
-    geom_point(data = means, aes(x = count, y = mean),
-               colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2o_eigensightings_skewed_allpoints_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2o.1, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2o.2 <- ggplot()+
-    geom_point(data = eigen_skewed, aes(x = count, y = eigen),
-               colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
-    geom_point(data = means, aes(x = count, y = mean),
-               colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    geom_smooth(data = eigen_skewed, aes(x = count, y = eigen),
-                colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'figure2o_eigensightings_skewed_allpoints_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2o.2, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2o.3 <- ggplot(data = means, aes(y = mean,
-                                        #y = standardised,
-                                        x = count))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'mean eigenvector centrality',
-                       limits = c(0,1),
-                       expand = c(0.02,0.02))
-)
-ggsave(filename = 'figure2o_eigensightings_skewed_meanpoints_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2o.3, device = 'png', width = 1400, height = 800, units = 'px')
-
-(figure2o.4 <- ggplot(data = means, aes(x = count, y = mean))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'mean eigenvector centrality',
-                       limits = c(0,1),
-                       expand = c(0,0))
-)
-ggsave(filename = 'figure2o_eigensightings_skewed_meanpoints_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = figure2o.4, device = 'png', width = 1400, height = 800, units = 'px')
-
-# clean up
-rm(list = ls()[!ls() %in% c('figure2a', 'figure2b', 'figure2c',
-                            'figure2d', 'figure2e', 'figure2f',
-                            'figure2g.1','figure2g.2','figure2g.3',
-                            'figure2h.1','figure2h.2','figure2h.3',
-                            'figure2i.1','figure2i.2','figure2i.3',
-                            'figure2j.1','figure2j.2',
-                            'figure2k.1','figure2k.2','figure2k.3','figure2k.4',
-                            'figure2l.1','figure2l.2','figure2l.3','figure2l.4',
-                            'figure2m.1','figure2m.2',
-                            'figure2n.1','figure2n.2','figure2n.3','figure2n.4',
-                            'figure2o.1','figure2o.2','figure2o.3','figure2o.4')]) ; gc()
-
-# save for plotting
-save.image('../outputs/sparse_network_methods_figures/figure2_plots.RData')
-
-## merge first six panels ####
-# run patchwork and save
-(figure2a + figure2b + figure2c) / (figure2d + figure2e + figure2f) +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'figure2_tophalf.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1200, units = 'px')
-
-# clean up
-#rm(figure2a, figure2b, figure2c, figure2d, figure2e, figure2f) ; gc()
-
-## merge second six panels ####
-# run patchwork for plots with no lines
-(figure2g.1 + figure2h.1 + figure2i.1) / (figure2j.1 + figure2k.1 + figure2l.1) +
-  plot_annotation(tag_levels = list(c('g','h','i','j','k','l')))
-ggsave(filename = 'figure2_bottomhalf_nolines.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1200, units = 'px')
-
-# run patchwork for plots with lines
-(figure2g.2 + figure2h.2 + figure2i.2) / (figure2j.2 + figure2k.2 + figure2l.2) +
-  plot_annotation(tag_levels = list(c('g','h','i','j','k','l')))
-ggsave(filename = 'figure2_bottomhalf_withlines.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1200, units = 'px')
-
-## merge final 3 panels ####
-# run patchwork for plots with no lines
-(figure2m.1 + figure2n.1 + figure2o.1) +
-  plot_annotation(tag_levels = list(c('m','n','o')))
-ggsave(filename = 'figure2_eigensightings_nolines.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1200, units = 'px')
-
-# run patchwork for plots with lines
-(figure2m.2 + figure2n.2 + figure2o.2) +
-  plot_annotation(tag_levels = list(c('m','n','o')))
-ggsave(filename = 'figure2_eigensightings_withlines.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1200, units = 'px')
-
-## merge all fifteen panels ####
-# load('../outputs/sparse_network_methods_figures/figure2_plots.RData')
-# run patchwork for plots with no lines
-(figure2a + figure2b + figure2c) / (figure2d + figure2e + figure2f) / (figure2g.1 + figure2h.1 + figure2i.1) / (figure2j.1 + figure2k.1 + figure2l.1) / (figure2m.1 + figure2n.1 + figure2o.1) +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'figure2_nolines.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 2400, units = 'px')
-
-# run patchwork for plots with lines
-(figure2a + figure2b + figure2c) / (figure2d + figure2e + figure2f) / (figure2g.2 + figure2h.2 + figure2i.2) / (figure2j.2 + figure2k.2 + figure2l.2) / (figure2m.2 + figure2n.2 + figure2o.2)  +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'figure2_withlines.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 2400, units = 'px')
-
-## merge by model type ####
-# priors:
-(figure2a + figure2b + figure2c) +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'split_by_model_type/prior_plots.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 600, units = 'px')
-
-# SRI:
-(figure2d + figure2g.2) / (figure2j.2 + figure2m.2) +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'split_by_model_type/sri_plots.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1800, units = 'px')
-
-# symmetrical BISoN:
-(figure2e + figure2h.2) / (figure2k.2 + figure2n.2) +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'split_by_model_type/bison_symmetric_plots.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1800, units = 'px')
-
-# asymmetrical BISoN:
-(figure2f + figure2i.2) / (figure2l.2 + figure2o.2) +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'split_by_model_type/bison_asymmetric_plots.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 1800, units = 'px')
-
-# all BISoN:
-(figure2e + figure2f) / (figure2h.3 + figure2i.3) / (figure2k.2 + figure2l.2) / (figure2n.2 + figure2o.2) +
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'split_by_model_type/bison_plots.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 3600, units = 'px')
-
-# clean up
-rm(list = ls()) ; gc()
-
-#### Figure 3: 4 panel plot of conditional BISoN for prior/posterior/mean_edge_vs_sightings/eigenvector_vs_sightings. if 0: beta(0.7,10), if 1: beta(1,5) ####
-## panel a: prior ####
-# define sequence over which to plot
-x <- seq(0, 1, length = 100)
-
-# calculate probability of all values of x assuming completely flat prior
-conditional1 <- dbeta(x = x, shape1 = 0.7, shape2 = 10)
-conditional2 <- dbeta(x = x, shape1 = 1, shape2 = 5)
-data <- data.frame(x = x,
-                   density1 = conditional1,
-                   density2 = conditional2)
 # plot
-(figure3a <- ggplot(data)+
-    geom_line(aes(x = x, y = density1), linewidth = 1.2, colour = rgb(33/255, 145/255, 140/255))+
-    geom_line(aes(x = x, y = density2), linewidth = 1.2, colour = rgb(68/255,1/255,84/255,1))+
+(figure_default_posterior <- ggplot(data = edge_samples1)+
+    geom_density(aes(group = parameter, x = weight), colour = rgb(33/255, 145/255, 140/255, 0.1))+
     scale_x_continuous(name = 'edge weight')+
-    scale_y_continuous(name = 'density', expand = c(0,0))+
-    coord_cartesian(ylim = c(0,15))
+    scale_y_continuous(name = 'density')
+  )
+ggsave(filename = 'default_posterior_alldyads.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_default_posterior, device = 'png', width = 1400, height = 800, units = 'px')
+
+edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+edge_samples1 <- edge_samples1 %>% 
+  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
+            by = 'dyad_males') %>% 
+  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
+
+set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
+plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
+edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
+(figure_default_posterior <- ggplot(data = edges_subset)+
+    geom_density(aes(group = parameter, x = weight, colour = together0), show.legend = F)+#, colour = rgb(33/255, 145/255, 140/255, 0.1))+
+    stat_density(aes(group = parameter, x = weight, colour = together0),
+                 geom = "line", position = "identity", linewidth = 0)+
+    scale_x_continuous(name = 'edge weight')+
+    scale_y_continuous(name = 'density')+
+    scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5), rgb(68/255, 1/255, 84/255, 0.5)),
+                        aesthetics = 'colour')+
+    theme(legend.position = c(0.8,0.7),
+          legend.background = element_rect(fill = 'white', colour = 'black'),
+          legend.key.height = unit(4, 'mm'),
+          legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8))+
+    guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
+    labs(colour = 'sightings together')
 )
-ggsave(filename = 'figure3a_prior_conditional.png',
+ggsave(filename = 'default_posterior_sampledyads.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure3a, device = 'png', width = 1400, height = 800, units = 'px')
-ggsave(filename = 'split_by_model_type/prior_conditional.png',
+       plot = figure_default_posterior, device = 'png', width = 1400, height = 800, units = 'px')
+
+# clean workspace
+save.image('../outputs/sparse_network_methods_figures/model_run_default.RData')
+
+## default, mean edge weight vs dyad sighting count ####
+means <- data.frame(dyad = colnames(edges),
+                    mean = apply(edges,2,mean))
+means$dyad_males <- 1:nrow(means)
+
+means <- means %>% 
+  left_join(counts_df[,c('dyad_id','node_1_males','node_2_males','event_count','count_dyad','count_1','count_2','dyad_males')],
+            by = 'dyad_males')
+
+(figure_default_edgesightings.1 <- ggplot(means, aes(x = count_dyad, y = mean))+
+    geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
+    scale_x_continuous(name = 'total dyad sightings')+
+    scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
+)
+ggsave(filename = 'default_edgesightings_noline.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure3a, device = 'png', width = 700, height = 500, units = 'px')
+       plot = figure_default_edgesightings.1, device = 'png', width = 1400, height = 800, units = 'px')
 
-# clean up
-rm(list = ls()[!ls() %in% c('figure3a')]) ; gc()
+(figure_default_edgesightings.2 <- ggplot(means, aes(x = count_dyad, y = mean))+
+    geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
+    geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
+    scale_x_continuous(name = 'total dyad sightings')+
+    scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
+)
+ggsave(filename = 'default_edgesightings_withline.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_default_edgesightings.2, device = 'png', width = 1400, height = 800, units = 'px')
 
-## panel b: posterior ####
+(figure_default_edgesightings.3 <- ggplot()+
+    geom_point(data = edge_samples1, aes(x = count_dyad, y = weight),
+               colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+    geom_point(data = means, aes(x = count_dyad, y = mean),
+               colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
+    geom_smooth(data = means, aes(x = count_dyad, y = mean), colour = rgb(68/255, 1/255, 84/255))+
+    scale_x_continuous(name = 'total dyad sightings')+
+    scale_y_continuous(name = 'edge weight', limits = c(-0.02,1.02), expand = c(0,0))
+)
+ggsave(filename = 'default_edgesightings_allpoints_withline.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_default_edgesightings.3, device = 'png', width = 1400, height = 800, units = 'px')
+
+save.image('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
+
+# ## default, eigenvector centrality vs individual sighting count ####
+# # get adjacency array for default prior
+# elephants <- sort(unique(c(counts_df$id_1, counts_df$id_2)))
+# default_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
+#                         dimnames = list(elephants, elephants, NULL))
+# N <- nrow(counts_df)
+# 
+# for (i in 1:N) {
+#   dyad_row <- counts_df[i, ]
+#   default_adjarr[dyad_row$id_1, dyad_row$id_2, ] <- edges[1:1000, i]
+# }
+# default_adjarr[,,1]
+# 
+# # make matrix to save eigenvector values to
+# eigen_default <- matrix(NA, nrow = 1000, ncol = length(elephants),
+#                         dimnames = list(1:1000, elephants))
+# 
+# # calculate eigenvector scores
+# for(i in 1:nrow(eigen_default)){
+#   default_net <- igraph::graph_from_adjacency_matrix(default_adjarr[,,i], weighted = T, mode = 'undirected', diag = FALSE)
+#   eigen <- as.data.frame(igraph::eigen_centrality(default_net)$vector)
+#   eigen_default[i,] <- eigen$`igraph::eigen_centrality(default_net)$vector`
+# }
+# rm(default_net, dyad_row, eigen); gc()
+# eigen_default[,1]
+# eigen_default[1,]
+# 
+# eigen_default <- eigen_default %>% 
+#   as.data.frame() %>% 
+#   pivot_longer(cols = everything(), names_to = 'id', values_to = 'eigen') %>% 
+#   group_by(id) %>% 
+#   mutate(mean = mean(eigen)) %>% 
+#   left_join(eigen_sri[,c('id', 'together0', 'count')], by = 'id')
+# 
+# means <- eigen_default %>% 
+#   select(id, mean, together0, count) %>% 
+#   distinct()
+# 
+# (figure5e.1 <- ggplot()+
+#     geom_point(data = eigen_default, aes(x = count, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01),
+#                size = 0.5,
+#                shape = 19)+
+#     geom_point(data = means, aes(x = count, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255),
+#                size = 0.5,
+#                shape = 19)+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+#   )
+# ggsave(filename = 'figure5e_eigensightings_default_allpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5e.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5e.2 <- ggplot()+
+#     geom_point(data = eigen_default, aes(x = count, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01),
+#                size = 0.5,
+#                shape = 19)+
+#     geom_point(data = means, aes(x = count, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255),
+#                size = 0.5,
+#                shape = 19)+
+#     geom_smooth(data = eigen_default, aes(x = count, y = eigen),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5e_eigensightings_default_allpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5e.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5e.3 <- ggplot(data = means, aes(y = mean,
+#                                         x = count))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255),
+#                size = 0.5,
+#                shape = 19)+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'mean eigenvector centrality',
+#                        limits = c(0, 1),
+#                        expand = c(0.02,0.02))
+# )
+# ggsave(filename = 'figure5e_eigensightings_default_meanpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5e.3, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5e.4 <- ggplot(data = means, aes(x = count, y = mean))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255),
+#                size = 0.5,
+#                shape = 19)+
+#     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'mean eigenvector centrality',
+#                        limits = c(0,1),
+#                        expand = c(0.02,0.02))
+# )
+# ggsave(filename = 'figure5e_eigensightings_default_meanpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5e.4, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# ## default, eigenvector centrality vs total number of dyads where together = 0 ####
+# (figure5g.1 <- ggplot()+
+#     geom_point(data = eigen_default, aes(x = together0, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01),
+#                size = 0.5,
+#                shape = 19)+
+#     geom_point(data = means, aes(x = together0, y = mean, colour = count),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5g_eigentogether0_default_allpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5g.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5g.2 <- ggplot()+
+#     geom_point(data = eigen_default, aes(x = together0, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01),
+#                size = 0.5,
+#                shape = 19)+
+#     geom_point(data = means, aes(x = together0, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(data = eigen_default, aes(x = together0, y = eigen),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5g_eigentogether0_default_allpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5g.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5g.3 <- ggplot(means)+
+#     geom_point(aes(x = together0, y = mean, colour = count),
+#                size = 0.5,
+#                shape = 19)+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
+#     labs(colour = 'number of\nsightings')
+# )
+# ggsave(filename = 'figure5g_eigentogether0_default_meanpoints_noline_coloursightings.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5g.3, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5g.4 <- ggplot(means)+
+#     geom_point(aes(x = together0, y = mean, colour = count),
+#                size = 0.5,
+#                shape = 19)+
+#     geom_smooth(aes(x = together0, y = mean),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
+#     labs(colour = 'number of\nsightings')
+# )
+# ggsave(filename = 'figure5g_eigentogether0_default_meanpoints_withline_colourssightings.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5g.4, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# save.image('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
+# 
+## right-skewed normal(-2.5, 1.5), Posterior distribution ####
+rm(counts_ls_default, edge_binary_default, edge_samples1, edges, edges_subset, means) ; gc()
+
+# compile edge model
+edge_binary_skewed <- cmdstan_model('other/methods_paper/edge_binary_skewed.stan')
+
+# respecify priors for skewed model
+counts_ls_skewed <- list(n_dyads = nrow(counts_df), 
+                         dyad_ids = counts_df$dyad_id,
+                         together = counts_df$event_count,
+                         count_dyad = counts_df$count_dyad,
+                         prior_mean = -2.5,
+                         prior_stdev = 1.5)
+
+# fit model
+fit_edges_skewed <- edge_binary_skewed$sample(
+  data = counts_ls_skewed, 
+  chains = n_chains, 
+  parallel_chains = n_chains)
+
+# extract edges
+edges <- fit_edges_skewed$draws() %>% as.data.frame()
+edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
+edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
+edge_names <- data.frame(name = colnames(edges1)) %>% 
+  separate(name, into = c('chain','weight'), sep = '.edge_')
+colnames(edges1) <- edge_names$weight
+edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
+edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
+edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
+edges <- rbind(edges1, edges2, edges3, edges4)
+n_samples <- nrow(edges)
+edge_samples1 <- edges1 %>% 
+  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
+
+# plot
+(figure_skewed_posterior <- ggplot(data = edge_samples1)+
+    geom_density(aes(group = parameter, x = weight), colour = rgb(33/255, 145/255, 140/255, 0.1))+
+    scale_x_continuous(name = 'edge weight')+
+    scale_y_continuous(name = 'density')
+)
+ggsave(filename = 'skewed_posterior_alldyads.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_skewed_posterior, device = 'png', width = 1400, height = 800, units = 'px')
+
+edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+edge_samples1 <- edge_samples1 %>% 
+  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
+            by = 'dyad_males') %>% 
+  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
+
+set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
+plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
+edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
+(figure_skewed_posterior <- ggplot(data = edges_subset)+
+    geom_density(aes(group = parameter, x = weight, colour = together0), show.legend = F)+#, colour = rgb(33/255, 145/255, 140/255, 0.1))+
+    stat_density(aes(group = parameter, x = weight, colour = together0),
+                 geom = "line", position = "identity", linewidth = 0)+
+    scale_x_continuous(name = 'edge weight')+
+    scale_y_continuous(name = 'density')+
+    scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5), rgb(68/255, 1/255, 84/255, 0.5)),
+                        aesthetics = 'colour')+
+    theme(legend.position = c(0.8,0.7),
+          legend.background = element_rect(fill = 'white', colour = 'black'),
+          legend.key.height = unit(4, 'mm'),
+          legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8))+
+    guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
+    labs(colour = 'sightings together')
+)
+ggsave(filename = 'skewed_posterior_sampledyads.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_skewed_posterior, device = 'png', width = 1400, height = 800, units = 'px')
+
+# clean up and save
+save.image('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
+
+## right-skewed, mean edge weight vs dyad sighting count ####
+means <- edge_samples1 %>% 
+  group_by(parameter) %>% 
+  mutate(mean = mean(weight)) %>% 
+  select(parameter, mean) %>% 
+  distinct()
+
+means$dyad_males <- 1:nrow(means)
+
+means <- means %>% 
+  left_join(counts_df[,c('dyad_id','node_1_males','node_2_males','event_count','count_dyad','count_1','count_2','dyad_males')],
+            by = 'dyad_males', multiple = 'all')
+
+(figure_skewed_edgesightings.1 <- ggplot(means, aes(x = count_dyad, y = mean))+
+    geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1),
+               size = 0.5,
+               shape = 19)+
+    scale_x_continuous(name = 'total dyad sightings')+
+    scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
+)
+ggsave(filename = 'skewed_edgesightings_noline.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_skewed_edgesightings.1, device = 'png', width = 1400, height = 800, units = 'px')
+
+(figure_skewed_edgesightings.2 <- ggplot(means, aes(x = count_dyad, y = mean))+
+    geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1),
+               size = 0.5,
+               shape = 19)+
+    geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
+    scale_x_continuous(name = 'total dyad sightings')+
+    scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))
+)
+ggsave(filename = 'skewed_edgesightings_withline.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_skewed_edgesightings.2, device = 'png', width = 1400, height = 800, units = 'px')
+
+(figure_skewed_edgesightings.3 <- ggplot()+
+    geom_point(data = edge_samples1, aes(x = count_dyad, y = weight),
+               colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+    geom_point(data = means, aes(x = count_dyad, y = mean),
+               colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
+    geom_smooth(data = means, aes(x = count_dyad, y = mean), colour = rgb(68/255, 1/255, 84/255))+
+    scale_x_continuous(name = 'total dyad sightings')+
+    scale_y_continuous(name = 'edge weight', limits = c(-0.02,1.02), expand = c(0,0))
+)
+ggsave(filename = 'skewed_edgesightings_allpoints_withline.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = figure_skewed_edgesightings.3, device = 'png', width = 1400, height = 800, units = 'px')
+
+# ## right-skewed, eigenvector centrality vs individual sighting count ####
+# elephants <- sort(unique(c(counts_df$id_1, counts_df$id_2)))
+# skewed_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
+#                        dimnames = list(elephants, elephants, NULL))
+# N <- nrow(counts_df)
+# 
+# for (i in 1:N) {
+#   dyad_row <- counts_df[i, ]
+#   skewed_adjarr[dyad_row$id_1, dyad_row$id_2, ] <- edges[1:1000, i]
+# }
+# skewed_adjarr[,,1]
+# 
+# # make matrix to save eigenvector values to
+# eigen_skewed <- matrix(NA, nrow = 1000, ncol = length(elephants),
+#                        dimnames = list(1:1000, elephants))
+# 
+# # calculate eigenvector scores
+# for(i in 1:nrow(eigen_skewed)){
+#   skewed_net <- igraph::graph_from_adjacency_matrix(skewed_adjarr[,,i], weighted = T, mode = 'undirected', diag = FALSE)
+#   eigen <- as.data.frame(igraph::eigen_centrality(skewed_net)$vector)
+#   eigen_skewed[i,] <- eigen$`igraph::eigen_centrality(skewed_net)$vector`
+# }
+# eigen_skewed[,1]
+# eigen_skewed[1,]
+# 
+# eigen_skewed <- eigen_skewed %>% 
+#   as.data.frame() %>% 
+#   pivot_longer(cols = everything(), names_to = 'id', values_to = 'eigen') %>% 
+#   group_by(id) %>% 
+#   mutate(mean = mean(eigen)) %>% 
+#   left_join(eigen_sri[,c('id', 'together0', 'count')], by = 'id')
+# 
+# means <- eigen_skewed %>% 
+#   select(id, mean, together0, count) %>% 
+#   distinct()
+# 
+# (figure5f.1 <- ggplot()+
+#     geom_point(data = eigen_skewed, aes(x = count, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = count, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5f_eigensightings_skewed_allpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5f.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5f.2 <- ggplot()+
+#     geom_point(data = eigen_skewed, aes(x = count, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = count, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(data = eigen_skewed, aes(x = count, y = eigen),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5f_eigensightings_skewed_allpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5f.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5f.3 <- ggplot(data = means, aes(y = mean,
+#                                         #y = standardised,
+#                                         x = count))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'mean eigenvector centrality',
+#                        limits = c(0,1),
+#                        expand = c(0.02,0.02))
+# )
+# ggsave(filename = 'figure5f_eigensightings_skewed_meanpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5f.3, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5f.4 <- ggplot(data = means, aes(x = count, y = mean))+
+#     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'total node sightings')+
+#     scale_y_continuous(name = 'mean eigenvector centrality',
+#                        limits = c(0,1),
+#                        expand = c(0,0))
+# )
+# ggsave(filename = 'figure5f_eigensightings_skewed_meanpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5f.4, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# # save for plotting
+# save.image('../outputs/sparse_network_methods_figures/figure5_plots.RData')
+# 
+# ## right-skewed, eigenvector centrality vs total number of dyads where together = 0 ####
+# (figure5h.1 <- ggplot()+
+#     geom_point(data = eigen_skewed, aes(x = together0, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = together0, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5h_eigentogether0_skewed_allpoints_noline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5h.1, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5h.2 <- ggplot()+
+#     geom_point(data = eigen_skewed, aes(x = together0, y = eigen),
+#                colour = rgb(253/255, 231/255, 37/255, 0.01), size = 0.5, shape = 19)+
+#     geom_point(data = means, aes(x = together0, y = mean),
+#                colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
+#     geom_smooth(data = eigen_skewed, aes(x = together0, y = eigen),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
+# )
+# ggsave(filename = 'figure5h_eigentogether0_skewed_allpoints_withline.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5h.2, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5h.3 <- ggplot(means)+
+#     geom_point(aes(x = together0, y = mean, colour = count),
+#                size = 0.5, shape = 19)+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
+#     labs(colour = 'number of\nsightings')
+# )
+# ggsave(filename = 'figure5h_eigentogether0_skewed_meanpoints_noline_coloursightings.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5h.3, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# (figure5h.4 <- ggplot(means)+
+#     geom_point(aes(x = together0, y = mean, colour = count),
+#                size = 0.5, shape = 19)+
+#     geom_smooth(aes(x = together0, y = mean),
+#                 colour = rgb(68/255, 1/255, 84/255))+
+#     scale_x_continuous(name = 'dyads together = 0')+
+#     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))+
+#     labs(colour = 'number of\nsightings')
+# )
+# ggsave(filename = 'figure5h_eigentogether0_skewed_meanpoints_withline_colourssightings.png',
+#        path = '../outputs/sparse_network_methods_figures/',
+#        plot = figure5h.4, device = 'png', width = 1400, height = 800, units = 'px')
+# 
+# # save for plotting
+# save.image('../outputs/sparse_network_methods_figures/figure5_plots.RData')
+# 
+## merge ####
+rm(counts_df, counts_ls_skewed, edge_binary_skewed, edge_names, edge_samples1, edges, edges_subset, edges1, edges2, edges3, edges4, fit_edges_default, fit_edges_skewed, fit_edges_uniform, means, n_chains, n_samples, plot_dyad_ids, plot_dyads) ; gc()
+
+save.image('../outputs/sparse_network_methods_figures/bison_figures.RData')
+
+rm(figure_default_edgesightings.1, figure_default_edgesightings.2,
+   figure_skewed_edgesightings.1, figure_skewed_edgesightings.2,
+   figure_uniform_edgesightings.1, figure_uniform_edgesightings.2) ; gc()
+
+(figure_uniform_posterior + figure_default_posterior + figure_skewed_posterior)+
+  plot_annotation(tag_levels = 'a')
+ggsave(filename = 'posterior_unconditional.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 2100, height = 800, units = 'px')
+rm(figure_default_posterior, figure_skewed_posterior, figure_uniform_posterior) ; gc()
+
+(figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+ 
+  plot_annotation(tag_levels = list(c('d','e','f')))
+ggsave(filename = 'edgesightings_unconditional.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 2100, height = 800, units = 'px')
+
+#### Figure 6: 4 panel plot of conditional BISoN for prior/posterior/mean_edge_vs_sightings/eigenvector_vs_sightings. if 0: beta(0.7,10), if 1: beta(1,5) ####
+## panel a: posterior ####
 load('motnp_edgeweights_conditionalprior.RData')
 counts <- counts_df %>% 
   select(dyad_id, count_dyad, event_count) %>% 
@@ -1202,7 +1355,7 @@ ggsave(filename = 'figure3b_posterior_conditional_sampledyads.png',
        plot = figure3b.2, device = 'png', width = 1400, height = 800, units = 'px')
 
 
-## panel c: mean edge weight vs dyad sightings ####
+## panel b: mean edge weight vs dyad sightings ####
 means <- edges %>% 
   group_by(dyad) %>% 
   mutate(mean = mean(edge_draw)) %>% 
@@ -1244,7 +1397,7 @@ ggsave(filename = 'figure3c_edgesightings_conditional_allpoints_withline.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = figure3c.4, device = 'png', width = 1400, height = 800, units = 'px')
 
-## panel d: eigenvector vs total number of dyads where together = 0 ####
+## panel c: eigenvector vs total number of dyads where together = 0 ####
 edge_samples <- fit_edges_motnp$draws() %>% as.data.frame()
 edge_samples <- edge_samples[,(n_chains+1):ncol(edge_samples)]
 edge_samples <- edge_samples[,seq(1,ncol(edge_samples)-3, by = 4)]
@@ -1362,7 +1515,7 @@ ggsave(filename = 'figure3d_eigentogether_conditional_meanpoints_withline_colour
        path = '../outputs/sparse_network_methods_figures/',
        plot = figure3d.4, device = 'png', width = 1400, height = 800, units = 'px')
 
-## panel e: eigenvector vs individual sightings ####
+## panel d: eigenvector vs individual sightings ####
 (figure3e.1 <- ggplot()+
     geom_point(data = eigen_motnp, aes(x = count, y = eigen),
                colour = rgb(253/255, 231/255, 37/255, 0.01))+
@@ -1416,7 +1569,7 @@ ggsave(filename = 'figure3e_eigensightings_conditional_meanpoints_withline.png',
 # save image for future
 save.image('../outputs/sparse_network_methods_figures/figure3.RData')
 
-## merge panels ####
+## merge ####
 #load('../outputs/sparse_network_methods_figures/figure3.RData')
 
 # run patchwork and save

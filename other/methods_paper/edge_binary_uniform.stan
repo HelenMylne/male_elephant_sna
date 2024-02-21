@@ -10,6 +10,6 @@ parameters {
 }
 
 model {
-    edge_weight ~ normal(-2.5, 1.5);
-    together ~ binomial(count_dyad, inv_logit(edge_weight));
+    edge_weight ~ uniform(0,1);
+    together ~ binomial(count_dyad, edge_weight);
 }
