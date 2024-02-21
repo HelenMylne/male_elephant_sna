@@ -5,16 +5,16 @@ data {
   int num_windows;                       // Number of time windows
   
   // per time window data size
-  int num_nodes_window1;   // Number of rows in data in time window 1
-  int num_nodes_window2;   // Number of rows in data in time window 2
-  int num_nodes_window3;   // Number of rows in data in time window 3
-  int num_nodes_window4;   // Number of rows in data in time window 4
-  int num_nodes_window5;   // Number of rows in data in time window 5
-  int num_nodes_window6;   // Number of rows in data in time window 6
-  int num_nodes_window7;   // Number of rows in data in time window 7
-  int num_nodes_window8;   // Number of rows in data in time window 8
-  int num_nodes_window9;   // Number of rows in data in time window 9
-  int num_nodes_window10;  // Number of rows in data in time window 10
+  int num_nodes_window1;  // Number of rows in data in time window 1
+  int num_nodes_window2;  // Number of rows in data in time window 2
+  int num_nodes_window3;  // Number of rows in data in time window 3
+  int num_nodes_window4;  // Number of rows in data in time window 4
+  int num_nodes_window5;  // Number of rows in data in time window 5
+  int num_nodes_window6;  // Number of rows in data in time window 6
+  int num_nodes_window7;  // Number of rows in data in time window 7
+  int num_nodes_window8;  // Number of rows in data in time window 8
+  int num_nodes_window9;  // Number of rows in data in time window 9
+  int num_nodes_window10; // Number of rows in data in time window 10
   int num_nodes_window11;  // Number of rows in data in time window 11
   int num_nodes_window12;  // Number of rows in data in time window 12
   int num_nodes_window13;  // Number of rows in data in time window 13
@@ -24,7 +24,7 @@ data {
   int num_nodes_window17;  // Number of rows in data in time window 17
   int num_nodes_window18;  // Number of rows in data in time window 18
   int num_nodes_window19;  // Number of rows in data in time window 19
-  int num_nodes_window20;  // Number of rows in data in time window 10
+  int num_nodes_window20; // Number of rows in data in time window 10
   int num_nodes_window21;  // Number of rows in data in time window 21
   int num_nodes_window22;  // Number of rows in data in time window 22
   int num_nodes_window23;  // Number of rows in data in time window 23
@@ -34,7 +34,7 @@ data {
   int num_nodes_window27;  // Number of rows in data in time window 27
   int num_nodes_window28;  // Number of rows in data in time window 28
   int num_nodes_window29;  // Number of rows in data in time window 29
-  int num_nodes_window30;  // Number of rows in data in time window 30
+  int num_nodes_window30; // Number of rows in data in time window 30
   int num_nodes_window31;  // Number of rows in data in time window 31
   int num_nodes_window32;  // Number of rows in data in time window 32
   int num_nodes_window33;  // Number of rows in data in time window 33
@@ -173,7 +173,9 @@ parameters {
   real<lower=0> sigma;
   // random effects
   vector[num_windows] rand_window;
+  real<lower=0> sigma_window;
   vector[num_nodes] rand_node;
+  real<lower=0> sigma_node;
 }
 
 transformed parameters {
@@ -326,12 +328,14 @@ transformed parameters {
 
  model {
   // priors
-  beta_age ~ normal(0,0.6); //beta_age ~ normal(0,0.8);
+  beta_age ~ normal(0,0.8);
   sigma ~ exponential(2);
-  intercept ~ normal(-6,2); //intercept ~ normal(logit(0.05),2);
-  rand_window ~ normal(0,1);
-  rand_node ~ normal(0,1);
-
+  intercept ~ normal(logit(0.05),2);
+  rand_window ~ normal(0,sigma_window);
+  sigma_window ~ exponential(1);
+  rand_node ~ normal(0,sigma_node);
+  sigma_node ~ exponential(1);
+  
   // likelihood
   centrality_mu_1 ~ multi_normal(predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
   centrality_mu_2 ~ multi_normal(predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
