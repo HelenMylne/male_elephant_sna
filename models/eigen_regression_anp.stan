@@ -179,157 +179,158 @@ parameters {
 }
 
 transformed parameters {
-  // linear model
-  vector[num_nodes_window1] predictor_window1;
-  for(i in 1:num_nodes_window1) {
-    predictor_window1[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[1])] + rand_window[1] + rand_node[nodes_window1[i]];
-  }
-  vector[num_nodes_window2] predictor_window2;
-  for(i in 1:num_nodes_window2) {
-    predictor_window2[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[2])] + rand_window[2] + rand_node[nodes_window2[i]];
-  }
-  vector[num_nodes_window3] predictor_window3;
-  for(i in 1:num_nodes_window3) {
-    predictor_window3[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[3])] + rand_window[3] + rand_node[nodes_window3[i]];
-  }
-  vector[num_nodes_window4] predictor_window4;
-  for(i in 1:num_nodes_window4) {
-    predictor_window4[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[4])] + rand_window[4] + rand_node[nodes_window4[i]];
-  }
-  vector[num_nodes_window5] predictor_window5;
-  for(i in 1:num_nodes_window5) {
-    predictor_window5[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[5])] + rand_window[5] + rand_node[nodes_window5[i]];
-  }
-  vector[num_nodes_window6] predictor_window6;
-  for(i in 1:num_nodes_window6) {
-    predictor_window6[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[6])] + rand_window[6] + rand_node[nodes_window6[i]];
-  }
-  vector[num_nodes_window7] predictor_window7;
-  for(i in 1:num_nodes_window7) {
-    predictor_window7[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[7])] + rand_window[7] + rand_node[nodes_window7[i]];
-  }
-  vector[num_nodes_window8] predictor_window8;
-  for(i in 1:num_nodes_window8) {
-    predictor_window8[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[8])] + rand_window[8] + rand_node[nodes_window8[i]];
-  }
-  vector[num_nodes_window9] predictor_window9;
-  for(i in 1:num_nodes_window9) {
-    predictor_window9[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[9])] + rand_window[9] + rand_node[nodes_window9[i]];
-  }
-  vector[num_nodes_window10] predictor_window10;
-  for(i in 1:num_nodes_window10) {
-    predictor_window10[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[10])] + rand_window[10] + rand_node[nodes_window10[i]];
-  }
-  vector[num_nodes_window11] predictor_window11;
-  for(i in 1:num_nodes_window11) {
-    predictor_window11[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[11])] + rand_window[11] + rand_node[nodes_window11[i]];
-  }
-  vector[num_nodes_window12] predictor_window12;
-  for(i in 1:num_nodes_window12) {
-    predictor_window12[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[12])] + rand_window[12] + rand_node[nodes_window12[i]];
-  }
-  vector[num_nodes_window13] predictor_window13;
-  for(i in 1:num_nodes_window13) {
-    predictor_window13[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[13])] + rand_window[13] + rand_node[nodes_window13[i]];
-  }
-  vector[num_nodes_window14] predictor_window14;
-  for(i in 1:num_nodes_window14) {
-    predictor_window14[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[14])] + rand_window[14] + rand_node[nodes_window14[i]];
-  }
-  vector[num_nodes_window15] predictor_window15;
-  for(i in 1:num_nodes_window15) {
-    predictor_window15[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[15])] + rand_window[15] + rand_node[nodes_window15[i]];
-  }
-  vector[num_nodes_window16] predictor_window16;
-  for(i in 1:num_nodes_window16) {
-    predictor_window16[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[16])] + rand_window[16] + rand_node[nodes_window16[i]];
-  }
-  vector[num_nodes_window17] predictor_window17;
-  for(i in 1:num_nodes_window17) {
-    predictor_window17[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[17])] + rand_window[17] + rand_node[nodes_window17[i]];
-  }
-  vector[num_nodes_window18] predictor_window18;
-  for(i in 1:num_nodes_window18) {
-    predictor_window18[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[18])] + rand_window[18] + rand_node[nodes_window18[i]];
-  }
-  vector[num_nodes_window19] predictor_window19;
-  for(i in 1:num_nodes_window19) {
-    predictor_window19[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[19])] + rand_window[19] + rand_node[nodes_window19[i]];
-  }
-  vector[num_nodes_window20] predictor_window20;
-  for(i in 1:num_nodes_window20) {
-    predictor_window20[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[20])] + rand_window[20] + rand_node[nodes_window20[i]];
-  }
-  vector[num_nodes_window21] predictor_window21;
-  for(i in 1:num_nodes_window21) {
-    predictor_window21[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[21])] + rand_window[21] + rand_node[nodes_window21[i]];
-  }
-  vector[num_nodes_window22] predictor_window22;
-  for(i in 1:num_nodes_window22) {
-    predictor_window22[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[22])] + rand_window[22] + rand_node[nodes_window22[i]];
-  }
-  vector[num_nodes_window23] predictor_window23;
-  for(i in 1:num_nodes_window23) {
-    predictor_window23[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[23])] + rand_window[23] + rand_node[nodes_window23[i]];
-  }
-  vector[num_nodes_window24] predictor_window24;
-  for(i in 1:num_nodes_window24) {
-    predictor_window24[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[24])] + rand_window[24] + rand_node[nodes_window24[i]];
-  }
-  vector[num_nodes_window25] predictor_window25;
-  for(i in 1:num_nodes_window25) {
-    predictor_window25[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[25])] + rand_window[25] + rand_node[nodes_window25[i]];
-  }
-  vector[num_nodes_window26] predictor_window26;
-  for(i in 1:num_nodes_window26) {
-    predictor_window26[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[26])] + rand_window[26] + rand_node[nodes_window26[i]];
-  }
-  vector[num_nodes_window27] predictor_window27;
-  for(i in 1:num_nodes_window27) {
-    predictor_window27[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[27])] + rand_window[27] + rand_node[nodes_window27[i]];
-  }
-  vector[num_nodes_window28] predictor_window28;
-  for(i in 1:num_nodes_window28) {
-    predictor_window28[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[28])] + rand_window[28] + rand_node[nodes_window28[i]];
-  }
-  vector[num_nodes_window29] predictor_window29;
-  for(i in 1:num_nodes_window29) {
-    predictor_window29[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[29])] + rand_window[29] + rand_node[nodes_window29[i]];
-  }
-  vector[num_nodes_window30] predictor_window30;
-  for(i in 1:num_nodes_window30) {
-    predictor_window30[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[30])] + rand_window[30] + rand_node[nodes_window30[i]];
-  }
-  vector[num_nodes_window31] predictor_window31;
-  for(i in 1:num_nodes_window31) {
-    predictor_window31[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[31])] + rand_window[31] + rand_node[nodes_window31[i]];
-  }
-  vector[num_nodes_window32] predictor_window32;
-  for(i in 1:num_nodes_window32) {
-    predictor_window32[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[32])] + rand_window[32] + rand_node[nodes_window32[i]];
-  }
-  vector[num_nodes_window33] predictor_window33;
-  for(i in 1:num_nodes_window33) {
-    predictor_window33[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[33])] + rand_window[33] + rand_node[nodes_window33[i]];
-  }
-  vector[num_nodes_window34] predictor_window34;
-  for(i in 1:num_nodes_window34) {
-    predictor_window34[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[34])] + rand_window[34] + rand_node[nodes_window34[i]];
-  }
-  vector[num_nodes_window35] predictor_window35;
-  for(i in 1:num_nodes_window35) {
-    predictor_window35[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[35])] + rand_window[35] + rand_node[nodes_window35[i]];
-  }
-  vector[num_nodes_window36] predictor_window36;
-  for(i in 1:num_nodes_window36) {
-    predictor_window36[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[36])] + rand_window[36] + rand_node[nodes_window36[i]];
-  }
-  
   // random effects
   vector[num_windows] window_random_effect;
   window_random_effect = rand_window * sigma_window;
   vector[num_nodes] node_random_effect;
   node_random_effect = rand_node * sigma_node;
+  
+  // linear model
+  vector[num_nodes_window1] predictor_window1;
+  for(i in 1:num_nodes_window1) {
+    predictor_window1[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[1])] + window_random_effect[1] + node_random_effect[nodes_window1[i]];
+  }
+  vector[num_nodes_window2] predictor_window2;
+  for(i in 1:num_nodes_window2) {
+    predictor_window2[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[2])] + window_random_effect[2] + node_random_effect[nodes_window2[i]];
+  }
+  vector[num_nodes_window3] predictor_window3;
+  for(i in 1:num_nodes_window3) {
+    predictor_window3[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[3])] + window_random_effect[3] + node_random_effect[nodes_window3[i]];
+  }
+  vector[num_nodes_window4] predictor_window4;
+  for(i in 1:num_nodes_window4) {
+    predictor_window4[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[4])] + window_random_effect[4] + node_random_effect[nodes_window4[i]];
+  }
+  vector[num_nodes_window5] predictor_window5;
+  for(i in 1:num_nodes_window5) {
+    predictor_window5[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[5])] + window_random_effect[5] + node_random_effect[nodes_window5[i]];
+  }
+  vector[num_nodes_window6] predictor_window6;
+  for(i in 1:num_nodes_window6) {
+    predictor_window6[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[6])] + window_random_effect[6] + node_random_effect[nodes_window6[i]];
+  }
+  vector[num_nodes_window7] predictor_window7;
+  for(i in 1:num_nodes_window7) {
+    predictor_window7[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[7])] + window_random_effect[7] + node_random_effect[nodes_window7[i]];
+  }
+  vector[num_nodes_window8] predictor_window8;
+  for(i in 1:num_nodes_window8) {
+    predictor_window8[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[8])] + window_random_effect[8] + node_random_effect[nodes_window8[i]];
+  }
+  vector[num_nodes_window9] predictor_window9;
+  for(i in 1:num_nodes_window9) {
+    predictor_window9[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[9])] + window_random_effect[9] + node_random_effect[nodes_window9[i]];
+  }
+  vector[num_nodes_window10] predictor_window10;
+  for(i in 1:num_nodes_window10) {
+    predictor_window10[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[10])] + window_random_effect[10] + node_random_effect[nodes_window10[i]];
+  }
+  vector[num_nodes_window11] predictor_window11;
+  for(i in 1:num_nodes_window11) {
+    predictor_window11[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[11])] + window_random_effect[11] + node_random_effect[nodes_window11[i]];
+  }
+  vector[num_nodes_window12] predictor_window12;
+  for(i in 1:num_nodes_window12) {
+    predictor_window12[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[12])] + window_random_effect[12] + node_random_effect[nodes_window12[i]];
+  }
+  vector[num_nodes_window13] predictor_window13;
+  for(i in 1:num_nodes_window13) {
+    predictor_window13[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[13])] + window_random_effect[13] + node_random_effect[nodes_window13[i]];
+  }
+  vector[num_nodes_window14] predictor_window14;
+  for(i in 1:num_nodes_window14) {
+    predictor_window14[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[14])] + window_random_effect[14] + node_random_effect[nodes_window14[i]];
+  }
+  vector[num_nodes_window15] predictor_window15;
+  for(i in 1:num_nodes_window15) {
+    predictor_window15[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[15])] + window_random_effect[15] + node_random_effect[nodes_window15[i]];
+  }
+  vector[num_nodes_window16] predictor_window16;
+  for(i in 1:num_nodes_window16) {
+    predictor_window16[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[16])] + window_random_effect[16] + node_random_effect[nodes_window16[i]];
+  }
+  vector[num_nodes_window17] predictor_window17;
+  for(i in 1:num_nodes_window17) {
+    predictor_window17[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[17])] + window_random_effect[17] + node_random_effect[nodes_window17[i]];
+  }
+  vector[num_nodes_window18] predictor_window18;
+  for(i in 1:num_nodes_window18) {
+    predictor_window18[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[18])] + window_random_effect[18] + node_random_effect[nodes_window18[i]];
+  }
+  vector[num_nodes_window19] predictor_window19;
+  for(i in 1:num_nodes_window19) {
+    predictor_window19[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[19])] + window_random_effect[19] + node_random_effect[nodes_window19[i]];
+  }
+  vector[num_nodes_window20] predictor_window20;
+  for(i in 1:num_nodes_window20) {
+    predictor_window20[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[20])] + window_random_effect[20] + node_random_effect[nodes_window20[i]];
+  }
+  vector[num_nodes_window21] predictor_window21;
+  for(i in 1:num_nodes_window21) {
+    predictor_window21[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[21])] + window_random_effect[21] + node_random_effect[nodes_window21[i]];
+  }
+  vector[num_nodes_window22] predictor_window22;
+  for(i in 1:num_nodes_window22) {
+    predictor_window22[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[22])] + window_random_effect[22] + node_random_effect[nodes_window22[i]];
+  }
+  vector[num_nodes_window23] predictor_window23;
+  for(i in 1:num_nodes_window23) {
+    predictor_window23[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[23])] + window_random_effect[23] + node_random_effect[nodes_window23[i]];
+  }
+  vector[num_nodes_window24] predictor_window24;
+  for(i in 1:num_nodes_window24) {
+    predictor_window24[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[24])] + window_random_effect[24] + node_random_effect[nodes_window24[i]];
+  }
+  vector[num_nodes_window25] predictor_window25;
+  for(i in 1:num_nodes_window25) {
+    predictor_window25[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[25])] + window_random_effect[25] + node_random_effect[nodes_window25[i]];
+  }
+  vector[num_nodes_window26] predictor_window26;
+  for(i in 1:num_nodes_window26) {
+    predictor_window26[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[26])] + window_random_effect[26] + node_random_effect[nodes_window26[i]];
+  }
+  vector[num_nodes_window27] predictor_window27;
+  for(i in 1:num_nodes_window27) {
+    predictor_window27[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[27])] + window_random_effect[27] + node_random_effect[nodes_window27[i]];
+  }
+  vector[num_nodes_window28] predictor_window28;
+  for(i in 1:num_nodes_window28) {
+    predictor_window28[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[28])] + window_random_effect[28] + node_random_effect[nodes_window28[i]];
+  }
+  vector[num_nodes_window29] predictor_window29;
+  for(i in 1:num_nodes_window29) {
+    predictor_window29[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[29])] + window_random_effect[29] + node_random_effect[nodes_window29[i]];
+  }
+  vector[num_nodes_window30] predictor_window30;
+  for(i in 1:num_nodes_window30) {
+    predictor_window30[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[30])] + window_random_effect[30] + node_random_effect[nodes_window30[i]];
+  }
+  vector[num_nodes_window31] predictor_window31;
+  for(i in 1:num_nodes_window31) {
+    predictor_window31[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[31])] + window_random_effect[31] + node_random_effect[nodes_window31[i]];
+  }
+  vector[num_nodes_window32] predictor_window32;
+  for(i in 1:num_nodes_window32) {
+    predictor_window32[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[32])] + window_random_effect[32] + node_random_effect[nodes_window32[i]];
+  }
+  vector[num_nodes_window33] predictor_window33;
+  for(i in 1:num_nodes_window33) {
+    predictor_window33[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[33])] + window_random_effect[33] + node_random_effect[nodes_window33[i]];
+  }
+  vector[num_nodes_window34] predictor_window34;
+  for(i in 1:num_nodes_window34) {
+    predictor_window34[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[34])] + window_random_effect[34] + node_random_effect[nodes_window34[i]];
+  }
+  vector[num_nodes_window35] predictor_window35;
+  for(i in 1:num_nodes_window35) {
+    predictor_window35[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[35])] + window_random_effect[35] + node_random_effect[nodes_window35[i]];
+  }
+  vector[num_nodes_window36] predictor_window36;
+  for(i in 1:num_nodes_window36) {
+    predictor_window36[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[36])] + window_random_effect[36] + node_random_effect[nodes_window36[i]];
+  }
+  
 }
 
  model {
