@@ -1,15 +1,20 @@
-#### set up #### 
-library(LaplacesDemon)
-library(tidyverse)
-library(cmdstanr) #set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
+#### set up ####
+# library(StanHeaders) ; library(rstan) ; library(LaplacesDemon) ; library(tidyverse)
+library(StanHeaders, lib.loc = '../packages/')
+library(rstan, lib.loc = '../packages/')
+#library(cmdstanr, lib.loc = '../packages/')
+#set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/')
+library(LaplacesDemon, lib.loc = '../packages/')
+library(tidyverse, lib.loc = '../packages/')
 
+# pdf('step4_nodalregression/checks/simulation_anp_modelprep.pdf')
 theme_set(theme_bw())
 set.seed(2)
 
 #### derive population information directly from ANP data ####
-sim <- read_csv('../data_processed/step4_nodalregression/anp_allnodes.csv') %>% 
-  select(-mean_eigen) %>% 
-  relocate(age_std, .after = age) %>% 
+sim <- read_csv('../data_processed/step4_nodalregression/anp_allnodes.csv') %>%
+  select(-mean_eigen) %>%
+  relocate(age_std, .after = age) %>%
   relocate(node_random, .after = node)
 
 ## define parameters
@@ -21,7 +26,7 @@ n_windows <- length(unique(sim$window))
 hist(sim$age)
 
 #### simulate centralities ####
-## simulate age effect
+# simulate age effect
 sim_slope <- -0.02
 
 ## simulate intercept
@@ -35,9 +40,9 @@ sim_node_unique <- rnorm(n_nodes, mean = 0, sd = 0.2)
 sim$mu <- sim$age * sim_slope + sim_intcp + sim_window_unique[sim$window] + sim_node_unique[sim$node_random]    # simulate mean centrality on outcome scale
 
 ## plot mean centrality against age
-plot(mu ~ age, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-5,1), las = 1)           # plot
-points(mu ~ age, data = sim[sim$window == 2,], col = 'blue', pch = 19)                                 # plot
-points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)                                # plot
+plot(mu ~ age, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-5,1), las = 1)
+points(mu ~ age, data = sim[sim$window == 2,], col = 'blue', pch = 19)
+points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)
 
 ## check inputs
 colour <- rep(c('red','orange','yellow','green','blue','purple'), each = 6)
@@ -58,20 +63,20 @@ for(j in 1:n_data){
 }
 
 ## visualise
-data.frame(sim_dat) %>% 
-  select(sample(sim$node_random, 40, replace = F)) %>% 
+data.frame(sim_dat) %>%
+  select(sample(sim$node_random, 40, replace = F)) %>%
   pivot_longer(cols = everything(),
-               names_to = "node_random", values_to = "centrality") %>% 
-  separate(node_random, into = c('X','node_window'), remove = T, sep = 1) %>% 
-  dplyr::select(-X) %>% 
-  separate(node_window, into = c('node_random','window'), sep = '_', remove = F) %>% 
-  mutate(node = as.integer(node_random)) %>% 
-  left_join(sim[,c('node_window','age')], by = 'node_window') %>% 
+               names_to = "node_random", values_to = "centrality") %>%
+  separate(node_random, into = c('X','node_window'), remove = T, sep = 1) %>%
+  dplyr::select(-X) %>%
+  separate(node_window, into = c('node_random','window'), sep = '_', remove = F) %>%
+  mutate(node = as.integer(node_random)) %>%
+  left_join(sim[,c('node_window','age')], by = 'node_window') %>%
   ggplot(aes(x = centrality, fill = age, group = node_window)) +
   geom_density(linewidth = 0.4, alpha = 0.6) +
   facet_grid(rows = vars(as.factor(node)), scales = "free") +
-  labs(x = "Eigenvector centrality (standardised)") + 
-  theme_void() + 
+  labs(x = "Eigenvector centrality (standardised)") +
+  theme_void() +
   theme(strip.text.y = element_text(size = 12),
         axis.text.x = element_text(angle = 0, size = 12, debug = FALSE),
         axis.title.x = element_text(size = 12),
@@ -87,23 +92,23 @@ for(time_window in 1:n_windows){
   eigen_covs[[time_window]] <- cov(sim_dat[,which(sim$window == time_window)])
 }
 
-## check normal approximation -- simulate from combined mean and covariance, plot curve against relative node ID 
+## check normal approximation -- simulate from combined mean and covariance, plot curve against relative node ID
 par(mfrow = c(6,6), mai = c(0.1,0.1,0.1,0.1))
 for(time_window in 1:n_windows){
   ## simulate from multivariate normal
   sim_cent_samples <- MASS::mvrnorm(1e5, eigen_means[[time_window]], eigen_covs[[time_window]])
-  
+
   ## identify random node of interest
   node_id_sample <- sample(which(sim$window == time_window),1)
   nodes_timewindow <- sim %>%
     filter(window == time_window)
   node_id_check <- which(nodes_timewindow$node == sim$node[node_id_sample])
-  
+
   ## plot true density curve
   plot(density(sim_dat[,node_id_sample]), lwd = 2, las = 1,
        main = paste0('time window ', time_window),
        xlab = '', ylab = '')
-  
+
   ## plot normal approximation
   lines(density(sim_cent_samples[, node_id_check]),
         col = rgb(0,0,1,0.5), lwd = 2)
@@ -112,7 +117,7 @@ par(mfrow = c(1,1), mai = c(0.5,0.5,0.5,0.5))
 rm(sim_cent_samples, node_id_sample, node_id_check, nodes_timewindow) ; gc()
 
 ## create data
-nodes_per_window <- as.data.frame(table(sim$window)) %>% 
+nodes_per_window <- as.data.frame(table(sim$window)) %>%
   rename(window = Var1,
          node_count = Freq)
 
@@ -311,8 +316,12 @@ eigen_list <- list(
 
 #### prior predictive check ####
 n <- 100
-beta_age <- rnorm(n, 0, 0.6)   # beta_age <- rnorm(n, 0, 0.8)
 intercept  <- rnorm(n, -6, 2) #rnorm(n, LaplacesDemon::logit(0.05), 3) # taking the intercept from the logit of results from Chiyo 2011 (doesn't state mean/median centrality so estimated from graph based on where correlation line would cross x = 0)
+beta_age <- rnorm(n, 0, 0.8)   # beta_age <- rnorm(n, 0, 0.8)
+sigma_window <- rexp(n, 3)
+sigma_node <- rexp(n, 3)
+rand_window <- rnorm(n, 0, sigma_window)
+rand_node <- rnorm(n, 0,sigma_node)
 min_raw <- min(unlist(eigen_list[grep('centrality_mu', names(eigen_list))]))
 max_raw <- max(unlist(eigen_list[grep('centrality_mu', names(eigen_list))]))
 plot(NULL, las = 1, xlab = 'age (standardised)', ylab = 'eigenvector',
@@ -322,94 +331,132 @@ plot(NULL, las = 1, xlab = 'age (standardised)', ylab = 'eigenvector',
 abline(h = min_raw, lty = 2) ; abline(h = max_raw, lty = 2)
 for(i in 1:n){
   lines(x = seq(min(sim$age_std), max(sim$age_std), length.out = 2),
-        y = intercept[i] + beta_age[i]*c(min(sim$age_std), max(sim$age_std)),
+        y = intercept[i] + beta_age[i]*c(min(sim$age_std), max(sim$age_std)) + rand_window[i] + rand_node[i],
         col = rgb(0,0,1,0.4))
 }
 rm(n, max_raw, min_raw, beta_age, intercept) ; gc()
 
+dev.off()
+
 #### run model -- age as a continuous variable with 2 windows ####
 ## load model
-#nodal_regression <- stan_model('models/eigen_regression_intercept.stan')
-nodal_regression <- cmdstan_model('models/eigen_regression_anp.stan')
+nodal_regression <- stan_model('models/eigen_regression_anp.stan')
+#nodal_regression <- cmdstan_model('models/eigen_regression_anp.stan')
 
 ## run model
 n_chains <- 4
 n_samples <- 1000
-#fit_sim <- sampling(nodal_regression, data = eigen_list, chains = n_chains, cores = n_chains)
-fit_sim <- nodal_regression$sample(data = eigen_list,
-                                   chains = n_chains, parallel_chains = n_chains,
-                                   iter_warmup = n_samples, iter_sampling = n_samples)
+fit_sim <- sampling(nodal_regression, data = eigen_list,
+                    chains = n_chains, cores = n_chains)
+# fit_sim <- nodal_regression$sample(data = eigen_list,
+#                                    chains = n_chains, parallel_chains = n_chains,
+#                                    iter_warmup = n_samples, iter_sampling = n_samples)
+# temp_rds_file <- tempfile(fileext = '.RDS')
+# fit_sim$save.object(file = temp_rds_file)
+
+save.image('anp_nodalregression/simulation.RData')
 
 #### check outputs ####
+#load('anp_nodalregression/simulation.RData')
+#fit_sim <- readRDS(temp_rds_file)
+pdf('step4_nodalregression/checks/simulation_anp_modelchecks.pdf')
+
 ## extract model fit -- very good!
-( summary <- fit_sim$summary() )
-par(mfrow = c(3,1))
-hist(summary$rhat,#[grep(pattern = 'chol_',
-     #x = summary$variable,
-     #invert = T)],
-     breaks = 50)
-hist(summary$ess_bulk,#[grep(pattern = 'chol_',
-     #x = summary$variable,
-     #invert = T)],
-     breaks = 50)
-hist(summary$ess_tail,#[grep(pattern = 'chol_',
-     #x = summary$variable,
-     #invert = T)],
-     breaks = 50)
+# ( summary <- fit_sim$summary() )
+# par(mfrow = c(3,1))
+# hist(summary$rhat,#[grep(pattern = 'chol_',
+#      #x = summary$variable,
+#      #invert = T)],
+#      breaks = 50)
+# hist(summary$ess_bulk,#[grep(pattern = 'chol_',
+#      #x = summary$variable,
+#      #invert = T)],
+#      breaks = 50)
+# hist(summary$ess_tail,#[grep(pattern = 'chol_',
+#      #x = summary$variable,
+#      #invert = T)],
+#      breaks = 50)
+summary <- summary(fit_sim)
+fit_summary <- as.data.frame(summary$summary)
+par(mfrow = c(2,1))
+hist(fit_summary$Rhat[grep(pattern = 'predictor_window', x = rownames(fit_summary),invert = T)],
+     breaks = 50, main = 'Rhat distribution')
+hist(fit_summary$n_eff[grep(pattern = 'predictor_window', x = rownames(fit_summary), invert = T)],
+     breaks = 50, main = 'n_eff distribution')
 par(mfrow = c(1,1))
 
 ## extract posterior
-#params <- rstan::extract(fit_sim)
-params_std <- fit_sim$draws(format = 'draws_df')
+# params_std <- fit_sim$draws(format = 'draws_df')
+params_std <- rstan::extract(fit_sim) %>%
+  as.data.frame()
 
 ## separate random effects from global parameters
-rand_window <- params_std %>% 
+rand_window <- params_std %>%
   dplyr::select(grep('rand_window', colnames(params_std), value=TRUE))
-check_windows <- apply(rand_window, 2, mean) %>% 
-  as.data.frame() %>% 
-  mutate(node = colnames(rand_window)) %>% 
-  relocate(node) %>% 
+check_windows <- apply(rand_window, 2, mean) %>%
+  as.data.frame() %>%
+  mutate(node = colnames(rand_window)) %>%
+  relocate(node) %>%
   mutate(sim_input = sim_window_unique)
 colnames(check_windows)[2] <- 'model_output'
-plot(check_windows$model_output ~ check_windows$sim_input)
+plot(check_windows$model_output ~ check_windows$sim_input,
+     main = 'model calculated effect of window vs\nactual simulated effect of window')
 
-rand_node <- params_std %>% 
+rand_node <- params_std %>%
   dplyr::select(grep('rand_node', colnames(params_std), value=TRUE))
-check_nodes <- apply(rand_node, 2, mean) %>% 
-  as.data.frame() %>% 
-  mutate(node = colnames(rand_node)) %>% 
-  relocate(node) %>% 
+check_nodes <- apply(rand_node, 2, mean) %>%
+  as.data.frame() %>%
+  mutate(node = colnames(rand_node)) %>%
+  relocate(node) %>%
   mutate(sim_input = sim_node_unique)
 colnames(check_nodes)[2] <- 'model_output'
-plot(check_nodes$model_output ~ check_nodes$sim_input)   # wouldn't expect this to be an actual 1:1 relationship because of the scales, but there should be a positive relationship
+plot(check_nodes$model_output ~ check_nodes$sim_input,
+     main = 'model calculated effect of node ID vs\nactual simulated effect of node ID')   # wouldn't expect this to be an actual 1:1 relationship because of the scales, but there should be a positive relationship
 
 rm(check_windows, check_nodes) ; gc()
 
 ## traceplot all parameters
-#traceplot(fit_sim, pars = c('intercept','beta_age','sigma','predictor[1]','predictor[50]','predictor[100]'))
-plot_params <- c('intercept','beta_age','sigma',
-                 'rand_node[1]','rand_node[50]','rand_node[100]',
-                 'rand_window[1]','rand_window[2]',
-                 'predictor_window1[1]','predictor_window1[16]','predictor_window1[38]','predictor_window1[50]',
-                 'predictor_window2[1]','predictor_window2[25]','predictor_window2[50]','predictor_window2[75]')
-params_std %>% 
-  select(all_of(plot_params),`.draw`,`.chain`,`.iteration`) %>% 
-  pivot_longer(cols = all_of(plot_params), names_to = 'parameter', values_to = 'draw') %>% 
-  rename(chain = .chain,
-         chain_position = .iteration,
-         draw_id = .draw) %>% 
-  #filter(chain == 1) %>% # inspect individual chains -- check for wandery sections that might be hidden by other chains when all plotted together
-  ggplot(aes(x = chain_position, y = draw, colour = as.factor(chain)))+
-  geom_line()+
-  facet_wrap(. ~ parameter, scales = 'free_y')+
-  theme_bw()+
-  theme(legend.position = 'none')
-rm(plot_params) ; gc()
+# plot_params <- c('intercept','beta_age','sigma',
+#                  'rand_node[1]','rand_node[50]','rand_node[100]','rand_node[150]',
+#                  'rand_window[1]','rand_window[2]','rand_window[3]','rand_window[4]',
+#                  'predictor_window1[1]','predictor_window1[16]',
+#                  'predictor_window2[1]','predictor_window2[2]')
+# params_std %>%
+#   select(all_of(plot_params),`.draw`,`.chain`,`.iteration`) %>%
+#   pivot_longer(cols = all_of(plot_params), names_to = 'parameter', values_to = 'draw') %>%
+#   rename(chain = .chain,
+#          chain_position = .iteration,
+#          draw_id = .draw) %>%
+#   #filter(chain == 1) %>% # inspect individual chains -- check for wandery sections that might be hidden by other chains when all plotted together
+#   ggplot(aes(x = chain_position, y = draw, colour = as.factor(chain)))+
+#   geom_line()+
+#   facet_wrap(. ~ parameter, scales = 'free_y')+
+#   theme_bw()+
+#   theme(legend.position = 'none')
+# rm(plot_params) ; gc()
+
+traceplot(fit_sim, pars = 'intercept')
+traceplot(fit_sim, pars = 'beta_age')
+traceplot(fit_sim, pars = 'sigma')
+
+#plot_rand_nodes <- sample(colnames(rand_node), size = 12, replace = F)
+plot_rand_nodes <- c('rand_node[1]','rand_node[60]','rand_node[119]','rand_node[179]','rand_node[238]','rand_node[298]','rand_node[357]','rand_node[417]','rand_node[476]','rand_node[536]','rand_node[595]','rand_node[655]')
+traceplot(fit_sim, pars = plot_rand_nodes)
+
+plot_rand_windows1 <- c('rand_window[1]','rand_window[2]','rand_window[3]','rand_window[4]','rand_window[5]','rand_window[6]','rand_window[7]','rand_window[8]','rand_window[9]')
+traceplot(fit_sim, pars = plot_rand_windows1)
+plot_rand_windows2 <- c('rand_window[10]','rand_window[11]','rand_window[12]','rand_window[13]','rand_window[14]','rand_window[15]','rand_window[16]','rand_window[17]','rand_window[18]')
+traceplot(fit_sim, pars = plot_rand_windows2)
+plot_rand_windows3 <- c('rand_window[19]','rand_window[20]','rand_window[21]','rand_window[22]','rand_window[23]','rand_window[24]','rand_window[25]','rand_window[26]','rand_window[27]')
+traceplot(fit_sim, pars = plot_rand_windows3)
+plot_rand_windows4 <- c('rand_window[28]','rand_window[29]','rand_window[30]','rand_window[31]','rand_window[32]','rand_window[33]','rand_window[34]','rand_window[35]','rand_window[36]')
+traceplot(fit_sim, pars = plot_rand_windows4)
+rm(plot_params, plot_rand_nodes, plot_rand_windows1, plot_rand_windows2, plot_rand_windows3, plot_rand_windows4) ; gc()
 
 #### posterior predictive check ####
-par(mfrow = c(3,1))
+par(mfrow = c(3,3))
 
-## check on standardised scale
+## create check function
 ppcheck <- function(eigen_mat, eigen_df, cent_cov, window, params, rand_node, rand_window){
   plot(density(eigen_mat[1, which(eigen_df$window == window)]), las = 1, ylim = c(0,1),
        main = "Posterior predictive check:\nblack = data, blue = predicted",
@@ -431,110 +478,46 @@ ppcheck <- function(eigen_mat, eigen_df, cent_cov, window, params, rand_node, ra
     lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
   }
 }
-ppcheck(eigen_mat = sim_dat, eigen_df = sim,
-        cent_cov = sim_cent_cov_1, window = 1, 
-        params = params_std, rand_node = rand_node, rand_window = rand_window)
-ppcheck(eigen_mat = sim_dat, eigen_df = sim,
-        cent_cov = sim_cent_cov_1, window = 2, 
-        params = params_std, rand_node = rand_node, rand_window = rand_window)
-ppcheck(eigen_mat = sim_dat, eigen_df = sim,
-        cent_cov = sim_cent_cov_1, window = 3, 
-        params = params_std, rand_node = rand_node, rand_window = rand_window)
 
-# ## check on unstandardised scale
-# plot(density(sim_dat[1, which(sim$window == 1)]), las = 1, ylim = c(0,0.5),
-#      main = "Posterior predictive check (unstandardised):\nblack = data, blue = predicted",
-#      col=rgb(0, 0, 0, 0.25))
-# eigen_data1 <- list(num_nodes_window1 = length(which(sim$window == 1)),
-#                     centrality_mu_1 = sim_cent_mu_1,
-#                     centrality_cov_1 = sim_cent_cov_1,
-#                     node_age = sim$age_std[sim$window == 1],
-#                     window = 1,
-#                     nodes = sim$node_random[sim$window == 1],
-#                     nodes_window1 = sim$node_random[sim$window == 1])
-# for (i in 1:100) {
-#   j <- sample(1:length(params_ustd$beta_age_ustd), 1)
-#   lines(density(sim_dat[j, which(sim$window == 1)]), col=rgb(0, 0, 0, 0.25))
-#   mu <- params_ustd$beta_age_ustd[j]*eigen_data1$node_age + params_std$intercept[j]
-#   for(k in 1:length(mu)) {
-#     mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data1$window]) + as.numeric(rand_node[j,eigen_data1$nodes[k]])
-#   }
-#   sigma <- sim_cent_cov_1 + diag(rep(params_ustd$sigma[j], eigen_list$num_nodes_window1))
-#   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 1, 1, 0.25))
-# }
-# 
-# plot(density(sim_dat[1, which(sim$window == 2)]), las = 1, ylim = c(0,1),
-#      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
-#      col=rgb(0, 0, 0, 0.25))
-# eigen_data2 <- list(num_nodes_window2 = length(which(sim$window == 2)),
-#                     centrality_mu_2 = sim_cent_mu_2,
-#                     centrality_cov_2 = sim_cent_cov_2,
-#                     node_age = sim$age_std[sim$window == 2],
-#                     window = 2,
-#                     nodes = sim$node_random[sim$window == 2],
-#                     nodes_window2 = sim$node_random[sim$window == 2])
-# for (i in 1:100) {
-#   j <- sample(1:length(params_std$beta_age), 1)
-#   lines(density(sim_dat_std[j, which(sim$window == 2)]), col=rgb(0, 0, 0, 0.25))
-#   mu <- params_std$beta_age[j]*eigen_data2$node_age + params_std$intercept[j]
-#   for(k in 1:length(mu)) {
-#     mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data2$window]) + as.numeric(rand_node[j,eigen_data2$nodes[k]])
-#   }
-#   sigma <- sim_cent_cov_2 + diag(rep(params_std$sigma[j], eigen_list$num_nodes_window2))
-#   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
-# }
-# 
-# plot(density(sim_dat_std[1, which(sim$window == 3)]), las = 1, ylim = c(0,1),
-#      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
-#      col=rgb(0, 0, 0, 0.25))
-# eigen_data3 <- list(num_nodes_window3 = length(which(sim$window == 3)),
-#                     centrality_mu_3 = sim_cent_mu_3,
-#                     centrality_cov_3 = sim_cent_cov_3,
-#                     node_age = sim$age_std[sim$window == 3],
-#                     window = 3,
-#                     nodes = sim$node_random[sim$window == 3],
-#                     nodes_window3 = sim$node[sim$window == 3])
-# for (i in 1:100) {
-#   j <- sample(1:length(params_std$beta_age), 1)
-#   lines(density(sim_dat_std[j, which(sim$window == 3)]), col=rgb(0, 0, 0, 0.25))
-#   mu <- params_std$beta_age[j]*eigen_data3$node_age + params_std$intercept[j]
-#   for(k in 1:length(mu)) {
-#     mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data3$window]) + as.numeric(rand_node[j,eigen_data3$nodes[k]])
-#   }
-#   sigma <- sim_cent_cov_3 + diag(rep(params_std$sigma[j], eigen_list$num_nodes_window3))
-#   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
-# }
-
+## check per time window
+for(time_window in 1:n_windows){
+  ppcheck(eigen_mat = sim_dat, eigen_df = sim,
+          cent_cov = eigen_covs[[time_window]], window = time_window,
+          params = params_std, rand_node = rand_node, rand_window = rand_window)
+}
 par(mfrow = c(1,1))
+dev.off()
 
 #### predict from model -- standardised scale ####
+pdf('step4_nodalregression/checks/simulation_anp_predictions.pdf')
+
 ## create mean prediction function
 get_mean_predictions <- function(predict_df, parameters, include_node = TRUE, include_window = TRUE){
   ## create empty matrix to fill with predictions
   mean_matrix <- matrix(NA, nrow = nrow(parameters), ncol = nrow(predict_df),
                         dimnames = list(NULL, predict_df$node_window))
-  
+
   ## populate matrix = mean centrality values per node, predicting for real data
   for(i in 1:nrow(mean_matrix)){
     mean_matrix[i,] <- parameters$beta_age[i] * predict_df$age_std + parameters$intercept[i]
   }
-  
+
   if(include_window == TRUE){
     window_effect <- parameters %>% dplyr::select(grep('rand_window', colnames(parameters), value=TRUE))
     for(i in 1:nrow(mean_matrix)){
       mean_matrix[i,] <- mean_matrix[i,] + as.numeric(window_effect[i,predict_df$window])
     }
   }
-  
+
   if(include_node == TRUE){
     node_effect <- parameters %>% dplyr::select(grep('rand_node', colnames(parameters), value=TRUE))
     for(i in 1:nrow(mean_matrix)){
       mean_matrix[i,] <- mean_matrix[i,] + as.numeric(node_effect[i, predict_df$node_random])
     }
   }
-  
+
   return(mean_matrix)
-  
+
 }
 
 ## get mean predictions
@@ -542,11 +525,8 @@ mu_std <- get_mean_predictions(predict_df = sim, parameters = params_std, includ
 
 ## add mean and CI of predicted means to input data frame for comparison
 sim$mu_mean_std <- apply(mu_std, 2, mean)
-sim$mu_lwr_std <- NA ; sim$mu_upr_std <- NA
-for( i in 1:nrow(sim) ){
-  sim$mu_lwr_std[i] <- rethinking::HPDI(mu_std[,i], prob = 0.95)[1]
-  sim$mu_upr_std[i] <- rethinking::HPDI(mu_std[,i], prob = 0.95)[2]
-}
+sim$mu_lwr_std <- apply(mu_std, 2, quantile, prob = 0.025)
+sim$mu_upr_std <- apply(mu_std, 2, quantile, prob = 0.975)
 
 ## plot mean of model vs mean of raw data
 ggplot()+
@@ -556,34 +536,39 @@ ggplot()+
   geom_abline(slope = 1, intercept = 0) # add line showing where points would lie if model fit was perfect
 
 ## put together sigma arrays, separated by time window
-sigma1 <- array(NA, dim = c(eigen_list$num_nodes_window1, eigen_list$num_nodes_window1, nrow(params_std)),
-                dimnames = list(eigen_list$nodes_window1, eigen_list$nodes_window1, NULL))
-sigma2 <- array(NA, dim = c(eigen_list$num_nodes_window2, eigen_list$num_nodes_window2, nrow(params_std)),
-                dimnames = list(eigen_list$nodes_window2, eigen_list$nodes_window2, NULL))
-sigma3 <- array(NA, dim = c(eigen_list$num_nodes_window3, eigen_list$num_nodes_window3, nrow(params_std)),
-                dimnames = list(eigen_list$nodes_window3, eigen_list$nodes_window3, NULL))
-for(i in 1:nrow(params_std)){
-  sigma1[,,i] <- sim_cent_cov_1 + diag(rep(params_std$sigma[i], eigen_list$num_nodes_window1))
-  sigma2[,,i] <- sim_cent_cov_2 + diag(rep(params_std$sigma[i], eigen_list$num_nodes_window2))
-  sigma3[,,i] <- sim_cent_cov_3 + diag(rep(params_std$sigma[i], eigen_list$num_nodes_window3))
+num_nodes_windows <- unlist(eigen_list[grep('num_nodes_window', names(eigen_list))])
+sigma_list <- list()
+for(time_window in 1:n_windows) {
+  sigma_window <- array(NA, dim = c(num_nodes_windows[time_window],
+                                    num_nodes_windows[time_window],
+                                    nrow(params_std)),
+                        dimnames = list(sim$node_random[sim$window == time_window],
+                                        sim$node_random[sim$window == time_window],
+                                        NULL))
+  cent_cov <- eigen_covs[[time_window]]
+  for(i in 1:nrow(params_std)){
+    sigma_window[,,i] <- cent_cov + diag(rep(params_std$sigma[i], num_nodes_windows[time_window]))
+  }
+  sigma_list[[time_window]] <- sigma_window
 }
 
 ## create empty matrix to take full set of predicted values per elephant
 predictions_std <- matrix(NA, nrow = nrow(params_std), ncol = nrow(sim), dimnames = list(NULL, sim$node_window))
 
 ## populate matrix using mean values in matrix mu_std, and sigma values based on time window
-for(i in 1:nrow(predictions_std)){
-  predictions_std[i,sim$window == 1] <- MASS::mvrnorm(1, mu_std[i,sim$window == 1], sigma1[,,i])
-  predictions_std[i,sim$window == 2] <- MASS::mvrnorm(1, mu_std[i,sim$window == 2], sigma2[,,i])
-  predictions_std[i,sim$window == 3] <- MASS::mvrnorm(1, mu_std[i,sim$window == 3], sigma3[,,i])
+for(time_window in 1:n_windows){
+  sigma_window <- sigma_list[[time_window]]
+  columns <- which(sim$window == time_window)
+  for(i in 1:nrow(predictions_std)){
+    predictions_std[i,columns] <- MASS::mvrnorm(1,
+                                                mu_std[i,columns],
+                                                sigma_window[,,i])
+  }
 }
 
 ## add CI of predicted data points to input data frame for comparison
-sim$predict_lwr_std <- NA ; sim$predict_upr_std <- NA
-for( i in 1:nrow(sim) ){
-  sim$predict_lwr_std[i] <- rethinking::HPDI(predictions_std[,i], prob = 0.95)[1]
-  sim$predict_upr_std[i] <- rethinking::HPDI(predictions_std[,i], prob = 0.95)[2]
-}
+sim$predict_lwr_std <- apply(predictions_std, 2, quantile, prob = 0.025)
+sim$predict_upr_std <- apply(predictions_std, 2, quantile, prob = 0.025)
 
 ## plot predictions
 ggplot(sim)+
@@ -600,7 +585,12 @@ ggplot(sim)+
   labs(colour = 'time window', fill = 'time window',
        y = 'eigenvector centrality', x = 'age (years)')
 
+save.image('anp_nodalregression/simulation.RData')
+
 #### extract original values from output -- simulated slope value originally used produces an effect on the unstandardised scale. The model works on the standardised scale. Convert predictions to unstandardised scale and then run contrasts to calculate the slope coefficient. ####
+pdf('step4_nodalregression/checks/simulation_anp_extractoriginal.pdf')
+#load('anp_nodalregression/simulation.RData')
+
 ## predict means from model again, now using age_std + 1 stdev -- for now working with age_std+1SD not age+1yr because that's how I originally simulated the data. if change the simulation so that mean centrality = age*slope rather age_std*slope, then change this to extract the correct slope value
 ## get mean predictions
 sim2 <- sim %>% 
@@ -610,16 +600,18 @@ sim$mu_mean_plus1 <- apply(mu2_std, 2, mean)
 
 ## full distribution of predictions using age_std + 1 stdev
 predictions2_std <- matrix(NA, nrow = nrow(params_std), ncol = nrow(sim2), dimnames = list(NULL, sim$node_window))
-for(i in 1:nrow(predictions2_std)){
-  predictions2_std[i,sim$window == 1] <- MASS::mvrnorm(1, mu2_std[i,sim2$window == 1], sigma1[,,i])
-  predictions2_std[i,sim$window == 2] <- MASS::mvrnorm(1, mu2_std[i,sim2$window == 2], sigma2[,,i])
-  predictions2_std[i,sim$window == 3] <- MASS::mvrnorm(1, mu2_std[i,sim2$window == 3], sigma3[,,i])
+for(time_window in 1:n_windows){
+  sigma_window <- sigma_list[[time_window]]
+  columns <- which(sim$window == time_window)
+  for(i in 1:nrow(predictions2_std)){
+    predictions2_std[i,columns] <- MASS::mvrnorm(1, mu2_std[i,columns], sigma_window[,,i])
+  }
 }
 
 ## contrast predictions on standardised scale -- check that this returns the marginal effect presented in the summary
 contrast_std <- predictions2_std - predictions_std    # contrast between predicted values for raw data and all same data but add 1 to age
 head(contrast_std[,1:5])                              # check matrix looks right
-mean(params_std$beta_age)                                 # output parameter direct from model
+mean(params_std$beta_age)                             # output parameter direct from model
 mean(contrast_std)                                    # should be very similar to mean of output parameter
 quantile(contrast_std, prob = c(0.025, 0.975))        # very wide
 
@@ -646,10 +638,12 @@ newdat$predict_mean_upr <- apply(fake_mean, 2, quantile, prob = 0.975)
 
 ## create prediction matrix
 fake_pred <- matrix(NA, nrow = nrow(params_std), ncol = nrow(newdat))
-for(i in 1:nrow(fake_pred)){
-  fake_pred[i,newdat$window == 1] <- MASS::mvrnorm(1, fake_mean[i,newdat$window == 1], sigma1[,,i])
-  fake_pred[i,newdat$window == 2] <- MASS::mvrnorm(1, fake_mean[i,newdat$window == 2], sigma2[,,i])
-  fake_pred[i,newdat$window == 3] <- MASS::mvrnorm(1, fake_mean[i,newdat$window == 3], sigma3[,,i])
+for(time_window in 1:n_windows){
+  sigma_window <- sigma_list[[time_window]]
+  columns <- which(newdat$window == time_window)
+  for(i in 1:nrow(fake_pred)){
+    fake_pred[i,columns] <- MASS::mvrnorm(1, fake_mean[i,columns], sigma_window[,,i])
+  }
 }
 
 ## add CI of predicted data points to input data frame for comparison
@@ -686,7 +680,10 @@ ggplot()+
 ## convert full predictions to data frame
 sim_dat_df <- sim_dat %>% 
   as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'node_window', values_to = 'eigen') %>% 
+  pivot_longer(cols = everything(), names_to = 'node_window', values_to = 'eigen')
+
+sim$node_window <- paste0(sim$node_random, '_', sim$window)
+sim_dat_df <- sim_dat_df %>% 
   left_join(sim[,c('node_window','age','window')], by = 'node_window')
 
 ## plot full distribution
@@ -711,3 +708,6 @@ ggplot()+
   theme(legend.position = 'bottom')+
   labs(colour = 'time window', fill = 'time window',
        y = 'eigenvector centrality', x = 'age (years)')
+
+dev.off()
+save.image('anp_nodalregression/simulation.RData')
