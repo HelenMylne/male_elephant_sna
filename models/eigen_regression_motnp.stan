@@ -32,9 +32,9 @@ transformed parameters {
 
  model {
   // priors
-  intercept ~ normal(0,1);
+  intercept ~ normal(logit(0.05),1);
   delta ~ dirichlet(prior_age);
-  beta_age  ~ normal(0,1);
+  beta_age  ~ normal(0,0.08);
   sigma ~ exponential(2);
 
   // likelihood
