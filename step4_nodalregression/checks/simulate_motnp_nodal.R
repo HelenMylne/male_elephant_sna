@@ -2,26 +2,52 @@
 library(LaplacesDemon)
 library(tidyverse)
 library(cmdstanr)
-#set_cmdstan_path('../packages/.cmdstan2/cmdstan-2.33.1/')
+set_cmdstan_path('../packages/.cmdstan2/cmdstan-2.33.1/')
 
 set.seed(1)
+pdf('step4_nodalregression/checks/simulation_motnp_nodal.pdf')
 
 ## simulate population ####
-## define population parameters
-min_age <- 11                                                # youngest individual
-max_age <- 60                                                #  oldest  individual
-n_nodes <- 2*((max_age+1) - min_age)                         # total nodes = average 2 per age
+# ## define population parameters
+# min_age <- 11                                                # youngest individual
+# max_age <- 60                                                #  oldest  individual
+# n_nodes <- 2*((max_age+1) - min_age)                         # total nodes = average 2 per age
+# 
+# ## simulate population for first time window
+# sim <- data.frame(node = 1:n_nodes,                          # create data frame of individuals
+#                   age = sample(x = min_age:max_age, size = n_nodes,
+#                                replace = T, prob = 1/(min_age:max_age))) %>% 
+#   mutate(age_cat = ifelse(age <= 15, 1,
+#                           ifelse(age <= 20, 2,
+#                                  ifelse(age <= 25, 3,
+#                                         ifelse(age <= 40, 4, 5)))),
+#          mu = NA,
+#          sd = NA)
 
-## simulate population for first time window
-sim <- data.frame(node = 1:n_nodes,                          # create data frame of individuals
-                  age = sample(x = min_age:max_age, size = n_nodes,
-                               replace = T, prob = 1/(min_age:max_age))) %>% 
-  mutate(age_cat = ifelse(age <= 15, 1,
-                          ifelse(age <= 20, 2,
-                                 ifelse(age <= 25, 3,
-                                        ifelse(age <= 40, 4, 5)))),
-         mu = NA,
-         sd = NA)
+load('motnp_nodalregression.RData')
+sim <- nodes %>% 
+  mutate(age_cat_chr = ifelse(age_cat_chr == '40+', '40-60', age_cat_chr)) %>% 
+  separate(age_cat_chr, into = c('min_age','max_age'),
+           remove = F, sep = '-') %>% 
+  mutate(min_age = as.numeric(min_age),
+         max_age = as.numeric(max_age))
+rm(list = ls()[! ls() %in% 'sim'])
+
+sim$age_sim <- NA
+for(i in 1:nrow(sim)){
+  sd <- (sim$max_age[i] - sim$min_age[i])/2
+  age <- round(rnorm(1000, mean = sim$age[i], sd = sd),0)
+  age <- age[which(age < sim$max_age[i] & age > sim$min_age[i])[1]]
+  sim$age_sim[i] <- age
+}
+rm(age, sd, i) ; gc()
+
+sim <- sim %>% 
+  select(-age, -min_age, -max_age) %>% 
+  rename(age = age_sim) %>% 
+  relocate(age, .after = node)
+
+n_nodes <- nrow(sim)
 
 ## simulate centralities ####
 ## simulate age effect
@@ -32,7 +58,8 @@ plot(sim$mu ~ sim$age) #plot(sim$mu ~ sim$age_cat)
 
 ## simulate full distribution of samples per node
 sim$sd <- 1            # allow to vary amongst nodes once confident that it's working with the simple version
-sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_nodes, dimnames = list(NULL, sim$node_window))    # create matrix
+sim_dat <- matrix(data = NA, nrow = 4000, ncol = n_nodes,
+                  dimnames = list(NULL, sim$node_rank))    # create matrix
 for(j in 1:n_nodes){
   sim_dat[,j] <- rnorm(n = nrow(sim_dat), mean = sim$mu[j], sd = sim$sd[j])  # simulate distribution
 }
@@ -42,14 +69,14 @@ plot(sim_dat[1,] ~ sim$age)          # plot simulated values against age
 data.frame(sim_dat) %>% 
   pivot_longer(cols = everything(),
                names_to = "node", values_to = "centrality") %>% 
-  separate(node, into = c('X','node'), remove = T, sep = 1) %>% 
+  separate(node, into = c('X','node_rank'), remove = T, sep = 1) %>% 
   dplyr::select(-X) %>% 
-  mutate(node = as.integer(node)) %>% 
-  left_join(sim[,c('node','age')], by = 'node') %>% 
-  filter(node %in% seq(1, n_nodes, by = 2)) %>% 
+  mutate(node_rank = as.integer(node_rank)) %>% 
+  left_join(sim[,c('node_rank','age')], by = 'node_rank') %>% 
+  filter(node_rank %in% seq(1, n_nodes, by = 3)) %>% 
   ggplot(aes(x = centrality, fill = age)) +
   geom_density(linewidth = 0.4) +
-  facet_grid(rows = vars(as.factor(node)), scales = "free") +
+  facet_grid(rows = vars(as.factor(node_rank)), scales = "free") +
   labs(x = "Eigenvector centrality (standardised)") + 
   theme_void() + 
   theme(strip.text.y = element_text(size = 12),
@@ -61,14 +88,14 @@ data.frame(sim_dat) %>%
 data.frame(sim_dat) %>% 
   pivot_longer(cols = everything(),
                names_to = "node", values_to = "centrality") %>% 
-  separate(node, into = c('X','node'), remove = T, sep = 1) %>% 
+  separate(node, into = c('X','node_rank'), remove = T, sep = 1) %>% 
   dplyr::select(-X) %>% 
-  mutate(node = as.integer(node)) %>% 
-  left_join(sim[,c('node','age_cat')], by = 'node') %>% 
-  filter(node %in% seq(1, n_nodes, by = 2)) %>% 
-  ggplot(aes(x = centrality, fill = as.factor(age_cat))) +
+  mutate(node_rank = as.integer(node_rank)) %>% 
+  left_join(sim[,c('node_rank','age_cat_num')], by = 'node_rank') %>% 
+  filter(node_rank %in% seq(1, n_nodes, by = 3)) %>% 
+  ggplot(aes(x = centrality, fill = as.factor(age_cat_num))) +
   geom_density(linewidth = 0.4) +
-  facet_grid(rows = vars(as.factor(node)), scales = "free") +
+  facet_grid(rows = vars(as.factor(node_rank)), scales = "free") +
   labs(x = "Eigenvector centrality (standardised)") + 
   scale_fill_viridis_d() +
   theme_void() + 
@@ -95,12 +122,13 @@ lines(density(sim_cent_samples[, 1]), col = rgb(0,0,1,0.5), lwd = 2)  # overlay 
 ## prior predictive check ####
 n <- 100
 beta_age <- rnorm(n, 0, 1)
-intercept  <- rnorm(n, 0, 1.5)
+intercept  <- rnorm(n, 0, 2)# LaplacesDemon::logit(0.05), 2)
 age_dirichlet <- rdirichlet(n, c(1,1,1,1,1))
-plot(NULL, las = 1, xlab = 'age (standardised)', ylab = 'eigenvector (standardised)',
-     ylim = c(min(sim_cent_mu)-1, max(sim_cent_mu)+1), xlim = c(min(sim$age_cat), max(sim$age_cat)))
+x <- (min(sim$age_cat_num):max(sim$age_cat_num)) - (min(sim$age_cat_num) - 1)
+plot(NULL, las = 1, xlab = 'age category', ylab = 'eigenvector (standardised)',
+     ylim = c(min(sim_cent_mu)-5, max(sim_cent_mu)+5),
+     xlim = c(min(x), max(x)))
 abline(h = min(sim_cent_mu), lty = 2) ; abline(h = max(sim_cent_mu), lty = 2)
-x <- min(sim$age_cat):max(sim$age_cat)
 for(i in 1:n){
   y <- rep(NA, length(x))
   for(j in 1:length(x)){
@@ -112,17 +140,17 @@ rm(n, beta_age, intercept, age_dirichlet, x, y) ; gc()
 
 ## run model -- age as an ordered categorical variable with 1 window ####
 ## create data
-n_age_cat <- length(unique(sim$age_cat))
+n_age_cat <- length(unique(sim$age_cat_num))
 eigen_list <- list(num_nodes = n_nodes,
                    num_age_cat = n_age_cat,
                    length_dirichlet = n_age_cat + 1,
                    centrality_mu = sim_cent_mu,
                    centrality_cov = sim_cent_cov,
-                   node_age = sim$age_cat,
+                   node_age = sim$age_cat_fct,
                    prior_age = rep(1, n_age_cat))
 
 ## check inputs
-plot(sim_cent_mu ~ sim$age_cat)
+plot(eigen_list$centrality_mu ~ eigen_list$node_age)
 
 ## load model
 nodal_regression <- cmdstan_model('models/eigen_regression_motnp.stan')
@@ -206,6 +234,7 @@ for (i in 1:100) {
   sigma <- sim_cent_cov + diag(rep(params$sigma[j], n_nodes))
   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
 }
+warnings()
 
 ## predict from model ####
 # create functions for predictions
@@ -217,7 +246,7 @@ predict_mean_centrality <- function(params, delta_j, pred_data){
                                       pred_data$node))
   for(i in 1:nrow(mu_matrix)){
     for(j in 1:ncol(mu_matrix)){
-      mu_matrix[i,j] <- params$intercept[i] + params$beta_age[i] * sum(delta_j[i,(1:pred_data$age_cat[j])])
+      mu_matrix[i,j] <- params$intercept[i] + params$beta_age[i] * sum(delta_j[i,(1:pred_data$age_cat_fct[j])])
     }
   }
   return(mu_matrix)
@@ -232,7 +261,7 @@ predict_full_centrality <- function(params, mu_matrix, cov_matrix){
 }
 
 ## create predictions data frame
-pred_data <- sim[order(sim$age_cat),] # ordered because otherwise a later plotting function was being super annoying about forming logical lines and which bits it connected
+pred_data <- sim[order(sim$age_cat_num),] # ordered because otherwise a later plotting function was being super annoying about forming logical lines and which bits it connected
 
 ## predicted means
 predict_mu <- predict_mean_centrality(params = params, delta_j = delta_j, pred_data = pred_data)
@@ -247,12 +276,12 @@ pred_data$full_upr_predict <- apply(predict_full, 2, quantile, probs = 0.975)
 
 ## compare to raw data
 ggplot(pred_data)+
-  geom_ribbon(aes(x = age_cat, ymin = full_lwr_predict, ymax = full_upr_predict),
+  geom_ribbon(aes(x = age_cat_num, ymin = full_lwr_predict, ymax = full_upr_predict),
               alpha = 0.3, fill = 'purple')+
-  geom_ribbon(aes(x = age_cat, ymin = mu_lwr_predict, ymax = mu_upr_predict),
+  geom_ribbon(aes(x = age_cat_num, ymin = mu_lwr_predict, ymax = mu_upr_predict),
               alpha = 0.3, fill = 'blue')+
-  geom_point(aes(x = age_cat, y = mu))+
-  geom_line(aes(x = age_cat, y = mu_mean_predict))+
+  geom_point(aes(x = age_cat_num, y = mu))+
+  geom_line(aes(x = age_cat_num, y = mu_mean_predict))+
   theme_classic()
 ggplot(pred_data,
        aes(y = mu_mean_predict, x = mu))+
@@ -271,12 +300,12 @@ pred_data$full_upr_predict_invlogit <- apply(predict_full_invlogit, 2, quantile,
 ## compare to invlogit raw data
 pred_data$mu_raw_invlogit <- invlogit(pred_data$mu)
 ggplot(pred_data)+
-  geom_ribbon(aes(x = age_cat, ymin = full_lwr_predict_invlogit, ymax = full_upr_predict_invlogit),
+  geom_ribbon(aes(x = age_cat_num, ymin = full_lwr_predict_invlogit, ymax = full_upr_predict_invlogit),
               alpha = 0.3, fill = 'purple')+
-  geom_ribbon(aes(x = age_cat, ymin = mu_lwr_predict_invlogit, ymax = mu_upr_predict_invlogit),
+  geom_ribbon(aes(x = age_cat_num, ymin = mu_lwr_predict_invlogit, ymax = mu_upr_predict_invlogit),
               alpha = 0.3, fill = 'blue')+
-  geom_point(aes(x = age_cat, y = LaplacesDemon::invlogit(mu)))+
-  geom_line(aes(x = age_cat, y = mu_mean_predict_invlogit))+
+  geom_point(aes(x = age_cat_num, y = LaplacesDemon::invlogit(mu)))+
+  geom_line(aes(x = age_cat_num, y = mu_mean_predict_invlogit))+
   theme_classic()
 
 ## clean up
@@ -290,14 +319,19 @@ pred_fulls <- list()
 
 ## predict for ages from 10 years younger than current up to 10 years older: multiple opportunities to pass through age category thresholds 
 for( i in -10:10 ){
-  pred_data_new <- sim[order(sim$age_cat),] %>% 
+  pred_data_new <- sim[order(sim$age_cat_num),] %>% 
     mutate(age = age + i) %>% 
-    mutate(age_cat = ifelse(age <= 15, 1,
-                            ifelse(age <= 20, 2,
-                                   ifelse(age <= 25, 3,
-                                          ifelse(age <= 40, 4, 5)))))
-  pred_mu_new <- predict_mean_centrality(params = params, delta_j = delta_j, pred_data = pred_data_new)
-  pred_full_new <- predict_full_centrality(params = params, mu_matrix = pred_mu_new, cov_matrix = sim_cent_cov)
+    mutate(age_cat_num = ifelse(age <= 15, 1,
+                                ifelse(age <= 20, 2,
+                                       ifelse(age <= 25, 3,
+                                              ifelse(age <= 40, 4, 5))))) %>% 
+    mutate(age_cat_fct = as.integer(as.factor(age_cat_num)))
+  pred_mu_new <- predict_mean_centrality(params = params,
+                                         delta_j = delta_j,
+                                         pred_data = pred_data_new)
+  pred_full_new <- predict_full_centrality(params = params,
+                                           mu_matrix = pred_mu_new,
+                                           cov_matrix = sim_cent_cov)
   pred_means[[(i+11)]] <- pred_mu_new
   pred_fulls[[(i+11)]] <- pred_full_new
   print(i)
@@ -310,12 +344,15 @@ contrasts_all <- data.frame(older = rep(-10:10, each = 21),
                             mean_contrast = NA)
 
 ## for each combination of predictions, calculate contrast and divide difference by number of years changed
+contrast_matrices <- list()
 for(i in 1:21){
   for(j in 1:21){
     if(i > j){
       contrast <- (pred_fulls[[i]] - pred_fulls[[j]]) / (i-j)
-      contrasts_all$mean_contrast[contrasts_all$older == (i - 11) & 
-                                    contrasts_all$younger == (j - 11)] <- mean(contrast)
+      row_to_fill <- which(contrasts_all$older == (i - 11) & 
+                             contrasts_all$younger == (j - 11))
+      contrast_matrices[[row_to_fill]] <- contrast
+      contrasts_all$mean_contrast[row_to_fill] <- mean(contrast)
     }
   }
 }
@@ -324,7 +361,15 @@ for(i in 1:21){
 contrasts_all <- contrasts_all %>%
   filter(is.na(mean_contrast) == FALSE)
 
+## take only the times where the elephant changed age category
+contrast <- pred_fulls[[2]]-pred_fulls[[1]]
+mean(contrast)
+
 ## compare to input
 sim_slope
 mean(contrasts_all$mean_contrast)
 quantile(contrasts_all$mean_contrast, prob = c(0.025, 0.975))
+
+## save
+save.image('step4_nodalregression/checks/simulation_motnp_nodal.RData')
+dev.off()
