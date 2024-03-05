@@ -337,7 +337,7 @@ transformed parameters {
   // priors
   beta_age ~ normal(0,0.8);
   sigma ~ exponential(2);
-  intercept ~ normal(logit(0.05),2);
+  intercept ~ normal(logit(0.05),2); // 0.05 best estimate of intercept for Amboseli population eigen ~ age (edge weights from half weight index) from Chiyo 2011 -- estimated intercept from figure. Logit because on 0-1 scale 
   rand_window ~ normal(0,1); // rand_window ~ normal(0,sigma_window);
   sigma_window ~ exponential(2);
   rand_node ~ normal(0,1);   // rand_node ~ normal(0,sigma_node);
