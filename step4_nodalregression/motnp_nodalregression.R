@@ -1,21 +1,22 @@
-##### information #####
+#### information #####
 # 1) to estimate the ages of individuals in other populations, first came up with a survival curve for the Amboseli elephants which have good birth and death data.
 # 2) selected the Gompertz bathtub distribution
 # 3) use distribution to convert MOTNP ages in categories to probability distributions of true age (first part of this script)
 # 4) extract node centrality distribution from draws of edge weight
 # 5) use MOTNP age distributions to predict network centrality (third part of this script)
 
-##### set up ####
+#### set up ####
 #options(future.globals.maxSize = 10000*(1024^2))   # running model with full age distributions = 5.01GB of globals, which exceeds default maximum allowed size. Set to allow up to 10 GB to allow model to run
 
-# library(rstan) ; library(igraph) ; library(tidyverse) ; library(LaplacesDemon) ; library(MASS)
+# library(rstan) ; library(sna) ; library(tidyverse) ; library(LaplacesDemon) ; library(MASS)
 library(StanHeaders, lib.loc = '../packages/')
 library(rstan, lib.loc = '../packages/')
-library(igraph, lib.loc = '../packages/')          # library(igraph)
+library(sna, lib.loc = '../packages/')             # library(sna)
 library(tidyverse, lib.loc = '../packages/')       # library(tidyverse)
 library(LaplacesDemon, lib.loc = '../packages/')   # library(LaplacesDemon)
 library(MASS, lib.loc = '../packages/')            # library(MASS)
 #library(cmdstanr, lib.loc = '../packages/')        # library(cmdstanr)
+#library(igraph, lib.loc = '../packages/')          # library(igraph)
 #library(brms, lib.loc = '../packages/')            # library(brms)
 #library(Rcpp, lib.loc = '../packages/')            # library(Rcpp)
 #library(ggdist, lib.loc = '../packages/')          # library(ggdist)
@@ -36,7 +37,7 @@ pdf('../outputs/motnp_nodalregression.pdf')
 ## set up theme for plots
 theme_set(theme_classic())
 
-##### read in data ####
+#### read in data ####
 # load edge weight model and data frames
 load('motnp_edgeweights_conditionalprior.RData')
 rm(edgelist, x, make_edgelist, plot_network_threshold, i, motnp_ages) ; gc()
@@ -90,38 +91,53 @@ adj_tensor <- array(NA, c(n_eles, n_eles, n_samples*n_chains),
 for(i in 1:n_dyads) {
   dyad_row <- counts_df[i,]
   adj_tensor[dyad_row$id_1, dyad_row$id_2, ] <- edge_samples[,i]
+  adj_tensor[dyad_row$id_2, dyad_row$id_1, ] <- edge_samples[,i]
 }
 adj_tensor[,,1]
 
 #### extract centralities ####
+# ## calculate centrality and store posterior samples in a matrix
+# centrality_samples <- matrix(0, n_chains*n_samples, n_eles, dimnames = list(NULL,nodes$id))
+# #centrality_samples_std <- matrix(0, n_chains*n_samples, n_eles, dimnames = list(NULL,nodes$id))
+# for (draw in 1:(n_chains*n_samples)) {
+#   g <- graph_from_adjacency_matrix(adj_tensor[,,draw], mode = "undirected",
+#                                    diag = FALSE, # TRUE in Jordan's example and in ANP -- shouldn't make a difference as NA anyway
+#                                    weighted = TRUE)
+#   centrality_samples[draw, ] <- eigen_centrality(g)$vector
+#   #centrality_samples_std[draw, ] <- (centrality_samples[draw, ] - mean(centrality_samples[draw, ]))/sd(centrality_samples[draw, ])
+# }
+# head(centrality_samples)      # unstandardised eigenvector centrality
+# #head(centrality_samples_std)  #  standardised  eigenvector centrality
+
 ## calculate centrality and store posterior samples in a matrix
-centrality_samples <- matrix(0, n_chains*n_samples, n_eles, dimnames = list(NULL,nodes$id))
-centrality_samples_std <- matrix(0, n_chains*n_samples, n_eles, dimnames = list(NULL,nodes$id))
+centrality_samples_invlogit <- matrix(0, n_chains*n_samples, n_eles,
+                                      dimnames = list(NULL,nodes$id))
 for (draw in 1:(n_chains*n_samples)) {
-  g <- graph_from_adjacency_matrix(adj_tensor[,,draw], mode = "undirected",
-                                   diag = FALSE, # TRUE in Jordan's example and in ANP -- shouldn't make a difference as NA anyway
-                                   weighted = TRUE)
-  centrality_samples[draw, ] <- eigen_centrality(g)$vector
-  centrality_samples_std[draw, ] <- (centrality_samples[draw, ] - mean(centrality_samples[draw, ]))/sd(centrality_samples[draw, ])
+  centrality_samples_invlogit[draw, ] <- sna::evcent(dat = adj_tensor[,,draw],
+                                                     gmode = 'graph', diag = F)
 }
-head(centrality_samples)      # unstandardised eigenvector centrality
-head(centrality_samples_std)  #  standardised  eigenvector centrality
+head(centrality_samples_invlogit)      # unstandardised eigenvector centrality
+
+## convert to logit scale
+centrality_samples <- logit(centrality_samples_invlogit)
 
 ## visualise centralities
 nodes$node_rank <- as.integer(as.factor(nodes$node))
-df_wide <- data.frame(centrality_samples_std)
+df_wide <- data.frame(centrality_samples)
 colnames(df_wide) <- 1:n_eles
 df_long <- pivot_longer(df_wide, cols = everything(),
                         names_to = "node_rank", values_to = "centrality") %>% 
   mutate(node_rank = as.integer(node_rank)) %>% 
-  left_join(nodes[,c('node_rank','age')], by = 'node_rank')
+  left_join(nodes[,c('node_rank','age_cat_num')], by = 'node_rank')
 df_long %>% 
   filter(node_rank <= 30) %>% 
-  mutate(nodes_reordered = fct_reorder(.f = as.factor(node_rank), .x = age, .desc = T)) %>% 
-  ggplot(aes(x = centrality, fill = age)) +
+  mutate(nodes_reordered = fct_reorder(.f = as.factor(node_rank), .x = age_cat_num, .desc = T)) %>% 
+  ggplot(aes(x = centrality, fill = as.factor(age_cat_num))) +
   geom_density(linewidth = 0.4) +
+  scale_fill_viridis_d() +
   facet_grid(rows = vars(as.factor(nodes_reordered)), scales = "free") +
-  labs(x = "Eigenvector centrality (standardised)") + 
+  labs(x = "Eigenvector centrality",
+       fill = 'age cat') + 
   theme_void() + 
   theme(strip.text.y = element_text(size = 12),
         axis.text.x = element_text(angle = 0, size = 12, debug = FALSE),
@@ -130,7 +146,12 @@ df_long %>%
 
 #### compute normal approximation ####
 ## check covariance
-plot(centrality_samples_std[, 1], centrality_samples_std[, 2],
+plot(centrality_samples[, 1], centrality_samples[, 2],
+     xlab = 'standardised eigenvectors ID1',
+     ylab = 'standardised eigenvectors ID2',
+     las = 1, pch = 19, col = rgb(0,0,1,0.2))
+plot(centrality_samples[, which(nodes$age_cat_num == 3)[1]],
+     centrality_samples[, which(nodes$age_cat_num == 7)[1]],
      xlab = 'standardised eigenvectors ID1',
      ylab = 'standardised eigenvectors ID2',
      las = 1, pch = 19, col = rgb(0,0,1,0.2))
@@ -143,13 +164,11 @@ for(i in 1:length(to_plot)){
 }
 
 ## compute normal approximation
-centrality_mu <- apply(centrality_samples_std, 2, mean)
-centrality_cov <- cov(centrality_samples_std)
-
+centrality_mu <- apply(centrality_samples, 2, mean)
+centrality_cov <- cov(centrality_samples)
 centrality_samples_sim <- MASS::mvrnorm(1e5, centrality_mu, centrality_cov)
-
 for(i in 1:length(to_plot)){
-  plot(density(centrality_samples_std[, i]), lwd = 2, main = "", xlab = "")
+  plot(density(centrality_samples[, i]), lwd = 2, main = "", xlab = "")
   lines(density(centrality_samples_sim[, i]), col = rgb(0,0,1,0.5), lwd = 2)
   
 }
@@ -157,15 +176,17 @@ par(mfrow = c(1,1), mai = c(1,1,1,1))
 
 save.image('motnp_nodalregression.RData')
 
-##### prior predictive check ####
-## prior predictive check
+#### prior predictive check ####
+## set values
 n <- 100
 n_age_cat <- length(unique(nodes$age_cat_fct))
-beta_age <- rnorm(n, 0, 1)
-intercept  <- rnorm(n, 0, 1)
+beta_age <- rnorm(n, 0, 0.8)
+intercept  <- rnorm(n, logit(0.05), 2)
 age_dirichlet <- rdirichlet(n, c(1,1,1,1,1))
-plot(NULL, las = 1, xlab = 'age (standardised)', ylab = 'eigenvector (standardised)',
-     ylim = c(min(centrality_mu)-1, max(centrality_mu)+1), xlim = c(1,n_age_cat))
+
+## plot
+plot(NULL, las = 1, xlab = 'age category', ylab = 'logit eigenvector',
+     ylim = c(min(centrality_mu)-5, max(centrality_mu)+5), xlim = c(1,n_age_cat))
 abline(h = min(centrality_mu), lty = 2) ; abline(h = max(centrality_mu), lty = 2)
 x <- 1:n_age_cat
 for(i in 1:n){
@@ -180,23 +201,14 @@ rm(n, beta_age, intercept, age_dirichlet, sigma, x, y, df_plot, df_wide) ; gc()
 #### run model -- using ordered categorical exposure ####
 #load('motnp_nodalregression.RData')
 
-# ## extract age distributions (using a normal for now)
-# motnp_ages <- readRDS('../data_processed/step2_ageestimation/motnp_ageestimates_mcmcoutput.rds')
-# motnp_ages <- motnp_ages[,which(colnames(motnp_ages) %in% ele_ids)]
-# age_mu <- apply(motnp_ages, 2, mean)
-# age_sd <- apply(motnp_ages, 2, sd)
-# 
 ## create data list
 eigen_list <- list(num_nodes = n_eles,
                    num_age_cat = n_age_cat,
                    length_dirichlet = n_age_cat+1,
-                   #nodes = nodes$node_rank,
                    centrality_mu = centrality_mu,
                    centrality_cov = centrality_cov,
-                   #age_mu = age_mu,
-                   #age_sd = age_sd)
                    node_age = as.integer(nodes$age_cat_fct),
-                   prior_age = c(1,1,1,1,1))
+                   prior_age = rep(1, n_age_cat))
 
 ## check inputs
 boxplot(centrality_mu ~ nodes$age_cat_fct, notch = T)
@@ -212,20 +224,37 @@ fit_motnp_eigen <- sampling(nodal_regression,
 
 ## save output (get it saved, then clean it up once it hasn't crashed, then save the cleaner version!)
 save.image('motnp_nodalregression.RData')
-rm(g, edge_samples, adj_tensor, i, to_plot, draw,summary,centrality_samples_sim, dyad_row) ; gc()
+rm(edge_samples, adj_tensor, i, to_plot, draw,summary,centrality_samples_sim, dyad_row) ; gc()
 save.image('motnp_nodalregression.RData')
 
-#### posterior check ####
+#### check outputs ####
 # load('motnp_nodalregression.RData')
 ## traceplot linear effect size
-traceplot(fit_motnp_eigen, pars = c('beta_age','sigma','predictor[1]','predictor[2]','predictor[3]','predictor[4]','predictor[5]','predictor[6]','predictor[7]','predictor[8]','predictor[9]','predictor[10]'))
+traceplot(fit_motnp_eigen, pars = c('intercept','beta_age','sigma','predictor[1]','predictor[2]','predictor[3]','predictor[4]','predictor[5]','predictor[6]','predictor[7]','predictor[8]','predictor[9]'))
+traceplot(fit_motnp_eigen, pars = c('delta_j[1]','delta_j[2]','delta_j[3]',
+                                    'delta_j[4]','delta_j[5]','delta_j[6]'))
 
-## posterior predictive check
+## summarise
+(summary <- as.data.frame(round(summary(fit_motnp_eigen)$summary, 3)))
+summary$parameter <- rownames(summary)
+par(mfrow = c(2,1))
+hist(summary$Rhat, breaks = 50)
+hist(summary$n_eff, breaks = 50)
+par(mfrow = c(1,1))
+
+## extract posterior
 params <- rstan::extract(fit_motnp_eigen)
-plot(density(centrality_samples_std[1, ]), main="Posterior predictive density of responses (standardised centrality)", col=rgb(0, 0, 0, 0.25), ylim=c(0, 0.6))
+
+## plot posterior age effect
+plot(density(params$beta_age),
+     main = "Posterior age effect estimate")
+abline(v = 0, lty = 2)
+
+#### posterior predictive check ####
+plot(density(centrality_samples[1, ]), main="Posterior predictive density of responses:\nblack = data, blue = predicted", col=rgb(0, 0, 0, 0.25), ylim=c(0, 3))
 for (i in 1:100) {
   j <- sample(1:(n_chains*n_samples), 1)
-  lines(density(centrality_samples_std[j, ]), col=rgb(0, 0, 0, 0.25))
+  lines(density(centrality_samples[j, ]), col=rgb(0, 0, 0, 0.25))
   mu <- rep(NA, n_eles)
   for(k in 1:n_eles){
     mu[k] <- params$beta_age[j]*sum(params$delta_j[j,1:nodes$age_cat_fct[k]]) + params$intercept[j]
@@ -234,7 +263,95 @@ for (i in 1:100) {
   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
 }
 
-## interpret model
+#### predict from model -- raw data ####
+# load('motnp_nodalregression.RData')
+## create functions for predictions
+predict_mean_centrality <- function(params, pred_data){
+  mu_matrix <- matrix(data = NA,
+                      nrow = length(params$beta_age),
+                      ncol = nrow(pred_data),
+                      dimnames = list(1:length(params$beta_age),
+                                      pred_data$node))
+  for(i in 1:nrow(mu_matrix)){
+    for(j in 1:ncol(mu_matrix)){
+      mu_matrix[i,j] <- params$intercept[i] + params$beta_age[i] * sum(params$delta_j[i,(1:pred_data$age_cat_fct[j])])
+    }
+  }
+  return(mu_matrix)
+}
+predict_full_centrality <- function(params, mu_matrix, cov_matrix){
+  full_matrix <- mu_matrix
+  for(i in 1:nrow(full_matrix)){
+    full_matrix[i,] <- MASS::mvrnorm(n = 1, mu = mu_matrix[i,],
+                                     Sigma = cov_matrix + diag(rep(params$sigma[i], ncol(full_matrix))))
+  }
+  return(full_matrix)
+}
+
+## predicted means
+sim_mean <- predict_mean_centrality(params = params, pred_data = nodes)
+nodes$mu_avg_predict <- apply(sim_mean, 2, mean)
+nodes$mu_lwr_predict <- apply(sim_mean, 2, quantile, probs = 0.025)
+nodes$mu_upr_predict <- apply(sim_mean, 2, quantile, probs = 0.975)
+
+## full predictions
+sim_full <- predict_full_centrality(params = params, mu_matrix = sim_mean, cov_matrix = centrality_cov)
+nodes$full_lwr_predict <- apply(sim_full, 2, quantile, probs = 0.025)
+nodes$full_upr_predict <- apply(sim_full, 2, quantile, probs = 0.975)
+
+## compare to raw data
+nodes <- nodes %>% 
+  mutate(mu_raw = centrality_mu)
+ggplot(nodes)+
+  geom_ribbon(aes(x = age_cat_num, ymin = full_lwr_predict, ymax = full_upr_predict),
+              alpha = 0.3, fill = 'purple')+
+  geom_ribbon(aes(x = age_cat_num, ymin = mu_lwr_predict, ymax = mu_upr_predict),
+              alpha = 0.3, fill = 'blue')+
+  geom_jitter(aes(x = age_cat_num, y = mu_raw), width = 0.2)+
+  geom_line(aes(x = age_cat_num, y = mu_avg_predict))+
+  theme_classic()
+
+## save image
+save.image('motnp_nodalregression.RData')
+
+## summarise predictions -- all the same for all nodes in the same category because age is the only predictor
+nodes_full <- sim_full %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything(), names_to = 'node', values_to = 'node_pred') %>% 
+  mutate(draw = rep(1:n_eles, each = nrow(sim_full)),
+         node = as.numeric(node)) %>% 
+  left_join(nodes[,c('id','node','age_cat_chr','age_cat_fct')],
+            by = 'node') %>% 
+  group_by(id) %>% 
+  mutate(pred_full_lwr = quantile(node_pred, probs = 0.025),
+         pred_full_mean = mean(node_pred),
+         pred_full_mid = quantile(node_pred, probs = 0.5),
+         pred_full_upr = quantile(node_pred, probs = 0.975))
+
+ggplot()+
+  geom_violin(data = nodes_full,
+              aes(x = age_cat_fct, y = node_pred,
+                  fill = factor(age_cat_chr, levels = c('10-15', '15-19', '20-25',
+                                                        '25-40','40+'))),
+              alpha = 0.5)+
+  geom_boxplot(data = nodes_full,
+               aes(x = age_cat_fct, y = pred_full_mean, fill = age_cat_chr))+
+  geom_jitter(data = nodes,
+              aes(x = age_cat_fct, y = mu_raw, fill = age_cat_chr),
+              width = 0.2, pch = 21)+
+  scale_fill_viridis_d()+
+  #scale_colour_viridis_d()+
+  labs(fill = 'age category',
+       #colour = 'age category',
+       x = 'age category',
+       y = 'predicted eigenvector centrality')
+
+## save output
+save.image('motnp_nodalregression.RData')
+dev.off()
+
+#### extract contrasts from predictions ####
+## extract raw values
 par(mfrow = c(2,2))
 beta_diff_12 <- params$delta[, 1] - params$delta[, 2]
 plot(density(beta_diff_12), main="Posterior difference:\n10-15 and 15-20") ; abline(v=0, lty=2)
@@ -245,6 +362,7 @@ plot(density(beta_diff_34), main="Posterior difference:\n21-25 and 26-40") ; abl
 beta_diff_45 <- params$delta[, 4] - params$delta[, 5]
 plot(density(beta_diff_45), main="Posterior difference:\n26-40 and 40+") ; abline(v=0, lty=2)
 
+## plot
 par(mfrow = c(1,1))
 plot(density(beta_diff_12), main="Posterior differences")
 lines(density(beta_diff_23), col = 'red')
@@ -252,274 +370,151 @@ lines(density(beta_diff_34), col = 'blue')
 lines(density(beta_diff_45), col = 'purple')
 abline(v=0, lty=2)
 
-plot(density(params$beta_age),
-     main = "Posterior age effect estimate")
-abline(v = 0, lty = 2)
+## predict for age categroy + 1
+pred_data_new <- nodes[order(nodes$age_cat_num),] %>% 
+    mutate(age_cat_num_original = age_cat_num,
+           age_cat_fct_original = age_cat_fct,
+           age_cat_num = ifelse(age_cat_num == 7, 3, age_cat_num + 1),
+           age_cat_fct = as.integer(as.factor(age_cat_num)))
+pred_mu_new <- predict_mean_centrality(params = params,
+                                       pred_data = pred_data_new)
+pred_full_new <- predict_full_centrality(params = params,
+                                         mu_matrix = pred_mu_new,
+                                         cov_matrix = centrality_cov)
 
-# #### predict from model -- dummy ####
-# ## summarise
-# (summary <- as.data.frame(round(summary(fit_motnp_eigen)$summary[1:14, c(1, 4, 8)], 3)))
-# summary$parameter <- rownames(summary)
-# 
-# ## simulate full predictions for model
-# ages <- as.numeric(unique(nodes$age_cat_fct))
-# sim_mean <- matrix(NA, nrow = n_chains*n_samples, ncol = n_age_cat,
-#                    dimnames = list(1:(n_chains*n_samples), ages))
-# sim_full <- matrix(NA, nrow = n_chains*n_samples, ncol = n_age_cat,
-#                    dimnames = list(1:(n_chains*n_samples), ages))
-# for(i in 1:(n_chains*n_samples)){
-#   for(j in 1:(n_age_cat)){
-#     sim_mean[i,j] <- params$beta_age[i]*params$delta[ages[j]] + params$intercept[i]
-#     sim_full[i,j] <- MASS::mvrnorm(n = 1,
-#                               mu = sim_mean[i,j],
-#                               Sigma = params$sigma[i])
-#   }
-# }
-# 
-# ## summarise mean predictions
-# sum_mean_pred <- data.frame(age = sort(as.numeric(unique(nodes$age_cat_fct))),
-#                        lwr = apply(sim_mean, 2, quantile, probs = 0.025),
-#                        mean = apply(sim_mean, 2, mean),
-#                        mid = apply(sim_mean, 2, quantile, probs = 0.5),
-#                        upr = apply(sim_mean, 2, quantile, probs = 0.975))
-# plot(sum_mean_pred$mean ~ sum_mean_pred$age, type = 'b', col = 'blue', ylim = c(-5,5))
-# lines(sum_mean_pred$lwr ~ sum_mean_pred$age, lty = 2)
-# lines(sum_mean_pred$upr ~ sum_mean_pred$age, lty = 2)
-# 
-# ## summarise total predictions
-# sum_full_pred <- data.frame(age = sort(as.numeric(unique(nodes$age_cat_fct))),
-#                             lwr = apply(sim_full, 2, quantile, probs = 0.025),
-#                             mean = apply(sim_full, 2, mean),
-#                             mid = apply(sim_full, 2, quantile, probs = 0.5),
-#                             upr = apply(sim_full, 2, quantile, probs = 0.975))
-# lines(sum_full_pred$lwr ~ sum_full_pred$age, lty = 3)
-# lines(sum_full_pred$upr ~ sum_full_pred$age, lty = 3)
-# 
-# ## plot simulations
-# sim_df <- as.data.frame(sim_full) %>% 
-#   pivot_longer(cols = everything(), names_to = 'age', values_to = 'eigen_sim')
-# points(sim_df$eigen_sim ~ sim_df$age, col = rgb(0,0,0,0.01), pch = 19, cex = 0.5)
-# 
-# ## plot raw with model output
-# df_long_mean <- df_long %>%
-#   group_by(node_rank) %>% 
-#   mutate(mean_eigen = mean(centrality)) %>% 
-#   ungroup() %>% 
-#   left_join(nodes, by = 'node_rank') %>% 
-#   dplyr::select(age_cat_fct, mean_eigen, sightings, node) %>% 
-#   distinct()
-# df_long_plot <- df_long %>%
-#   left_join(nodes, by = 'node_rank') %>% 
-#   dplyr::select(-age.x, -age.y)
-# ggplot()+
-#   geom_ribbon(data = sum_full_pred,
-#               aes(x = age, ymin = lwr, ymax = upr),          # shade simulations
-#               colour = 'transparent', fill = rgb(0,0,0,0.1))+
-#   geom_ribbon(data = sum_mean_pred,
-#               aes(x = age, ymin = lwr, ymax = upr),          # shade mean distribution
-#               colour = 'transparent', 
-#               fill = rgb(33/255, 145/255, 140/255, 0.5))+
-#   geom_point(data = df_long_plot, 
-#              aes(x = as.numeric(age_cat_fct), 
-#                  y = centrality),                  # all eigenvector draws
-#              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-#   geom_point(data = df_long_mean,
-#              aes(x = as.numeric(age_cat_fct), 
-#                  y = mean_eigen, 
-#                  size = sightings),  # mean eigenvector
-#              colour = rgb(68/255, 1/255, 84/255))+
-#   geom_line(data = sum_mean_pred,
-#             aes(x = age, y = mid),                                # mean line
-#             colour = rgb(33/255, 145/255, 140/255),
-#             linewidth = 1)+
-#   # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
-#   #                                   y = mean_eigen, group = node_rank),
-#   #           colour = rgb(68/255, 1/255, 84/255), linewidth = 0.5, width = 0)+
-#   scale_x_continuous('age (years)')+
-#   scale_y_continuous('eigenvector centrality (standardised)')+
-#   theme(axis.text = element_text(size = 18),
-#         axis.title = element_text(size = 22),
-#         legend.text = element_text(size = 18),
-#         legend.title = element_text(size = 22))
-# ggsave(filename = '../outputs/motnp_nodalregression_line.png', device = 'png',
-#        plot = last_plot(), width = 16.6, height = 11.6)
-# 
-# ggplot()+
-#   geom_violin(data = sim_df, aes(x = as.factor(age), y = eigen_sim),          # shade simulations
-#               #colour = 'transparent', 
-#               fill = rgb(0,0,0,0.1))+
-#   geom_errorbar(data = sum_mean_pred, aes(x = age, ymin = lwr, ymax = upr),               # shade mean distribution
-#               colour = rgb(33/255, 145/255, 140/255),
-#               linewidth = 1.5, width = 0.5)+
-#   geom_line(data = sum_mean_pred,
-#             aes(x = age,
-#                 y = mid),                                # mean line
-#             colour = rgb(33/255, 145/255, 140/255), linewidth = 1.5)+
-#   geom_point(data = df_long_plot,
-#              aes(x = as.numeric(age_cat_fct),
-#                  y = centrality),                  # all eigenvector draws
-#              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-#   geom_point(data = df_long_mean,
-#              aes(x = as.numeric(age_cat_fct),
-#                  y = mean_eigen,
-#                  size = sightings),  # mean eigenvector
-#              colour = rgb(68/255, 1/255, 84/255))+
-#   # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
-#   #                                   y = mean_eigen, group = node_rank),
-#   #           colour = rgb(68/255, 1/255, 84/255), linewidth = 0.5, width = 0)+
-#   scale_x_discrete('age category')+
-#   scale_y_continuous('eigenvector centrality (standardised)')+
-#   theme_classic()+
-#   theme(axis.text = element_text(size = 18),
-#         axis.title = element_text(size = 22),
-#         legend.text = element_text(size = 18),
-#         legend.title = element_text(size = 22))
-# ggsave(filename = '../outputs/motnp_nodalregression_violin.png', device = 'png',
-#        plot = last_plot(), width = 16.6, height = 11.6)
-# 
-# ## save output
-# save.image('motnp_nodalregression.RData')
-# dev.off()
-# 
-#### predict from model -- raw data ####
-# load('motnp_nodalregression.RData')
+## calculate contrast -- all changes
+contrast <- pred_full_new - sim_full
+mean(contrast)
+quantile(contrast, prob = c(0.025, 0.975))
 
-## summarise
-(summary <- as.data.frame(round(summary(fit_motnp_eigen)$summary[1:14, c(1, 4, 8)], 3)))
-summary$parameter <- rownames(summary)
+## calculate contrast -- 1 vs 2
+contrast12 <- contrast[,which(nodes$age_cat_fct == 1)]
+mean(contrast12)
+quantile(contrast12, prob = c(0.025, 0.975))
 
-## simulate full predictions for model
-sim_mean <- matrix(NA, nrow = n_chains*n_samples, ncol = n_eles,
-                   dimnames = list(1:(n_chains*n_samples), nodes$id))
-sim_full <- matrix(NA, nrow = n_chains*n_samples, ncol = n_eles,
-                   dimnames = list(1:(n_chains*n_samples), nodes$id))
-for(i in 1:(n_chains*n_samples)){
-  for(j in 1:n_eles){
-    sim_mean[i,j] <- params$beta_age[i]*params$delta[nodes$age_cat_fct[j]] + params$intercept[i]
-    sim_full[i,j] <- MASS::mvrnorm(n = 1,
-                                   mu = sim_mean[i,j],
-                                   Sigma = params$sigma[i])
-  }
+## calculate contrast -- 2 vs 3
+contrast23 <- contrast[,which(nodes$age_cat_fct == 2)]
+mean(contrast23)
+quantile(contrast23, prob = c(0.025, 0.975))
+
+## calculate contrast -- 3 vs 4
+contrast34 <- contrast[,which(nodes$age_cat_fct == 3)]
+mean(contrast34)
+quantile(contrast34, prob = c(0.025, 0.975))
+
+## calculate contrast -- 4 vs 5
+contrast45 <- contrast[,which(nodes$age_cat_fct == 4)]
+mean(contrast45)
+quantile(contrast45, prob = c(0.025, 0.975))
+
+## calculate contrast -- 5 vs 1
+contrast51 <- contrast[,which(nodes$age_cat_fct == 5)]
+mean(contrast51)
+quantile(contrast51, prob = c(0.025, 0.975))
+
+## plot contrasts
+contrasts <- data.frame(contrast = c('1 vs 2', '2 vs 3', '3 vs 4', '4 vs 5'),
+                        mean = c(mean(contrast12),mean(contrast23),
+                                 mean(contrast34),mean(contrast45)),
+                        upr = c(quantile(contrast12, prob = c(0.975)),
+                                quantile(contrast23, prob = c(0.975)),
+                                quantile(contrast34, prob = c(0.975)),
+                                quantile(contrast45, prob = c(0.975))),
+                        lwr = c(quantile(contrast12, prob = c(0.025)),
+                                quantile(contrast23, prob = c(0.025)),
+                                quantile(contrast34, prob = c(0.025)),
+                                quantile(contrast45, prob = c(0.025)))) %>% 
+  pivot_longer(cols = c('mean', 'upr', 'lwr'),
+               names_to = 'stat', values_to = 'value')
+ggplot()+
+  geom_line(data = contrasts[contrasts$stat != 'mean',],
+            aes(y = value, x = contrast))+
+  geom_hline(aes(yintercept = 0), linetype = 2)+
+  geom_point(data = contrasts[contrasts$stat == 'mean',],
+             aes(y = value, x = contrast))+
+  scale_x_discrete(#expand = c(0.05,0.05),
+                   name = 'age category comparison')+
+  scale_y_continuous(name = 'difference in prediction',
+                     limits = c(-1,1))+
+  theme_bw()+
+  coord_flip()
+
+## save
+save.image('motnp_nodalregression.RData')
+
+#### plot nicely ####
+## clean data frame
+clean <- data.frame(age_cat_fct = 1:5,
+                    mean = NA,
+                    predict_mu_lwr = NA,
+                    predict_mu_upr = NA,
+                    predict_full_lwr = NA,
+                    predict_full_upr = NA)
+
+## predict means only
+predict_clean_mean <- predict_mean_centrality(params, clean)
+clean$mean <- mean(predict_clean_mean)
+clean$predict_mu_lwr <- apply(predict_clean_mean, 2, quantile, prob = 0.025)
+clean$predict_mu_upr <- apply(predict_clean_mean, 2, quantile, prob = 0.975)
+
+## average fulls for whole data frame (can't just predict from clean data frame because dimensions don't fit with covariance matrix)
+for(i in 1:n_age_cat){
+  sim_age <- sim_full[,which(nodes$age_cat_fct == i)]
+  clean$predict_full_lwr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2, quantile, prob = 0.025))
+  clean$predict_full_upr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2, quantile, prob = 0.975))
 }
-boxplot(sim_full[,1])
 
-## summarise mean predictions -- all the same for all nodes in the same category because the only predictor
-nodes_mean <- sim_mean %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'id', values_to = 'node_mean') %>% 
-  mutate(draw = rep(1:n_eles, each = nrow(sim_mean))) %>% 
-  group_by(id) %>% 
-  left_join(nodes[,c('id','node','age_cat_chr','age_cat_fct')]) %>% 
-  mutate(pred_mu_lwr = quantile(node_mean, probs = 0.025),
-         pred_mu_mean = mean(node_mean),
-         pred_mu_mid = quantile(node_mean, probs = 0.5),
-         pred_mu_upr = quantile(node_mean, probs = 0.975))
-ggplot(nodes_mean)+
-  geom_boxplot(aes(x = age_cat_fct, y = pred_mu_mean))
-
-## summarise total predictions
-nodes_full <- sim_full %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'id', values_to = 'node_pred') %>% 
-  mutate(draw = rep(1:n_eles, each = nrow(sim_full))) %>% 
-  group_by(id) %>% 
-  left_join(nodes[,c('id','node','age_cat_chr','age_cat_fct')]) %>% 
-  mutate(pred_full_lwr = quantile(node_pred, probs = 0.025),
-         pred_full_mean = mean(node_pred),
-         pred_full_mid = quantile(node_pred, probs = 0.5),
-         pred_full_upr = quantile(node_pred, probs = 0.975))
-ggplot()+
-  geom_violin(data = nodes_full,
-              aes(x = age_cat_fct, y = node_pred,
-                  fill = factor(age_cat_chr, levels = c('10-15', '15-19',
-                                                        '20-25','25-40','40+'))),
-              alpha = 0.5)+
-  geom_boxplot(data = nodes_full,
-               aes(x = age_cat_fct, y = pred_full_mean, fill = age_cat_chr))+
-  #geom_boxplot(data = nodes_mean, aes(x = age_cat_fct, y = pred_mu_mean), colour = 'white')+
-  scale_fill_viridis_d()+
-  labs(fill = 'age category', x = 'age category', y = 'predicted eigenvector centrality')
-
-## plot raw with model output -- GOT TO HERE WITH ATTEMPTING TO FIX PREDICTIONS
-df_long_mean <- df_long %>%
-  group_by(node_rank) %>% 
-  mutate(mean_eigen = mean(centrality)) %>% 
-  ungroup() %>% 
+## add node data
+df_long <- df_long %>%
   left_join(nodes, by = 'node_rank') %>% 
-  dplyr::select(age_cat_fct, mean_eigen, sightings, node) %>% 
-  distinct()
-df_long_plot <- df_long %>%
-  left_join(nodes, by = 'node_rank') %>% 
-  dplyr::select(-age.x, -age.y)
-ggplot()+
-  geom_ribbon(data = nodes_full,
+  dplyr::select(-age_cat_num.x) %>% 
+  rename(age_cat_num = age_cat_num.y)
+
+## plot
+(clean_nodal_model <- ggplot()+
+  geom_ribbon(data = clean,
               aes(x = as.numeric(age_cat_fct),
-                  ymin = pred_full_lwr, ymax = pred_full_upr),  # shade simulations
+                  ymin = predict_full_lwr, ymax = predict_full_upr),    # shade simulations
               colour = 'transparent', fill = rgb(0,0,0,0.1))+
-  geom_ribbon(data = nodes_mean,
+  geom_ribbon(data = clean,
               aes(x = as.numeric(age_cat_fct),
-                  ymin = pred_mu_lwr, ymax = pred_mu_upr),      # shade mean distribution
-              colour = 'transparent', 
+                  ymin = predict_mu_lwr, ymax = predict_mu_upr),  # shade mean distribution
+              colour = 'transparent',
               fill = rgb(33/255, 145/255, 140/255, 0.5))+
-  geom_point(data = df_long_plot, 
-             aes(x = as.numeric(age_cat_fct), 
-                 y = centrality),                               # all eigenvector draws
-             colour = rgb(253/255, 231/255, 37/255, 0.01))+
-  geom_point(data = df_long_mean,
-             aes(x = as.numeric(age_cat_fct), 
-                 y = mean_eigen, 
-                 size = sightings),                             # mean eigenvector
-             colour = rgb(68/255, 1/255, 84/255))+
-  geom_line(data = nodes_mean,
+  geom_line(data = clean,
             aes(x = as.numeric(age_cat_fct),
-                y = pred_mu_mean),                              # mean line
+                y = mean),                            # mean line
             colour = rgb(33/255, 145/255, 140/255),
             linewidth = 1)+
-  # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
-  #                                   y = mean_eigen, group = node_rank),
-  #           colour = rgb(68/255, 1/255, 84/255), linewidth = 0.5, width = 0)+
-  scale_x_continuous('age (years)')+
-  scale_y_continuous('eigenvector centrality (standardised)')+
+  scale_x_continuous('age category')+
+  scale_y_continuous('eigenvector centrality')+
   theme(axis.text = element_text(size = 18),
         axis.title = element_text(size = 22),
         legend.text = element_text(size = 18),
-        legend.title = element_text(size = 22))
-ggsave(filename = '../outputs/motnp_nodalregression_line.png', device = 'png',
+        legend.title = element_text(size = 22)))
+
+clean_nodal_model +
+  geom_point(data = nodes,
+           aes(x = as.numeric(age_cat_fct),
+               y = mu_raw,
+               size = sightings),                               # mean eigenvector
+           colour = rgb(68/255, 1/255, 84/255))
+ggsave(filename = '../outputs/motnp_nodalregression_line_meanpoints.png', device = 'png',
        plot = last_plot(), width = 16.6, height = 11.6)
 
-ggplot()+
-  geom_violin(data = sim_df, aes(x = as.factor(age), y = eigen_sim),          # shade simulations
-              #colour = 'transparent', 
-              fill = rgb(0,0,0,0.1))+
-  geom_errorbar(data = sum_mean_pred, aes(x = age, ymin = lwr, ymax = upr),               # shade mean distribution
-                colour = rgb(33/255, 145/255, 140/255),
-                linewidth = 1.5, width = 0.5)+
-  geom_line(data = sum_mean_pred,
-            aes(x = age,
-                y = mid),                                # mean line
-            colour = rgb(33/255, 145/255, 140/255), linewidth = 1.5)+
-  geom_point(data = df_long_plot,
+clean_nodal_model +
+  geom_point(data = df_long,
              aes(x = as.numeric(age_cat_fct),
-                 y = centrality),                  # all eigenvector draws
-             colour = rgb(253/255, 231/255, 37/255, 0.01))+
-  geom_point(data = df_long_mean,
+                 y = centrality),                                 # all eigenvector draws
+             colour = rgb(253/255, 231/255, 37/255, 0.01)) +
+  geom_point(data = nodes,
              aes(x = as.numeric(age_cat_fct),
-                 y = mean_eigen,
-                 size = sightings),  # mean eigenvector
-             colour = rgb(68/255, 1/255, 84/255))+
-  # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
-  #                                   y = mean_eigen, group = node_rank),
-  #           colour = rgb(68/255, 1/255, 84/255), linewidth = 0.5, width = 0)+
-  scale_x_discrete('age category')+
-  scale_y_continuous('eigenvector centrality (standardised)')+
-  theme_classic()+
-  theme(axis.text = element_text(size = 18),
-        axis.title = element_text(size = 22),
-        legend.text = element_text(size = 18),
-        legend.title = element_text(size = 22))
-ggsave(filename = '../outputs/motnp_nodalregression_violin.png', device = 'png',
+                 y = mu_raw,
+                 size = sightings),                               # mean eigenvector
+             colour = rgb(68/255, 1/255, 84/255))
+ggsave(filename = '../outputs/motnp_nodalregression_line_allpoints.png', device = 'png',
        plot = last_plot(), width = 16.6, height = 11.6)
 
-## save output
+## save
 save.image('motnp_nodalregression.RData')
 dev.off()
