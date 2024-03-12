@@ -83,7 +83,7 @@ plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, thresh
                                                           ifelse(node_age < 40,
                                                                  "#39568CFF",
                                                                  "#440154FF")))),
-                      vertex.size = node_sightings, 
+                      vertex.size = log(node_sightings*3)*3, # node_sightings,
                       frame.color = NA,
                       frame.width = 0,
                       edge.color = NA,
@@ -114,21 +114,38 @@ plot_network_threshold_anp <- function (edge_samples, dyad_data, lwd = 2, thresh
 }
 
 par(mai = c(0.2,0.2,0.2,0.2))
-pdf('../outputs/anp_edgecalculations_networkplots_conditionalprior_changesize.pdf')
+#pdf('../outputs/anp_edgecalculations_networkplots_conditionalprior_changesize.pdf')
 
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
+
+png(file=paste0('../outputs/step3_edgeweightestimation/anpshort1_network_0.1.png'),
+    width=800, height=800)
+set.seed(2)
+par(mai = c(0.1,0.1,0.1,0.1))
 plot_network_threshold_anp(edge_samples = edge_samples,
                            dyad_data = cdf_1,
                            threshold = 0.10,
                            node.size = nodes,
                            node.colour = nodes,
                            lwd = 15)
+dev.off()
+
+png(file=paste0('../outputs/step3_edgeweightestimation/anpshort1_network_0.15.png'),
+    width=800, height=800)
+set.seed(2)
+par(mai = c(0.1,0.1,0.1,0.1))
 plot_network_threshold_anp(edge_samples = edge_samples,
                            dyad_data = cdf_1,
                            threshold = 0.15,
                            node.size = nodes,
                            node.colour = nodes,
                            lwd = 15)
+dev.off()
+
+png(file=paste0('../outputs/step3_edgeweightestimation/anpshort1_network_0.2.png'),
+    width=800, height=800)
+set.seed(2)
+par(mai = c(0.1,0.1,0.1,0.1))
 plot_network_threshold_anp(edge_samples = edge_samples,
                            dyad_data = cdf_1,
                            threshold = 0.20,
@@ -223,7 +240,7 @@ for(window in 2:36){
                                                             ifelse(node_age < 40,
                                                                    "#39568CFF",
                                                                    "#440154FF")))),
-                        vertex.size = node_sightings, 
+                        vertex.size = log(node_sightings*3)*3, # node_sightings,
                         frame.color = NA,
                         frame.width = 0,
                         edge.color = NA,
@@ -255,15 +272,19 @@ for(window in 2:36){
   
   
   for(i in c(0.1, 0.15, 0.2)){
+    png(file=paste0('../outputs/step3_edgeweightestimation/anpshort',window,'_network_',i,'.png'),
+        width=800, height=800)
+    set.seed(2)
+    par(mai = c(0.1,0.1,0.1,0.1))
     plot_network_threshold_anp(edge_samples = edge_samples,
                                dyad_data = cdf,
                                threshold = i,
                                node.size = nodes,
                                node.colour = nodes,
                                lwd = 15)
+    dev.off()
   }
-  
   rm(list = ls()[! ls() %in% c('window','plot_network_threshold_anp')]) ; gc()
 }
 
-dev.off()
+#dev.off()
