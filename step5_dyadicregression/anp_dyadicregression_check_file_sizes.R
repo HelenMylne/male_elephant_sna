@@ -109,13 +109,13 @@ load('anpshort_dyadicregression_datasizecheck.RData')
 ## global data values
 n_data <- nrow(dyads_all)
 n_dyads <- length(unique(dyads_all$dyad_window_nonrandom))
+n_nodes <- length(unique(c(dyads_all$node_1_original,
+                           dyads_all$node_2_original)))
 
 ## randomise node ID
 nodes_df_rand <- data.frame(node_1_original = unique(c(dyads_all$node_1_original,
                                                        dyads_all$node_2_original))) %>% 
-  mutate(node_2_original = node_1_original)
-n_nodes <- nrow(nodes_df_rand)
-nodes_df_rand <- nodes_df_rand %>% 
+  mutate(node_2_original = node_1_original) %>% 
   mutate(node_1_randomised = sample(1:n_nodes, n_nodes, replace = F)) %>% 
   mutate(node_2_randomised = node_1_randomised)
 dyads_all <- dyads_all %>% 
@@ -127,10 +127,12 @@ dyads_all <- dyads_all %>%
          node_2_window = paste0(node_2_randomised,'_',window))
 
 ## randomise dyad ID
-nodes_df_rand <- data.frame(dyad_original = unique(dyads_all$dyad_id)) %>% 
-  mutate(dyad_randomised = sample(1:n_dyads, n_dyads, replace = F))
+dyads_df_rand <- data.frame(dyad_original = unique(dyads_all$dyad_id))
+dyads_df_rand$dyad_randomised <- sample(dyads_df_rand$dyad_original,
+                                        nrow(dyads_df_rand),
+                                        replace = F)
 dyads_all <- dyads_all %>% 
-  left_join(nodes_df_rand[,c('dyad_randomised','dyad_original')],
+  left_join(dyads_df_rand[,c('dyad_randomised','dyad_original')],
             by = 'dyad_original')
 
 ## combine window with randomised node/dyad
