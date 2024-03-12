@@ -451,7 +451,7 @@ plot_rand_windows3 <- c('rand_window[19]','rand_window[20]','rand_window[21]','r
 traceplot(fit_sim, pars = plot_rand_windows3)
 plot_rand_windows4 <- c('rand_window[28]','rand_window[29]','rand_window[30]','rand_window[31]','rand_window[32]','rand_window[33]','rand_window[34]','rand_window[35]','rand_window[36]')
 traceplot(fit_sim, pars = plot_rand_windows4)
-rm(plot_params, plot_rand_nodes, plot_rand_windows1, plot_rand_windows2, plot_rand_windows3, plot_rand_windows4) ; gc()
+rm(plot_rand_nodes, plot_rand_windows1, plot_rand_windows2, plot_rand_windows3, plot_rand_windows4) ; gc()
 
 #### posterior predictive check ####
 par(mfrow = c(3,3))
