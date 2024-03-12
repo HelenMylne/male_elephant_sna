@@ -301,7 +301,8 @@ nodes$full_upr_predict <- apply(sim_full, 2, quantile, probs = 0.975)
 
 ## compare to raw data
 nodes <- nodes %>% 
-  mutate(mu_raw = centrality_mu)
+  mutate(mu_raw = centrality_mu,
+         mu_raw_invlogit = LaplacesDemon::invlogit(centrality_mu))
 ggplot(nodes)+
   geom_ribbon(aes(x = age_cat_num, ymin = full_lwr_predict, ymax = full_upr_predict),
               alpha = 0.3, fill = 'purple')+
@@ -319,25 +320,33 @@ nodes_full <- sim_full %>%
   as.data.frame() %>% 
   pivot_longer(cols = everything(), names_to = 'node', values_to = 'node_pred') %>% 
   mutate(draw = rep(1:n_eles, each = nrow(sim_full)),
-         node = as.numeric(node)) %>% 
+         node = as.numeric(node),
+         invlogit_pred = LaplacesDemon::invlogit(node_pred)) %>% 
   left_join(nodes[,c('id','node','age_cat_chr','age_cat_fct')],
             by = 'node') %>% 
   group_by(id) %>% 
   mutate(pred_full_lwr = quantile(node_pred, probs = 0.025),
          pred_full_mean = mean(node_pred),
          pred_full_mid = quantile(node_pred, probs = 0.5),
-         pred_full_upr = quantile(node_pred, probs = 0.975))
+         pred_full_upr = quantile(node_pred, probs = 0.975),
+         pred_full_lwr_invlogit = quantile(invlogit_pred, probs = 0.025),
+         pred_full_mean_invlogit = mean(invlogit_pred),
+         pred_full_mid_invlogit = quantile(v, probs = 0.5),
+         pred_full_upr_invlogit = quantile(invlogit_pred, probs = 0.975))
 
 ggplot()+
   geom_violin(data = nodes_full,
               aes(x = age_cat_fct, y = node_pred,
-                  fill = factor(age_cat_chr, levels = c('10-15', '15-19', '20-25',
-                                                        '25-40','40+'))),
+                  fill = factor(age_cat_chr, 
+                                levels = c('10-15', '15-19', '20-25',
+                                           '25-40','40+'))),
               alpha = 0.5)+
   geom_boxplot(data = nodes_full,
-               aes(x = age_cat_fct, y = pred_full_mean, fill = age_cat_chr))+
+               aes(x = age_cat_fct, y = pred_full_mid, 
+                   fill = age_cat_chr))+
   geom_jitter(data = nodes,
-              aes(x = age_cat_fct, y = mu_raw, fill = age_cat_chr),
+              aes(x = age_cat_fct, y = mu_raw, 
+                  fill = age_cat_chr, size = sightings),
               width = 0.2, pch = 21)+
   scale_fill_viridis_d()+
   #scale_colour_viridis_d()+
@@ -345,10 +354,34 @@ ggplot()+
        #colour = 'age category',
        x = 'age category',
        y = 'predicted eigenvector centrality')
+ggsave(file = '../outputs/step4_nodalregression/motnp_nodal_violin_logit.png', device = 'png',
+       plot = last_plot(), width = 2100, height = 1600, units = 'px')
+
+ggplot()+
+  geom_violin(data = nodes_full,
+              aes(x = age_cat_fct, y = invlogit_pred,
+                  fill = factor(age_cat_chr,
+                                levels = c('10-15', '15-19', '20-25',
+                                           '25-40','40+'))),
+              alpha = 0.5)+
+  geom_boxplot(data = nodes_full,
+               aes(x = age_cat_fct, y = pred_full_mid_invlogit,
+                   fill = age_cat_chr))+
+  geom_jitter(data = nodes,
+              aes(x = age_cat_fct, y = mu_raw_invlogit,
+                  fill = age_cat_chr, size = sightings),
+              width = 0.2, pch = 21)+
+  scale_fill_viridis_d()+
+  #scale_colour_viridis_d()+
+  labs(fill = 'age category',
+       #colour = 'age category',
+       x = 'age category',
+       y = 'predicted eigenvector centrality')
+ggsave(file = '../outputs/step4_nodalregression/motnp_nodal_violin.png', device = 'png',
+       plot = last_plot(), width = 2100, height = 1600, units = 'px')
 
 ## save output
 save.image('motnp_nodalregression.RData')
-dev.off()
 
 #### extract contrasts from predictions ####
 ## extract raw values
@@ -446,10 +479,11 @@ save.image('motnp_nodalregression.RData')
 ## clean data frame
 clean <- data.frame(age_cat_fct = 1:5,
                     mean = NA,
-                    predict_mu_lwr = NA,
-                    predict_mu_upr = NA,
-                    predict_full_lwr = NA,
-                    predict_full_upr = NA)
+                    predict_mu_lwr = NA, predict_mu_upr = NA,
+                    predict_full_lwr = NA, predict_full_upr = NA,
+                    mean_invlogit = NA,
+                    predict_mu_lwr_invlogit = NA, predict_mu_upr_invlogit = NA,
+                    predict_full_lwr_invlogit = NA, predict_full_upr_invlogit = NA)
 
 ## predict means only
 predict_clean_mean <- predict_mean_centrality(params, clean)
@@ -457,21 +491,35 @@ clean$mean <- mean(predict_clean_mean)
 clean$predict_mu_lwr <- apply(predict_clean_mean, 2, quantile, prob = 0.025)
 clean$predict_mu_upr <- apply(predict_clean_mean, 2, quantile, prob = 0.975)
 
+## convert to invlogit scale
+predict_clean_mean_invlogit <- LaplacesDemon::invlogit(predict_clean_mean)
+clean$mean_invlogit <- mean(predict_clean_mean_invlogit)
+clean$predict_mu_lwr_invlogit <- apply(predict_clean_mean_invlogit, 2, quantile, prob = 0.025)
+clean$predict_mu_upr_invlogit <- apply(predict_clean_mean_invlogit, 2, quantile, prob = 0.975)
+
 ## average fulls for whole data frame (can't just predict from clean data frame because dimensions don't fit with covariance matrix)
 for(i in 1:n_age_cat){
   sim_age <- sim_full[,which(nodes$age_cat_fct == i)]
-  clean$predict_full_lwr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2, quantile, prob = 0.025))
-  clean$predict_full_upr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2, quantile, prob = 0.975))
+  sim_age_invlogit <- LaplacesDemon::invlogit(sim_age)
+  clean$predict_full_lwr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2,
+                                                               quantile, prob = 0.025))
+  clean$predict_full_upr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2,
+                                                               quantile, prob = 0.975))
+  clean$predict_full_lwr_invlogit[clean$age_cat_fct == i] <- mean(apply(sim_age_invlogit, 2,
+                                                                        quantile, prob = 0.025))
+  clean$predict_full_upr_invlogit[clean$age_cat_fct == i] <- mean(apply(sim_age_invlogit, 2,
+                                                                        quantile, prob = 0.975))
 }
 
 ## add node data
 df_long <- df_long %>%
+  mutate(centrality_invlogit = LaplacesDemon::invlogit(centrality)) %>% 
   left_join(nodes, by = 'node_rank') %>% 
   dplyr::select(-age_cat_num.x) %>% 
   rename(age_cat_num = age_cat_num.y)
 
-## plot
-(clean_nodal_model <- ggplot()+
+## plot on logit scale
+(clean_plot <- ggplot()+
   geom_ribbon(data = clean,
               aes(x = as.numeric(age_cat_fct),
                   ymin = predict_full_lwr, ymax = predict_full_upr),    # shade simulations
@@ -493,27 +541,74 @@ df_long <- df_long %>%
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 22)))
 
-clean_nodal_model +
+clean_plot +
   geom_point(data = nodes,
            aes(x = as.numeric(age_cat_fct),
                y = mu_raw,
-               size = sightings),                               # mean eigenvector
+               size = sightings),
            colour = rgb(68/255, 1/255, 84/255))
-ggsave(filename = '../outputs/motnp_nodalregression_line_meanpoints.png', device = 'png',
-       plot = last_plot(), width = 16.6, height = 11.6)
+ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_meanpoints_logit.png', device = 'png',
+       plot = last_plot(), width = 2800, height = 1600, units = 'px')
 
-clean_nodal_model +
+clean_plot +
   geom_point(data = df_long,
              aes(x = as.numeric(age_cat_fct),
-                 y = centrality),                                 # all eigenvector draws
+                 y = centrality),
              colour = rgb(253/255, 231/255, 37/255, 0.01)) +
   geom_point(data = nodes,
              aes(x = as.numeric(age_cat_fct),
                  y = mu_raw,
-                 size = sightings),                               # mean eigenvector
+                 size = sightings),
              colour = rgb(68/255, 1/255, 84/255))
-ggsave(filename = '../outputs/motnp_nodalregression_line_allpoints.png', device = 'png',
-       plot = last_plot(), width = 16.6, height = 11.6)
+ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_allpoints_logit.png', device = 'png',
+       plot = last_plot(), width = 2800, height = 1600, units = 'px')
+
+## plot on invlogit scale
+(clean_plot <- ggplot()+
+    geom_ribbon(data = clean,
+                aes(x = as.numeric(age_cat_fct),
+                    ymin = predict_full_lwr_invlogit,
+                    ymax = predict_full_upr_invlogit),           # shade simulations
+                colour = 'transparent', fill = rgb(0,0,0,0.1))+
+    geom_ribbon(data = clean,
+                aes(x = as.numeric(age_cat_fct),
+                    ymin = predict_mu_lwr_invlogit,
+                    ymax = predict_mu_upr_invlogit),             # shade mean distribution
+                colour = 'transparent',
+                fill = rgb(33/255, 145/255, 140/255, 0.5))+
+    geom_line(data = clean,
+              aes(x = as.numeric(age_cat_fct),
+                  y = mean_invlogit),                            # mean line
+              colour = rgb(33/255, 145/255, 140/255),
+              linewidth = 1)+
+    scale_x_continuous('age category')+
+    scale_y_continuous('eigenvector centrality')+
+    theme(axis.text = element_text(size = 18),
+          axis.title = element_text(size = 22),
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 22)))
+
+clean_plot +
+  geom_point(data = nodes,
+             aes(x = as.numeric(age_cat_fct),
+                 y = mu_raw_invlogit,
+                 size = sightings),
+             colour = rgb(68/255, 1/255, 84/255))
+ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_meanpoints_invlogit.png',
+       device = 'png', plot = last_plot(), width = 2800, height = 1600, units = 'px')
+
+clean_plot +
+  geom_point(data = df_long,
+             aes(x = as.numeric(age_cat_fct),
+                 y = centrality_invlogit),
+             colour = rgb(253/255, 231/255, 37/255, 0.01)) +
+  geom_point(data = nodes,
+             aes(x = as.numeric(age_cat_fct),
+                 y = mu_raw_invlogit,
+                 size = sightings),
+             colour = rgb(68/255, 1/255, 84/255))
+ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_allpoints_invlogit.png', device = 'png',
+       plot = last_plot(), width = 2800, height = 1600, units = 'px')
 
 ## save
 save.image('motnp_nodalregression.RData')
