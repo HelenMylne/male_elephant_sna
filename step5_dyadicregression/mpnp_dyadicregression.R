@@ -22,7 +22,7 @@ rm(edge_binary, fit_edges_mpnp1, edgelist, eles, missing_age, mean_ages, summary
 pdf('../outputs/mpnp_dyadicregression.pdf')
 theme_set(theme_classic())
 
-### filter down to only elephants with known age categories ####
+#### filter down to only elephants with known age categories ####
 ## ages
 hist(nodes$age, breaks = 50)
 nodes$age_cat <- ifelse(nodes$age < 10, 1,
@@ -40,10 +40,12 @@ n_nodes <- length(ele_ids)
 ## dyads data frame
 n_dyads <- nrow(counts_df)
 dyads_to_include <- counts_df %>%
-  mutate(dyad_rank = 1:n_dyads) %>%
+  mutate(dyad_rank_all = 1:n_dyads) %>%
   filter(id_1 %in% ele_ids) %>%
   filter(id_2 %in% ele_ids)
 n_dyads <- nrow(dyads_to_include)
+dyads_to_include <- dyads_to_include %>%
+  mutate(dyad_rank_include = 1:n_dyads)
 
 #### identify younger and older ####
 ## categorise ages
@@ -65,13 +67,17 @@ for(i in 1:nrow(dyads_to_include)){
 
 ## clean up dyads_to_include a bit
 dyads_to_include <- dyads_to_include %>%
-  dplyr::select(dyad_rank, dyad_id, id_1, id_2, node_1, node_2, node_rank_1, node_rank_2, age_cat_1, age_cat_2, age_min, age_max)
+  dplyr::select(dyad_rank_all, dyad_rank_include, dyad_id, id_1, id_2, node_1, node_2, node_rank_1, node_rank_2, age_cat_1, age_cat_2, age_min, age_max)
 
-#### summarise edges ####
-# edge_samples <- edge_samples[, dyads_to_include$dyad_rank]
-# dyads_to_include$mean_edge <- apply(edge_samples, 2, mean)
+#### summarise edges and cut down edge samples ####
+## trim edge samples
+edge_samples <- edge_samples[, dyads_to_include$dyad_rank_all]
+colnames(edge_samples) <- dyads_to_include$dyad_rank_include
 
-#### plot raw data ####
+## summarise
+dyads_to_include$mean_edge <- apply(edge_samples, 2, mean)
+
+# #### plot raw data ####
 # ggplot()+
 #   geom_jitter(data = dyads_to_include,
 #               aes(x = age_min, y = mean_edge,
@@ -97,18 +103,20 @@ dyads_to_include <- dyads_to_include %>%
 #                       sample(size = 50, 3001:4000, replace = F))
 # draws_to_include
 # edge_samples <- edge_samples[draws_to_include, ]
-# logit_edge_draws <- logit(edge_samples)
-# print('logit_edge_draws subset defined')
-# gc()
-# logit_edge_draws_mu <- apply(logit_edge_draws, 2, mean)
-# print('logit_edge_draws means calculated')
-# gc()
+logit_edge_draws <- logit(edge_samples)
+print('logit_edge_draws defined')
+gc()
+logit_edge_draws_mu <- apply(logit_edge_draws, 2, mean)
+print('logit_edge_draws means calculated')
+gc()
 
 ## recalculate parameters
 (n_dyads <- nrow(dyads_to_include))
 (n_nodes <- nrow(nodes_to_include))
 
-## create covariance matrix -- much more complicated than planned as "logit_edge_draws_cov <- cov(logit_edge_draws)" is not possible due to extent of matrix produced
+## create covariance matrix -- much more complicated than planned as "logit_edge_draws_cov <- cov(logit_edge_draws)" is not possible due to extent of matrix produced: too big for himem_week nodes on Viking, and takes too long for himem01 node
+#logit_edge_draws_cov <- cov(logit_edge_draws)
+
 # test <- edge_samples[,1:10] # test <- matrix(0, 20, 10) ; colnames(test) <- 1:10 ; for(i in 1:10){ test[,i] <- rnorm(20, rnorm(1,0,0.5), 1) }
 # round(cov(test),2)
 # test_cov <- matrix(NA, nrow = 10, ncol = 10)
@@ -124,7 +132,10 @@ dyads_to_include <- dyads_to_include %>%
 #                                        which(as.numeric(colnames(cov_breakdown)) == j)])
 #         test_cov[j,i] <-  test_cov[i,j]
 #       }
-#       if(i %% 10 == 0) { rm(test_breakdown, cov_breakdown) ; gc() }
+#       if(i %% 2 == 0) {
+#         rm(test_breakdown, cov_breakdown) ; gc()
+#         print(i)
+#         }
 #     }
 #   }
 # }
@@ -132,38 +143,38 @@ dyads_to_include <- dyads_to_include %>%
 logit_edge_draws_cov <- matrix(data = 0, nrow = n_dyads, ncol = n_dyads)
 print('empty cov matrix created')
 
-# (logit_edge_draws <- logit_edge_draws[,1:2])
-# (cov_short <- cov(logit_edge_draws))
-# 
-# (logit_edge_draws_cov[1,1] <- cov_short[1,1])
-# 
-# (logit_edge_draws_cov[1,2] <- cov_short[which(as.numeric(rownames(cov_short)) == 1),
-#                                         which(as.numeric(colnames(cov_short)) == 2)])
-# 
-# (logit_edge_draws_cov[2,1] <- cov_short[which(as.numeric(rownames(cov_short)) == 1),
-#                                         which(as.numeric(colnames(cov_short)) == 2)])
-# 
-
-# for(i in 1:nrow(logit_edge_draws_cov)){
-#   for(j in 1:ncol(logit_edge_draws_cov)){
-#     if(i <= j){
-#       (edge_draws_breakdown <- logit_edge_draws[,c(i,j)])
-#       (cov_breakdown <- cov(edge_draws_breakdown))
-#       if(i == j){
-#         (logit_edge_draws_cov[i,j] <- cov_breakdown[1,1])
-#       } else {
-#         (logit_edge_draws_cov[i,j] <- cov_breakdown[which(as.numeric(rownames(cov_breakdown)) == i),
-#                                                    which(as.numeric(colnames(cov_breakdown)) == j)])
-#         #logit_edge_draws_cov[j,i] <-  logit_edge_draws_cov[i,j]
-#       }
-#       #if(j %% 100 == 0){
-#       saveRDS(object = logit_edge_draws_cov, file = '../data_processed/step5_dyadicregression/mpnp_logit_edgedraws_cov.RDS')
-#       rm(edge_draws_breakdown, cov_breakdown) ; gc()
-#       #}
-#     }
-#   }
-# }
+for(i in 1:nrow(logit_edge_draws_cov)){
+  for(j in 1:ncol(logit_edge_draws_cov)){
+    if(i <= j){
+      edge_draws_breakdown <- logit_edge_draws[,c(i,j)]
+      cov_breakdown <- cov(edge_draws_breakdown)
+      if(i == j){
+        logit_edge_draws_cov[i,j] <- cov_breakdown[1,1]
+      } else {
+        if(length(cov_breakdown[which(as.numeric(rownames(cov_breakdown)) == i),
+                                which(as.numeric(colnames(cov_breakdown)) == j)]) != 1){
+          print(paste0('i = ',i,
+                       ', j = ',j,
+                       ', length replacement = ',
+                       length(cov_breakdown[which(as.numeric(rownames(cov_breakdown)) == i),
+                                            which(as.numeric(colnames(cov_breakdown)) == j)])))
+        }
+        logit_edge_draws_cov[i,j] <- cov_breakdown[which(as.numeric(rownames(cov_breakdown)) == i),
+                                                   which(as.numeric(colnames(cov_breakdown)) == j)]
+        logit_edge_draws_cov[j,i] <-  logit_edge_draws_cov[i,j]
+      }
+    }
+    if(j %% 100 == 0){
+      saveRDS(object = logit_edge_draws_cov, file = '../data_processed/step5_dyadicregression/mpnp_logit_edgedraws_cov.RDS')
+      rm(edge_draws_breakdown, cov_breakdown) ; gc()
+      print(paste0('column = ',j,', row = ',i,' at ',Sys.time()))
+    }
+  }
+  print(i)
+}
 print('covariance matrix calculated')
+
+save.image('mpnplong_dyadicregression.RData')
 
 # #### plot to check how well multivariate approximation is working ####
 # ### Randomly selecting samples to examine
@@ -253,7 +264,7 @@ print('covariance matrix calculated')
 # #   parallel_chains = n_chains)
 # 
 # ## save output
-# save.image('mpnp_dyadicregression.RData')
+# save.image('mpnplong_dyadicregression.RData')
 # dev.off()
 # 
 # ## extra raw data plot that Viking was screwing up earlier and I want it but I'd rather that the model runs properly so fix this once the model is run!
