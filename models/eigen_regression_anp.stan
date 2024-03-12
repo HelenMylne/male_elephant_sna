@@ -333,7 +333,7 @@ transformed parameters {
   
 }
 
- model {
+model {
   // priors
   beta_age ~ normal(0,0.8);
   sigma ~ exponential(2);
