@@ -24,7 +24,7 @@ library(MASS, lib.loc = '../packages/')            # library(MASS)
 set.seed(12345)
 
 ## set up pdf
-pdf('../outputs/mpnplong_nodalregression_modelprep.pdf')
+#pdf('../outputs/step4_nodalregression/mpnplong_nodalregression_modelprep.pdf')
 
 ## set up theme for plots
 theme_set(theme_classic())
@@ -43,41 +43,36 @@ nodes$age_cat <- ifelse(nodes$age < 10, 1,
                                       ifelse(nodes$age < 26, 4,
                                              ifelse(nodes$age < 36, 5, 6)))))
 ## nodes data frame
-nodes <- nodes %>% 
+nodes <- nodes %>%
   filter(! is.na(age_cat))
 n_age_cat <- length(unique(nodes$age_cat))
 ele_ids <- nodes$id
 n_eles <- length(ele_ids)
 
 ## dyads data frame
-counts_df <- counts_df %>% 
-  filter(id_1 %in% ele_ids) %>% 
+counts_df <- counts_df %>%
+  filter(id_1 %in% ele_ids) %>%
   filter(id_2 %in% ele_ids)
 n_dyads <- nrow(counts_df)
 
 #### extract centralities ####
 ## clean up nodes
 ncol(edge_samples) ; nrow(counts_df)
-nodes <- nodes %>% 
+nodes <- nodes %>%
   mutate(node_rank = as.integer(as.factor(node)))
-node_join <- nodes %>% 
-  dplyr::select(node_rank, node, id) %>% 
-  rename(node_1 = node, id_1 = id, node_rank_1 = node_rank) %>% 
+node_join <- nodes %>%
+  dplyr::select(node_rank, node, id) %>%
+  rename(node_1 = node, id_1 = id, node_rank_1 = node_rank) %>%
   mutate(node_2 = node_1, id_2 = id_1, node_rank_2 = node_rank_1)
 
 ## add rank IDs to counts_df
-counts_df <- counts_df %>% 
+counts_df <- counts_df %>%
   left_join(node_join[,c('node_rank_1','node_1','id_1')],
-            by = c('node_1', 'id_1')) %>% 
+            by = c('node_1', 'id_1')) %>%
   left_join(node_join[,c('node_rank_2','node_2','id_2')],
             by = c('node_2', 'id_2'))
 
 ## build adjacency tensor
-# adj_tensor <- array(0, c(n_chains*n_samples, n_eles, n_eles))
-# for (dyad_id in 1:n_dyads) {
-#   dyad_row <- counts_df[dyad_id, ]
-#   adj_tensor[, dyad_row$node_rank_1, dyad_row$node_rank_2] <- edge_samples[, dyad_id]
-# }
 adj_tensor <- array(NA, c(n_eles, n_eles, n_samples*n_chains),
                     dimnames = list(ele_ids, ele_ids, NULL))
 for(i in 1:n_dyads) {
@@ -107,17 +102,17 @@ save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
 df_wide <- data.frame(centrality_samples)
 colnames(df_wide) <- 1:n_eles
 df_long <- pivot_longer(df_wide, cols = everything(),
-                        names_to = "node_rank", values_to = "centrality") %>% 
-  mutate(node_rank = as.integer(node_rank)) %>% 
+                        names_to = "node_rank", values_to = "centrality") %>%
+  mutate(node_rank = as.integer(node_rank)) %>%
   left_join(nodes[,c('node_rank','age')], by = 'node_rank')
-df_long %>% 
-  filter(node_rank <= 50) %>% 
-  mutate(nodes_reordered = fct_reorder(.f = as.factor(node_rank), .x = age, .desc = T)) %>% 
+df_long %>%
+  filter(node_rank <= 50) %>%
+  mutate(nodes_reordered = fct_reorder(.f = as.factor(node_rank), .x = age, .desc = T)) %>%
   ggplot(aes(x = centrality, fill = age)) +
   geom_density(linewidth = 0.4) +
   facet_grid(rows = vars(as.factor(nodes_reordered)), scales = "free") +
-  labs(x = "Eigenvector centrality (standardised)") + 
-  theme_void() + 
+  labs(x = "Eigenvector centrality (standardised)") +
+  theme_void() +
   theme(strip.text.y = element_text(size = 12),
         axis.text.x = element_text(angle = 0, size = 12, debug = FALSE),
         axis.title.x = element_text(size = 12),
@@ -180,7 +175,7 @@ rm(n, beta_age, intercept, age_dirichlet, sigma, x, y, df_plot, df_wide) ; gc()
 ## save and reset plotting
 save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
 dev.off()
-pdf('../outputs/mpnplong_nodalregression_modelchecks.pdf')
+pdf('../outputs/step4_nodalregression/mpnplong_nodalregression_modelchecks.pdf')
 
 #### run model ####
 ## create data list
@@ -204,8 +199,7 @@ fit_mpnp_eigen <- sampling(nodal_regression,
                            cores = n_chains,
                            chains = n_chains)
 
-## save output (get it saved, then clean it up once it hasn't crashed, then save the cleaner version!)
-save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
+## save output
 rm(edge_samples, adj_tensor, i, to_plot, draw,summary,centrality_samples_sim, dyad_row) ; gc()
 save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
 
@@ -245,7 +239,9 @@ beta_diff_56 <- params$delta[, 5] - params$delta[, 6]
 # plot(density(beta_diff_34), main="Posterior difference:\n21-25 and 26-35") ; abline(v=0, lty=2)
 # plot(density(beta_diff_45), main="Posterior difference:\n26-35 and >35") ; abline(v=0, lty=2)
 # par(mfrow = c(1,1))
-plot(density(beta_diff_12, col = 'green'), main="Posterior differences: green=1-2, turquoise=2-3,\nblue=3-4, purple=4-5, red=5-6")
+plot(density(beta_diff_12), col = 'green',
+     main="Posterior differences: green=1-2, turquoise=2-3,\nblue=3-4, purple=4-5, red=5-6",
+     ylim = c(0, 5), las = 1, xlim = c(-1,1))
 lines(density(beta_diff_23), col = 'turquoise')
 lines(density(beta_diff_34), col = 'blue')
 lines(density(beta_diff_45), col = 'purple')
@@ -253,7 +249,7 @@ lines(density(beta_diff_56), col = 'red')
 abline(v=0, lty=2)
 
 #### posterior predictive check ####
-plot(density(centrality_samples[1, ]), main="Posterior predictive density of responses:\nblack = data, blue = predicted", col=rgb(0, 0, 0, 0.25), ylim=c(0, 1))
+plot(density(centrality_samples[1, ]), main="Posterior predictive density of responses:\nblack = data, blue = predicted", col=rgb(0, 0, 0, 0.25), ylim=c(0, 5))
 for (i in 1:100) {
   j <- sample(1:(n_chains*n_samples), 1)
   lines(density(centrality_samples[j, ]), col=rgb(0, 0, 0, 0.25))
@@ -268,7 +264,8 @@ for (i in 1:100) {
 ## save and reset plotting
 save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
 dev.off()
-pdf('../outputs/mpnplong_nodalregression_modelpredictions.pdf')
+print('model checks complete')
+pdf('../outputs/step4_nodalregression/mpnplong_nodalregression_modelpredictions.pdf')
 
 #### predict from model ####
 ## create functions for predictions
@@ -304,31 +301,21 @@ nodes$mu_upr_predict <- apply(sim_mean, 2, quantile, probs = 0.975)
 sim_full <- predict_full_centrality(params = params, mu_matrix = sim_mean, cov_matrix = centrality_cov)
 nodes$full_lwr_predict <- apply(sim_full, 2, quantile, probs = 0.025)
 nodes$full_upr_predict <- apply(sim_full, 2, quantile, probs = 0.975)
-# 
-# ## summarise mean predictions
-# sum_mean_pred <- data.frame(age = sort(ages),
-#                             lwr = apply(sim_mean, 2, quantile, probs = 0.025),
-#                             mean = apply(sim_mean, 2, mean),
-#                             mid = apply(sim_mean, 2, quantile, probs = 0.5),
-#                             upr = apply(sim_mean, 2, quantile, probs = 0.975))
-# plot(sum_mean_pred$mean ~ sum_mean_pred$age, type = 'b', col = 'blue', ylim = c(-5,5))
-# lines(sum_mean_pred$lwr ~ sum_mean_pred$age, lty = 2)
-# lines(sum_mean_pred$upr ~ sum_mean_pred$age, lty = 2)
-# 
-# ## summarise total predictions
-# sum_full_pred <- data.frame(age = sort(ages),
-#                             lwr = apply(sim_full, 2, quantile, probs = 0.025),
-#                             mean = apply(sim_full, 2, mean),
-#                             mid = apply(sim_full, 2, quantile, probs = 0.5),
-#                             upr = apply(sim_full, 2, quantile, probs = 0.975))
-# lines(sum_full_pred$lwr ~ sum_full_pred$age, lty = 3)
-# lines(sum_full_pred$upr ~ sum_full_pred$age, lty = 3)
 
+## save output
+save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
+print('predictions made')
 
 ## compare to raw data
-nodes <- nodes %>% 
+nodes <- nodes %>%
   mutate(mu_raw = centrality_mu,
-         mu_raw_invlogit = LaplacesDemon::invlogit(centrality_mu))
+         mu_raw_invlogit = LaplacesDemon::invlogit(centrality_mu),
+         age_cat_chr = ifelse(age_cat == 1, '<10',
+                              ifelse(age_cat == 2, '10-15',
+                                     ifelse(age_cat == 3, '16-20',
+                                            ifelse(age_cat == 4, '21-25',
+                                                   ifelse(age_cat == 5, '26-35','36+')))))) %>%
+  relocate(age_cat_chr, .after = age_cat)
 ggplot(nodes)+
   geom_ribbon(aes(x = age_cat, ymin = full_lwr_predict, ymax = full_upr_predict),
               alpha = 0.3, fill = 'purple')+
@@ -339,37 +326,37 @@ ggplot(nodes)+
   theme_classic()
 
 ## summarise predictions -- all the same for all nodes in the same category because age is the only predictor
-nodes_full <- sim_full %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'node', values_to = 'node_pred') %>% 
+nodes_full <- sim_full %>%
+  as.data.frame() %>%
+  pivot_longer(cols = everything(), names_to = 'node', values_to = 'node_pred') %>%
   mutate(draw = rep(1:n_eles, each = nrow(sim_full)),
          node = as.numeric(node),
-         invlogit_pred = LaplacesDemon::invlogit(node_pred)) %>% 
+         invlogit_pred = LaplacesDemon::invlogit(node_pred)) %>%
   left_join(nodes[,c('id','node','age_cat_chr','age_cat')],
-            by = 'node') %>% 
-  group_by(id) %>% 
+            by = 'node') %>%
+  group_by(id) %>%
   mutate(pred_full_lwr = quantile(node_pred, probs = 0.025),
          pred_full_mean = mean(node_pred),
          pred_full_mid = quantile(node_pred, probs = 0.5),
          pred_full_upr = quantile(node_pred, probs = 0.975),
          pred_full_lwr_invlogit = quantile(invlogit_pred, probs = 0.025),
          pred_full_mean_invlogit = mean(invlogit_pred),
-         pred_full_mid_invlogit = quantile(v, probs = 0.5),
+         pred_full_mid_invlogit = quantile(invlogit_pred, probs = 0.5),
          pred_full_upr_invlogit = quantile(invlogit_pred, probs = 0.975))
 
 ## plot simulations
 ggplot()+
   geom_violin(data = nodes_full,
-              aes(x = age_cat, y = node_pred,
-                  fill = factor(age_cat_chr, 
+              aes(x = age_cat_chr, y = node_pred,
+                  fill = factor(age_cat_chr,
                                 levels = c('10-15', '15-19', '20-25',
                                            '25-40','40+'))),
               alpha = 0.5)+
   geom_boxplot(data = nodes_full,
-               aes(x = age_cat, y = pred_full_mid, 
+               aes(x = age_cat_chr, y = pred_full_mid,
                    fill = age_cat_chr))+
   geom_jitter(data = nodes,
-              aes(x = age_cat, y = mu_raw, 
+              aes(x = age_cat, y = mu_raw,
                   fill = age_cat_chr, size = sightings),
               width = 0.2, pch = 21)+
   scale_fill_viridis_d()+
@@ -383,16 +370,16 @@ ggsave(file = '../outputs/step4_nodalregression/mpnplong_nodal_violin_logit.png'
 
 ggplot()+
   geom_violin(data = nodes_full,
-              aes(x = age_cat, y = invlogit_pred,
+              aes(x = age_cat_chr, y = invlogit_pred,
                   fill = factor(age_cat_chr,
                                 levels = c('10-15', '15-19', '20-25',
                                            '25-40','40+'))),
               alpha = 0.5)+
   geom_boxplot(data = nodes_full,
-               aes(x = age_cat, y = pred_full_mid_invlogit,
+               aes(x = age_cat_chr, y = pred_full_mid_invlogit,
                    fill = age_cat_chr))+
   geom_jitter(data = nodes,
-              aes(x = age_cat, y = mu_raw_invlogit,
+              aes(x = age_cat_chr, y = mu_raw_invlogit,
                   fill = age_cat_chr, size = sightings),
               width = 0.2, pch = 21)+
   scale_fill_viridis_d()+
@@ -407,87 +394,9 @@ ggsave(file = '../outputs/step4_nodalregression/mpnplong_nodal_violin.png', devi
 ## save output
 save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
 
-# ## old plots -- check that MOTNP-based ones work before deleting these ####
-# ## plot raw with model output
-# df_long_mean <- df_long %>%
-#   group_by(node_rank) %>% 
-#   mutate(mean_eigen = mean(centrality)) %>% 
-#   ungroup() %>% 
-#   left_join(nodes, by = 'node_rank') %>% 
-#   dplyr::select(age_cat,mean_eigen,sightings,node) %>%
-#   distinct()
-# df_long_plot <- df_long %>%
-#   left_join(nodes, by = 'node_rank') %>%
-#   dplyr::select(-age.x, -age.y)
-# ggplot()+
-#   geom_ribbon(data = sum_full_pred,
-#               aes(x = age, ymin = lwr, ymax = upr),          # shade simulations
-#               colour = 'transparent', fill = rgb(0,0,0,0.1))+
-#   geom_ribbon(data = sum_mean_pred,
-#               aes(x = age, ymin = lwr, ymax = upr),          # shade mean distribution
-#               colour = 'transparent', 
-#               fill = rgb(33/255, 145/255, 140/255, 0.5))+
-#   geom_point(data = df_long_plot,
-#              aes(x = as.numeric(age_cat), 
-#                  y = centrality),                  # all eigenvector draws
-#              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-#   geom_point(data = df_long_mean,
-#              aes(x = as.numeric(age_cat), 
-#                  y = mean_eigen, 
-#                  size = sightings),  # mean eigenvector
-#              colour = rgb(68/255, 1/255, 84/255))+
-#   geom_line(data = sum_mean_pred,
-#             aes(x = age, y = mid),                                # mean line
-#             colour = rgb(33/255, 145/255, 140/255),
-#             linewidth = 1)+
-#   # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
-#   #                                   y = mean_eigen, group = node_rank),
-#   #           colour = rgb(68/255, 1/255, 84/255), linewidth = 0.5, width = 0)+
-#   scale_x_continuous('age (years)')+
-#   scale_y_continuous('eigenvector centrality (standardised)')+
-#   theme(axis.text = element_text(size = 18),
-#         axis.title = element_text(size = 22),
-#         legend.text = element_text(size = 18),
-#         legend.title = element_text(size = 22))
-# ggsave(filename = '../outputs/mpnplong_nodalregression_line.png', device = 'png',
-#        plot = last_plot(), width = 16.6, height = 11.6)
-# 
-# ggplot()+
-#   geom_violin(data = sim_df, aes(x = as.factor(age), y = eigen_sim),          # shade simulations
-#               #colour = 'transparent', 
-#               fill = rgb(0,0,0,0.1))+
-#   geom_errorbar(data = sum_mean_pred, aes(x = age, ymin = lwr, ymax = upr),               # shade mean distribution
-#                 colour = rgb(33/255, 145/255, 140/255),
-#                 linewidth = 1.5, width = 0.5)+
-#   geom_line(data = sum_mean_pred, aes(x = age, y = mid),                                # mean line
-#             colour = rgb(33/255, 145/255, 140/255), linewidth = 1.5)+
-#   geom_point(data = df_long_plot,
-#              aes(x = as.numeric(age_cat), y = centrality),                  # all eigenvector draws
-#              colour = rgb(253/255, 231/255, 37/255, 0.01))+
-#   geom_point(data = df_long_mean,
-#              aes(x = as.numeric(age_cat), y = mean_eigen, size = sightings),  # mean eigenvector
-#              colour = rgb(68/255, 1/255, 84/255))+
-#   # geom_errorbar(data = nodes, aes(xmin = age_lwr, xmax = age_upr,                # age distribution
-#   #                                   y = mean_eigen, group = node_rank),
-#   #           colour = rgb(68/255, 1/255, 84/255), linewidth = 0.5, width = 0)+
-#   scale_x_discrete('age category')+
-#   scale_y_continuous('eigenvector centrality (standardised)')+
-#   theme_classic()+
-#   theme(axis.text = element_text(size = 18),
-#         axis.title = element_text(size = 22),
-#         legend.text = element_text(size = 18),
-#         legend.title = element_text(size = 22))
-# ggsave(filename = '../outputs/mpnplong_nodalregression_violin.png', device = 'png',
-#        plot = last_plot(), width = 16.6, height = 11.6)
-
-## save output
-save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
-dev.off()
-rm(list = ls()[!ls() %in% c('n_samples','n_age_cat','n_chains')])
-
-## extract contrasts from predictions ####
+#### extract contrasts from predictions ####
 ## predict for age categroy + 1
-pred_data_new <- nodes[order(nodes$age_cat),] %>% 
+pred_data_new <- nodes[order(nodes$age_cat),] %>%
   mutate(age_cat_original = age_cat,
          age_cat = ifelse(age_cat == 6, 1, age_cat + 1))
 pred_mu_new <- predict_mean_centrality(params = params,
@@ -534,7 +443,11 @@ quantile(contrast61, prob = c(0.026, 0.976))
 ## plot contrasts
 contrasts <- data.frame(contrast = c('1 vs 2', '2 vs 3', '3 vs 4', '4 vs 5', '5 vs 6'),
                         mean = c(mean(contrast12),mean(contrast23),
-                                 mean(contrast34),mean(contrast45)),
+                                 mean(contrast34),mean(contrast45),
+                                 mean(contrast56)),
+                        median = c(median(contrast12),median(contrast23),
+                                   median(contrast34),median(contrast45),
+                                   median(contrast56)),
                         upr = c(quantile(contrast12, prob = c(0.975)),
                                 quantile(contrast23, prob = c(0.975)),
                                 quantile(contrast34, prob = c(0.975)),
@@ -544,7 +457,7 @@ contrasts <- data.frame(contrast = c('1 vs 2', '2 vs 3', '3 vs 4', '4 vs 5', '5 
                                 quantile(contrast23, prob = c(0.025)),
                                 quantile(contrast34, prob = c(0.025)),
                                 quantile(contrast45, prob = c(0.025)),
-                                quantile(contrast56, prob = c(0.025)))) %>% 
+                                quantile(contrast56, prob = c(0.025)))) %>%
   pivot_longer(cols = c('mean', 'upr', 'lwr'),
                names_to = 'stat', values_to = 'value')
 ggplot()+
@@ -564,6 +477,9 @@ ggplot()+
 save.image('mpnp_nodalregression/mpnplong_nodalregression.RData')
 
 ## plot nicely ####
+load('mpnp_nodalregression/mpnplong_nodalregression.RData')
+pdf('../outputs/step4_nodalregression/mpnplong_nodalregression_niceplots.pdf')
+
 ## clean data frame
 clean <- data.frame(age_cat = 1:6,
                     mean = NA,
@@ -602,9 +518,7 @@ for(i in 1:n_age_cat){
 ## add node data
 df_long <- df_long %>%
   mutate(centrality_invlogit = LaplacesDemon::invlogit(centrality)) %>% 
-  left_join(nodes, by = 'node_rank') %>% 
-  dplyr::select(-age_cat.x) %>% 
-  rename(age_cat = age_cat.y)
+  left_join(nodes, by = 'node_rank')
 
 ## plot on logit scale
 (clean_plot <- ggplot()+
