@@ -122,7 +122,7 @@ lines(density(sim_cent_samples[, 1]), col = rgb(0,0,1,0.5), lwd = 2)  # overlay 
 ## prior predictive check ####
 n <- 100
 beta_age <- rnorm(n, 0, 1)
-intercept  <- rnorm(n, 0, 2)# LaplacesDemon::logit(0.05), 2)
+intercept  <- rnorm(n, LaplacesDemon::logit(0.05), 2)
 age_dirichlet <- rdirichlet(n, c(1,1,1,1,1))
 x <- (min(sim$age_cat_num):max(sim$age_cat_num)) - (min(sim$age_cat_num) - 1)
 plot(NULL, las = 1, xlab = 'age category', ylab = 'eigenvector (standardised)',
