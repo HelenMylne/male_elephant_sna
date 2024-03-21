@@ -53,7 +53,9 @@ parameters {
   real<lower=0> sigma;
   // random effects
   vector[num_windows] rand_window;
+  real<lower=0> sigma_window;
   vector[num_nodes] rand_node;
+  real<lower=0> sigma_node;
   // difference between age categories
   simplex[num_age_cat] delta;
 }
