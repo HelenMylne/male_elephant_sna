@@ -56,7 +56,7 @@ print(paste0('model loaded in at ', Sys.time()))
 
 #### loop to run models ####
 ### set up values for running loop
-for(time_window in 1:2 ){
+for(time_window in 1:5 ){
   #### set up ####
    print(paste0('loop started at ', Sys.time()))
 
@@ -82,14 +82,21 @@ for(time_window in 1:2 ){
    }
 
    # ### import age data
-   # eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
-   # mean_ages <- data.frame(id = colnames(eles),
-   #                         age = apply(eles, 2, mean))
-   #
-   # # combine node counts with age data
-   # nodes <- left_join(nodes, mean_ages, by = 'id') # join age data to sightings
-   # length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
-   #
+   eles <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+   mean_ages <- data.frame(id = colnames(eles),
+                           age = apply(eles, 2, mean))
+
+   ### combine node counts with age data
+   nodes <- left_join(nodes, mean_ages, by = 'id') # join age data to sightings
+   length(which(is.na(nodes$age) == TRUE))         # count elephants without age data
+   nodes$age_cat <- ifelse(nodes$age < 10, 1,
+                             ifelse(nodes$age < 15, 2,
+                                    ifelse(nodes$age < 20, 3,
+                                           ifelse(nodes$age < 25, 4,
+                                                  ifelse(nodes$age < 35, 5, 6)))))
+   
+   ### save nodes data frame for later use
+   saveRDS(nodes, paste0('../data_processed/step3_edgeweightestimation/mpnp',time_window,'_nodes.rds'))
 
    ### set values for model
    n_dyads <- nrow(counts_df)
@@ -153,7 +160,7 @@ for(time_window in 1:2 ){
 
 #### loop to produce plots ####
 ### set up values for running loop
-for(time_window in 1:1 ){
+for(time_window in 1:5 ){
   ### create file of output graphs
   pdf(file = paste0('../outputs/mpnpshort',time_window,'_edgeweights_conditionalprior.pdf'), width = 20, height = 15)
   
