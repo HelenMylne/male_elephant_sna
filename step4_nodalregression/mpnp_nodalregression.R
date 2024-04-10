@@ -348,16 +348,15 @@ nodes_full <- sim_full %>%
 ggplot()+
   geom_violin(data = nodes_full,
               aes(x = age_cat_chr, y = node_pred,
-                  fill = factor(age_cat_chr,
-                                levels = c('10-15', '15-19', '20-25',
-                                           '25-40','40+'))),
+                  fill = factor(age_cat, levels = 1:6)),
               alpha = 0.5)+
   geom_boxplot(data = nodes_full,
                aes(x = age_cat_chr, y = pred_full_mid,
-                   fill = age_cat_chr))+
+                   fill = factor(age_cat, levels = 1:6)))+
   geom_jitter(data = nodes,
               aes(x = age_cat, y = mu_raw,
-                  fill = age_cat_chr, size = sightings),
+                  fill = factor(age_cat, levels = 1:6),
+                  size = sightings),
               width = 0.2, pch = 21)+
   scale_fill_viridis_d()+
   #scale_colour_viridis_d()+
@@ -371,16 +370,15 @@ ggsave(file = '../outputs/step4_nodalregression/mpnplong_nodal_violin_logit.png'
 ggplot()+
   geom_violin(data = nodes_full,
               aes(x = age_cat_chr, y = invlogit_pred,
-                  fill = factor(age_cat_chr,
-                                levels = c('10-15', '15-19', '20-25',
-                                           '25-40','40+'))),
+                  fill = factor(age_cat, levels = 1:6)),
               alpha = 0.5)+
   geom_boxplot(data = nodes_full,
                aes(x = age_cat_chr, y = pred_full_mid_invlogit,
-                   fill = age_cat_chr))+
+                   fill = factor(age_cat, levels = 1:6)))+
   geom_jitter(data = nodes,
               aes(x = age_cat_chr, y = mu_raw_invlogit,
-                  fill = age_cat_chr, size = sightings),
+                  fill = factor(age_cat, levels = 1:6),
+                  size = sightings),
               width = 0.2, pch = 21)+
   scale_fill_viridis_d()+
   #scale_colour_viridis_d()+
