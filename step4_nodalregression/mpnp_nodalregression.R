@@ -191,7 +191,7 @@ eigen_list <- list(num_nodes = n_eles,
 boxplot(centrality_mu ~ nodes$age_cat, notch = T)
 
 ## load model
-nodal_regression <- stan_model('models/eigen_regression_motnp.stan') # MOTNP version for long window because single window with ordered categorical predictor
+nodal_regression <- stan_model('models/eigen_regression_mpnp_long.stan') # same structure as MOTNP, but now using a student-t distribution instead of a normal because the data are of a slightly different structure
 
 ## run model
 fit_mpnp_eigen <- sampling(nodal_regression,
