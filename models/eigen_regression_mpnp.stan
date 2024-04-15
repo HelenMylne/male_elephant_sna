@@ -107,10 +107,15 @@ transformed parameters {
   sigma_node ~ exponential(2);
   
   // likelihood
-  centrality_mu_1 ~ multi_normal(predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
-  centrality_mu_2 ~ multi_normal(predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
-  centrality_mu_3 ~ multi_normal(predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
-  centrality_mu_4 ~ multi_normal(predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
-  centrality_mu_5 ~ multi_normal(predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
+  // centrality_mu_1 ~ multi_normal(predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
+  // centrality_mu_2 ~ multi_normal(predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
+  // centrality_mu_3 ~ multi_normal(predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
+  // centrality_mu_4 ~ multi_normal(predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
+  // centrality_mu_5 ~ multi_normal(predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
+  centrality_mu_1 ~ multi_student_t(num_nodes_window1, predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
+  centrality_mu_2 ~ multi_student_t(num_nodes_window2, predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
+  centrality_mu_3 ~ multi_student_t(num_nodes_window3, predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
+  centrality_mu_4 ~ multi_student_t(num_nodes_window4, predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
+  centrality_mu_5 ~ multi_student_t(num_nodes_window5, predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
 }
 

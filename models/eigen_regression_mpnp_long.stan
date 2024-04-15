@@ -38,6 +38,6 @@ transformed parameters {
   sigma ~ exponential(2);
 
   // likelihood
-  centrality_mu ~ multi_normal(predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
-  //centrality_mu ~ multi_student_t(num_nodes, predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
+  //centrality_mu ~ multi_normal(predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
+  centrality_mu ~ multi_student_t(num_nodes, predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
 }
