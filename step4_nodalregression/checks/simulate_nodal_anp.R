@@ -13,7 +13,7 @@ set.seed(2)
 
 #### derive population information directly from ANP data ####
 sim <- read_csv('../data_processed/step4_nodalregression/anp_allnodes.csv') %>%
-  select(-mean_eigen) %>%
+  #select(-mean_eigen) %>%
   relocate(age_std, .after = age) %>%
   relocate(node_random, .after = node)
 
@@ -40,7 +40,7 @@ sim_node_unique <- rnorm(n_nodes, mean = 0, sd = 0.2)
 sim$mu <- sim$age * sim_slope + sim_intcp + sim_window_unique[sim$window] + sim_node_unique[sim$node_random]    # simulate mean centrality on outcome scale
 
 ## plot mean centrality against age
-plot(mu ~ age, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-5,1), las = 1)
+plot(mu ~ age, data = sim[sim$window == 1,], col = 'red', pch = 19, ylim = c(-8,-2), las = 1)
 points(mu ~ age, data = sim[sim$window == 2,], col = 'blue', pch = 19)
 points(mu ~ age, data = sim[sim$window == 3,], col = 'green', pch = 19)
 
