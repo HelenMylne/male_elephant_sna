@@ -15,7 +15,7 @@ library(tidyverse, lib.loc = '../packages/')
 library(LaplacesDemon, lib.loc = '../packages/')
 library(MASS, lib.loc = '../packages/')
 #library(sna, lib.loc = '../packages/')
-set_cmdstan_path('../packages/.cmdstan/cmdstan-2.34.1/') # Viking
+set_cmdstan_path('../packages/.cmdstan/cmdstan-2.34.1/') # Viking ; set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0/') # Desktop
 
 ## set seed for reproducibility
 set.seed(12345)
@@ -509,7 +509,8 @@ n_chains <- 4
 n_samples <- 1000
 
 ## load model
-nodal_regression <- cmdstan_model('models/eigen_regression_anp.stan')
+nodal_regression <- cmdstan_model('models/eigen_regression_anp.stan',
+                                  cpp_options = list(stan_threads = TRUE))
 
 ## run model
 fit_anp_nodal <- nodal_regression$sample(data = model_data_list,
@@ -806,7 +807,7 @@ save.image('anp_nodalregression/anp_short_nodal.RData')
 #### final "clean" plots using hypothetical data ####
 ## create dummy dataset
 newdat <- nodes_all %>% 
-  select(node_random, age, age_std, window)
+  dplyr::select(node_random, age, age_std, window)
 
 ## get mean predictions
 fake_mean <- get_mean_predictions(predict_df = newdat, parameters = params,
@@ -836,7 +837,7 @@ newdat_summary <- newdat %>%
   group_by(age, window) %>% 
   mutate(predict_pred_lwr = mean(predict_pred_lwr),
          predict_pred_upr = mean(predict_pred_upr)) %>% 
-  select(age, predict_pred_lwr, predict_pred_upr,window) %>% 
+  dplyr::select(age, predict_pred_lwr, predict_pred_upr,window) %>% 
   distinct()
 
 ## plot mean values
