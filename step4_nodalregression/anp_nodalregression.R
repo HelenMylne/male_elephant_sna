@@ -24,8 +24,8 @@ set.seed(12345)
 theme_set(theme_bw())
 
 ## define PDF output
-#pdf('../outputs/anp_nodalregression_modelprep.pdf')
-pdf('../outputs/anp_nodalregression_priorpredictive.pdf')
+#pdf('../outputs/step4_nodalregression/anp_nodalregression_modelprep.pdf')
+pdf('../outputs/step4_nodalregression/anp_nodalregression_priorpredictive.pdf')
 
 #### import data and randomise node IDs -- ensures that the model is not reading a correlation between node ID and age and partitioning too much of the variance to node ID #####
 ## load time window 1 and remove additional data
@@ -525,7 +525,7 @@ save.image('anp_nodalregression/anp_short_nodal.RData')
 load('anp_nodalregression/anp_short_nodal.RData')
 
 ## define PDF output
-pdf('../outputs/anp_nodalregression_modelchecks.pdf')
+pdf('../outputs/step4_nodalregression/anp_nodalregression_modelchecks.pdf')
 
 ## extract model fit -- very good!
 ( summary <- fit_anp_nodal$summary() )
