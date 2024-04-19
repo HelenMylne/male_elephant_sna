@@ -331,7 +331,7 @@ nodes_full <- sim_full %>%
          pred_full_upr = quantile(node_pred, probs = 0.975),
          pred_full_lwr_invlogit = quantile(invlogit_pred, probs = 0.025),
          pred_full_mean_invlogit = mean(invlogit_pred),
-         pred_full_mid_invlogit = quantile(v, probs = 0.5),
+         pred_full_mid_invlogit = quantile(invlogit_pred, probs = 0.5),
          pred_full_upr_invlogit = quantile(invlogit_pred, probs = 0.975))
 
 ggplot()+
