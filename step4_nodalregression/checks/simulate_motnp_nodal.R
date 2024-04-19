@@ -24,9 +24,13 @@ pdf('step4_nodalregression/checks/simulation_motnp_nodal.pdf')
 #          mu = NA,
 #          sd = NA)
 
-load('motnp_nodalregression.RData')
+load('motnp_edgeweights_conditionalprior.RData')
 sim <- nodes %>% 
-  mutate(age_cat_chr = ifelse(age_cat_chr == '40+', '40-60', age_cat_chr)) %>% 
+  #mutate(age_cat_chr = ifelse(age_cat_chr == '40+', '40-60', age_cat_chr)) %>% 
+  mutate(age_cat_chr = ifelse(age < 16, '10-15',
+                              ifelse(age < 21, '16-20',
+                                     ifelse(age < 26, '21-25',
+                                            ifelse(age < 40, '26-39', '40-60'))))) %>% 
   separate(age_cat_chr, into = c('min_age','max_age'),
            remove = F, sep = '-') %>% 
   mutate(min_age = as.numeric(min_age),
@@ -45,8 +49,15 @@ rm(age, sd, i) ; gc()
 sim <- sim %>% 
   select(-age, -min_age, -max_age) %>% 
   rename(age = age_sim) %>% 
-  relocate(age, .after = node)
-
+  relocate(age, .after = sightings) %>% 
+  mutate(node_rank = as.integer(as.factor(node))) %>% 
+  relocate(node_rank, .after = node) %>% 
+  mutate(age_cat_num = ifelse(age_cat_chr == '10-15', 1,
+                              ifelse(age_cat_chr == '16-20', 2,
+                                     ifelse(age_cat_chr == '21-25', 3,
+                                            ifelse(age_cat_chr == '26-39', 4, 5))))) %>% 
+  mutate(age_cat_fct = as.factor(age_cat_num)) %>% 
+  relocate(age_cat_num, .after = age_cat_chr)
 n_nodes <- nrow(sim)
 
 ## simulate centralities ####
@@ -121,7 +132,7 @@ lines(density(sim_cent_samples[, 1]), col = rgb(0,0,1,0.5), lwd = 2)  # overlay 
 
 ## prior predictive check ####
 n <- 100
-beta_age <- rnorm(n, 0, 1)
+beta_age <- rnorm(n, 0, 2) # sigma = 0.08 to match ANP, but higher values make more sense when looking at the check
 intercept  <- rnorm(n, LaplacesDemon::logit(0.05), 2)
 age_dirichlet <- rdirichlet(n, c(1,1,1,1,1))
 x <- (min(sim$age_cat_num):max(sim$age_cat_num)) - (min(sim$age_cat_num) - 1)
@@ -146,7 +157,7 @@ eigen_list <- list(num_nodes = n_nodes,
                    length_dirichlet = n_age_cat + 1,
                    centrality_mu = sim_cent_mu,
                    centrality_cov = sim_cent_cov,
-                   node_age = sim$age_cat_fct,
+                   node_age = as.factor(sim$age_cat_num),#sim$age_cat_fct,
                    prior_age = rep(1, n_age_cat))
 
 ## check inputs
@@ -154,6 +165,7 @@ plot(eigen_list$centrality_mu ~ eigen_list$node_age)
 
 ## load model
 nodal_regression <- cmdstan_model('models/eigen_regression_motnp.stan')
+#nodal_regression <- cmdstan_model('models/eigen_regression_mpnp_long.stan')
 
 ## run model
 n_chains <- 4
@@ -261,7 +273,8 @@ predict_full_centrality <- function(params, mu_matrix, cov_matrix){
 }
 
 ## create predictions data frame
-pred_data <- sim[order(sim$age_cat_num),] # ordered because otherwise a later plotting function was being super annoying about forming logical lines and which bits it connected
+pred_data <- sim[order(sim$age_cat_num),] %>%  # ordered because otherwise a later plotting function was being super annoying about forming logical lines and which bits it connected
+  mutate(age_cat_fct = as.factor(age_cat_num))
 
 ## predicted means
 predict_mu <- predict_mean_centrality(params = params, delta_j = delta_j, pred_data = pred_data)
@@ -341,7 +354,8 @@ warnings() # should just be "Dropping 'draws_df' class as required metadata was 
 ## create data frame to store outputs
 contrasts_all <- data.frame(older = rep(-10:10, each = 21),
                             younger = rep(-10:10, 21),
-                            mean_contrast = NA)
+                            mean_contrast_all = NA,
+                            mean_contrast_change = NA)
 
 ## for each combination of predictions, calculate contrast and divide difference by number of years changed
 contrast_matrices <- list()
@@ -352,23 +366,34 @@ for(i in 1:21){
       row_to_fill <- which(contrasts_all$older == (i - 11) & 
                              contrasts_all$younger == (j - 11))
       contrast_matrices[[row_to_fill]] <- contrast
-      contrasts_all$mean_contrast[row_to_fill] <- mean(contrast)
+      contrasts_all$mean_contrast_all[row_to_fill] <- mean(contrast)
+      
+      pred_data_new <- sim[order(sim$age_cat_num),] %>% 
+        mutate(age_new = age + i) %>% 
+        mutate(age_cat_new = ifelse(age_new <= 15, 1,
+                                    ifelse(age_new <= 20, 2,
+                                           ifelse(age_new <= 25, 3,
+                                                  ifelse(age_new <= 40, 4, 5)))))
+      contrast <- contrast[,which(pred_data_new$age_cat_new != pred_data_new$age_cat_num)]
+      contrasts_all$mean_contrast_change[row_to_fill] <- mean(contrast)
     }
   }
 }
 
 ## remove impossible age combinations
 contrasts_all <- contrasts_all %>%
-  filter(is.na(mean_contrast) == FALSE)
+  filter(is.na(mean_contrast_all) == FALSE)
 
-## take only the times where the elephant changed age category
-contrast <- pred_fulls[[2]]-pred_fulls[[1]]
-mean(contrast)
+# ## take only the times where the elephant changed age category
+# contrast <- pred_fulls[[2]] - pred_fulls[[1]]
+# mean(contrast)
 
 ## compare to input
 sim_slope
-mean(contrasts_all$mean_contrast)
-quantile(contrasts_all$mean_contrast, prob = c(0.025, 0.975))
+mean(contrasts_all$mean_contrast_all)
+quantile(contrasts_all$mean_contrast_all, prob = c(0.025, 0.975))
+mean(contrasts_all$mean_contrast_change)
+quantile(contrasts_all$mean_contrast_change, prob = c(0.025, 0.975))
 
 ## save
 save.image('step4_nodalregression/checks/simulation_motnp_nodal.RData')
