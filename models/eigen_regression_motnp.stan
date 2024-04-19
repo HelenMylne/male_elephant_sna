@@ -13,8 +13,9 @@ parameters {
   real intercept;
   // exposure slope
   real beta_age;
-  //variance
+  // variance and degrees of freedom
   real<lower=0> sigma;
+  real<lower=1,upper=5> nu;
   // difference between age categories
   simplex[num_age_cat] delta;
 }
@@ -34,10 +35,11 @@ transformed parameters {
   // priors
   intercept ~ normal(logit(0.05),1);
   delta ~ dirichlet(prior_age);
-  beta_age  ~ normal(0,0.08);
+  beta_age  ~ normal(0,2);
   sigma ~ exponential(2);
+  nu ~ normal(3,1);
 
   // likelihood
-  centrality_mu ~ multi_normal(predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
-  //centrality_mu ~ multi_student_t(num_nodes, predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
+  // centrality_mu ~ multi_normal(predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
+  centrality_mu ~ multi_student_t(nu, predictor, centrality_cov + diag_matrix(rep_vector(sigma, num_nodes)));
 }
