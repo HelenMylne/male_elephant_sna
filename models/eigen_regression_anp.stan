@@ -169,8 +169,9 @@ parameters {
   real intercept;
   // exposure slope
   real beta_age;
-  //variance
+  // variance and degrees of freedom
   real<lower=0> sigma;
+  real<lower=1,upper=5> nu;
   // random effects
   vector[num_windows] rand_window;
   real<lower=0> sigma_window;
@@ -335,9 +336,10 @@ transformed parameters {
 
 model {
   // priors
+  intercept ~ normal(logit(0.05),2); // 0.05 best estimate of intercept for Amboseli population eigen ~ age (edge weights from half weight index) from Chiyo 2011 -- estimated intercept from figure. Logit because on 0-1 scale 
   beta_age ~ normal(0,0.8);
   sigma ~ exponential(2);
-  intercept ~ normal(logit(0.05),2); // 0.05 best estimate of intercept for Amboseli population eigen ~ age (edge weights from half weight index) from Chiyo 2011 -- estimated intercept from figure. Logit because on 0-1 scale 
+  nu ~ normal(3,1);
   rand_window ~ normal(0,1); // rand_window ~ normal(0,sigma_window);
   sigma_window ~ exponential(2);
   rand_node ~ normal(0,1);   // rand_node ~ normal(0,sigma_node);
@@ -380,42 +382,42 @@ model {
   // centrality_mu_34 ~ multi_normal(predictor_window34, centrality_cov_34 + diag_matrix(rep_vector(sigma, num_nodes_window34)));
   // centrality_mu_35 ~ multi_normal(predictor_window35, centrality_cov_35 + diag_matrix(rep_vector(sigma, num_nodes_window35)));
   // centrality_mu_36 ~ multi_normal(predictor_window36, centrality_cov_36 + diag_matrix(rep_vector(sigma, num_nodes_window36)));
-  centrality_mu_1 ~ multi_student_t(num_nodes_window1, predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
-  centrality_mu_2 ~ multi_student_t(num_nodes_window2, predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
-  centrality_mu_3 ~ multi_student_t(num_nodes_window3, predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
-  centrality_mu_4 ~ multi_student_t(num_nodes_window4, predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
-  centrality_mu_5 ~ multi_student_t(num_nodes_window5, predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
-  centrality_mu_6 ~ multi_student_t(num_nodes_window6, predictor_window6, centrality_cov_6 + diag_matrix(rep_vector(sigma, num_nodes_window6)));
-  centrality_mu_7 ~ multi_student_t(num_nodes_window7, predictor_window7, centrality_cov_7 + diag_matrix(rep_vector(sigma, num_nodes_window7)));
-  centrality_mu_8 ~ multi_student_t(num_nodes_window8, predictor_window8, centrality_cov_8 + diag_matrix(rep_vector(sigma, num_nodes_window8)));
-  centrality_mu_9 ~ multi_student_t(num_nodes_window9, predictor_window9, centrality_cov_9 + diag_matrix(rep_vector(sigma, num_nodes_window9)));
-  centrality_mu_10 ~ multi_student_t(num_nodes_window10, predictor_window10, centrality_cov_10 + diag_matrix(rep_vector(sigma, num_nodes_window10)));
-  centrality_mu_11 ~ multi_student_t(num_nodes_window11, predictor_window11, centrality_cov_11 + diag_matrix(rep_vector(sigma, num_nodes_window11)));
-  centrality_mu_12 ~ multi_student_t(num_nodes_window12, predictor_window12, centrality_cov_12 + diag_matrix(rep_vector(sigma, num_nodes_window12)));
-  centrality_mu_13 ~ multi_student_t(num_nodes_window13, predictor_window13, centrality_cov_13 + diag_matrix(rep_vector(sigma, num_nodes_window13)));
-  centrality_mu_14 ~ multi_student_t(num_nodes_window14, predictor_window14, centrality_cov_14 + diag_matrix(rep_vector(sigma, num_nodes_window14)));
-  centrality_mu_15 ~ multi_student_t(num_nodes_window15, predictor_window15, centrality_cov_15 + diag_matrix(rep_vector(sigma, num_nodes_window15)));
-  centrality_mu_16 ~ multi_student_t(num_nodes_window16, predictor_window16, centrality_cov_16 + diag_matrix(rep_vector(sigma, num_nodes_window16)));
-  centrality_mu_17 ~ multi_student_t(num_nodes_window17, predictor_window17, centrality_cov_17 + diag_matrix(rep_vector(sigma, num_nodes_window17)));
-  centrality_mu_18 ~ multi_student_t(num_nodes_window18, predictor_window18, centrality_cov_18 + diag_matrix(rep_vector(sigma, num_nodes_window18)));
-  centrality_mu_19 ~ multi_student_t(num_nodes_window19, predictor_window19, centrality_cov_19 + diag_matrix(rep_vector(sigma, num_nodes_window19)));
-  centrality_mu_20 ~ multi_student_t(num_nodes_window20, predictor_window20, centrality_cov_20 + diag_matrix(rep_vector(sigma, num_nodes_window20)));
-  centrality_mu_21 ~ multi_student_t(num_nodes_window21, predictor_window21, centrality_cov_21 + diag_matrix(rep_vector(sigma, num_nodes_window21)));
-  centrality_mu_22 ~ multi_student_t(num_nodes_window22, predictor_window22, centrality_cov_22 + diag_matrix(rep_vector(sigma, num_nodes_window22)));
-  centrality_mu_23 ~ multi_student_t(num_nodes_window23, predictor_window23, centrality_cov_23 + diag_matrix(rep_vector(sigma, num_nodes_window23)));
-  centrality_mu_24 ~ multi_student_t(num_nodes_window24, predictor_window24, centrality_cov_24 + diag_matrix(rep_vector(sigma, num_nodes_window24)));
-  centrality_mu_25 ~ multi_student_t(num_nodes_window25, predictor_window25, centrality_cov_25 + diag_matrix(rep_vector(sigma, num_nodes_window25)));
-  centrality_mu_26 ~ multi_student_t(num_nodes_window26, predictor_window26, centrality_cov_26 + diag_matrix(rep_vector(sigma, num_nodes_window26)));
-  centrality_mu_27 ~ multi_student_t(num_nodes_window27, predictor_window27, centrality_cov_27 + diag_matrix(rep_vector(sigma, num_nodes_window27)));
-  centrality_mu_28 ~ multi_student_t(num_nodes_window28, predictor_window28, centrality_cov_28 + diag_matrix(rep_vector(sigma, num_nodes_window28)));
-  centrality_mu_29 ~ multi_student_t(num_nodes_window29, predictor_window29, centrality_cov_29 + diag_matrix(rep_vector(sigma, num_nodes_window29)));
-  centrality_mu_30 ~ multi_student_t(num_nodes_window30, predictor_window30, centrality_cov_30 + diag_matrix(rep_vector(sigma, num_nodes_window30)));
-  centrality_mu_31 ~ multi_student_t(num_nodes_window31, predictor_window31, centrality_cov_31 + diag_matrix(rep_vector(sigma, num_nodes_window31)));
-  centrality_mu_32 ~ multi_student_t(num_nodes_window32, predictor_window32, centrality_cov_32 + diag_matrix(rep_vector(sigma, num_nodes_window32)));
-  centrality_mu_33 ~ multi_student_t(num_nodes_window33, predictor_window33, centrality_cov_33 + diag_matrix(rep_vector(sigma, num_nodes_window33)));
-  centrality_mu_34 ~ multi_student_t(num_nodes_window34, predictor_window34, centrality_cov_34 + diag_matrix(rep_vector(sigma, num_nodes_window34)));
-  centrality_mu_35 ~ multi_student_t(num_nodes_window35, predictor_window35, centrality_cov_35 + diag_matrix(rep_vector(sigma, num_nodes_window35)));
-  centrality_mu_36 ~ multi_student_t(num_nodes_window36, predictor_window36, centrality_cov_36 + diag_matrix(rep_vector(sigma, num_nodes_window36)));
+  centrality_mu_1 ~ multi_student_t(nu, predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
+  centrality_mu_2 ~ multi_student_t(nu, predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
+  centrality_mu_3 ~ multi_student_t(nu, predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
+  centrality_mu_4 ~ multi_student_t(nu, predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
+  centrality_mu_5 ~ multi_student_t(nu, predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
+  centrality_mu_6 ~ multi_student_t(nu, predictor_window6, centrality_cov_6 + diag_matrix(rep_vector(sigma, num_nodes_window6)));
+  centrality_mu_7 ~ multi_student_t(nu, predictor_window7, centrality_cov_7 + diag_matrix(rep_vector(sigma, num_nodes_window7)));
+  centrality_mu_8 ~ multi_student_t(nu, predictor_window8, centrality_cov_8 + diag_matrix(rep_vector(sigma, num_nodes_window8)));
+  centrality_mu_9 ~ multi_student_t(nu, predictor_window9, centrality_cov_9 + diag_matrix(rep_vector(sigma, num_nodes_window9)));
+  centrality_mu_10 ~ multi_student_t(nu, predictor_window10, centrality_cov_10 + diag_matrix(rep_vector(sigma, num_nodes_window10)));
+  centrality_mu_11 ~ multi_student_t(nu, predictor_window11, centrality_cov_11 + diag_matrix(rep_vector(sigma, num_nodes_window11)));
+  centrality_mu_12 ~ multi_student_t(nu, predictor_window12, centrality_cov_12 + diag_matrix(rep_vector(sigma, num_nodes_window12)));
+  centrality_mu_13 ~ multi_student_t(nu, predictor_window13, centrality_cov_13 + diag_matrix(rep_vector(sigma, num_nodes_window13)));
+  centrality_mu_14 ~ multi_student_t(nu, predictor_window14, centrality_cov_14 + diag_matrix(rep_vector(sigma, num_nodes_window14)));
+  centrality_mu_15 ~ multi_student_t(nu, predictor_window15, centrality_cov_15 + diag_matrix(rep_vector(sigma, num_nodes_window15)));
+  centrality_mu_16 ~ multi_student_t(nu, predictor_window16, centrality_cov_16 + diag_matrix(rep_vector(sigma, num_nodes_window16)));
+  centrality_mu_17 ~ multi_student_t(nu, predictor_window17, centrality_cov_17 + diag_matrix(rep_vector(sigma, num_nodes_window17)));
+  centrality_mu_18 ~ multi_student_t(nu, predictor_window18, centrality_cov_18 + diag_matrix(rep_vector(sigma, num_nodes_window18)));
+  centrality_mu_19 ~ multi_student_t(nu, predictor_window19, centrality_cov_19 + diag_matrix(rep_vector(sigma, num_nodes_window19)));
+  centrality_mu_20 ~ multi_student_t(nu, predictor_window20, centrality_cov_20 + diag_matrix(rep_vector(sigma, num_nodes_window20)));
+  centrality_mu_21 ~ multi_student_t(nu, predictor_window21, centrality_cov_21 + diag_matrix(rep_vector(sigma, num_nodes_window21)));
+  centrality_mu_22 ~ multi_student_t(nu, predictor_window22, centrality_cov_22 + diag_matrix(rep_vector(sigma, num_nodes_window22)));
+  centrality_mu_23 ~ multi_student_t(nu, predictor_window23, centrality_cov_23 + diag_matrix(rep_vector(sigma, num_nodes_window23)));
+  centrality_mu_24 ~ multi_student_t(nu, predictor_window24, centrality_cov_24 + diag_matrix(rep_vector(sigma, num_nodes_window24)));
+  centrality_mu_25 ~ multi_student_t(nu, predictor_window25, centrality_cov_25 + diag_matrix(rep_vector(sigma, num_nodes_window25)));
+  centrality_mu_26 ~ multi_student_t(nu, predictor_window26, centrality_cov_26 + diag_matrix(rep_vector(sigma, num_nodes_window26)));
+  centrality_mu_27 ~ multi_student_t(nu, predictor_window27, centrality_cov_27 + diag_matrix(rep_vector(sigma, num_nodes_window27)));
+  centrality_mu_28 ~ multi_student_t(nu, predictor_window28, centrality_cov_28 + diag_matrix(rep_vector(sigma, num_nodes_window28)));
+  centrality_mu_29 ~ multi_student_t(nu, predictor_window29, centrality_cov_29 + diag_matrix(rep_vector(sigma, num_nodes_window29)));
+  centrality_mu_30 ~ multi_student_t(nu, predictor_window30, centrality_cov_30 + diag_matrix(rep_vector(sigma, num_nodes_window30)));
+  centrality_mu_31 ~ multi_student_t(nu, predictor_window31, centrality_cov_31 + diag_matrix(rep_vector(sigma, num_nodes_window31)));
+  centrality_mu_32 ~ multi_student_t(nu, predictor_window32, centrality_cov_32 + diag_matrix(rep_vector(sigma, num_nodes_window32)));
+  centrality_mu_33 ~ multi_student_t(nu, predictor_window33, centrality_cov_33 + diag_matrix(rep_vector(sigma, num_nodes_window33)));
+  centrality_mu_34 ~ multi_student_t(nu, predictor_window34, centrality_cov_34 + diag_matrix(rep_vector(sigma, num_nodes_window34)));
+  centrality_mu_35 ~ multi_student_t(nu, predictor_window35, centrality_cov_35 + diag_matrix(rep_vector(sigma, num_nodes_window35)));
+  centrality_mu_36 ~ multi_student_t(nu, predictor_window36, centrality_cov_36 + diag_matrix(rep_vector(sigma, num_nodes_window36)));
 
 }
 
