@@ -49,9 +49,10 @@ parameters {
   real intercept;
   // exposure slope
   real beta_age;
-  //variance
+  // variance and degrees of freedom
   real<lower=0> sigma;
-  // random effects
+  real<lower=1,upper=5> nu;
+    // random effects
   vector[num_windows] rand_window;
   real<lower=0> sigma_window;
   vector[num_nodes] rand_node;
@@ -100,6 +101,7 @@ transformed parameters {
   delta ~ dirichlet(prior_age);
   beta_age  ~ normal(0,0.8);
   sigma ~ exponential(2);
+  nu ~ normal(3,1);
   // random effects
   rand_window ~ normal(0,1); // rand_window ~ normal(0,sigma_window);
   sigma_window ~ exponential(2);
@@ -112,10 +114,10 @@ transformed parameters {
   // centrality_mu_3 ~ multi_normal(predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
   // centrality_mu_4 ~ multi_normal(predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
   // centrality_mu_5 ~ multi_normal(predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
-  centrality_mu_1 ~ multi_student_t(num_nodes_window1, predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
-  centrality_mu_2 ~ multi_student_t(num_nodes_window2, predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
-  centrality_mu_3 ~ multi_student_t(num_nodes_window3, predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
-  centrality_mu_4 ~ multi_student_t(num_nodes_window4, predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
-  centrality_mu_5 ~ multi_student_t(num_nodes_window5, predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
+  centrality_mu_1 ~ multi_student_t(nu, predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
+  centrality_mu_2 ~ multi_student_t(nu, predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
+  centrality_mu_3 ~ multi_student_t(nu, predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
+  centrality_mu_4 ~ multi_student_t(nu, predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
+  centrality_mu_5 ~ multi_student_t(nu, predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
 }
 
