@@ -24,12 +24,12 @@ set.seed(12345)
 theme_set(theme_bw())
 
 ## define PDF output
-#pdf('../outputs/step4_nodalregression/anp_nodalregression_modelprep.pdf')
-pdf('../outputs/step4_nodalregression/anp_nodalregression_priorpredictive.pdf')
+#pdf('../outputs/step4_nodalregression/anp_nodalregression_modelprep_studentt.pdf')
+pdf('../outputs/step4_nodalregression/anp_nodalregression_priorpredictive_studentt.pdf')
 
 #### import data and randomise node IDs -- ensures that the model is not reading a correlation between node ID and age and partitioning too much of the variance to node ID #####
 ## load time window 1 and remove additional data
-load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
+load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior_studentt.RData')
 rm(list = ls()[! ls() %in% c('nodes','n_windows')]) ; gc()
 
 ## create full data frame with window variable
@@ -39,7 +39,7 @@ nodes_all <- nodes %>%
 ## attach all other data frames
 for(time_window in 2:n_windows){
   ## import workspace image for time window
-  load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior_studentt.RData'))
   rm(list = ls()[! ls() %in% c('nodes','nodes_all','time_window')]) ; gc()
 
   ## add window variable
@@ -77,13 +77,13 @@ ggplot(nodes_all)+
 
 ## clean up
 rm(nodes_random, nodes) ; gc()
-save.image('anp_nodalregression/anp_short_nodal_dataprep.RData')
+save.image('anp_nodalregression/anp_short_nodal_dataprep_studentt.RData')
 write_csv(nodes_all, '../data_processed/step4_nodalregression/anp_allnodes.csv')
 
 #### reimport data and calculate centrality #####
-# load('anp_nodalregression/anp_short_nodal_dataprep.RData')
+# load('anp_nodalregression/anp_short_nodal_dataprep_studentt.RData')
 ## load time window 1 and remove additional data
-load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
+load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior_studentt.RData')
 rm(list = ls()[! ls() %in% c('nodes_all', 'cdf_1', 'edge_samples','n_windows')]) ; gc()
 
 ## create function to extract centrality
@@ -169,7 +169,7 @@ rm(cent_mu1, cent_cov1, nodes, cdf_1, mean_df) ; gc()
 ## for loop
 for(time_window in 2:n_windows){
   ## import workspace image
-  load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior_studentt.RData'))
   rm(list = ls()[! ls() %in% c('nodes', 'cdf', 'edge_samples','n_windows','nodes_all','covs_all','cents_all','time_window','extract_eigen_centrality')]) ; gc()
 
   ## select randomised nodes data frame for window
@@ -215,7 +215,7 @@ for(time_window in 2:n_windows){
 
 ## clean up and save workspace
 rm(cdf, cent_cov, cent_new, edge_samples, nodes, cent_mu, time_window, extract_eigen_centrality) ; gc()
-save.image('anp_nodalregression/anp_short_nodal.RData')
+save.image('anp_nodalregression/anp_short_nodal_studentt.RData')
 
 #### visualise centralities #####
 df_plot <- data.frame(cents_all) %>%
@@ -265,10 +265,10 @@ par(mfrow = c(1,1))
 
 ## clean up and save workspace
 rm(mean_df, df_plot, nodes_timewindow, node_id_check, node_id_sample, time_window, mu, cov, sim_cent_samples) ; gc()
-save.image('anp_nodalregression/anp_short_nodal_modelprep.RData')
+save.image('anp_nodalregression/anp_short_nodal_modelprep_studentt.RData')
 
 #### create data list #####
-load('anp_nodalregression/anp_short_nodal_modelprep.RData')
+load('anp_nodalregression/anp_short_nodal_modelprep_studentt.RData')
 n_data <- nrow(nodes_all)
 n_nodes <- length(unique(nodes_all$node_random))
 n_windows <- length(unique(nodes_all$window))
@@ -519,13 +519,13 @@ fit_anp_nodal <- nodal_regression$sample(data = model_data_list,
                                          iter_warmup = n_samples, iter_sampling = n_samples)
 
 ## save workspace
-save.image('anp_nodalregression/anp_short_nodal.RData')
+save.image('anp_nodalregression/anp_short_nodal_studentt.RData')
 
 #### check outputs ####
-load('anp_nodalregression/anp_short_nodal.RData')
+load('anp_nodalregression/anp_short_nodal_studentt.RData')
 
 ## define PDF output
-pdf('../outputs/step4_nodalregression/anp_nodalregression_modelchecks.pdf')
+pdf('../outputs/step4_nodalregression/anp_nodalregression_modelchecks_studentt.pdf')
 
 ## extract model fit -- very good!
 ( summary <- fit_anp_nodal$summary() )
@@ -594,7 +594,7 @@ traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows4)
 rm(plot_params,plot_rand_nodes,plot_rand_windows1,plot_rand_windows2,plot_rand_windows3,plot_rand_windows4) ; gc()
 
 ## save workspace
-save.image('anp_nodalregression/anp_short_nodal.RData')
+save.image('anp_nodalregression/anp_short_nodal_studentt.RData')
 
 #### posterior predictive check ####
 ## create posterior predictive check function
@@ -622,35 +622,14 @@ post_pred_check <- function(centrality_matrix, nodes_df, time_window, cent_cov, 
       mu[k] <- mu[k] + as.numeric(rand_window[j,time_window]) + as.numeric(rand_node[j,eigen_data$node_random[k]])
     }
     sigma <- cent_cov + diag(rep(parameters$sigma[j], num_nodes_window))
-    lines(density(MASS::mvrnorm(1, mu, sigma)),
-          col = rgb(0, 0, 1, 0.25))
+    nu <- params$nu[j]
+    #lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
+    lines(density(LaplacesDemon::rmvt(n = 1, mu = mu, S = sigma, df = nu)), col=rgb(0, 0, 1, 0.25))
   }
 }
 
 ## check on standardised scale
 par(mfrow = c(3,3))
-# plot(density(cents_all[1, which(nodes_all$window == 1)]), las = 1, ylim = c(0,1),
-#      #plot(density(cents_all_std[1, which(nodes_all$window == 1)]), las = 1, ylim = c(0,1),
-#      main = "Posterior predictive check (standardised centrality):\nblack = data, blue = predicted",
-#      col=rgb(0, 0, 0, 0.25))
-# eigen_data1 <- list(num_nodes_window1 = length(which(nodes_all$window == 1)),
-#                     centrality_mu_1 = sim_cent_mu_1,
-#                     centrality_cov_1 = sim_cent_cov_1,
-#                     node_age = sim$age_std[sim$window == 1],
-#                     window = 1,
-#                     nodes = sim$node_random[sim$window == 1],
-#                     nodes_window1 = sim$node_random[sim$window == 1])
-# for (i in 1:100) {
-#   j <- sample(1:length(params$beta_age), 1)
-#   lines(density(cents_all[j, which(sim$window == 1)]), col=rgb(0, 0, 0, 0.25))
-#   #lines(density(cents_all_std[j, which(sim$window == 1)]), col=rgb(0, 0, 0, 0.25))
-#   mu <- params$beta_age[j]*eigen_data1$node_age + params$intercept[j]
-#   for(k in 1:length(mu)) {
-#     mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data1$window]) + as.numeric(rand_node[j,eigen_data1$nodes[k]])
-#   }
-#   sigma <- sim_cent_cov_1 + diag(rep(params$sigma[j], eigen_list$num_nodes_window1))
-#   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
-# }
 for(time_window in 1:n_windows){
   post_pred_check(centrality_matrix = cents_all,
                   nodes_df = nodes_all, time_window = time_window,
@@ -765,7 +744,7 @@ ggplot(nodes_all)+
        y = 'eigenvector centrality', x = 'age (years)')
 
 ## save workspace
-save.image('anp_nodalregression/anp_short_nodal.RData')
+save.image('anp_nodalregression/anp_short_nodal_studentt.RData')
 
 #### extract original values from output -- simulated slope value originally used produces an effect on the unstandardised scale. The model works on the standardised scale. Convert predictions to unstandardised scale and then run contrasts to calculate the slope coefficient. ####
 ## get mean predictions
@@ -802,7 +781,7 @@ mean(contrast)                                        # should be very nodes_all
 quantile(contrast, prob = c(0.025, 0.975))            # very wide
 
 ## save workspace
-save.image('anp_nodalregression/anp_short_nodal.RData')
+save.image('anp_nodalregression/anp_short_nodal_studentt.RData')
 
 #### final "clean" plots using hypothetical data ####
 ## create dummy dataset
@@ -889,6 +868,6 @@ ggplot()+
        y = 'eigenvector centrality', x = 'age (years)')
 
 ## clean up and save workspace
-save.image('anp_nodalregression/anp_short_nodal.RData')
+save.image('anp_nodalregression/anp_short_nodal_studentt.RData')
 dev.off()
 
