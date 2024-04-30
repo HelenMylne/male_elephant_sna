@@ -475,7 +475,9 @@ ppcheck <- function(eigen_mat, eigen_df, cent_cov, window, params, rand_node, ra
       mu[k] <- mu[k] + as.numeric(rand_window[j,eigen_data$window]) + as.numeric(rand_node[j,eigen_data$nodes[k]])
     }
     sigma <- cent_cov + diag(rep(params$sigma[j], eigen_data$num_nodes_window))
-    lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
+    nu <- params$nu[j]
+    lines(density(LaplacesDemon::rmvt(n = 1, mu = mu, S = sigma, df = nu)), col=rgb(0, 0, 1, 0.25))
+    #lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
   }
 }
 
