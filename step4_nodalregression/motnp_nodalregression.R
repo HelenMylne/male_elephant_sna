@@ -32,7 +32,7 @@ library(MASS, lib.loc = '../packages/')            # library(MASS)
 set.seed(12345)
 
 ## set up pdf
-pdf('../outputs/motnp_nodalregression.pdf')
+pdf('../outputs/step4_nodalregression/motnp_nodalregression.pdf')
 
 ## set up theme for plots
 theme_set(theme_classic())
@@ -230,7 +230,9 @@ save.image('motnp_nodalregression.RData')
 #### check outputs ####
 # load('motnp_nodalregression.RData')
 ## traceplot linear effect size
-traceplot(fit_motnp_eigen, pars = c('intercept','beta_age','sigma','predictor[1]','predictor[2]','predictor[3]','predictor[4]','predictor[5]','predictor[6]','predictor[7]','predictor[8]','predictor[9]'))
+traceplot(fit_motnp_eigen, pars = c('intercept','beta_age','sigma',#'nu',
+                                    'predictor[1]','predictor[2]','predictor[3]','predictor[4]',
+                                    'predictor[5]','predictor[6]','predictor[7]','predictor[8]'))
 traceplot(fit_motnp_eigen, pars = c('delta_j[1]','delta_j[2]','delta_j[3]',
                                     'delta_j[4]','delta_j[5]','delta_j[6]'))
 
@@ -251,7 +253,11 @@ plot(density(params$beta_age),
 abline(v = 0, lty = 2)
 
 #### posterior predictive check ####
-plot(density(centrality_samples[1, ]), main="Posterior predictive density of responses:\nblack = data, blue = predicted", col=rgb(0, 0, 0, 0.25), ylim=c(0, 3))
+# par(mfrow = c(2,2))
+plot(density(centrality_samples[1, ]),
+     main="Posterior predictive density of responses:\nblack = data, blue = predicted",
+     #main="nu = relevant draw from model",
+     col=rgb(0, 0, 0, 0.25), ylim=c(0, 8))
 for (i in 1:100) {
   j <- sample(1:(n_chains*n_samples), 1)
   lines(density(centrality_samples[j, ]), col=rgb(0, 0, 0, 0.25))
@@ -260,8 +266,61 @@ for (i in 1:100) {
     mu[k] <- params$beta_age[j]*sum(params$delta_j[j,1:nodes$age_cat_fct[k]]) + params$intercept[j]
   }
   sigma <- centrality_cov + diag(rep(params$sigma[j], n_eles))
+  #nu <- params$nu[j]
+  #lines(density(LaplacesDemon::rmvt(n = 1, mu = mu, S = sigma, df = nu)), col=rgb(0, 0, 1, 0.25))
   lines(density(MASS::mvrnorm(1, mu, sigma)), col=rgb(0, 0, 1, 0.25))
 }
+# 
+# nu <- mean(params$nu)
+# plot(density(centrality_samples[1, ]),
+#      #main="Posterior predictive density of responses:\nblack = data, blue = predicted",
+#      main="nu = mean draw from model",
+#      col=rgb(0, 0, 0, 0.25), ylim=c(0, 8))
+# for (i in 1:100) {
+#   j <- sample(1:(n_chains*n_samples), 1)
+#   lines(density(centrality_samples[j, ]), col=rgb(0, 0, 0, 0.25))
+#   mu <- rep(NA, n_eles)
+#   for(k in 1:n_eles){
+#     mu[k] <- params$beta_age[j]*sum(params$delta_j[j,1:nodes$age_cat_fct[k]]) + params$intercept[j]
+#   }
+#   sigma <- centrality_cov + diag(rep(params$sigma[j], n_eles))
+#   #nu <- params$nu[j]
+#   lines(density(LaplacesDemon::rmvt(n = 1, mu = mu, S = sigma, df = nu)), col=rgb(0, 0, 1, 0.25))
+# }
+# 
+# nu <- min(params$nu)
+# plot(density(centrality_samples[1, ]),
+#      #main="Posterior predictive density of responses:\nblack = data, blue = predicted",
+#      main="nu = minimum draw from model",
+#      col=rgb(0, 0, 0, 0.25), ylim=c(0, 8))
+# for (i in 1:100) {
+#   j <- sample(1:(n_chains*n_samples), 1)
+#   lines(density(centrality_samples[j, ]), col=rgb(0, 0, 0, 0.25))
+#   mu <- rep(NA, n_eles)
+#   for(k in 1:n_eles){
+#     mu[k] <- params$beta_age[j]*sum(params$delta_j[j,1:nodes$age_cat_fct[k]]) + params$intercept[j]
+#   }
+#   sigma <- centrality_cov + diag(rep(params$sigma[j], n_eles))
+#   #nu <- params$nu[j]
+#   lines(density(LaplacesDemon::rmvt(n = 1, mu = mu, S = sigma, df = nu)), col=rgb(0, 0, 1, 0.25))
+# }
+# 
+# nu <- max(params$nu)
+# plot(density(centrality_samples[1, ]),
+#      #main="Posterior predictive density of responses:\nblack = data, blue = predicted",
+#      main="nu = maximum draw from model",
+#      col=rgb(0, 0, 0, 0.25), ylim=c(0, 8))
+# for (i in 1:100) {
+#   j <- sample(1:(n_chains*n_samples), 1)
+#   lines(density(centrality_samples[j, ]), col=rgb(0, 0, 0, 0.25))
+#   mu <- rep(NA, n_eles)
+#   for(k in 1:n_eles){
+#     mu[k] <- params$beta_age[j]*sum(params$delta_j[j,1:nodes$age_cat_fct[k]]) + params$intercept[j]
+#   }
+#   sigma <- centrality_cov + diag(rep(params$sigma[j], n_eles))
+#   #nu <- params$nu[j]
+#   lines(density(LaplacesDemon::rmvt(n = 1, mu = mu, S = sigma, df = nu)), col=rgb(0, 0, 1, 0.25))
+# }
 
 #### predict from model -- raw data ####
 # load('motnp_nodalregression.RData')
@@ -475,141 +534,141 @@ ggplot()+
 ## save
 save.image('motnp_nodalregression.RData')
 
-#### plot nicely ####
-## clean data frame
-clean <- data.frame(age_cat_fct = 1:5,
-                    mean = NA,
-                    predict_mu_lwr = NA, predict_mu_upr = NA,
-                    predict_full_lwr = NA, predict_full_upr = NA,
-                    mean_invlogit = NA,
-                    predict_mu_lwr_invlogit = NA, predict_mu_upr_invlogit = NA,
-                    predict_full_lwr_invlogit = NA, predict_full_upr_invlogit = NA)
-
-## predict means only
-predict_clean_mean <- predict_mean_centrality(params, clean)
-clean$mean <- mean(predict_clean_mean)
-clean$predict_mu_lwr <- apply(predict_clean_mean, 2, quantile, prob = 0.025)
-clean$predict_mu_upr <- apply(predict_clean_mean, 2, quantile, prob = 0.975)
-
-## convert to invlogit scale
-predict_clean_mean_invlogit <- LaplacesDemon::invlogit(predict_clean_mean)
-clean$mean_invlogit <- mean(predict_clean_mean_invlogit)
-clean$predict_mu_lwr_invlogit <- apply(predict_clean_mean_invlogit, 2, quantile, prob = 0.025)
-clean$predict_mu_upr_invlogit <- apply(predict_clean_mean_invlogit, 2, quantile, prob = 0.975)
-
-## average fulls for whole data frame (can't just predict from clean data frame because dimensions don't fit with covariance matrix)
-for(i in 1:n_age_cat){
-  sim_age <- sim_full[,which(nodes$age_cat_fct == i)]
-  sim_age_invlogit <- LaplacesDemon::invlogit(sim_age)
-  clean$predict_full_lwr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2,
-                                                               quantile, prob = 0.025))
-  clean$predict_full_upr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2,
-                                                               quantile, prob = 0.975))
-  clean$predict_full_lwr_invlogit[clean$age_cat_fct == i] <- mean(apply(sim_age_invlogit, 2,
-                                                                        quantile, prob = 0.025))
-  clean$predict_full_upr_invlogit[clean$age_cat_fct == i] <- mean(apply(sim_age_invlogit, 2,
-                                                                        quantile, prob = 0.975))
-}
-
-## add node data
-df_long <- df_long %>%
-  mutate(centrality_invlogit = LaplacesDemon::invlogit(centrality)) %>% 
-  left_join(nodes, by = 'node_rank') %>% 
-  dplyr::select(-age_cat_num.x) %>% 
-  rename(age_cat_num = age_cat_num.y)
-
-## plot on logit scale
-(clean_plot <- ggplot()+
-  geom_ribbon(data = clean,
-              aes(x = as.numeric(age_cat_fct),
-                  ymin = predict_full_lwr, ymax = predict_full_upr),    # shade simulations
-              colour = 'transparent', fill = rgb(0,0,0,0.1))+
-  geom_ribbon(data = clean,
-              aes(x = as.numeric(age_cat_fct),
-                  ymin = predict_mu_lwr, ymax = predict_mu_upr),  # shade mean distribution
-              colour = 'transparent',
-              fill = rgb(33/255, 145/255, 140/255, 0.5))+
-  geom_line(data = clean,
-            aes(x = as.numeric(age_cat_fct),
-                y = mean),                            # mean line
-            colour = rgb(33/255, 145/255, 140/255),
-            linewidth = 1)+
-  scale_x_continuous('age category')+
-  scale_y_continuous('eigenvector centrality')+
-  theme(axis.text = element_text(size = 18),
-        axis.title = element_text(size = 22),
-        legend.text = element_text(size = 18),
-        legend.title = element_text(size = 22)))
-
-clean_plot +
-  geom_point(data = nodes,
-           aes(x = as.numeric(age_cat_fct),
-               y = mu_raw,
-               size = sightings),
-           colour = rgb(68/255, 1/255, 84/255))
-ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_meanpoints_logit.png', device = 'png',
-       plot = last_plot(), width = 2800, height = 1600, units = 'px')
-
-clean_plot +
-  geom_point(data = df_long,
-             aes(x = as.numeric(age_cat_fct),
-                 y = centrality),
-             colour = rgb(253/255, 231/255, 37/255, 0.01)) +
-  geom_point(data = nodes,
-             aes(x = as.numeric(age_cat_fct),
-                 y = mu_raw,
-                 size = sightings),
-             colour = rgb(68/255, 1/255, 84/255))
-ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_allpoints_logit.png', device = 'png',
-       plot = last_plot(), width = 2800, height = 1600, units = 'px')
-
-## plot on invlogit scale
-(clean_plot <- ggplot()+
-    geom_ribbon(data = clean,
-                aes(x = as.numeric(age_cat_fct),
-                    ymin = predict_full_lwr_invlogit,
-                    ymax = predict_full_upr_invlogit),           # shade simulations
-                colour = 'transparent', fill = rgb(0,0,0,0.1))+
-    geom_ribbon(data = clean,
-                aes(x = as.numeric(age_cat_fct),
-                    ymin = predict_mu_lwr_invlogit,
-                    ymax = predict_mu_upr_invlogit),             # shade mean distribution
-                colour = 'transparent',
-                fill = rgb(33/255, 145/255, 140/255, 0.5))+
-    geom_line(data = clean,
-              aes(x = as.numeric(age_cat_fct),
-                  y = mean_invlogit),                            # mean line
-              colour = rgb(33/255, 145/255, 140/255),
-              linewidth = 1)+
-    scale_x_continuous('age category')+
-    scale_y_continuous('eigenvector centrality')+
-    theme(axis.text = element_text(size = 18),
-          axis.title = element_text(size = 22),
-          legend.text = element_text(size = 18),
-          legend.title = element_text(size = 22)))
-
-clean_plot +
-  geom_point(data = nodes,
-             aes(x = as.numeric(age_cat_fct),
-                 y = mu_raw_invlogit,
-                 size = sightings),
-             colour = rgb(68/255, 1/255, 84/255))
-ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_meanpoints_invlogit.png',
-       device = 'png', plot = last_plot(), width = 2800, height = 1600, units = 'px')
-
-clean_plot +
-  geom_point(data = df_long,
-             aes(x = as.numeric(age_cat_fct),
-                 y = centrality_invlogit),
-             colour = rgb(253/255, 231/255, 37/255, 0.01)) +
-  geom_point(data = nodes,
-             aes(x = as.numeric(age_cat_fct),
-                 y = mu_raw_invlogit,
-                 size = sightings),
-             colour = rgb(68/255, 1/255, 84/255))
-ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_allpoints_invlogit.png', device = 'png',
-       plot = last_plot(), width = 2800, height = 1600, units = 'px')
-
-## save
+# #### plot nicely ####
+# ## clean data frame
+# clean <- data.frame(age_cat_fct = 1:5,
+#                     mean = NA,
+#                     predict_mu_lwr = NA, predict_mu_upr = NA,
+#                     predict_full_lwr = NA, predict_full_upr = NA,
+#                     mean_invlogit = NA,
+#                     predict_mu_lwr_invlogit = NA, predict_mu_upr_invlogit = NA,
+#                     predict_full_lwr_invlogit = NA, predict_full_upr_invlogit = NA)
+# 
+# ## predict means only
+# predict_clean_mean <- predict_mean_centrality(params, clean)
+# clean$mean <- mean(predict_clean_mean)
+# clean$predict_mu_lwr <- apply(predict_clean_mean, 2, quantile, prob = 0.025)
+# clean$predict_mu_upr <- apply(predict_clean_mean, 2, quantile, prob = 0.975)
+# 
+# ## convert to invlogit scale
+# predict_clean_mean_invlogit <- LaplacesDemon::invlogit(predict_clean_mean)
+# clean$mean_invlogit <- mean(predict_clean_mean_invlogit)
+# clean$predict_mu_lwr_invlogit <- apply(predict_clean_mean_invlogit, 2, quantile, prob = 0.025)
+# clean$predict_mu_upr_invlogit <- apply(predict_clean_mean_invlogit, 2, quantile, prob = 0.975)
+# 
+# ## average fulls for whole data frame (can't just predict from clean data frame because dimensions don't fit with covariance matrix)
+# for(i in 1:n_age_cat){
+#   sim_age <- sim_full[,which(nodes$age_cat_fct == i)]
+#   sim_age_invlogit <- LaplacesDemon::invlogit(sim_age)
+#   clean$predict_full_lwr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2,
+#                                                                quantile, prob = 0.025))
+#   clean$predict_full_upr[clean$age_cat_fct == i] <- mean(apply(sim_age, 2,
+#                                                                quantile, prob = 0.975))
+#   clean$predict_full_lwr_invlogit[clean$age_cat_fct == i] <- mean(apply(sim_age_invlogit, 2,
+#                                                                         quantile, prob = 0.025))
+#   clean$predict_full_upr_invlogit[clean$age_cat_fct == i] <- mean(apply(sim_age_invlogit, 2,
+#                                                                         quantile, prob = 0.975))
+# }
+# 
+# ## add node data
+# df_long <- df_long %>%
+#   mutate(centrality_invlogit = LaplacesDemon::invlogit(centrality)) %>% 
+#   left_join(nodes, by = 'node_rank') %>% 
+#   dplyr::select(-age_cat_num.x) %>% 
+#   rename(age_cat_num = age_cat_num.y)
+# 
+# ## plot on logit scale
+# (clean_plot <- ggplot()+
+#   geom_ribbon(data = clean,
+#               aes(x = as.numeric(age_cat_fct),
+#                   ymin = predict_full_lwr, ymax = predict_full_upr),    # shade simulations
+#               colour = 'transparent', fill = rgb(0,0,0,0.1))+
+#   geom_ribbon(data = clean,
+#               aes(x = as.numeric(age_cat_fct),
+#                   ymin = predict_mu_lwr, ymax = predict_mu_upr),  # shade mean distribution
+#               colour = 'transparent',
+#               fill = rgb(33/255, 145/255, 140/255, 0.5))+
+#   geom_line(data = clean,
+#             aes(x = as.numeric(age_cat_fct),
+#                 y = mean),                            # mean line
+#             colour = rgb(33/255, 145/255, 140/255),
+#             linewidth = 1)+
+#   scale_x_continuous('age category')+
+#   scale_y_continuous('eigenvector centrality')+
+#   theme(axis.text = element_text(size = 18),
+#         axis.title = element_text(size = 22),
+#         legend.text = element_text(size = 18),
+#         legend.title = element_text(size = 22)))
+# 
+# clean_plot +
+#   geom_point(data = nodes,
+#            aes(x = as.numeric(age_cat_fct),
+#                y = mu_raw,
+#                size = sightings),
+#            colour = rgb(68/255, 1/255, 84/255))
+# ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_meanpoints_logit.png', device = 'png',
+#        plot = last_plot(), width = 2800, height = 1600, units = 'px')
+# 
+# clean_plot +
+#   geom_point(data = df_long,
+#              aes(x = as.numeric(age_cat_fct),
+#                  y = centrality),
+#              colour = rgb(253/255, 231/255, 37/255, 0.01)) +
+#   geom_point(data = nodes,
+#              aes(x = as.numeric(age_cat_fct),
+#                  y = mu_raw,
+#                  size = sightings),
+#              colour = rgb(68/255, 1/255, 84/255))
+# ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_allpoints_logit.png', device = 'png',
+#        plot = last_plot(), width = 2800, height = 1600, units = 'px')
+# 
+# ## plot on invlogit scale
+# (clean_plot <- ggplot()+
+#     geom_ribbon(data = clean,
+#                 aes(x = as.numeric(age_cat_fct),
+#                     ymin = predict_full_lwr_invlogit,
+#                     ymax = predict_full_upr_invlogit),           # shade simulations
+#                 colour = 'transparent', fill = rgb(0,0,0,0.1))+
+#     geom_ribbon(data = clean,
+#                 aes(x = as.numeric(age_cat_fct),
+#                     ymin = predict_mu_lwr_invlogit,
+#                     ymax = predict_mu_upr_invlogit),             # shade mean distribution
+#                 colour = 'transparent',
+#                 fill = rgb(33/255, 145/255, 140/255, 0.5))+
+#     geom_line(data = clean,
+#               aes(x = as.numeric(age_cat_fct),
+#                   y = mean_invlogit),                            # mean line
+#               colour = rgb(33/255, 145/255, 140/255),
+#               linewidth = 1)+
+#     scale_x_continuous('age category')+
+#     scale_y_continuous('eigenvector centrality')+
+#     theme(axis.text = element_text(size = 18),
+#           axis.title = element_text(size = 22),
+#           legend.text = element_text(size = 18),
+#           legend.title = element_text(size = 22)))
+# 
+# clean_plot +
+#   geom_point(data = nodes,
+#              aes(x = as.numeric(age_cat_fct),
+#                  y = mu_raw_invlogit,
+#                  size = sightings),
+#              colour = rgb(68/255, 1/255, 84/255))
+# ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_meanpoints_invlogit.png',
+#        device = 'png', plot = last_plot(), width = 2800, height = 1600, units = 'px')
+# 
+# clean_plot +
+#   geom_point(data = df_long,
+#              aes(x = as.numeric(age_cat_fct),
+#                  y = centrality_invlogit),
+#              colour = rgb(253/255, 231/255, 37/255, 0.01)) +
+#   geom_point(data = nodes,
+#              aes(x = as.numeric(age_cat_fct),
+#                  y = mu_raw_invlogit,
+#                  size = sightings),
+#              colour = rgb(68/255, 1/255, 84/255))
+# ggsave(filename = '../outputs/step4_nodalregression/motnp_nodalregression_line_allpoints_invlogit.png', device = 'png',
+#        plot = last_plot(), width = 2800, height = 1600, units = 'px')
+# 
+#### save ####
 save.image('motnp_nodalregression.RData')
 dev.off()
