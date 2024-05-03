@@ -629,24 +629,52 @@ rm(eles, edges, edgelist, summary, edge_binary, fit_edges_mpnp, mean_ages, make_
 
 nodes_all <- nodes %>% 
   mutate(window = 5)
-counts_df_all <- counts_df
+cdf_all <- counts_df
 edge_samples_all <- list() ; edge_samples_all[[5]] <- edge_samples
 num_nodes_all <- list() ; num_nodes_all[[5]] <- n_dyads
+rm(edge_samples, counts_df, nodes)
 
 for(time_window in 4:1){
+  print(paste0('start time window ', time_window))
+  
   # load next window
   load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  rm(eles, edges, edgelist, summary, edge_binary, fit_edges_mpnp, make_edgelist, plot_network_threshold_mpnp, counts_ls) ; gc()
+  rm(list = ls()[!ls() %in% c('counts_df','cdf_all','edge_samples','edge_samples_all','edge_weights_matrix','nodes','nodes_all','num_nodes_all','time_window')])
   
   # find age data for ones that don't have it already
   if(length(colnames(nodes_all)) != length(colnames(nodes))+1){
     ages <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
-    
     nodes <- nodes %>% 
       filter(id %in% colnames(ages)) %>% 
       mutate(age = NA)
     for(i in 1:nrow(nodes)){
       nodes$age[i] <- mean(ages[,which(colnames(ages) == nodes$id[i])])
+    }
+  } else {
+    if(max(nodes$age) <= 10){
+      ages <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+      nodes <- nodes %>% 
+        filter(id %in% colnames(ages)) %>% 
+        mutate(age = NA)
+      for(i in 1:nrow(nodes)){
+        nodes$age[i] <- mean(ages[,which(colnames(ages) == nodes$id[i])])
+      }
+    }
+  }
+  
+  # make sure correct version of edge samples goes in
+  if('edge_weights_matrix' %in% ls()){
+    if(ncol(edge_weights_matrix) == nrow(counts_df) | 
+       ncol(edge_weights_matrix) == nrow(counts_df) + 1){
+      edge_samples <- edge_weights_matrix
+      print('edge weights matrix renamed to edge samples')
+    } else {
+      if(ncol(edge_samples) == nrow(counts_df) | 
+         ncol(edge_samples) == nrow(counts_df) + 1){
+        print('edge samples input raw')
+      } else{
+        print("edge samples don't match number of dyads -- WARNING!! THIS NEEDS TO BE REDONE AND CHECKED OVER")
+      }
     }
   }
   
@@ -654,14 +682,15 @@ for(time_window in 4:1){
   nodes <- nodes %>% 
     mutate(window = time_window)
   nodes_all <- rbind(nodes, nodes_all)
-  counts_df_all <- rbind(counts_df, counts_df_all)
+  cdf_all <- rbind(counts_df, cdf_all)
   edge_samples_all[[time_window]] <- edge_samples
-  num_nodes_all[[time_window]] <- n_dyads
+  num_nodes_all[[time_window]] <- nrow(counts_df)
+  
+  # clear data from current time step
+  rm(edge_samples, edge_weights_matrix, ages, nodes, counts_df) ; gc()
 }
 
-cdf_all <- counts_df_all
-
-rm(counts_df_all, edge_samples, nodes, n_dyads, time_window) ; gc()
+rm(edge_samples, edge_weights_matrix, ages, nodes, n_dyads, time_window) ; gc()
 
 #### filter down to only elephants with known age categories ####
 ## ages
@@ -913,7 +942,6 @@ for(time_window in 1:n_windows){
 par(mfrow = c(1,1))
 rm(sim_cent_samples, node_id_sample) ; gc()
 
-
 print('normal approximation completed')
 
 #### prior predictive check ####
@@ -989,7 +1017,7 @@ eigen_list <- list(
 
 ## check inputs
 plot(eigen_list$centrality_mu_1 ~ jitter(nodes_all$age_cat[nodes_all$window == 1]),
-     pch = 19, col = 'red', las = 1, ylim = -8, 0)
+     pch = 19, col = 'red', las = 1, ylim = c(-8, 0))
 points(eigen_list$centrality_mu_2 ~ jitter(nodes_all$age_cat[nodes_all$window == 2]),
        pch = 19, col = 'blue')
 points(eigen_list$centrality_mu_3 ~ jitter(nodes_all$age_cat[nodes_all$window == 3]),
