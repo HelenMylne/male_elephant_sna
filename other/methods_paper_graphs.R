@@ -28,13 +28,28 @@ data <- data.frame(x = x, density = flat_prior)
 
 # plot
 (priors_sri <- ggplot(data)+
-    geom_line(aes(x = x, y = density), linewidth = 1.2, colour = rgb(33/255, 145/255, 140/255))+
+    geom_line(aes(x = x, y = density),
+              linewidth = 1.2,
+              colour = rgb(33/255, 145/255, 140/255))+
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density', limits = c(0,1.05), expand = c(0,0))
 )
 ggsave(filename = 'priors_sri.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = priors_sri, device = 'png', width = 700, height = 700, units = 'px')
+
+# remove all information around it
+(priors_sri <- ggplot(data)+
+    geom_line(aes(x = x, y = density),
+              linewidth = 1.2,
+              colour = rgb(33/255, 145/255, 140/255))+
+    scale_x_continuous(breaks = c(0,0.5,1),
+                       name = NULL)+
+    scale_y_continuous(name = NULL,
+                       breaks = c(0,0.5,1),
+                       limits = c(0,1.05),
+                       expand = c(0,0))
+)
 
 ## default, prior distribution ####
 # calculate probability of all values of x assuming default bisonR prior shape
@@ -45,7 +60,9 @@ data <- data.frame(x = x, density = default_prior)
 
 # plot
 (priors_default <- ggplot(data)+
-    geom_line(aes(x = x, y = density), linewidth = 1.2, colour = rgb(33/255, 145/255, 140/255))+
+    geom_line(aes(x = x, y = density),
+              linewidth = 1.2,
+              colour = rgb(33/255, 145/255, 140/255))+
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density',
                        limits = c(0,0.2),
@@ -56,6 +73,18 @@ ggsave(filename = 'priors_default.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = priors_default, device = 'png', width = 700, height = 700, units = 'px')
 
+(priors_default <- ggplot(data)+
+    geom_line(aes(x = x, y = density),
+              linewidth = 1.2,
+              colour = rgb(33/255, 145/255, 140/255))+
+    scale_x_continuous(breaks = c(0,0.5,1),
+                       name = NULL)+
+    scale_y_continuous(name = NULL,
+                       breaks = c(0,0.1,0.2),
+                       limits = c(0,0.2),
+                       expand = c(0,0))
+)
+
 ## skewed, prior distribution ####
 # calculate probability of all values of x assuming right skewed prior shape
 skewed_prior <- c(1, 5)
@@ -64,7 +93,9 @@ data <- data.frame(x = x, density = skewed_prior)
 
 # plot
 (priors_skewed <- ggplot(data)+
-    geom_line(aes(x = x, y = density), linewidth = 1.2, colour = rgb(33/255, 145/255, 140/255))+
+    geom_line(aes(x = x, y = density),
+              linewidth = 1.2,
+              colour = rgb(33/255, 145/255, 140/255))+
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density',
                        #limits = c(0,0.3),
@@ -74,6 +105,18 @@ data <- data.frame(x = x, density = skewed_prior)
 ggsave(filename = 'priors_skewed.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = priors_skewed, device = 'png', width = 700, height = 700, units = 'px')
+
+(priors_skewed <- ggplot(data)+
+    geom_line(aes(x = x, y = density),
+              linewidth = 1.2,
+              colour = rgb(33/255, 145/255, 140/255))+
+    scale_x_continuous(breaks = c(0,0.5,1),
+                       name = NULL)+
+    scale_y_continuous(name = NULL,
+                       breaks = c(0,1,2,3,4,5),
+                       limits = c(0,5),
+                       expand = c(0,0))
+)
 
 # clean up
 rm(list = ls()[!ls() %in% c('priors_sri','priors_default','priors_skewed')]) ; gc()
@@ -111,23 +154,23 @@ data <- data.frame(x = x,
     scale_y_continuous(name = 'density',
                        expand = c(0,0),
                        limits = c(0,15))+
-    scale_linetype_manual(name = 'sightings together',
+    scale_linetype_manual(name = NULL,#'sightings together',
                           values = c(1,6))+
-    scale_colour_manual(name = 'sightings together',
+    scale_colour_manual(name = NULL,#'sightings together',
                         values = c(rgb(33/255, 145/255, 140/255),
                                    rgb(68/255,1/255,84/255,1)))+
-    theme(legend.position = c(0.57,0.77),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
-          legend.key.height = unit(4, 'mm'),
-          legend.title = element_text(size = 10),
-          legend.text = element_text(size = 8))
+    theme(legend.position = 'right') #c(0.57,0.77),
+          # legend.background = element_rect(fill = 'white', colour = 'black'),
+          # legend.key.height = unit(4, 'mm'),
+          # legend.title = element_text(size = 10),
+          # legend.text = element_text(size = 8))
 )
 ggsave(filename = 'prior_conditional.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = prior_conditional, device = 'png', width = 700, height = 600, units = 'px')
 
 # clean up
-rm(list = ls()) ; gc()
+rm(list = ls()[!ls() %in% c('priors_sri','priors_default','priors_skewed','prior_conditional')]) ; gc()
 
 #### SRI outputs: 2 panel plot of SRI edges and edge_vs_sightings ####
 ## SRI edge bar graph ####
@@ -165,7 +208,7 @@ length(unique(c(subset10$id_1, subset10$id_2)))
                        #limits = c(0,1000),
                        expand = c(0,0))+
     annotate('text', x = 0.42, y = 165,
-             label = paste0(length(which(counts_df$sri == 0)), ' dyads with \nSRI = 0'),
+             label = paste0('+ ', length(which(counts_df$sri == 0)), ' dyads with \nSRI = 0'),
              size = unit(4, 'pt'),
              colour = rgb(33/255, 145/255, 140/255))+
     coord_cartesian(ylim = c(0,200))
@@ -199,7 +242,7 @@ ggsave(filename = 'edgesightings_sri_withline_changealpha.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = edgesightings_sri.1, device = 'png', width = 700, height = 700, units = 'px')
 
-counts_df$hack_linetype_all <- 'all values'
+counts_df$hack_linetype_all <- 'all dyads'
 counts_df$hack_linetype_together <- 'together at least once'
 (edgesightings_sri.2 <- ggplot()+
     geom_point(data = counts_df,
@@ -221,17 +264,16 @@ counts_df$hack_linetype_together <- 'together at least once'
     scale_y_continuous(name = 'SRI weight', limits = c(-0.02,1.02), expand = c(0,0))+
     scale_linetype_manual(values = c(1,6),
                           #breaks = c('never together','together at least once'),
-                          breaks = c('all values','together at least once'),
-                          name = 'sightings together')+
-    theme(legend.position = c(0.55,0.77),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
+                          breaks = c('all dyads','together at least once'),
+                          name = NULL)+
+    theme(legend.position = 'bottom', #c(0.55,0.77),
+          #legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
-          legend.text = element_text(size = 8))
-)
+          legend.text = element_text(size = 8)))
 ggsave(filename = 'edgesightings_sri_twolines_changealpha.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = edgesightings_sri.2, device = 'png', width = 700, height = 700, units = 'px')
+       plot = last_plot(), device = 'png', width = 700, height = 700, units = 'px')
 
 counts_df$sri_rank <- as.integer(as.factor(counts_df$sri))
 p7 <- as.data.frame(table(counts_df$count_dyad, counts_df$sri)) %>%
@@ -259,8 +301,8 @@ p7 <- as.data.frame(table(counts_df$count_dyad, counts_df$sri)) %>%
                           breaks = c('all values','together at least once'),
                           name = 'sightings together')+
     labs(size = 'number of dyads')+
-    theme(legend.position = c(0.54,0.72),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
+    theme(legend.position = 'right', #c(0.54,0.72),
+          #legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
           legend.text = element_text(size = 8))+
@@ -274,55 +316,65 @@ ggsave(filename = 'edgesightings_sri_twolines_changesize.png',
        plot = edgesightings_sri.3, device = 'png', width = 700, height = 700, units = 'px')
 
 # # clean up
-rm(list = ls()[!ls() %in% c('edges_sri','edgesightings_sri.2', 'counts_df')]) ; gc()
+rm(list = ls()[!ls() %in% c('edges_sri','edgesightings_sri.2', 'counts_df',
+                            'priors_sri','priors_default','priors_skewed','prior_conditional')]) ; gc()
 
 ## merge ####
-(edges_sri + edgesightings_sri.2)+
+combined <- (edges_sri + edgesightings_sri.2)+
   plot_annotation(tag_levels = 'a')
+combined + plot_layout(guides = 'collect')
 ggsave(filename = 'outputs_sri.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
 
 #### unconditional outputs: 6 panel plot of uniform/default/skewed for posterior and edge_vs_sightings ####
+colours <- c('#21918c','#440154')
+
 ## uniform, posterior distribution ####
-rm(list = ls()) ; gc()
-load('motnp_edgeweights_conditionalprior.RData')
-rm(list = ls()[! ls() %in% c('counts_df','n_chains','eigen_sri')])
+# #rm(list = ls()) ; gc()
+# load('motnp_edgeweights_conditionalprior.RData')
+# rm(list = ls()[! ls() %in% c('counts_df','n_chains','eigen_sri','priors_sri','priors_default','priors_skewed','prior_conditional')])
+# 
+# # calculate sri
+# counts_df$sri <- counts_df$event_count / counts_df$count_dyad
+# print('sri calculated in counts_df')
+# 
+# # compile edge model
+# edge_binary_uniform <- cmdstan_model('other/methods_paper/edge_binary_uniform.stan')
+# 
+# # create data list for uniform model
+# counts_ls_uniform <- list(n_dyads = nrow(counts_df),
+#                           dyad_ids = counts_df$dyad_id,
+#                           together = counts_df$event_count,
+#                           count_dyad = counts_df$count_dyad)
+# 
+# # fit model
+# fit_edges_uniform <- edge_binary_uniform$sample(
+#   data = counts_ls_uniform,
+#   chains = n_chains,
+#   parallel_chains = n_chains)
+# 
+# # extract edges
+# edges <- fit_edges_uniform$draws() %>% as.data.frame()
+# edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
+# edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
+# edge_names <- data.frame(name = colnames(edges1)) %>%
+#   separate(name, into = c('chain','weight'), sep = '.edge_')
+# colnames(edges1) <- edge_names$weight
+# edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
+# edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
+# edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
+# edges <- rbind(edges1, edges2, edges3, edges4)
+# n_samples <- nrow(edges)
+# edge_samples1 <- edges1 %>%
+#   pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
+# rm(edges1, edges2, edges3, edges4) ; gc()
 
-# calculate sri
-counts_df$sri <- counts_df$event_count / counts_df$count_dyad
-print('sri calculated in counts_df')
 
-# compile edge model
-edge_binary_uniform <- cmdstan_model('other/methods_paper/edge_binary_uniform.stan')
 
-# create data list for uniform model
-counts_ls_uniform <- list(n_dyads = nrow(counts_df),
-                          dyad_ids = counts_df$dyad_id,
-                          together = counts_df$event_count,
-                          count_dyad = counts_df$count_dyad)
+load('../outputs/sparse_network_methods_figures/model_run_uniform.RData')
 
-# fit model
-fit_edges_uniform <- edge_binary_uniform$sample(
-  data = counts_ls_uniform,
-  chains = n_chains,
-  parallel_chains = n_chains)
 
-# extract edges
-edges <- fit_edges_uniform$draws() %>% as.data.frame()
-edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
-edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
-edge_names <- data.frame(name = colnames(edges1)) %>%
-  separate(name, into = c('chain','weight'), sep = '.edge_')
-colnames(edges1) <- edge_names$weight
-edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
-edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
-edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
-edges <- rbind(edges1, edges2, edges3, edges4)
-n_samples <- nrow(edges)
-edge_samples1 <- edges1 %>%
-  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
-rm(edges1, edges2, edges3, edges4) ; gc()
 
 # plot
 (figure_uniform_posterior <- ggplot(data = edge_samples1)+
@@ -335,11 +387,12 @@ ggsave(filename = 'posterior_uniform_alldyads.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = figure_uniform_posterior, device = 'png', width = 1600, height = 700, units = 'px')
 
-edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
-edge_samples1 <- edge_samples1 %>%
-  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
-            by = 'dyad_males') %>%
-  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
+## UNCOMMENT LATER -- HAS TO BE REMOVED WHEN NOT RERUNNING THE MODELS, AND VIKING DOESN'T LIKE RUNNING THE MODELS
+# edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+# edge_samples1 <- edge_samples1 %>%
+#   left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
+#             by = 'dyad_males') %>%
+#   mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
 
 set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
 plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
@@ -350,16 +403,15 @@ edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
                  geom = "line", position = "identity", linewidth = 0)+
     scale_x_continuous(name = 'edge weight', limits = c(0,1))+
     scale_y_continuous(name = 'density', limits = c(0,40))+
-    scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5),
-                                   rgb(68/255, 1/255, 84/255, 0.5)),
+    scale_colour_manual(values = colours,
                         aesthetics = 'colour')+
-    theme(legend.position =  c(0.61,0.81),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
+    theme(legend.position = 'bottom', #c(0.61,0.81),
+          # legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
-          legend.title = element_text(size = 10),
-          legend.text = element_text(size = 8))+
-    guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
-    labs(colour = 'sightings together')
+          # legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8))#+
+    # guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
+    # labs(colour = 'sightings together')
 )
 ggsave(filename = 'posterior_uniform_sampledyads.png',
        path = '../outputs/sparse_network_methods_figures/',
@@ -400,12 +452,6 @@ ggsave(filename = 'edgesightings_uniform_withline.png',
                colour = rgb(33/255, 145/255, 140/255, 0.1),
                size = 0.5,
                shape = 19)+
-    # geom_smooth(data = averages[averages$together == 'never together',],
-    #             aes(x = count_dyad, y = median),
-    #             colour = rgb(68/255, 1/255, 84/255))+
-    # geom_smooth(data = averages[averages$together == 'together at least once',],
-    #             aes(x = count_dyad, y = median),
-    #             colour = rgb(68/255, 1/255, 84/255))+
     geom_smooth(data = averages,
                 aes(x = count_dyad, y = median, linetype = as.factor(together)),
                 colour = rgb(68/255, 1/255, 84/255))+
@@ -413,78 +459,88 @@ ggsave(filename = 'edgesightings_uniform_withline.png',
     scale_y_continuous(name = 'median weight', limits = c(-0.02,1.02), expand = c(0,0))+
     scale_linetype_manual(name = 'sightings together',
                           values = c(1,6))+
-    theme(legend.position = c(0.64,0.81),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
+    theme(legend.position = 'bottom',#c(0.64,0.81),
+          # legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
-          legend.title = element_text(size = 10),
-          legend.text = element_text(size = 8))
-)
+          # legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8)))
 ggsave(filename = 'edgesightings_uniform_twolines.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure_uniform_edgesightings.2, device = 'png', width = 700, height = 700, units = 'px')
+       plot = last_plot(), device = 'png', width = 700, height = 700, units = 'px')
 
 (figure_uniform_edgesightings.3 <- ggplot()+
     geom_point(data = edge_samples1,
                aes(x = count_dyad, y = weight),
-               colour = rgb(253/255, 231/255, 37/255, 0.01),
+               colour = rgb(253/255, 231/255, 37/255, 0.005),
                size = 0.5, shape = 19)+
     geom_point(data = averages,
                aes(x = count_dyad, y = median),
-               colour = rgb(33/255, 145/255, 140/255, 0.1),
-               size = 0.5, shape = 19)+
+               colour = rgb(94/255, 201/255, 98/255, 0.2),#rgb(33/255, 145/255, 140/255, 0.1),
+               size = 1, shape = 19)+
     geom_smooth(data = averages,
-                aes(x = count_dyad, y = median, linetype = as.factor(together)),
-                colour = rgb(68/255, 1/255, 84/255))+
+                aes(x = count_dyad, y = median,
+                    colour = as.factor(together)) #linetype = as.factor(together)),
+                )+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'edge weight',
                        limits = c(-0.02,1.02),
                        expand = c(0,0))+
-    scale_linetype_manual(name = 'sightings together',
-                          values = c(1,6))+
-    theme(legend.position = c(0.59,0.81),
+    # scale_linetype_manual(name = 'sightings together',
+    #                       values = c(1,6))+
+    scale_colour_manual(values = colours)+
+    theme(legend.position = 'bottom',#c(0.59,0.81),
           legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
           legend.text = element_text(size = 8))
-)
+  )
 ggsave(filename = 'edgesightings_uniform_allpoints_twolines.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = figure_uniform_edgesightings.3, device = 'png', width = 700, height = 700, units = 'px')
+       plot = last_plot(), device = 'png', width = 700, height = 700, units = 'px')
 
 save.image('../outputs/sparse_network_methods_figures/plots_bisonuniform.RData')
-rm(list = ls()) ; gc()
+rm(list = ls()[!ls() %in% c('counts_df','n_chains',
+                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'colours')]) ; gc()
 
 ## default normal(0,2.5), posterior distribution ####
-# compile edge model
-edge_binary_default <- cmdstan_model('other/methods_paper/edge_binary_gaussian.stan')
+# # compile edge model
+# edge_binary_default <- cmdstan_model('other/methods_paper/edge_binary_gaussian.stan')
+# 
+# # load data
+# counts_ls_default <- list(n_dyads = nrow(counts_df),
+#                           dyad_ids = counts_df$dyad_id,
+#                           together = counts_df$event_count,
+#                           count_dyad = counts_df$count_dyad)
+# 
+# # fit model
+# fit_edges_default <- edge_binary_default$sample(
+#   data = counts_ls_default,
+#   chains = n_chains,
+#   parallel_chains = n_chains)
+# 
+# # extract edges
+# edges <- fit_edges_default$draws() %>% as.data.frame()
+# edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
+# edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
+# edge_names <- data.frame(name = colnames(edges1)) %>%
+#   separate(name, into = c('chain','weight'), sep = '.edge_')
+# colnames(edges1) <- edge_names$weight
+# edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
+# edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
+# edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
+# edges <- rbind(edges1, edges2, edges3, edges4)
+# n_samples <- nrow(edges)
+# edge_samples1 <- edges1 %>%
+#   pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
+# rm(edges1, edges2, edges3, edges4) ; gc()
 
-# load data
-counts_ls_default <- list(n_dyads = nrow(counts_df),
-                          dyad_ids = counts_df$dyad_id,
-                          together = counts_df$event_count,
-                          count_dyad = counts_df$count_dyad)
 
-# fit model
-fit_edges_default <- edge_binary_default$sample(
-  data = counts_ls_default,
-  chains = n_chains,
-  parallel_chains = n_chains)
 
-# extract edges
-edges <- fit_edges_default$draws() %>% as.data.frame()
-edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
-edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
-edge_names <- data.frame(name = colnames(edges1)) %>%
-  separate(name, into = c('chain','weight'), sep = '.edge_')
-colnames(edges1) <- edge_names$weight
-edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
-edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
-edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
-edges <- rbind(edges1, edges2, edges3, edges4)
-n_samples <- nrow(edges)
-edge_samples1 <- edges1 %>%
-  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
-rm(edges1, edges2, edges3, edges4) ; gc()
+
+load('../outputs/sparse_network_methods_figures/model_run_default.RData')
+
+
 
 # plot
 (figure_default_posterior <- ggplot(data = edge_samples1)+
@@ -497,11 +553,12 @@ ggsave(filename = 'posterior_default_alldyads.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = figure_default_posterior, device = 'png', width = 1600, height = 700, units = 'px')
 
-edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
-edge_samples1 <- edge_samples1 %>%
-  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
-            by = 'dyad_males') %>%
-  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
+## UNCOMMENT LATER -- HAS TO BE REMOVED WHEN NOT RERUNNING THE MODELS, AND VIKING DOESN'T LIKE RUNNING THE MODELS
+# edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+# edge_samples1 <- edge_samples1 %>%
+#   left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
+#             by = 'dyad_males') %>%
+#   mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
 
 set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
 plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
@@ -512,20 +569,16 @@ edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
                  geom = "line", position = "identity", linewidth = 0)+
     scale_x_continuous(name = 'edge weight', limits = c(0,1))+
     scale_y_continuous(name = 'density', limits = c(0,40))+
-    scale_colour_manual(values = c(rgb(68/255, 1/255, 84/255, 0.5),
-                                   rgb(33/255, 145/255, 140/255, 0.5)),
+    scale_colour_manual(values = colours,
                         aesthetics = 'colour')+
-    theme(legend.position = 'none')
-)
-
-figure_default_posterior +
-  theme(legend.position = c(0.655,0.825),
-        legend.background = element_rect(fill = 'white', colour = 'black'),
+    theme(legend.position = 'bottom',#c(0.655,0.825),
+        # legend.background = element_rect(fill = 'white', colour = 'black'),
         legend.key.height = unit(4, 'mm'),
-        legend.title = element_text(size = 10),
-        legend.text = element_text(size = 8))+
-  guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
-  labs(colour = 'sightings together')
+        # legend.title = element_text(size = 10),
+        legend.text = element_text(size = 8))#+
+  # guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
+  # labs(colour = 'sightings together')
+)
 ggsave(filename = 'posterior_default_sampledyads.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
@@ -591,59 +644,71 @@ ggsave(filename = 'edgesightings_default_twolines.png',
                size = 0.5, shape = 19)+
     geom_point(data = averages,
                aes(x = count_dyad, y = median),
-               colour = rgb(33/255, 145/255, 140/255, 0.1),
-               size = 0.5, shape = 19)+
+               colour = rgb(94/255, 201/255, 98/255, 0.2),#rgb(33/255, 145/255, 140/255, 0.1),
+               size = 1, shape = 19)+
     geom_smooth(data = averages,
-                aes(x = count_dyad, y = median, linetype = as.factor(together)),
-                colour = rgb(68/255, 1/255, 84/255))+
+                aes(x = count_dyad, y = median,
+                    colour = as.factor(together)) #linetype = as.factor(together)),
+                #colour = rgb(68/255, 1/255, 84/255)
+                )+
     scale_x_continuous(name = 'total dyad sightings')+
-    scale_y_continuous(name = 'edge weight', limits = c(-0.02,1.02), expand = c(0,0))+
-    scale_linetype_manual(name = 'sightings together',
-                          values = c(1,6))+
-    theme(legend.position = 'none'))
-figure_default_edgesightings.3 +
-  theme(legend.position = c(0.655,0.825),
+    scale_y_continuous(name = 'edge weight',
+                       limits = c(-0.02,1.02),
+                       expand = c(0,0))+
+    # scale_linetype_manual(name = 'sightings together',
+    #                       values = c(1,6))+
+    scale_colour_manual(values = colours)+
+    theme(legend.position = 'bottom',#c(0.655,0.825),
         legend.background = element_rect(fill = 'white', colour = 'black'),
         legend.key.height = unit(4, 'mm'),
         legend.title = element_text(size = 10),
         legend.text = element_text(size = 8))
+)
 ggsave(filename = 'edgesightings_default_allpoints_twolines.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 700, height = 700, units = 'px')
 
 save.image('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
-rm(list = ls()) ; gc()
+rm(list = ls()[!ls() %in% c('counts_df','n_chains',
+                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'colours')]) ; gc()
 
 ## skewed beta(0.7, 5), posterior distribution ####
-# compile edge model
-edge_binary_skewed <- cmdstan_model('other/methods_paper/edge_binary_skewed.stan')
+# # compile edge model
+# edge_binary_skewed <- cmdstan_model('other/methods_paper/edge_binary_skewed.stan')
+# 
+# # respecify priors for skewed model
+# counts_ls_skewed <- list(n_dyads = nrow(counts_df),
+#                          dyad_ids = counts_df$dyad_id,
+#                          together = counts_df$event_count,
+#                          count_dyad = counts_df$count_dyad)
+# 
+# # fit model
+# fit_edges_skewed <- edge_binary_skewed$sample(
+#   data = counts_ls_skewed,
+#   chains = n_chains,
+#   parallel_chains = n_chains)
+# 
+# # extract edges
+# edges <- fit_edges_skewed$draws() %>% as.data.frame()
+# edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
+# edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
+# edge_names <- data.frame(name = colnames(edges1)) %>%
+#   separate(name, into = c('chain','weight'), sep = '.edge_')
+# colnames(edges1) <- edge_names$weight
+# edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
+# edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
+# edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
+# edges <- rbind(edges1, edges2, edges3, edges4)
+# n_samples <- nrow(edges)
+# edge_samples1 <- edges1 %>%
+#   pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
 
-# respecify priors for skewed model
-counts_ls_skewed <- list(n_dyads = nrow(counts_df),
-                         dyad_ids = counts_df$dyad_id,
-                         together = counts_df$event_count,
-                         count_dyad = counts_df$count_dyad)
 
-# fit model
-fit_edges_skewed <- edge_binary_skewed$sample(
-  data = counts_ls_skewed,
-  chains = n_chains,
-  parallel_chains = n_chains)
 
-# extract edges
-edges <- fit_edges_skewed$draws() %>% as.data.frame()
-edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
-edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
-edge_names <- data.frame(name = colnames(edges1)) %>%
-  separate(name, into = c('chain','weight'), sep = '.edge_')
-colnames(edges1) <- edge_names$weight
-edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
-edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
-edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
-edges <- rbind(edges1, edges2, edges3, edges4)
-n_samples <- nrow(edges)
-edge_samples1 <- edges1 %>%
-  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
+load('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
+
+
 
 # plot
 (figure_skewed_posterior <- ggplot(data = edge_samples1)+
@@ -655,11 +720,12 @@ ggsave(filename = 'posterior_skewed_alldyads.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = figure_skewed_posterior, device = 'png', width = 1600, height = 700, units = 'px')
 
-edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
-edge_samples1 <- edge_samples1 %>%
-  left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
-            by = 'dyad_males') %>%
-  mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
+## UNCOMMENT LATER -- HAS TO BE REMOVED WHEN NOT RERUNNING THE MODELS, AND VIKING DOESN'T LIKE RUNNING THE MODELS
+# edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+# edge_samples1 <- edge_samples1 %>%
+#   left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
+#             by = 'dyad_males') %>%
+#   mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
 
 set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
 plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
@@ -670,20 +736,16 @@ edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
                  geom = "line", position = "identity", linewidth = 0)+
     scale_x_continuous(name = 'edge weight', limits = c(0,1))+
     scale_y_continuous(name = 'density', limits = c(0,40))+
-    scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5),
-                                   rgb(68/255, 1/255, 84/255, 0.5)),
+    scale_colour_manual(values = colours,
                         aesthetics = 'colour')+
-    theme(legend.position = 'none')
+    theme(legend.position = 'bottom', #c(0.655,0.825),
+          # legend.background = element_rect(fill = 'white', colour = 'black'),
+          legend.key.height = unit(4, 'mm'),
+          # legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8))#+
+    # guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
+    # labs(colour = 'sightings together')
 )
-
-figure_skewed_posterior +
-  theme(legend.position = c(0.655,0.825),
-        legend.background = element_rect(fill = 'white', colour = 'black'),
-        legend.key.height = unit(4, 'mm'),
-        legend.title = element_text(size = 10),
-        legend.text = element_text(size = 8))+
-  guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))+
-  labs(colour = 'sightings together')
 ggsave(filename = 'posterior_skewed_sampledyads.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
@@ -735,16 +797,15 @@ ggsave(filename = 'edgesightings_skewed_withline.png',
                        limits = c(-0.02,1.02), expand = c(0,0))+
     scale_linetype_manual(name = 'sightings together',
                           values = c(1,6))+
-    theme(legend.position = 'none'))
-figure_skewed_edgesightings.2 +
-  theme(legend.position = c(0.655,0.825),
-        legend.background = element_rect(fill = 'white', colour = 'black'),
-        legend.key.height = unit(4, 'mm'),
-        legend.title = element_text(size = 10),
-        legend.text = element_text(size = 8))
+    theme(legend.position = c(0.655,0.825),
+          legend.background = element_rect(fill = 'white', colour = 'black'),
+          legend.key.height = unit(4, 'mm'),
+          legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8))
+)
 ggsave(filename = 'edgesightings_skewed_twolines.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png',
+       plot = figure_skewed_edgesightings.2, device = 'png',
        width = 700, height = 700, units = 'px')
 
 (figure_skewed_edgesightings.3 <- ggplot()+
@@ -754,65 +815,106 @@ ggsave(filename = 'edgesightings_skewed_twolines.png',
                size = 0.5, shape = 19)+
     geom_point(data = averages,
                aes(x = count_dyad, y = median),
-               colour = rgb(33/255, 145/255, 140/255, 0.1),
-               size = 0.5, shape = 19)+
+               colour = rgb(94/255, 201/255, 98/255, 0.2),#rgb(33/255, 145/255, 140/255, 0.1),
+               size = 1, shape = 19)+
     geom_smooth(data = averages,
-                aes(x = count_dyad, y = median, linetype = as.factor(together)),
-                colour = rgb(68/255, 1/255, 84/255))+
+                aes(x = count_dyad, y = median,
+                    colour = as.factor(together)) #linetype = as.factor(together)),
+                #colour = rgb(68/255, 1/255, 84/255)
+                )+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'edge weight',
-                       limits = c(-0.02,1.02), expand = c(0,0))+
-    scale_linetype_manual(name = 'sightings together',
-                          values = c(1,6))+
-    theme(legend.position = 'none'))
-figure_skewed_edgesightings.3 +
-  theme(legend.position = c(0.655,0.825),
-        legend.background = element_rect(fill = 'white', colour = 'black'),
-        legend.key.height = unit(4, 'mm'),
-        legend.title = element_text(size = 10),
-        legend.text = element_text(size = 8))
+                       limits = c(-0.02,1.02),
+                       expand = c(0,0))+
+    # scale_linetype_manual(name = 'sightings together',
+    #                       values = c(1,6))+
+    scale_colour_manual(values = colours)+
+    theme(legend.position = 'bottom', #c(0.655,0.825),
+          legend.background = element_rect(fill = 'white', colour = 'black'),
+          legend.key.height = unit(4, 'mm'),
+          legend.title = element_text(size = 10),
+          legend.text = element_text(size = 8))
+)
 ggsave(filename = 'edgesightings_skewed_allpoints_twolines.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png',
+       plot = figure_skewed_edgesightings.3, device = 'png',
        width = 700, height = 700, units = 'px')
 
 ## save outputs
 save.image('../outputs/sparse_network_methods_figures/plots_bisonskewed.RData')
+# rm(list = ls()[!ls() %in% c('counts_df','n_chains',
+#                             'priors_sri','priors_default','priors_skewed','prior_conditional',
+#                             'colours')]) ; gc()
 
 ## merge ####
 #rm(list = ls()) ; gc()
-load('../outputs/sparse_network_methods_figures/plots_bisonskewed.RData')
-rm(list = ls()[!ls() %in% c('figure_skewed_posterior','figure_skewed_edgesightings.3')]) ; gc()
+# load('../outputs/sparse_network_methods_figures/plots_bisonskewed.RData')
+rm(list = ls()[!ls() %in% c('figure_skewed_posterior','figure_skewed_edgesightings.3',
+                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'colours')]) ; gc()
 load('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
 rm(list = ls()[!ls() %in% c('figure_default_posterior','figure_default_edgesightings.3',
-                            'figure_skewed_posterior','figure_skewed_edgesightings.3')]) ; gc()
+                            'figure_skewed_posterior','figure_skewed_edgesightings.3',
+                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'colours')]) ; gc()
 load('../outputs/sparse_network_methods_figures/plots_bisonuniform.RData')
 rm(list = ls()[!ls() %in% c('figure_uniform_posterior','figure_uniform_edgesightings.3',
                             'figure_default_posterior','figure_default_edgesightings.3',
-                            'figure_skewed_posterior','figure_skewed_edgesightings.3')]) ; gc()
+                            'figure_skewed_posterior','figure_skewed_edgesightings.3',
+                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'colours')]) ; gc()
 save.image('../outputs/sparse_network_methods_figures/plots_unconditional.RData')
 
 # load('../outputs/sparse_network_methods_figures/plots_unconditional.RData')
-(figure_uniform_posterior + figure_default_posterior + figure_skewed_posterior) /
-  (figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+
+combined_top <- (figure_uniform_posterior + figure_default_posterior + figure_skewed_posterior)+
   plot_annotation(tag_levels = 'a')
-ggsave(filename = 'outputs_unconditional.png',
+(combined_top <- combined_top + plot_layout(guides = 'collect'))
+ggsave(filename = 'posterior_unconditional_noinset.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
+
+combined_bottom <- (figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+
+  plot_annotation(tag_levels = list(c('d','e','f')))
+(combined_bottom <- combined_bottom + plot_layout(guides = 'collect'))
+ggsave(filename = 'edgesightings_unconditional_noinset.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
+
+# (figure_uniform_posterior + figure_default_posterior + figure_skewed_posterior) /
+#   (figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+
+#   plot_annotation(tag_levels = 'a')
+(combined_top / combined_bottom)
+ggsave(filename = 'outputs_unconditional_noinset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
 
-(figure_uniform_posterior + figure_default_posterior + figure_skewed_posterior)+
+uniform_posterior_inset <- figure_uniform_posterior + 
+  inset_element(priors_sri,
+                left = 0.5, right = 0.99,
+                bottom = 0.5, top = 0.99)
+default_posterior_inset <- figure_default_posterior + 
+  inset_element(priors_default,
+                left = 0.5, right = 0.99,
+                bottom = 0.5, top = 0.99)
+skewed_posterior_inset <- figure_skewed_posterior + 
+  inset_element(priors_skewed,
+                left = 0.5, right = 0.99, 
+                bottom = 0.5, top = 0.99)
+
+combined_top <- (uniform_posterior_inset + default_posterior_inset + skewed_posterior_inset)+
   plot_annotation(tag_levels = 'a')
-ggsave(filename = 'posterior_unconditional.png',
+(combined_top <- combined_top + plot_layout(guides = 'collect'))
+ggsave(filename = 'posterior_unconditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
 
-(figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+
-  plot_annotation(tag_levels = list(c('d','e','f')))
-ggsave(filename = 'edgesightings_unconditional.png',
+(combined_top / combined_bottom)
+ggsave(filename = 'outputs_unconditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
+       plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
 
-rm(list = ls()) ; gc()
+rm(list = ls()[!ls() %in% c('priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'colours')]) ; gc()
 
 #### conditional outputs: 2 panel plot of conditional for posterior and edge_vs_sightings ####
 ## conditional, posterior distribution ####
@@ -836,7 +938,7 @@ rm(edge_binary, edge_samples, edgelist, motnp_ages, nodes, summary, x, n_dyads, 
     scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.05),
                                    rgb(68/255, 1/255, 84/255, 0.05)),
                         aesthetics = 'colour')+
-    theme(legend.position = c(0.5,0.7),
+    theme(legend.position = 'bottom', #c(0.5,0.7),
           legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
@@ -860,7 +962,7 @@ edges_subset <- edges_subset[edges_subset$chain == 'chain1',]
     scale_y_continuous(name = 'density', limits = c(-2, 72), expand = c(0,0))+
     scale_colour_manual(values = c(rgb(33/255, 145/255, 140/255, 0.5), rgb(68/255, 1/255, 84/255, 0.5)),
                         aesthetics = 'colour')+
-    theme(legend.position = c(0.55,0.75),
+    theme(legend.position = 'bottom',#c(0.55,0.75),
           legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
@@ -906,7 +1008,7 @@ ggsave(filename = 'edgesightings_conditional_withline.png',
     scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))+
     scale_linetype_manual(name = 'sightings together',
                           values = c(1,6))+
-    theme(legend.position = c(0.59,0.77),
+    theme(legend.position = 'bottom',#c(0.59,0.77),
           legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
@@ -932,7 +1034,7 @@ ggsave(filename = 'edgesightings_conditional_withline.png',
     scale_y_continuous(name = 'edge weight', limits = c(-0.02,1.02), expand = c(0,0))+
     scale_linetype_manual(name = 'sightings together',
                           values = c(1,6))+
-    theme(legend.position = c(0.55,0.75),
+    theme(legend.position = 'bottom',#c(0.55,0.75),
           legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
@@ -947,12 +1049,24 @@ save.image('../outputs/sparse_network_methods_figures/plots_conditional.RData')
 
 ## merge ####
 # load('../outputs/sparse_network_methods_figures/plots_conditional.RData')
-rm(list = ls()[ !ls() %in% c('posterior_conditional.2','edgesightings_conditional.3')]) ; gc()
+rm(list = ls()[ !ls() %in% c('posterior_conditional.2','edgesightings_conditional.3','priors_sri','priors_default','priors_skewed','prior_conditional','colours')]) ; gc()
 
 # run patchwork and save
-(posterior_conditional.2 + edgesightings_conditional.3) +
+combined <- (posterior_conditional.2 + edgesightings_conditional.3) +
   plot_annotation(tag_levels = 'a')
-ggsave(filename = 'outputs_conditional.png',
+(combined + plot_layout(guides = 'collect'))
+ggsave(filename = 'outputs_conditional_noinset.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 1680, height = 700, units = 'px')
+
+conditional_posterior_inset <- posterior_conditional.2 + 
+  inset_element(priors_conditional,
+                left = 0.5, right = 0.99,
+                bottom = 0.5, top = 0.99)
+combined <- (conditional_posterior_inset + edgesightings_conditional.3) +
+  plot_annotation(tag_levels = 'a')
+(combined + plot_layout(guides = 'collect'))
+ggsave(filename = 'outputs_conditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1680, height = 700, units = 'px')
 
@@ -1755,7 +1869,8 @@ save.image('../outputs/sparse_network_methods_figures/eigen_checks.RData')
 rm(list = ls()[!ls() %in% c('eigen0_sri.2','eigensightings_sri.2',
                             'eigen0_uniform.2','eigen0_default.2','eigen0_skewed.2',
                             'eigensightings_uniform.2','eigensightings_default.2','eigensightings_skewed.2',
-                            'eigen0_conditional.2','eigensightings_conditional.2')]) ; gc()
+                            'eigen0_conditional.2','eigensightings_conditional.2',
+                            'priors_sri','priors_default','priors_skewed','prior_conditional','colours')]) ; gc()
 
 # SRI
 (eigen0_sri.2 + eigensightings_sri.2)+
@@ -1769,7 +1884,45 @@ rm(eigen0_sri.2,eigensightings_sri.2) ; gc()
 (eigen0_uniform.2 + eigen0_default.2 + eigen0_skewed.2) /
   (eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)+
   plot_annotation(tag_levels = 'a')
-ggsave(filename = 'eigen_outputs_unconditional.png',
+ggsave(filename = 'eigen_outputs_unconditional_noinset.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
+
+uniform_eigen0_inset <- eigen0_uniform.2 + 
+  inset_element(priors_uniform,
+                left = 0.01, right = 0.25,
+                bottom = 0.75, top = 0.99)
+default_eigen0_inset <- eigen0_default.2 + 
+  inset_element(priors_default,
+                left = 0.01, right = 0.25,
+                bottom = 0.75, top = 0.99)
+skewed_eigen0_inset <- eigen0_skewed.2 + 
+  inset_element(priors_skewed,
+                left = 0.01, right = 0.25,
+                bottom = 0.75, top = 0.99)
+(uniform_eigen0_inset + default_eigen0_inset + skewed_eigen0_inset) /
+  (eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)+
+  plot_annotation(tag_levels = 'a')
+ggsave(filename = 'eigen_outputs_unconditional_inset.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
+
+uniform_eigensightings_inset <- eigensightings_uniform.2 + 
+  inset_element(priors_uniform,
+                left = 0.5, right = 0.99,
+                bottom = 0.5, top = 0.99)
+default_eigensightings_inset <- eigensightings_default.2 + 
+  inset_element(priors_default,
+                left = 0.5, right = 0.99,
+                bottom = 0.5, top = 0.99)
+skewed_eigensightings_inset <- eigensightings_skewed.2 + 
+  inset_element(priors_skewed,
+                left = 0.5, right = 0.99,
+                bottom = 0.5, top = 0.99)
+  (eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)/
+(eigen0_uniform.2 + eigen0_default.2 + eigen0_skewed.2) +
+  plot_annotation(tag_levels = 'a')
+ggsave(filename = 'eigen_outputs_unconditional_inset_revorder.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
 rm(eigen0_uniform.2,eigen0_default.2,eigen0_skewed.2,
@@ -1778,11 +1931,23 @@ rm(eigen0_uniform.2,eigen0_default.2,eigen0_skewed.2,
 # conditional
 (eigen0_conditional.2 + eigensightings_conditional.2)+
   plot_annotation(tag_levels = 'a')
-ggsave(filename = 'eigen_outputs_conditional.png',
+ggsave(filename = 'eigen_outputs_conditional_noinset.png',
+       path = '../outputs/sparse_network_methods_figures/',
+       plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
+
+conditional_eigensightings_inset <- eigensightings_conditional.2 + 
+  inset_element(priors_uniform,
+                left = 0.75, right = 0.99,
+                bottom = 0.75, top = 0.99)
+(conditional_eigensightings_inset + eigen0_conditional.2)+
+  plot_annotation(tag_levels = 'a')
+ggsave(filename = 'eigen_outputs_conditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
 
 #### Supplementary material: simulation -- 6 facet plot of 10 sightings vs 2 sightings, never together vs half together vs always together ####
+rm(list = ls()) ; gc()
+
 # define sequence over which to plot
 x <- seq(0, 1, length = 100)
 
