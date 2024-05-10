@@ -39,16 +39,17 @@ ggsave(filename = 'priors_sri.png',
        plot = priors_sri, device = 'png', width = 700, height = 700, units = 'px')
 
 # remove all information around it
-(priors_sri <- ggplot(data)+
+(inset_sri <- ggplot(data)+
     geom_line(aes(x = x, y = density),
               linewidth = 1.2,
               colour = rgb(33/255, 145/255, 140/255))+
-    scale_x_continuous(breaks = c(0,0.5,1),
+    scale_x_continuous(#breaks = c(0,0.5,1),
                        name = NULL)+
     scale_y_continuous(name = NULL,
-                       breaks = c(0,0.5,1),
+                       #breaks = c(0,0.5,1),
                        limits = c(0,1.05),
-                       expand = c(0,0))
+                       expand = c(0,0))+
+    theme(axis.text = element_blank(), axis.ticks = element_blank())
 )
 
 ## default, prior distribution ####
@@ -73,16 +74,17 @@ ggsave(filename = 'priors_default.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = priors_default, device = 'png', width = 700, height = 700, units = 'px')
 
-(priors_default <- ggplot(data)+
+(inset_default <- ggplot(data)+
     geom_line(aes(x = x, y = density),
               linewidth = 1.2,
               colour = rgb(33/255, 145/255, 140/255))+
-    scale_x_continuous(breaks = c(0,0.5,1),
-                       name = NULL)+
+    scale_x_continuous(#breaks = c(0,0.5,1),
+    name = NULL)+
     scale_y_continuous(name = NULL,
-                       breaks = c(0,0.1,0.2),
+                       #breaks = c(0,0.1,0.2),
                        limits = c(0,0.2),
-                       expand = c(0,0))
+                       expand = c(0,0))+
+    theme(axis.text = element_blank(), axis.ticks = element_blank())
 )
 
 ## skewed, prior distribution ####
@@ -106,20 +108,18 @@ ggsave(filename = 'priors_skewed.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = priors_skewed, device = 'png', width = 700, height = 700, units = 'px')
 
-(priors_skewed <- ggplot(data)+
+(inset_skewed <- ggplot(data)+
     geom_line(aes(x = x, y = density),
               linewidth = 1.2,
               colour = rgb(33/255, 145/255, 140/255))+
     scale_x_continuous(breaks = c(0,0.5,1),
                        name = NULL)+
     scale_y_continuous(name = NULL,
-                       breaks = c(0,1,2,3,4,5),
-                       limits = c(0,5),
-                       expand = c(0,0))
+                       #breaks = c(0,1,2,3,4,5),
+                       limits = c(-0.1,5),
+                       expand = c(0,0))+
+    theme(axis.text = element_blank(), axis.ticks = element_blank())
 )
-
-# clean up
-rm(list = ls()[!ls() %in% c('priors_sri','priors_default','priors_skewed')]) ; gc()
 
 ## merge ####
 (priors_sri + priors_default + priors_skewed) +
@@ -127,6 +127,9 @@ rm(list = ls()[!ls() %in% c('priors_sri','priors_default','priors_skewed')]) ; g
 ggsave(filename = 'priors_unconditional.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2100, height = 700, units = 'px')
+
+# clean up
+rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed')]) ; gc()
 
 #### conditional prior: 1 panel plot of conditional prior ####
 # define sequence over which to plot
@@ -169,8 +172,27 @@ ggsave(filename = 'prior_conditional.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = prior_conditional, device = 'png', width = 700, height = 600, units = 'px')
 
+(inset_conditional <- ggplot(data)+
+    geom_line(aes(x = x, y = y, colour = together, linetype = together),
+              #linetype = 1,
+              #colour = rgb(33/255, 145/255, 140/255),
+              linewidth = 1.2)+
+    scale_x_continuous(name = NULL)+
+    scale_y_continuous(name = NULL,
+                       expand = c(0,0),
+                       limits = c(0,15))+
+    scale_linetype_manual(name = NULL,#'sightings together',
+                          values = c(1,6))+
+    scale_colour_manual(name = NULL,#'sightings together',
+                        values = c(rgb(33/255, 145/255, 140/255),
+                                   rgb(68/255,1/255,84/255,1)))+
+    theme(axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          legend.position = 'none')
+)
+
 # clean up
-rm(list = ls()[!ls() %in% c('priors_sri','priors_default','priors_skewed','prior_conditional')]) ; gc()
+rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed','inset_conditional')]) ; gc()
 
 #### SRI outputs: 2 panel plot of SRI edges and edge_vs_sightings ####
 ## SRI edge bar graph ####
@@ -207,7 +229,7 @@ length(unique(c(subset10$id_1, subset10$id_2)))
     scale_y_continuous(name = 'number of dyads',
                        #limits = c(0,1000),
                        expand = c(0,0))+
-    annotate('text', x = 0.42, y = 165,
+    annotate('text', x = 0.44, y = 165,
              label = paste0('+ ', length(which(counts_df$sri == 0)), ' dyads with \nSRI = 0'),
              size = unit(4, 'pt'),
              colour = rgb(33/255, 145/255, 140/255))+
@@ -299,7 +321,7 @@ p7 <- as.data.frame(table(counts_df$count_dyad, counts_df$sri)) %>%
     scale_size_continuous(range = c(0.2, 2))+
     scale_linetype_manual(values = c(1,6),
                           breaks = c('all values','together at least once'),
-                          name = 'sightings together')+
+                          name = NULL)+ #'sightings together')+
     labs(size = 'number of dyads')+
     theme(legend.position = 'right', #c(0.54,0.72),
           #legend.background = element_rect(fill = 'white', colour = 'black'),
@@ -317,12 +339,12 @@ ggsave(filename = 'edgesightings_sri_twolines_changesize.png',
 
 # # clean up
 rm(list = ls()[!ls() %in% c('edges_sri','edgesightings_sri.2', 'counts_df',
-                            'priors_sri','priors_default','priors_skewed','prior_conditional')]) ; gc()
+                            'inset_sri','inset_default','inset_skewed','inset_conditional')]) ; gc()
 
 ## merge ####
 combined <- (edges_sri + edgesightings_sri.2)+
   plot_annotation(tag_levels = 'a')
-combined + plot_layout(guides = 'collect')
+combined + plot_layout(guides = 'collect') & theme(legend.position = 'bottom')
 ggsave(filename = 'outputs_sri.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
@@ -333,7 +355,7 @@ colours <- c('#21918c','#440154')
 ## uniform, posterior distribution ####
 # #rm(list = ls()) ; gc()
 # load('motnp_edgeweights_conditionalprior.RData')
-# rm(list = ls()[! ls() %in% c('counts_df','n_chains','eigen_sri','priors_sri','priors_default','priors_skewed','prior_conditional')])
+# rm(list = ls()[! ls() %in% c('counts_df','n_chains','eigen_sri','inset_sri','inset_default','inset_skewed','inset_conditional')])
 # 
 # # calculate sri
 # counts_df$sri <- counts_df$event_count / counts_df$count_dyad
@@ -457,7 +479,7 @@ ggsave(filename = 'edgesightings_uniform_withline.png',
                 colour = rgb(68/255, 1/255, 84/255))+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'median weight', limits = c(-0.02,1.02), expand = c(0,0))+
-    scale_linetype_manual(name = 'sightings together',
+    scale_linetype_manual(name = NULL, #'sightings together'
                           values = c(1,6))+
     theme(legend.position = 'bottom',#c(0.64,0.81),
           # legend.background = element_rect(fill = 'white', colour = 'black'),
@@ -485,7 +507,7 @@ ggsave(filename = 'edgesightings_uniform_twolines.png',
     scale_y_continuous(name = 'edge weight',
                        limits = c(-0.02,1.02),
                        expand = c(0,0))+
-    # scale_linetype_manual(name = 'sightings together',
+    # scale_linetype_manual(name = NULL, #'sightings together'
     #                       values = c(1,6))+
     scale_colour_manual(values = colours)+
     theme(legend.position = 'bottom',#c(0.59,0.81),
@@ -500,7 +522,7 @@ ggsave(filename = 'edgesightings_uniform_allpoints_twolines.png',
 
 save.image('../outputs/sparse_network_methods_figures/plots_bisonuniform.RData')
 rm(list = ls()[!ls() %in% c('counts_df','n_chains',
-                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 
 ## default normal(0,2.5), posterior distribution ####
@@ -626,7 +648,7 @@ ggsave(filename = 'edgesightings_default_withline.png',
     scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))+
     theme(legend.position = 'none'))
 figure_default_edgesightings.2 +
-  scale_linetype_manual(name = 'sightings together',
+  scale_linetype_manual(name = NULL, #'sightings together'
                         values = c(1,6))+
   theme(legend.position = c(0.655,0.825),
         legend.background = element_rect(fill = 'white', colour = 'black'),
@@ -655,7 +677,7 @@ ggsave(filename = 'edgesightings_default_twolines.png',
     scale_y_continuous(name = 'edge weight',
                        limits = c(-0.02,1.02),
                        expand = c(0,0))+
-    # scale_linetype_manual(name = 'sightings together',
+    # scale_linetype_manual(name = NULL, #'sightings together'
     #                       values = c(1,6))+
     scale_colour_manual(values = colours)+
     theme(legend.position = 'bottom',#c(0.655,0.825),
@@ -670,7 +692,7 @@ ggsave(filename = 'edgesightings_default_allpoints_twolines.png',
 
 save.image('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
 rm(list = ls()[!ls() %in% c('counts_df','n_chains',
-                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 
 ## skewed beta(0.7, 5), posterior distribution ####
@@ -795,7 +817,7 @@ ggsave(filename = 'edgesightings_skewed_withline.png',
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'median weight',
                        limits = c(-0.02,1.02), expand = c(0,0))+
-    scale_linetype_manual(name = 'sightings together',
+    scale_linetype_manual(name = NULL, #'sightings together'
                           values = c(1,6))+
     theme(legend.position = c(0.655,0.825),
           legend.background = element_rect(fill = 'white', colour = 'black'),
@@ -826,7 +848,7 @@ ggsave(filename = 'edgesightings_skewed_twolines.png',
     scale_y_continuous(name = 'edge weight',
                        limits = c(-0.02,1.02),
                        expand = c(0,0))+
-    # scale_linetype_manual(name = 'sightings together',
+    # scale_linetype_manual(name = NULL, #'sightings together'
     #                       values = c(1,6))+
     scale_colour_manual(values = colours)+
     theme(legend.position = 'bottom', #c(0.655,0.825),
@@ -843,39 +865,41 @@ ggsave(filename = 'edgesightings_skewed_allpoints_twolines.png',
 ## save outputs
 save.image('../outputs/sparse_network_methods_figures/plots_bisonskewed.RData')
 # rm(list = ls()[!ls() %in% c('counts_df','n_chains',
-#                             'priors_sri','priors_default','priors_skewed','prior_conditional',
+#                             'inset_sri','inset_default','inset_skewed','inset_conditional',
 #                             'colours')]) ; gc()
 
 ## merge ####
 #rm(list = ls()) ; gc()
 # load('../outputs/sparse_network_methods_figures/plots_bisonskewed.RData')
 rm(list = ls()[!ls() %in% c('figure_skewed_posterior','figure_skewed_edgesightings.3',
-                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 load('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
 rm(list = ls()[!ls() %in% c('figure_default_posterior','figure_default_edgesightings.3',
                             'figure_skewed_posterior','figure_skewed_edgesightings.3',
-                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 load('../outputs/sparse_network_methods_figures/plots_bisonuniform.RData')
 rm(list = ls()[!ls() %in% c('figure_uniform_posterior','figure_uniform_edgesightings.3',
                             'figure_default_posterior','figure_default_edgesightings.3',
                             'figure_skewed_posterior','figure_skewed_edgesightings.3',
-                            'priors_sri','priors_default','priors_skewed','prior_conditional',
+                            'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 save.image('../outputs/sparse_network_methods_figures/plots_unconditional.RData')
 
 # load('../outputs/sparse_network_methods_figures/plots_unconditional.RData')
 combined_top <- (figure_uniform_posterior + figure_default_posterior + figure_skewed_posterior)+
   plot_annotation(tag_levels = 'a')
-(combined_top <- combined_top + plot_layout(guides = 'collect'))
+(combined_top <- combined_top + 
+    plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'posterior_unconditional_noinset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
 
 combined_bottom <- (figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+
   plot_annotation(tag_levels = list(c('d','e','f')))
-(combined_bottom <- combined_bottom + plot_layout(guides = 'collect'))
+(combined_bottom <- combined_bottom + 
+    plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'edgesightings_unconditional_noinset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
@@ -888,22 +912,28 @@ ggsave(filename = 'outputs_unconditional_noinset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
 
-uniform_posterior_inset <- figure_uniform_posterior + 
-  inset_element(priors_sri,
+uniform_posterior_inset <- wrap_elements(figure_uniform_posterior + 
+  inset_element(inset_sri,
                 left = 0.5, right = 0.99,
-                bottom = 0.5, top = 0.99)
-default_posterior_inset <- figure_default_posterior + 
-  inset_element(priors_default,
+                bottom = 0.5, top = 0.99) +
+    theme(legend.position = 'none'))
+default_posterior_inset <- wrap_elements(figure_default_posterior + 
+  inset_element(inset_default,
                 left = 0.5, right = 0.99,
-                bottom = 0.5, top = 0.99)
-skewed_posterior_inset <- figure_skewed_posterior + 
-  inset_element(priors_skewed,
+                bottom = 0.5, top = 0.99) +
+    theme(legend.position = 'bottom', legend.title = element_blank()))
+skewed_posterior_inset <- wrap_elements(figure_skewed_posterior + 
+  inset_element(inset_skewed,
                 left = 0.5, right = 0.99, 
-                bottom = 0.5, top = 0.99)
+                bottom = 0.5, top = 0.99) +
+    theme(legend.position = 'none'))
 
 combined_top <- (uniform_posterior_inset + default_posterior_inset + skewed_posterior_inset)+
   plot_annotation(tag_levels = 'a')
-(combined_top <- combined_top + plot_layout(guides = 'collect'))
+(combined_top <- combined_top + 
+    theme(legend.position = 'bottom', legend.title = element_blank()) +
+    plot_layout(guides = 'collect')
+    )
 ggsave(filename = 'posterior_unconditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
@@ -913,7 +943,7 @@ ggsave(filename = 'outputs_unconditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
 
-rm(list = ls()[!ls() %in% c('priors_sri','priors_default','priors_skewed','prior_conditional',
+rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 
 #### conditional outputs: 2 panel plot of conditional for posterior and edge_vs_sightings ####
@@ -1006,7 +1036,7 @@ ggsave(filename = 'edgesightings_conditional_withline.png',
                 colour = rgb(68/255, 1/255, 84/255))+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'mean weight', limits = c(-0.02,1.02), expand = c(0,0))+
-    scale_linetype_manual(name = 'sightings together',
+    scale_linetype_manual(name = NULL, #'sightings together'
                           values = c(1,6))+
     theme(legend.position = 'bottom',#c(0.59,0.77),
           legend.background = element_rect(fill = 'white', colour = 'black'),
@@ -1032,7 +1062,7 @@ ggsave(filename = 'edgesightings_conditional_withline.png',
                 colour = rgb(68/255, 1/255, 84/255))+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'edge weight', limits = c(-0.02,1.02), expand = c(0,0))+
-    scale_linetype_manual(name = 'sightings together',
+    scale_linetype_manual(name = NULL, #'sightings together'
                           values = c(1,6))+
     theme(legend.position = 'bottom',#c(0.55,0.75),
           legend.background = element_rect(fill = 'white', colour = 'black'),
@@ -1049,23 +1079,24 @@ save.image('../outputs/sparse_network_methods_figures/plots_conditional.RData')
 
 ## merge ####
 # load('../outputs/sparse_network_methods_figures/plots_conditional.RData')
-rm(list = ls()[ !ls() %in% c('posterior_conditional.2','edgesightings_conditional.3','priors_sri','priors_default','priors_skewed','prior_conditional','colours')]) ; gc()
+rm(list = ls()[ !ls() %in% c('posterior_conditional.2','edgesightings_conditional.3','inset_sri','inset_default','inset_skewed','inset_conditional','colours')]) ; gc()
 
 # run patchwork and save
 combined <- (posterior_conditional.2 + edgesightings_conditional.3) +
   plot_annotation(tag_levels = 'a')
-(combined + plot_layout(guides = 'collect'))
+(combined + plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'outputs_conditional_noinset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1680, height = 700, units = 'px')
 
-conditional_posterior_inset <- posterior_conditional.2 + 
-  inset_element(priors_conditional,
+conditional_posterior_inset <- wrap_elements(posterior_conditional.2 + 
+  inset_element(inset_conditional,
                 left = 0.5, right = 0.99,
-                bottom = 0.5, top = 0.99)
+                bottom = 0.5, top = 0.99))
+
 combined <- (conditional_posterior_inset + edgesightings_conditional.3) +
   plot_annotation(tag_levels = 'a')
-(combined + plot_layout(guides = 'collect'))
+(combined + plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'outputs_conditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1680, height = 700, units = 'px')
@@ -1870,7 +1901,7 @@ rm(list = ls()[!ls() %in% c('eigen0_sri.2','eigensightings_sri.2',
                             'eigen0_uniform.2','eigen0_default.2','eigen0_skewed.2',
                             'eigensightings_uniform.2','eigensightings_default.2','eigensightings_skewed.2',
                             'eigen0_conditional.2','eigensightings_conditional.2',
-                            'priors_sri','priors_default','priors_skewed','prior_conditional','colours')]) ; gc()
+                            'inset_sri','inset_default','inset_skewed','inset_conditional','colours')]) ; gc()
 
 # SRI
 (eigen0_sri.2 + eigensightings_sri.2)+
@@ -1888,18 +1919,19 @@ ggsave(filename = 'eigen_outputs_unconditional_noinset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
 
-uniform_eigen0_inset <- eigen0_uniform.2 + 
-  inset_element(priors_uniform,
+uniform_eigen0_inset <- wrap_elements(eigen0_uniform.2 + 
+  inset_element(inset_sri,
                 left = 0.01, right = 0.25,
-                bottom = 0.75, top = 0.99)
-default_eigen0_inset <- eigen0_default.2 + 
-  inset_element(priors_default,
+                bottom = 0.75, top = 0.99))
+default_eigen0_inset <- wrap_elements(eigen0_default.2 + 
+  inset_element(inset_default,
                 left = 0.01, right = 0.25,
-                bottom = 0.75, top = 0.99)
-skewed_eigen0_inset <- eigen0_skewed.2 + 
-  inset_element(priors_skewed,
+                bottom = 0.75, top = 0.99))
+skewed_eigen0_inset <- wrap_elements(eigen0_skewed.2 + 
+  inset_element(inset_skewed,
                 left = 0.01, right = 0.25,
-                bottom = 0.75, top = 0.99)
+                bottom = 0.75, top = 0.99))
+
 (uniform_eigen0_inset + default_eigen0_inset + skewed_eigen0_inset) /
   (eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)+
   plot_annotation(tag_levels = 'a')
@@ -1907,19 +1939,20 @@ ggsave(filename = 'eigen_outputs_unconditional_inset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
 
-uniform_eigensightings_inset <- eigensightings_uniform.2 + 
-  inset_element(priors_uniform,
+uniform_eigensightings_inset <- wrap_elements(eigensightings_uniform.2 + 
+  inset_element(inset_sri,
                 left = 0.5, right = 0.99,
-                bottom = 0.5, top = 0.99)
-default_eigensightings_inset <- eigensightings_default.2 + 
-  inset_element(priors_default,
+                bottom = 0.5, top = 0.99))
+default_eigensightings_inset <- wrap_elements(eigensightings_default.2 + 
+  inset_element(inset_default,
                 left = 0.5, right = 0.99,
-                bottom = 0.5, top = 0.99)
-skewed_eigensightings_inset <- eigensightings_skewed.2 + 
-  inset_element(priors_skewed,
+                bottom = 0.5, top = 0.99))
+skewed_eigensightings_inset <- wrap_elements(eigensightings_skewed.2 + 
+  inset_element(inset_skewed,
                 left = 0.5, right = 0.99,
-                bottom = 0.5, top = 0.99)
-  (eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)/
+                bottom = 0.5, top = 0.99))
+
+(eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)/
 (eigen0_uniform.2 + eigen0_default.2 + eigen0_skewed.2) +
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'eigen_outputs_unconditional_inset_revorder.png',
@@ -1935,10 +1968,11 @@ ggsave(filename = 'eigen_outputs_conditional_noinset.png',
        path = '../outputs/sparse_network_methods_figures/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
 
-conditional_eigensightings_inset <- eigensightings_conditional.2 + 
-  inset_element(priors_uniform,
+conditional_eigensightings_inset <- wrap_elements(eigensightings_conditional.2 + 
+  inset_element(inset_sri,
                 left = 0.75, right = 0.99,
-                bottom = 0.75, top = 0.99)
+                bottom = 0.75, top = 0.99))
+
 (conditional_eigensightings_inset + eigen0_conditional.2)+
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'eigen_outputs_conditional_inset.png',
