@@ -120,14 +120,14 @@ get_mean_predictions <- function(predict_df, parameters, include_node = TRUE, in
   }
   
   if(include_window == TRUE){
-    window_effect <- parameters %>% dplyr::select(grep('rand_window', colnames(parameters), value=TRUE))
+    window_effect <- parameters %>% dplyr::select(grep('window_random_effect', colnames(parameters), value=TRUE))
     for(i in 1:nrow(mean_matrix)){
       mean_matrix[i,] <- mean_matrix[i,] + as.numeric(window_effect[i,predict_df$window])
     }
   }
   
   if(include_node == TRUE){
-    node_effect <- parameters %>% dplyr::select(grep('rand_node', colnames(parameters), value=TRUE))
+    node_effect <- parameters %>% dplyr::select(grep('node_random_effect', colnames(parameters), value=TRUE))
     for(i in 1:nrow(mean_matrix)){
       mean_matrix[i,] <- mean_matrix[i,] + as.numeric(node_effect[i, predict_df$node_random])
     }
@@ -136,6 +136,8 @@ get_mean_predictions <- function(predict_df, parameters, include_node = TRUE, in
   return(mean_matrix)
   
 }
+
+print('functions written')
 
 #################### SHORT WINDOWS ####################
 ## set seed for reproducibility
@@ -195,7 +197,8 @@ ggplot(nodes_all)+
 ## clean up
 rm(nodes_random, nodes) ; gc()
 save.image('anp_nodalregression/anp_short_nodal_dataprep.RData')
-write_csv(nodes_all, '../data_processed/step4_nodalregression/anp_allnodes.csv')
+write_csv(nodes_all, '../data_processed/step4_nodalregression/anp_allnodes_short.csv')
+print('node data created')
 
 #### reimport data and calculate centrality #####
 # load('anp_nodalregression/anp_short_nodal_dataprep.RData')
@@ -297,6 +300,7 @@ for(time_window in 2:n_windows){
 ## clean up and save workspace
 rm(cdf, cent_cov, cent_new, edge_samples, nodes, cent_mu, time_window, extract_eigen_centrality) ; gc()
 save.image('anp_nodalregression/anp_short_nodal.RData')
+print('data imported')
 
 #### visualise centralities #####
 df_plot <- data.frame(cents_all) %>%
@@ -316,6 +320,7 @@ ggplot(data = df_plot, aes(x = centrality, fill = age, group = node_window)) +
         axis.text.x = element_text(angle = 0, size = 12, debug = FALSE),
         axis.title.x = element_text(size = 12),
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
+print('centralities plotted')
 
 #### check normal approximation #####
 par(mfrow = c(3,3))
@@ -347,6 +352,7 @@ par(mfrow = c(1,1))
 ## clean up and save workspace
 rm(mean_df, df_plot, nodes_timewindow, node_id_check, node_id_sample, time_window, mu, cov, sim_cent_samples) ; gc()
 save.image('anp_nodalregression/anp_short_nodal_modelprep.RData')
+print('normal approximation complete')
 
 #### create data list #####
 load('anp_nodalregression/anp_short_nodal_modelprep.RData')
@@ -563,6 +569,8 @@ for(i in 2:n_windows){
   }
 }
 
+print('data created')
+
 #### prior predictive check ####
 n <- 100
 beta_age <- rnorm(n, 0, 0.8)
@@ -583,6 +591,7 @@ for(i in 1:n){
 }
 rm(n, max_raw, min_raw, beta_age, intercept) ; gc()
 dev.off()
+print('prior predictive completed, model ready to run')
 
 #### run model ####
 ## set model parameters
@@ -601,14 +610,15 @@ fit_anp_nodal <- nodal_regression$sample(data = model_data_list,
 
 ## save workspace
 save.image('anp_nodalregression/anp_short_nodal.RData')
+print('model run')
 
 #### check outputs ####
 #load('anp_nodalregression/anp_short_nodal.RData')
 
 ## define PDF output
-pdf('../outputs/step4_nodalregression/anp_nodalregression_modelchecks.pdf')
+pdf('../outputs/step4_nodalregression/anpshort_nodalregression_modelchecks.pdf')
 
-## extract model fit -- very good!
+## extract model fit -- window effects have very low ESS, but Rhat is good for all
 ( summary <- fit_anp_nodal$summary() )
 par(mfrow = c(3,1))
 hist(summary$rhat, breaks = 50)
@@ -622,18 +632,18 @@ params <- fit_anp_nodal$draws(format = 'draws_df')
 
 ## separate random effects from global parameters
 rand_window <- params %>%
-  dplyr::select(grep('rand_window', colnames(params), value=TRUE))
+  dplyr::select(grep('window_random_effect', colnames(params), value=TRUE))
 rand_node <- params %>%
-  dplyr::select(grep('rand_node', colnames(params), value=TRUE))
+  dplyr::select(grep('node_random_effect', colnames(params), value=TRUE))
 
 ## traceplot all parameters
 #traceplot(fit_anp_nodal, pars = c('intercept','beta_age','sigma','predictor[1]','predictor[50]','predictor[100]'))
 plot_params <- c('intercept','beta_age','sigma') #,'nu')
-plot_rand_nodes <- colnames(params)[sample(grep('rand_node',colnames(params)), size = 12, replace = F)]
-plot_rand_windows1 <- c('rand_window[1]','rand_window[2]','rand_window[3]','rand_window[4]','rand_window[5]','rand_window[6]','rand_window[7]','rand_window[8]','rand_window[9]')
-plot_rand_windows2 <- c('rand_window[10]','rand_window[11]','rand_window[12]','rand_window[13]','rand_window[14]','rand_window[15]','rand_window[16]','rand_window[17]','rand_window[18]')
-plot_rand_windows3 <- c('rand_window[19]','rand_window[20]','rand_window[21]','rand_window[22]','rand_window[23]','rand_window[24]','rand_window[25]','rand_window[26]','rand_window[27]')
-plot_rand_windows4 <- c('rand_window[28]','rand_window[29]','rand_window[30]','rand_window[31]','rand_window[32]','rand_window[33]','rand_window[34]','rand_window[35]','rand_window[36]')
+plot_rand_nodes <- colnames(params)[sample(grep('node_random_effect',colnames(params)), size = 12, replace = F)]
+plot_rand_windows1 <- c('window_random_effect[1]','window_random_effect[2]','window_random_effect[3]','window_random_effect[4]','window_random_effect[5]','window_random_effect[6]','window_random_effect[7]','window_random_effect[8]','window_random_effect[9]')
+plot_rand_windows2 <- c('window_random_effect[10]','window_random_effect[11]','window_random_effect[12]','window_random_effect[13]','window_random_effect[14]','window_random_effect[15]','window_random_effect[16]','window_random_effect[17]','window_random_effect[18]')
+plot_rand_windows3 <- c('window_random_effect[19]','window_random_effect[20]','window_random_effect[21]','window_random_effect[22]','window_random_effect[23]','window_random_effect[24]','window_random_effect[25]','window_random_effect[26]','window_random_effect[27]')
+plot_rand_windows4 <- c('window_random_effect[28]','window_random_effect[29]','window_random_effect[30]','window_random_effect[31]','window_random_effect[32]','window_random_effect[33]','window_random_effect[34]','window_random_effect[35]','window_random_effect[36]')
 
 # params %>%
 #   select(all_of(plot_params),`.draw`,`.chain`,`.iteration`) %>%
@@ -647,16 +657,17 @@ plot_rand_windows4 <- c('rand_window[28]','rand_window[29]','rand_window[30]','r
 #   facet_wrap(. ~ parameter, scales = 'free_y')+
 #   theme_bw()+
 #   theme(legend.position = 'none')
-traceplot(parameter_df = params, parameters_to_plot = plot_params)
-traceplot(parameter_df = params, parameters_to_plot = plot_rand_nodes)
-traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows1)
-traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows2)
-traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows3)
-traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows4)
+traceplot(parameter_df = params, parameters_to_plot = plot_params)         # intercept looks terrible, beta age and sigma look decent
+traceplot(parameter_df = params, parameters_to_plot = plot_rand_nodes)     # generally good
+traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows1)  # not horrendous, but also definitely not good
+traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows2)  # not horrendous, but also definitely not good
+traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows3)  # not horrendous, but also definitely not good
+traceplot(parameter_df = params, parameters_to_plot = plot_rand_windows4)  # not horrendous, but also definitely not good
 rm(plot_params,plot_rand_nodes,plot_rand_windows1,plot_rand_windows2,plot_rand_windows3,plot_rand_windows4) ; gc()
 
 ## save workspace
 save.image('anp_nodalregression/anp_short_nodal.RData')
+print('outputs checked')
 
 #### posterior predictive check ####
 par(mfrow = c(3,3))
@@ -669,8 +680,9 @@ for(time_window in 1:n_windows){
 par(mfrow = c(1,1))
 
 ## define PDF output
-dev.off
-pdf('../outputs/step4_nodalregression/anp_nodalregression_modelpredictions.pdf')
+dev.off()
+pdf('../outputs/step4_nodalregression/anpshort_nodalregression_modelpredictions.pdf')
+print('posterior predictive complete')
 
 #### predict from model -- standardised scale ####
 ## get mean predictions
@@ -683,15 +695,20 @@ nodes_all$mu_upr <- apply(mu_predictions, 2, quantile, prob = 0.975)
 nodes_all$mu_lwr <- apply(mu_predictions, 2, quantile, prob = 0.025)
 
 ## plot mean of model vs mean of raw data
-ggplot()+
-  geom_point(data = nodes_all, #size = 0.5,
-             mapping = aes(x = mean_eigen, y = mu_mean, colour = as.factor(window)))+
-  scale_colour_viridis_d()+
-  #facet_wrap(. ~ as.factor(window))+
-  labs(colour = 'window',
-       x = 'simulated mean (standardised)',
-       y = 'predicted mean (standardised)')+
-  geom_abline(slope = 1, intercept = 0) # add line showing where points would lie if model fit was perfect
+compare_plot <- ggplot()+
+    geom_point(data = nodes_all, #size = 0.5,
+               mapping = aes(x = mean_eigen, y = mu_mean, colour = age))+
+    scale_colour_viridis_c()+
+    facet_wrap(facets = . ~ as.factor(window))+
+    labs(colour = 'window',
+         x = 'raw eigen mean',
+         y = 'predicted mean')+
+    geom_abline(slope = 1, intercept = 0) # add line showing where points would lie if model fit was perfect
+compare_plot +
+  scale_x_continuous(limits = c(-7,-1))+
+  scale_y_continuous(limits = c(-7,-1))
+compare_plot +
+  facet_wrap(facets = . ~ as.factor(window), scales = 'free')
 
 ## put together sigma arrays, separated by time window
 num_nodes_windows <- unlist(model_data_list[grep('num_nodes_window', names(model_data_list))])
@@ -716,12 +733,12 @@ full_predictions <- matrix(NA, nrow = nrow(params), ncol = nrow(nodes_all),
 
 ## populate matrix using mean values in matrix mu_std, and sigma values based on time window
 for(time_window in 1:n_windows){
-    sigma_window <- sigma_list[[time_window]]
-    columns <- which(nodes_all$window == time_window)
-    for(i in 1:nrow(full_predictions)){
-      full_predictions[i,columns] <- MASS::mvrnorm(1,
-                                                   mu_predictions[i,columns],
-                                                   sigma_window[,,i])
+  sigma_window <- sigma_list[[time_window]]
+  columns <- which(nodes_all$window == time_window)
+  for(i in 1:nrow(full_predictions)){
+    full_predictions[i,columns] <- MASS::mvrnorm(1,
+                                                 mu_predictions[i,columns],
+                                                 sigma_window[,,i])
   }
 }
 
@@ -731,17 +748,21 @@ nodes_all$predict_upr_std <- apply(full_predictions, 2, quantile, prob = 0.975)
 
 ## plot predictions
 ggplot(nodes_all)+
-  geom_ribbon(aes(x = age, ymin = predict_lwr_std, ymax = predict_upr_std, fill = as.factor(window)),
-              alpha = 0.2)+                      # background layer showing the 95% CI of all predictions
-  geom_ribbon(aes(x = age, ymin = mu_lwr, ymax = mu_upr, fill = as.factor(window)),
-              alpha = 0.4)+                      # mid layer showing the 95% CI of predicted means
-  geom_line(aes(x = age, y = mu_mean, colour = as.factor(window)))+  # line showing mean of predicted means
-  geom_point(aes(x = age, y = mean_eigen), size = 0.5)+              # original data points (standardised centrality, actual age)
+  geom_ribbon(aes(x = age, fill = as.factor(window),
+                  ymin = predict_lwr_std, ymax = predict_upr_std),
+              alpha = 0.2)+                    # 95% CI of all predictions
+  geom_ribbon(aes(x = age, fill = as.factor(window),
+                  ymin = mu_lwr, ymax = mu_upr),
+              alpha = 0.4)+                    # 95% CI of predicted means
+  geom_line(aes(x = age, y = mu_mean,
+                colour = as.factor(window)))+  # line showing mean of predicted means
+  geom_point(aes(x = age, y = mean_eigen),
+             size = 0.5)+                      # raw data points
   scale_colour_viridis_d(begin = 0, end = 0.7)+
   scale_fill_viridis_d(begin = 0, end = 0.7)+
   scale_x_continuous(expand = c(0,0))+
   facet_wrap(. ~ as.factor(window),
-             scales = 'free')+             # separate plots per window
+             scales = 'free_y')+                 # separate plots per window
   theme(legend.position = 'none')+
   #guides(colour = guide_legend(nrow = 6),
   #       fill = guide_legend(nrow = 6))+
@@ -750,6 +771,7 @@ ggplot(nodes_all)+
 
 ## save workspace
 save.image('anp_nodalregression/anp_short_nodal.RData')
+print('predictions made')
 
 #### extract original values from output -- simulated slope value originally used produces an effect on the unstandardised scale. The model works on the standardised scale. Convert predictions to unstandardised scale and then run contrasts to calculate the slope coefficient. ####
 ## get mean predictions
@@ -787,12 +809,13 @@ quantile(contrast, prob = c(0.025, 0.975))            # very wide
 
 ## save workspace
 save.image('anp_nodalregression/anp_short_nodal.RData')
+print('contrasts complete')
 
 #### final "clean" plots using hypothetical data ####
 #load('anp_nodalregression/anp_short_nodal.RData')
 
 ## create dummy dataset
-newdat <- nodes_all %>% 
+newdat <- nodes_all %>%
   dplyr::select(node_random, age, age_std, window)
 
 ## get mean predictions
@@ -820,65 +843,71 @@ newdat$predict_pred_lwr <- apply(fake_pred, 2, quantile, prob = 0.025)
 newdat$predict_pred_upr <- apply(fake_pred, 2, quantile, prob = 0.975)
 
 ## plot predictions
-newdat_summary <- newdat %>% 
-  group_by(age, window) %>% 
+newdat_summary <- newdat %>%
+  group_by(age, window) %>%
   mutate(predict_pred_lwr = mean(predict_pred_lwr),
-         predict_pred_upr = mean(predict_pred_upr)) %>% 
-  dplyr::select(age, predict_pred_lwr, predict_pred_upr,window) %>% 
+         predict_pred_upr = mean(predict_pred_upr)) %>%
+  dplyr::select(age, predict_pred_lwr, predict_pred_upr,window) %>%
   distinct()
 
 ## plot mean values
 ggplot()+
   geom_ribbon(data = newdat_summary,
-              aes(x = age, ymin = predict_pred_lwr, ymax = predict_pred_upr, fill = as.factor(window)),
-              alpha = 0.2)+                      # background layer showing the 95% CI of all predictions
+              aes(ymin = predict_pred_lwr, ymax = predict_pred_upr,
+                  x = age, fill = as.factor(window)),
+              alpha = 0.2)+                      # 95% CI of all predictions
   geom_ribbon(data = newdat,
-              aes(x = age, ymin = predict_mean_lwr, ymax = predict_mean_upr, fill = as.factor(window)),
-              alpha = 0.4)+                      # mid layer showing the 95% CI of predicted means
+              aes(ymin = predict_mean_lwr, ymax = predict_mean_upr,
+                  x = age, fill = as.factor(window)),
+              alpha = 0.4)+                      # 95% CI of predicted means
   geom_line(data = newdat,
-            aes(x = age, y = predict_mean, colour = as.factor(window)))+  # line showing mean of predicted means
+            aes(x = age, y = predict_mean, colour = as.factor(window)))+  # predicted means
   geom_point(data = nodes_all,
-             aes(x = age, y = mean_eigen))+      # original data points (standardised centrality, actual age)
+             aes(x = age, y = mean_eigen))+      # original data points
   scale_colour_viridis_d(begin = 0, end = 0.7)+
   scale_fill_viridis_d(begin = 0, end = 0.7)+
   facet_wrap(. ~ as.factor(window))+             # separate plots per window
-  theme(legend.position = 'bottom')+
+  #theme(legend.position = 'bottom')+
+  theme(legend.position = 'none')+
   labs(colour = 'time window', fill = 'time window',
        y = 'eigenvector centrality', x = 'age (years)')
 print('mean values plotted')
 
 ## convert raw data to data frame
-cents_all_df <- cents_all %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'node_window', values_to = 'eigen') %>% 
+cents_all_df <- cents_all %>%
+  as.data.frame() %>%
+  pivot_longer(cols = everything(), names_to = 'node_window', values_to = 'eigen') %>%
   left_join(nodes_all[,c('node_window','age','window')], by = 'node_window')
 
-## plot full distribution
-ggplot()+
-  geom_ribbon(data = newdat_summary,
-              aes(x = age, ymin = predict_pred_lwr, ymax = predict_pred_upr, fill = as.factor(window)),
-              alpha = 0.2)+                      # background layer showing the 95% CI of all predictions
-  geom_ribbon(data = newdat,
-              aes(x = age, ymin = predict_mean_lwr, ymax = predict_mean_upr, fill = as.factor(window)),
-              alpha = 0.4)+                      # mid layer showing the 95% CI of predicted means
-  geom_point(data = cents_all_df,
-             aes(x = age, y = eigen),
-             alpha = 0.01, size = 0.5)+         # original data points (standardised centrality, actual age)
-  geom_line(data = newdat,
-            aes(x = age, y = predict_mean, colour = as.factor(window)))+  # line showing mean of predicted means
-  geom_point(data = nodes_all,
-             aes(x = age, y = mean_eigen),
-             size = 0.5, colour = 'white')+      # original mean data points (standardised centrality, actual age)
-  scale_colour_viridis_d(begin = 0, end = 0.7)+
-  scale_fill_viridis_d(begin = 0, end = 0.7)+
-  facet_wrap(. ~ as.factor(window))+             # separate plots per window
-  theme(legend.position = 'bottom')+
-  labs(colour = 'time window', fill = 'time window',
-       y = 'eigenvector centrality', x = 'age (years)')
+# ## plot full distribution
+# ggplot()+
+#   geom_ribbon(data = newdat_summary,
+#               aes(ymin = predict_pred_lwr, ymax = predict_pred_upr,
+#                   x = age, fill = as.factor(window)),
+#               alpha = 0.2)+                      # 95% CI of all predictions
+#   geom_ribbon(data = newdat,
+#               aes(ymin = predict_mean_lwr, ymax = predict_mean_upr,
+#                   x = age, fill = as.factor(window)),
+#               alpha = 0.4)+                      # 95% CI of predicted means
+#   geom_point(data = cents_all_df,
+#              aes(x = age, y = eigen),
+#              alpha = 0.01, size = 0.5)+         # original data points
+#   geom_line(data = newdat,
+#             aes(x = age, y = predict_mean, colour = as.factor(window)))+  # predicted means
+#   geom_point(data = nodes_all,
+#              aes(x = age, y = mean_eigen),
+#              size = 0.5, colour = 'white')+      # original mean data points
+#   scale_colour_viridis_d(begin = 0, end = 0.7)+
+#   scale_fill_viridis_d(begin = 0, end = 0.7)+
+#   facet_wrap(. ~ as.factor(window))+             # separate plots per window
+#   theme(legend.position = 'bottom')+
+#   labs(colour = 'time window', fill = 'time window',
+#        y = 'eigenvector centrality', x = 'age (years)')
 
 ## clean up and save workspace
 save.image('anp_nodalregression/anp_short_nodal.RData')
 dev.off()
+print('short windows complete')
 
 #################### LONG WINDOWS ####################
 set.seed(12345)
@@ -939,12 +968,13 @@ ggplot(nodes_all)+
 rm(nodes_random, nodes) ; gc()
 save.image('anp_nodalregression/anp_long_nodal_dataprep.RData')
 write_csv(nodes_all, '../data_processed/step4_nodalregression/anp_allnodes_long.csv')
+print('node data created')
 
 #### reimport data and calculate centrality #####
 # load('anp_nodalregression/anp_long_nodal_dataprep.RData')
 ## load time window 1 and remove additional data
 load('anp_edgecalculations/anplong1_edgeweights_conditionalprior.RData')
-rm(list = ls()[! ls() %in% c('nodes_all', 'cdf_1', 'edge_samples','n_windows','extract_eigen_centrality','traceplot','post_pred_check', 'get_mean_predictions')]) ; gc()
+rm(list = ls()[! ls() %in% c('nodes_all', 'cdf', 'edge_samples','n_windows','extract_eigen_centrality','traceplot','post_pred_check', 'get_mean_predictions')]) ; gc()
 
 ## select nodes data frame for window 1 -- do this from nodes_all, not the nodes data frame already in the saved workspace, so now working from randomised node ID, not original ID
 nodes <- nodes_all %>%
@@ -958,13 +988,13 @@ nodes_all <- nodes_all %>%
   filter(window != 1)
 
 ## randomise node IDs in dyads data frame
-cdf_1 <- cdf_1 %>%
+cdf <- cdf %>%
   left_join(nodes[,c('node_1','node_1_randomised')], by = 'node_1') %>%
   left_join(nodes[,c('node_2','node_2_randomised')], by = 'node_2')
 
 ## extract centrality for window 1
 cents_all <- extract_eigen_centrality(nodes_df = nodes,
-                                      dyads_df = cdf_1,
+                                      dyads_df = cdf,
                                       edgeweight_matrix = edge_samples,
                                       window = 1)
 
@@ -988,7 +1018,7 @@ covs_all[[1]] <- cent_cov1
 nodes_all <- rbind(nodes_all, nodes)
 
 ## clean up
-rm(cent_mu1, cent_cov1, nodes, cdf_1, mean_df) ; gc()
+rm(cent_mu1, cent_cov1, nodes, cdf, mean_df) ; gc()
 
 ## for loop
 for(time_window in 2:n_windows){
@@ -1039,7 +1069,8 @@ for(time_window in 2:n_windows){
 
 ## clean up and save workspace
 rm(cdf, cent_cov, cent_new, edge_samples, nodes, cent_mu, time_window, extract_eigen_centrality) ; gc()
-save.image('anp_nodalregression/anp_long_nodal.RData')
+save.image('anp_nodalregression/anp_long_nodal_modelprep.RData')
+print('data imported')
 
 #### visualise centralities #####
 df_plot <- data.frame(cents_all) %>%
@@ -1059,6 +1090,7 @@ ggplot(data = df_plot, aes(x = centrality, fill = age, group = node_window)) +
         axis.text.x = element_text(angle = 0, size = 12, debug = FALSE),
         axis.title.x = element_text(size = 12),
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
+print('centralities plotted')
 
 #### check normal approximation #####
 par(mfrow = c(3,3))
@@ -1090,9 +1122,10 @@ par(mfrow = c(1,1))
 ## clean up and save workspace
 rm(mean_df, df_plot, nodes_timewindow, node_id_check, node_id_sample, time_window, mu, cov, sim_cent_samples) ; gc()
 save.image('anp_nodalregression/anp_long_nodal_modelprep.RData')
+print('normal approximation complete')
 
 #### create data list #####
-load('anp_nodalregression/anp_long_nodal_modelprep.RData')
+#load('anp_nodalregression/anp_long_nodal_modelprep.RData')
 n_data <- nrow(nodes_all)
 n_nodes <- length(unique(nodes_all$node_random))
 n_windows <- length(unique(nodes_all$window))
@@ -1149,15 +1182,19 @@ model_data_list <- list(
 ## check inputs
 colour <- c('red','orange','yellow','green','blue','purple','magenta')
 plot(model_data_list$centrality_mu_1 ~ model_data_list$node_age[1:model_data_list$num_nodes_window1],
-     pch = shapes[1], col = colour[1],
+     pch = 19, col = colour[1],
      ylim = c(-10,0), xlim = c(-2.5,5))
 for(i in 2:n_windows){
   if(i < n_windows){
-    points(model_data_list[[(i+n_windows+4)]] ~ model_data_list$node_age[(model_data_list$num_nodes_prev_windows[i]+1):model_data_list$num_nodes_prev_windows[i+1]], col = colour[i])
+    points(model_data_list[[(i+n_windows+4)]] ~ model_data_list$node_age[(model_data_list$num_nodes_prev_windows[i]+1):model_data_list$num_nodes_prev_windows[i+1]],
+           col = colour[i], pch = 19)
   } else {
-    points(model_data_list[[(i+n_windows+4)]] ~ model_data_list$node_age[(model_data_list$num_nodes_prev_windows[i]+1):length(model_data_list$node_age)], col = colour[i])
+    points(model_data_list[[(i+n_windows+4)]] ~ model_data_list$node_age[(model_data_list$num_nodes_prev_windows[i]+1):length(model_data_list$node_age)],
+           col = colour[i], pch = 19)
   }
 }
+
+print('data created')
 
 #### prior predictive check ####
 n <- 100
@@ -1179,6 +1216,7 @@ for(i in 1:n){
 }
 rm(n, max_raw, min_raw, beta_age, intercept) ; gc()
 dev.off()
+print('prior predictive completed, model ready to run')
 
 #### run model ####
 ## set model parameters
@@ -1186,7 +1224,7 @@ n_chains <- 4
 n_samples <- 1000
 
 ## load model
-nodal_regression <- cmdstan_model('models/eigen_regression_anp.stan',
+nodal_regression <- cmdstan_model('models/eigen_regression_anplong.stan',
                                   cpp_options = list(stan_threads = TRUE))
 
 ## run model
@@ -1197,12 +1235,13 @@ fit_anp_nodal <- nodal_regression$sample(data = model_data_list,
 
 ## save workspace
 save.image('anp_nodalregression/anp_long_nodal.RData')
+print('model run')
 
 #### check outputs ####
 #load('anp_nodalregression/anp_long_nodal.RData')
 
 ## define PDF output
-pdf('../outputs/step4_nodalregression/anp_nodalregression_modelchecks.pdf')
+pdf('../outputs/step4_nodalregression/anplong_nodalregression_modelchecks.pdf')
 
 ## extract model fit -- very good!
 ( summary <- fit_anp_nodal$summary() )
@@ -1218,15 +1257,15 @@ params <- fit_anp_nodal$draws(format = 'draws_df')
 
 ## separate random effects from global parameters
 rand_window <- params %>%
-  dplyr::select(grep('rand_window', colnames(params), value=TRUE))
+  dplyr::select(grep('window_random_effect', colnames(params), value=TRUE))
 rand_node <- params %>%
-  dplyr::select(grep('rand_node', colnames(params), value=TRUE))
+  dplyr::select(grep('node_random_effect', colnames(params), value=TRUE))
 
 ## traceplot all parameters
 #traceplot(fit_anp_nodal, pars = c('intercept','beta_age','sigma','predictor[1]','predictor[50]','predictor[100]'))
 plot_params <- c('intercept','beta_age','sigma') #,'nu')
-plot_rand_nodes <- colnames(params)[sample(grep('rand_node',colnames(params)), size = 12, replace = F)]
-plot_rand_windows <- colnames(params)[grep('rand_window',colnames(params))]
+plot_rand_nodes <- colnames(params)[sample(grep('node_random_effect',colnames(params)), size = 12, replace = F)]
+plot_rand_windows <- colnames(params)[grep('window_random_effect',colnames(params))]
 
 traceplot(parameter_df = params, parameters_to_plot = plot_params)
 traceplot(parameter_df = params, parameters_to_plot = plot_rand_nodes)
@@ -1235,6 +1274,7 @@ rm(plot_params,plot_rand_nodes,plot_rand_windows) ; gc()
 
 ## save workspace
 save.image('anp_nodalregression/anp_long_nodal.RData')
+print('outputs checked')
 
 #### posterior predictive check ####
 par(mfrow = c(3,3))
@@ -1248,7 +1288,8 @@ par(mfrow = c(1,1))
 
 ## define PDF output
 dev.off
-pdf('../outputs/step4_nodalregression/anp_nodalregression_modelpredictions.pdf')
+pdf('../outputs/step4_nodalregression/anplong_nodalregression_modelpredictions.pdf')
+print('posterior predictive complete')
 
 #### predict from model -- standardised scale ####
 ## get mean predictions
@@ -1261,15 +1302,20 @@ nodes_all$mu_upr <- apply(mu_predictions, 2, quantile, prob = 0.975)
 nodes_all$mu_lwr <- apply(mu_predictions, 2, quantile, prob = 0.025)
 
 ## plot mean of model vs mean of raw data
-ggplot()+
+compare_plot <- ggplot()+
   geom_point(data = nodes_all, #size = 0.5,
-             mapping = aes(x = mean_eigen, y = mu_mean, colour = as.factor(window)))+
-  scale_colour_viridis_d()+
-  #facet_wrap(. ~ as.factor(window))+
+             mapping = aes(x = mean_eigen, y = mu_mean, colour = age))+
+  scale_colour_viridis_c()+
+  facet_wrap(facets = . ~ as.factor(window))+
   labs(colour = 'window',
-       x = 'simulated mean (standardised)',
-       y = 'predicted mean (standardised)')+
+       x = 'raw eigen mean',
+       y = 'predicted mean')+
   geom_abline(slope = 1, intercept = 0) # add line showing where points would lie if model fit was perfect
+compare_plot + 
+  scale_x_continuous(limits = c(-7,-1))+
+  scale_y_continuous(limits = c(-7,-1))
+compare_plot + 
+  facet_wrap(facets = . ~ as.factor(window), scales = 'free')
 
 ## put together sigma arrays, separated by time window
 num_nodes_windows <- unlist(model_data_list[grep('num_nodes_window', names(model_data_list))])
@@ -1328,6 +1374,7 @@ ggplot(nodes_all)+
 
 ## save workspace
 save.image('anp_nodalregression/anp_long_nodal.RData')
+print('predictions made')
 
 #### extract original values from output -- simulated slope value originally used produces an effect on the unstandardised scale. The model works on the standardised scale. Convert predictions to unstandardised scale and then run contrasts to calculate the slope coefficient. ####
 ## get mean predictions
@@ -1365,6 +1412,7 @@ quantile(contrast, prob = c(0.025, 0.975))            # very wide
 
 ## save workspace
 save.image('anp_nodalregression/anp_long_nodal.RData')
+print('contrasts complete')
 
 #### final "clean" plots using hypothetical data ####
 #load('anp_nodalregression/anp_long_nodal.RData')
@@ -1457,3 +1505,4 @@ ggplot()+
 ## clean up and save workspace
 save.image('anp_nodalregression/anp_long_nodal.RData')
 dev.off()
+print('long windows complete')
