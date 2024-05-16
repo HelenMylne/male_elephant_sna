@@ -597,3 +597,19 @@ for(time_window in 3:n_windows){
   rm(counts_df, edge_samples, edgelist, edges, fit_edges_mpnp, nodes, summary, n_dyads) ; gc()
   
 }
+
+#### plot all short outputs of 0.15 for thesis ####
+n_windows <- 5
+for(time_window in 1:n_windows){
+  pdf(paste0('../outputs/step3_edgeweightestimation/mpnpshort',time_window,'_network_0.15.png'))
+  
+  load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  
+  plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.15,
+                              node.size = nodes, node.colour = nodes, lwd = 15)
+  
+  dev.off()
+  rm(list = ls()[!ls() %in% c('time_window','n_windows')]) ; gc()
+  
+  print(time_window)
+}
