@@ -619,117 +619,131 @@ theme_set(theme_classic())
 ######## short window ########
 rm(list = ls()) ; gc()
 pdf('../outputs/step4_nodalregression/mpnpshort_nodalregression_modelprep.pdf')
-
-## set seed for reproducibility
-set.seed(12345)
-
-## load data and remove additional data
-load('mpnp_edgecalculations/mpnpshort5_edgeweights_conditionalprior.RData')
-rm(eles, edges, edgelist, summary, edge_binary, fit_edges_mpnp, mean_ages, make_edgelist, plot_network_threshold_mpnp) ; gc()
-
-nodes_all <- nodes %>% 
-  mutate(window = 5)
-cdf_all <- counts_df
-edge_samples_all <- list() ; edge_samples_all[[5]] <- edge_samples
-num_nodes_all <- list() ; num_nodes_all[[5]] <- n_dyads
-rm(edge_samples, counts_df, nodes)
-
-for(time_window in 4:1){
-  print(paste0('start time window ', time_window))
-  
-  # load next window
-  load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  rm(list = ls()[!ls() %in% c('counts_df','cdf_all','edge_samples','edge_samples_all','edge_weights_matrix','nodes','nodes_all','num_nodes_all','time_window')])
-  
-  # find age data for ones that don't have it already
-  if(length(colnames(nodes_all)) != length(colnames(nodes))+1){
-    ages <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
-    nodes <- nodes %>% 
-      filter(id %in% colnames(ages)) %>% 
-      mutate(age = NA)
-    for(i in 1:nrow(nodes)){
-      nodes$age[i] <- mean(ages[,which(colnames(ages) == nodes$id[i])])
-    }
-  } else {
-    if(max(nodes$age) <= 10){
-      ages <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
-      nodes <- nodes %>% 
-        filter(id %in% colnames(ages)) %>% 
-        mutate(age = NA)
-      for(i in 1:nrow(nodes)){
-        nodes$age[i] <- mean(ages[,which(colnames(ages) == nodes$id[i])])
-      }
-    }
-  }
-  
-  # make sure correct version of edge samples goes in
-  if('edge_weights_matrix' %in% ls()){
-    if(ncol(edge_weights_matrix) == nrow(counts_df) | 
-       ncol(edge_weights_matrix) == nrow(counts_df) + 1){
-      edge_samples <- edge_weights_matrix
-      print('edge weights matrix renamed to edge samples')
-    } else {
-      if(ncol(edge_samples) == nrow(counts_df) | 
-         ncol(edge_samples) == nrow(counts_df) + 1){
-        print('edge samples input raw')
-      } else{
-        print("edge samples don't match number of dyads -- WARNING!! THIS NEEDS TO BE REDONE AND CHECKED OVER")
-      }
-    }
-  }
-  
-  # join data
-  nodes <- nodes %>% 
-    mutate(window = time_window)
-  nodes_all <- rbind(nodes, nodes_all)
-  cdf_all <- rbind(counts_df, cdf_all)
-  edge_samples_all[[time_window]] <- edge_samples
-  num_nodes_all[[time_window]] <- nrow(counts_df)
-  
-  # clear data from current time step
-  rm(edge_samples, edge_weights_matrix, ages, nodes, counts_df) ; gc()
-}
-
-rm(edge_samples, edge_weights_matrix, ages, nodes, n_dyads, time_window) ; gc()
-
-#### filter down to only elephants with known age categories ####
-## ages
-hist(nodes_all$age, breaks = 50)
-nodes_all$age_cat <- ifelse(nodes_all$age < 16, 1,
-                        ifelse(nodes_all$age < 21, 2,
-                               ifelse(nodes_all$age < 26, 3,
-                                      ifelse(nodes_all$age < 36, 4, 5))))
-## nodes data frame
-nodes_all <- nodes_all %>%
-  filter(! is.na(age_cat))
-n_age_cat <- length(unique(nodes_all$age_cat))
-
-## randomise node IDs
-node_random <- nodes_all %>% 
-  dplyr::select(id, node) %>% 
-  distinct()
-node_random$node_rand <- sample(1:nrow(node_random), replace = F)
-nodes_all <- nodes_all %>% 
-  left_join(node_random, by = c('id','node')) %>% 
-  mutate(node_window = paste0(node_rand,'_',window))
-
-## dyads data frame
-ele_ids <- node_random$id
-counts_df <- counts_df %>%
-  filter(id_1 %in% ele_ids) %>%
-  filter(id_2 %in% ele_ids)
-
-## define population parameters
-n_eles <- length(ele_ids)
-n_dyads <- nrow(counts_df)
-
-## see if ages have similar average across time windows -- not especially, but not horrendous
-ggplot(nodes_all)+
-  geom_bar(aes(x = as.factor(age_cat)))+
-  facet_wrap(. ~ window)
-
-print('population information collated')
-
+# 
+# ## set seed for reproducibility
+# set.seed(12345)
+# 
+# ## load data and remove additional data
+# load('mpnp_edgecalculations/mpnpshort5_edgeweights_conditionalprior.RData')
+# rm(eles, edges, edgelist, summary, edge_binary, fit_edges_mpnp, mean_ages, make_edgelist, plot_network_threshold_mpnp) ; gc()
+# 
+# nodes_all <- nodes %>% 
+#   mutate(window = 5)
+# cdf_all <- counts_df
+# edge_samples_all <- list() ; edge_samples_all[[5]] <- edge_samples
+# num_nodes_all <- list() ; num_nodes_all[[5]] <- n_dyads
+# rm(edge_samples, counts_df, nodes)
+# 
+# for(time_window in 4:1){
+#   print(paste0('start time window ', time_window))
+#   
+#   # load next window
+#   load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+#   rm(list = ls()[!ls() %in% c('counts_df','cdf_all','edge_samples','edge_samples_all','edge_weights_matrix','nodes','nodes_all','num_nodes_all','time_window')])
+#   
+#   # find age data for ones that don't have it already
+#   if(length(colnames(nodes_all)) != length(colnames(nodes))+1){
+#     ages <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+#     nodes <- nodes %>% 
+#       filter(id %in% colnames(ages)) %>% 
+#       mutate(age = NA)
+#     for(i in 1:nrow(nodes)){
+#       nodes$age[i] <- mean(ages[,which(colnames(ages) == nodes$id[i])])
+#     }
+#   } else {
+#     if(max(nodes$age, na.rm = T) <= 10){
+#       ages <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',time_window,'_ageestimates_mcmcoutput.rds'))
+#       nodes <- nodes %>% 
+#         filter(id %in% colnames(ages)) %>% 
+#         mutate(age = NA)
+#       for(i in 1:nrow(nodes)){
+#         nodes$age[i] <- mean(ages[,which(colnames(ages) == nodes$id[i])])
+#       }
+#     }
+#   }
+#   
+#   # make sure correct version of edge samples goes in
+#   if('edge_weights_matrix' %in% ls()){
+#     if(ncol(edge_weights_matrix) == nrow(counts_df) | 
+#        ncol(edge_weights_matrix) == nrow(counts_df) + 1){
+#       edge_samples <- edge_weights_matrix
+#       print('edge weights matrix renamed to edge samples')
+#     } else {
+#       if(ncol(edge_samples) == nrow(counts_df) | 
+#          ncol(edge_samples) == nrow(counts_df) + 1){
+#         print('edge samples input raw')
+#       } else{
+#         print("edge samples don't match number of dyads -- WARNING!! THIS NEEDS TO BE REDONE AND CHECKED OVER")
+#       }
+#     }
+#   }
+#   
+#   # join data
+#   nodes <- nodes %>% 
+#     mutate(window = time_window)
+#   nodes_all <- rbind(nodes, nodes_all)
+#   cdf_all <- rbind(counts_df, cdf_all)
+#   edge_samples_all[[time_window]] <- edge_samples
+#   num_nodes_all[[time_window]] <- nrow(counts_df)
+#   
+#   # clear data from current time step
+#   rm(edge_samples, edge_weights_matrix, ages, nodes, counts_df) ; gc()
+# }
+# 
+# #### filter down to only elephants with known age categories ####
+# ## ages
+# hist(nodes_all$age, breaks = 50)
+# nodes_all$age_cat <- ifelse(nodes_all$age < 16, 1,
+#                         ifelse(nodes_all$age < 21, 2,
+#                                ifelse(nodes_all$age < 26, 3,
+#                                       ifelse(nodes_all$age < 36, 4, 5))))
+# ## nodes data frame
+# nodes_all <- nodes_all %>%
+#   filter(! is.na(age_cat))
+# n_age_cat <- length(unique(nodes_all$age_cat))
+# 
+# ## randomise node IDs
+# node_random <- nodes_all %>% 
+#   dplyr::select(id, node) %>% 
+#   distinct()
+# node_random$node_rand <- sample(1:nrow(node_random), replace = F)
+# nodes_all <- nodes_all %>% 
+#   left_join(node_random, by = c('id','node')) %>% 
+#   mutate(node_window = paste0(node_rand,'_',window))
+# 
+# ## dyads data frame
+# ele_ids <- node_random$id
+# cdf_all <- cdf_all %>%
+#   filter(id_1 %in% ele_ids) %>%
+#   filter(id_2 %in% ele_ids)
+# node_random <- node_random %>% 
+#   rename(id_1 = id,
+#          node_1 = node,
+#          node_1_randomised = node_rand) %>% 
+#   mutate(id_2 = id_1,
+#          node_2 = node_1,
+#          node_2_randomised = node_1_randomised)
+# cdf_all <- cdf_all %>% 
+#   left_join(node_random[,c('id_1','node_1','node_1_randomised')],
+#             by = c('id_1','node_1')) %>% 
+#   left_join(node_random[,c('id_2','node_2','node_2_randomised')],
+#             by = c('id_2','node_2')) %>% 
+#   mutate(dyad_id_random = paste0(node_1_randomised, '_', node_2_randomised)) %>% 
+#   mutate(dyad_id_random = as.integer(as.factor(dyad_id_random)))
+# 
+# ## define population parameters
+# n_eles <- length(ele_ids)
+# n_data <- nrow(cdf_all)
+# n_dyads <- length(unique(cdf_all$dyad_id_random))
+# n_windows <- length(unique(cdf_all$period))
+# 
+# ## see if ages have similar average across time windows -- not especially, but not horrendous
+# ggplot(nodes_all)+
+#   geom_bar(aes(x = as.factor(age_cat)))+
+#   facet_wrap(. ~ window)
+# 
+# print('population information collated')
+# 
 #### extract centralities ####
 ## create function to extract centrality
 extract_eigen_centrality <- function(nodes_df, dyads_df, edgeweight_matrix, logit = TRUE, window){
@@ -737,27 +751,27 @@ extract_eigen_centrality <- function(nodes_df, dyads_df, edgeweight_matrix, logi
   num_nodes <- nrow(nodes_df)
   num_dyads <- nrow(dyads_df)
   num_samples <- nrow(edgeweight_matrix)
-  
+
   ## build adjacency tensor
   dyads_df$node_1_id <- as.integer(as.factor(dyads_df$node_1_randomised))
   dyads_df$node_2_id <- as.integer(as.factor(dyads_df$node_2_randomised))+1
   adj_tensor <- array(0, c(num_samples, num_nodes, num_nodes),
                       dimnames = list(NULL, nodes_df$node_window, nodes_df$node_window))
-  
+
   ## fill adjacency tensor
   for(dyad_id in 1:num_dyads) {
     dyad_row <- dyads_df[dyad_id, ]
     adj_tensor[, dyad_row$node_1_id, dyad_row$node_2_id] <- edgeweight_matrix[, dyad_id]
     adj_tensor[, dyad_row$node_2_id, dyad_row$node_1_id] <- edgeweight_matrix[, dyad_id]
   }
-  
+
   ## calculate centrality and store posterior samples in a matrix
   centrality_samples_invlogit <- matrix(0, num_samples, num_nodes,
                                         dimnames = list(NULL, nodes_df$node_window))
   for(i in 1:(num_samples)){
     centrality_samples_invlogit[i, ] <- sna::evcent(adj_tensor[i,,], gmode = 'graph')
   }
-  
+
   ## convert to logit scale
   if(logit == TRUE) {
     centrality_samples <- logit(centrality_samples_invlogit)
@@ -766,76 +780,98 @@ extract_eigen_centrality <- function(nodes_df, dyads_df, edgeweight_matrix, logi
     return(centrality_samples_invlogit)
   }
 }
+# 
+# # ## select nodes data frame for window 1 -- do this from nodes_all, not the nodes data frame already in the saved workspace, so now working from randomised node ID, not original ID
+# # nodes_join <- node_random %>%
+# #   #filter(window == 5) %>%
+# #   mutate(node_1 = node,
+# #          node_2 = node,
+# #          node_1_randomised = node_rand,
+# #          node_2_randomised = node_rand) %>% 
+# #   distinct()
+# # 
+# # ## randomise node IDs in dyads data frame
+# # cdf_all <- cdf_all %>%
+# #   left_join(nodes_join[,c('node_1','node_1_randomised')], by = 'node_1') %>%
+# #   left_join(nodes_join[,c('node_2','node_2_randomised')], by = 'node_2')
+# 
+# ## extract centrality for window 5
+# cents_all <- extract_eigen_centrality(nodes_df = nodes_all[nodes_all$window == 5,],
+#                                       dyads_df = cdf_all[cdf_all$period == 5,],
+#                                       edgeweight_matrix = edge_samples_all[[5]],
+#                                       window = 5)
+# 
+# ## extract mean and covariance
+# cent_mu5 <- apply(cents_all, 2, mean)
+# cent_cov5 <- cov(cents_all)
+# 
+# ## add mean estimate per ID to nodes data frame
+# mean_df <- as.data.frame(cent_mu5) %>%
+#   rename(mean_eigen = cent_mu5)
+# mean_df$node_window <- rownames(mean_df)
+# nodes_all <- nodes_all %>%
+#   left_join(mean_df, by = 'node_window')
+# 
+# ## prep for combining everything to a single data frame
+# covs_all <- list()
+# covs_all[[5]] <- cent_cov5
+# 
+# ## clean up
+# rm(cent_mu5, cent_cov5, mean_df) ; gc()
+# 
 
-## select nodes data frame for window 1 -- do this from nodes_all, not the nodes data frame already in the saved workspace, so now working from randomised node ID, not original ID
-nodes_join <- node_random %>%
-  #filter(window == 5) %>%
-  mutate(node_1 = node,
-         node_2 = node,
-         node_1_randomised = node_rand,
-         node_2_randomised = node_rand) %>% 
-  distinct()
 
-## randomise node IDs in dyads data frame
-cdf_all <- cdf_all %>%
-  left_join(nodes_join[,c('node_1','node_1_randomised')], by = 'node_1') %>%
-  left_join(nodes_join[,c('node_2','node_2_randomised')], by = 'node_2')
 
-## extract centrality for window 5
-cents_all <- extract_eigen_centrality(nodes_df = nodes_all[nodes_all$window == 5,],
-                                      dyads_df = cdf_all[cdf_all$period == 5,],
-                                      edgeweight_matrix = edge_samples_all[[5]],
-                                      window = 5)
+load('mpnp_nodalregression/mpnpshort_nodalregression.RData')
+## replot here just so you don't have to run everything again to put them in the pdf -- delete after pdf complete
+hist(nodes_all$age, breaks = 50)
+ggplot(nodes_all)+
+  geom_bar(aes(x = as.factor(age_cat)))+
+  facet_wrap(. ~ window)
 
-## extract mean and covariance
-cent_mu5 <- apply(cents_all, 2, mean)
-cent_cov5 <- cov(cents_all)
-
-## add mean estimate per ID to nodes data frame
-mean_df <- as.data.frame(cent_mu5) %>%
-  rename(mean_eigen = cent_mu5)
-mean_df$node_window <- rownames(mean_df)
-nodes_all <- nodes_all %>%
-  left_join(mean_df, by = 'node_window')
-
-## prep for combining everything to a single data frame
-covs_all <- list()
-covs_all[[5]] <- cent_cov5
-
-## clean up
-rm(cent_mu5, cent_cov5, mean_df) ; gc()
 
 ## for loop
 for(time_window in (n_windows-1):1){
-  ## import workspace image
-  load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  # ## import workspace image
+  # load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+  # 
+  # if('edge_weights_matrix' %in% ls()) {
+  #   edge_samples <- edge_weights_matrix
+  # }
+  # 
+  # rm(list = ls()[! ls() %in% c('counts_df','cdf_all','cents_all','covs_all','edge_samples','edge_samples_all','ele_ids','extract_eigen_centrality','n_age_cat','n_chains','n_dyads','n_eles','n_samples','n_windows','node_random','nodes_all','nodes_join','num_nodes_all','time_window')]) ; gc()
   
-  if('edge_weights_matrix' %in% ls()) {
-    edge_samples <- edge_weights_matrix
-  }
-  
-  rm(list = ls()[! ls() %in% c('counts_df','cdf_all','cents_all','covs_all','edge_samples','edge_samples_all','ele_ids','extract_eigen_centrality','n_age_cat','n_chains','n_dyads','n_eles','n_samples','n_windows','node_random','nodes_all','nodes_join','num_nodes_all','time_window')]) ; gc()
+  ## select edge weights matrix for window
+  edge_samples <- edge_samples_all[[time_window]]
   
   ## select randomised nodes data frame for window
   nodes <- nodes_all %>%
     filter(window == time_window) %>%
-    mutate(node_1 = node, node_2 = node,
-           node_1_randomised = node_rand, node_2_randomised = node_rand) %>%
+    # mutate(node_1 = node, node_2 = node,
+    #        node_1_randomised = node_rand, node_2_randomised = node_rand) %>%
     dplyr::select(-mean_eigen)
   nodes_all <- nodes_all %>%
     filter(window != time_window)
   
-  ## randomise node IDs in dyads data frame
-  cdf <- counts_df %>%
-    left_join(nodes[,c('node_1','node_1_randomised')], by = 'node_1') %>%
-    left_join(nodes[,c('node_2','node_2_randomised')], by = 'node_2')
-  cdf <- cdf %>% 
+  ## select dyad data frame for window
+  counts_df <- cdf_all %>% 
+    filter(period == time_window) %>% 
     filter(!is.na(node_1_randomised)) %>% 
-    filter(!is.na(node_2_randomised))
+    filter(!is.na(node_2_randomised)) %>% 
+    filter(node_1 %in% nodes$node) %>% 
+    filter(node_2 %in% nodes$node)
   
+  # ## randomise node IDs in dyads data frame
+  # cdf <- counts_df %>%
+  #   left_join(nodes[,c('node_1','node_1_randomised')], by = 'node_1') %>%
+  #   left_join(nodes[,c('node_2','node_2_randomised')], by = 'node_2')
+  # cdf <- cdf %>% 
+  #   filter(!is.na(node_1_randomised)) %>% 
+  #   filter(!is.na(node_2_randomised))
+
   ## extract centrality
   cent_new <- extract_eigen_centrality(nodes_df = nodes,
-                                       dyads_df = cdf,
+                                       dyads_df = counts_df,
                                        edgeweight_matrix = edge_samples,
                                        window = time_window)
   
@@ -848,7 +884,6 @@ for(time_window in (n_windows-1):1){
     rename(mean_eigen = cent_mu)
   mean_df$node_window <- rownames(mean_df)
   nodes <- nodes %>%
-    dplyr::select(-node_1, -node_2, -node_1_randomised, -node_2_randomised) %>%
     left_join(mean_df, by = 'node_window')
   
   ## combine everything to a single data frame
