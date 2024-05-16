@@ -70,6 +70,7 @@ edges <- edges %>%
   relocate(prediction, .after = 'edge_weight')
 
 #### plot outputs ####
+colours <- c('#21918c','#440154')
 edges <- edges %>% 
   mutate(weight_invlogit = invlogit(edge_weight),
          prdctn_invlogit = invlogit(prediction))
@@ -106,28 +107,43 @@ ggsave(filename = 'edgesightings_mixturemodel_withline_changealpha.png',
 
 edges$hack_linetype_all <- 'all values'
 edges$hack_linetype_together <- 'together at least once'
+
+edges$together <- ifelse(counts_df$event_count == 0,
+                             'never together', 'together at least once')
+
 (edgesightings_mixture2 <- ggplot()+
     geom_point(data = edges,
                aes(x = count_dyad, y = prdctn_invlogit),
-               colour = rgb(33/255, 145/255, 140/255, 0.1), size = 0.5, shape = 19)+
-    geom_smooth(data = edges[edges$event_count > 0,],
+               colour = rgb(94/255, 201/255, 98/255, 0.2),#rgb(33/255, 145/255, 140/255, 0.1),
+               size = 1, shape = 19)+
+    geom_smooth(data = edges[edges$together == 'together at least once',],
                 aes(x = count_dyad, y = prdctn_invlogit,
-                    linetype = hack_linetype_together),
-                linewidth = 0.8,
-                colour = rgb(68/255, 1/255, 84/255))+
-    geom_smooth(data = edges,
+                    colour = together)#linetype = hack_linetype_together),
+                #colour = rgb(68/255, 1/255, 84/255)
+                )+
+    # geom_smooth(data = edges,
+    #             aes(x = count_dyad, y = prdctn_invlogit,
+    #                 linetype = hack_linetype_all),
+    #             linewidth = 0.8,
+    #             colour = rgb(68/255, 1/255, 84/255))+
+    geom_smooth(data = edges[edges$together == 'never together',],
                 aes(x = count_dyad, y = prdctn_invlogit,
-                    linetype = hack_linetype_all),
-                linewidth = 0.8,
-                colour = rgb(68/255, 1/255, 84/255))+
+                    colour = together)
+                # data = data.frame(x = 2:max(counts_df$count_dyad[counts_df$event_count == 0]),
+                #                   y = 0, together = 'never together'),
+                # aes(x = x, y = y, colour = together)#,
+    )+
     scale_x_continuous(name = 'total dyad sightings')+
     scale_y_continuous(name = 'mixture weight', limits = c(-0.02,1.02), expand = c(0,0))+
-    scale_linetype_manual(values = c(1,6),
-                          #breaks = c('never together','together at least once'),
-                          breaks = c('all values','together at least once'),
-                          name = 'sightings together')+
-    theme(legend.position = c(0.56,0.76),
-          legend.background = element_rect(fill = 'white', colour = 'black'),
+    scale_colour_manual(values = colours,
+                        breaks = c('never together','together at least once'),
+                        name = NULL)+
+    # scale_linetype_manual(values = c(1,6),
+    #                       #breaks = c('never together','together at least once'),
+    #                       breaks = c('all values','together at least once'),
+    #                       name = 'sightings together')+
+    theme(legend.position = 'right',#c(0.56,0.76),
+          #legend.background = element_rect(fill = 'white', colour = 'black'),
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
           legend.text = element_text(size = 8))
@@ -141,7 +157,7 @@ ggsave(filename = 'edgesightings_mixture_twolines_changealpha.png',
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'outputs_mixturemodel.png',
        path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
+       plot = last_plot(), device = 'png', width = 2100, height = 700, units = 'px')
 
 #### calculate eigenvector ####
 # identify elephants
