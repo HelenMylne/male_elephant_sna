@@ -559,8 +559,8 @@ write_csv(dyads, 'methods_paper/data_processed/motnp_binomialpairwiseevents.csv'
 ## clean up environment ready for next step
 rm(list = ls()) ; gc()
 
-### add time marker
-print(paste0('Data wrangling completed at ', Sys.time(), '. Ready for analysis.'))
+## print progress marker
+print('data wrangling complete')
 
 #---------------- 3) SRI      ##########
 ######## Import data          ####
@@ -590,6 +590,9 @@ length(unique(c(subset10$id_1, subset10$id_2)))
 
 ## clean up
 rm(list = ls()[!ls() %in% c('counts_df')]) ; gc()
+
+## print progress marker
+print('SRI calculations complete')
 
 #---------------- 4) BISoN with Uniform prior ##########
 ######## Prep data for models                 ####
@@ -657,6 +660,9 @@ save.image('methods_paper/r_workspaces/model_run_uniform.RData')
 rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df',
                              'n_chains','n_samples','n_dyads')]) ; gc()
 
+## print progress marker
+print('uniform model run complete')
+
 #---------------- 5) BISoN with Default prior ##########
 ######## Compile edge model                   ####
 edge_binary_default <- cmdstan_model('methods_paper/models/edge_binary_gaussian.stan')
@@ -691,6 +697,9 @@ save.image('methods_paper/r_workspaces/model_run_default.RData')
 rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df',
                              'n_chains','n_samples','n_dyads')]) ; gc()
 
+## print progress marker
+print('default model run complete')
+
 #---------------- 6) BISoN with Skewed prior  ##########
 ######## Compile edge model                   ####
 edge_binary_skewed <- cmdstan_model('methods_paper/models/edge_binary_skewed.stan')
@@ -724,6 +733,9 @@ rm(edges1, edges2, edges3, edges4) ; gc()
 save.image('methods_paper/r_workspaces/model_run_skewed.RData')
 rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df',
                              'n_chains','n_samples','n_dyads')]) ; gc()
+
+## print progress marker
+print('skewed model run complete')
 
 #---------------- 7) BISoN with Conditional prior ##########
 ######## Compile edge model                       ####
@@ -777,8 +789,10 @@ rm(edges1, edges2, edges3, edges4) ; gc()
 
 ## save model for plotting
 # save.image('methods_paper/r_workspaces/model_run_conditional.RData')
-load('methods_paper/r_workspaces/model_run_conditional.RData')
 rm(list = ls()[!ls() %in% c('counts_df')]) ; gc()
+
+## print progress marker
+print('conditional model run complete')
 
 #---------------- 8) Create SRI plots for paper ##########
 pdf('methods_paper/outputs/all_plots.pdf')
@@ -871,6 +885,9 @@ ggsave(filename = 'outputs_sri.svg',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'svg', width = 2100, height = 700, units = 'px')
 
+## print progress marker
+print('SRI edges plotted')
+
 ######## SRI Eigenvector Centrality: eigenvector vs sighting count and non-associations ####
 #### Individual sighting count                                                          ####
 # calculate SRI and identify individuals
@@ -958,6 +975,9 @@ ggsave(filename = 'eigen_outputs_sri.svg',
 
 ## save workspace
 save.image('methods_paper/r_workspaces/sri.RData')
+
+## print progress marker
+print('SRI eigenvector plotted')
 
 #---------------- 9) Create Unconditional BISoN plots for paper ####
 ######## Unconditional Priors ####
@@ -1056,9 +1076,15 @@ inset_skewed <- ggplot(data)+
 ggsave(filename = 'priors_unconditional.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2100, height = 700, units = 'px')
+ggsave(filename = 'priors_unconditional.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 2100, height = 700, units = 'px')
 
-# clean up
+## clean up
 rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed','colours')]) ; gc()
+
+## print progress marker
+print('priors plotted')
 
 ######## Unconditional Outputs: posterior and edge_vs_sightings ####
 #### Uniform, uniform(0,1)                                      ####
@@ -1071,12 +1097,12 @@ load('methods_paper/r_workspaces/model_run_uniform.RData')
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density')
 )
-ggsave(filename = 'posterior_uniform_alldyads.png',
-       path = 'methods_paper/outputs/',
-       plot = figure_uniform_posterior, device = 'png', width = 1600, height = 700, units = 'px')
+# ggsave(filename = 'posterior_uniform_alldyads.png',
+#        path = 'methods_paper/outputs/',
+#        plot = figure_uniform_posterior, device = 'png', width = 1600, height = 700, units = 'px')
 
 ## split colours by if elephants were ever seen grouping together
-edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples)#/4)
 edge_samples1 <- edge_samples1 %>%
   left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
             by = 'dyad_males') %>%
@@ -1102,10 +1128,10 @@ edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
           legend.text = element_text(size = 8))+
     guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))
 )
-ggsave(filename = 'posterior_uniform_sampledyads.png',
-       path = 'methods_paper/outputs/in',
-       plot = figure_uniform_posterior, device = 'png',
-       width = 1000, height = 1000, units = 'px')
+# ggsave(filename = 'posterior_uniform_sampledyads.png',
+#        path = 'methods_paper/outputs/in',
+#        plot = figure_uniform_posterior, device = 'png',
+#        width = 1000, height = 1000, units = 'px')
 
 ## create dataframe to plot mean edge weight vs dyad sighting count
 counts_df$together <- ifelse(counts_df$event_count == 0,
@@ -1191,13 +1217,13 @@ load('methods_paper/r_workspaces/model_run_default.RData')
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density')
 )
-ggsave(filename = 'posterior_default_alldyads.png',
-       path = 'methods_paper/outputs/',
-       plot = figure_default_posterior, device = 'png',
-       width = 1600, height = 700, units = 'px')
+# ggsave(filename = 'posterior_default_alldyads.png',
+#        path = 'methods_paper/outputs/',
+#        plot = figure_default_posterior, device = 'png',
+#        width = 1600, height = 700, units = 'px')
 
 ## split colours by if elephants were ever seen grouping together
-edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples)#/4)
 edge_samples1 <- edge_samples1 %>%
   left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
             by = 'dyad_males') %>%
@@ -1311,12 +1337,12 @@ load('methods_paper/r_workspaces/model_run_skewed.RData')
     scale_x_continuous(name = 'edge weight')+
     scale_y_continuous(name = 'density')
 )
-ggsave(filename = 'posterior_skewed_alldyads.png',
-       path = 'methods_paper/outputs/',
-       plot = figure_skewed_posterior, device = 'png', width = 1600, height = 700, units = 'px')
+# ggsave(filename = 'posterior_skewed_alldyads.png',
+#        path = 'methods_paper/outputs/',
+#        plot = figure_skewed_posterior, device = 'png', width = 1600, height = 700, units = 'px')
 
 ## split colours by if elephants were ever seen grouping together
-edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples/4)
+edge_samples1$dyad_males <- rep(1:nrow(counts_df), n_samples)#/4)
 edge_samples1 <- edge_samples1 %>%
   left_join(counts_df[,c('dyad_males','id_1','id_2','count_1','count_2','count_dyad','event_count','sri')],
             by = 'dyad_males') %>%
@@ -1451,7 +1477,10 @@ save.image('methods_paper/r_workspaces/plots_unconditional.RData')
     theme(legend.position = 'bottom'))
 ggsave(filename = 'posterior_unconditional_noinset.png',
        path = 'methods_paper/outputs/',
-       plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
+       plot = combined_top, device = 'png', width = 2700, height = 700, units = 'px')
+ggsave(filename = 'posterior_unconditional_noinset.svg',
+       path = 'methods_paper/outputs/',
+       plot = combined_top, device = 'svg', width = 2700, height = 700, units = 'px')
 
 combined_bottom <- (figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+
   plot_annotation(tag_levels = list(c('d','e','f')))
@@ -1459,12 +1488,18 @@ combined_bottom <- (figure_uniform_edgesightings.3 + figure_default_edgesighting
     plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'edgesightings_unconditional_noinset.png',
        path = 'methods_paper/outputs/',
-       plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
+       plot = combined_bottom, device = 'png', width = 2700, height = 700, units = 'px')
+ggsave(filename = 'edgesightings_unconditional_noinset.svg',
+       path = 'methods_paper/outputs/',
+       plot = combined_bottom, device = 'svg', width = 2700, height = 700, units = 'px')
 
 (combined_top / combined_bottom)
 ggsave(filename = 'outputs_unconditional_noinset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
+ggsave(filename = 'outputs_unconditional_noinset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 2700, height = 1600, units = 'px')
 
 uniform_posterior_inset <- wrap_elements(figure_uniform_posterior + 
                                            inset_element(inset_sri,
@@ -1490,12 +1525,18 @@ combined_top <- (uniform_posterior_inset + default_posterior_inset + skewed_post
 )
 ggsave(filename = 'posterior_unconditional_inset.png',
        path = 'methods_paper/outputs/',
-       plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
+       plot = combined_top, device = 'png', width = 2700, height = 700, units = 'px')
+ggsave(filename = 'posterior_unconditional_inset.svg',
+       path = 'methods_paper/outputs/',
+       plot = combined_top, device = 'svg', width = 2700, height = 700, units = 'px')
 
 (combined_top / combined_bottom)
 ggsave(filename = 'outputs_unconditional_inset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
+ggsave(filename = 'outputs_unconditional_inset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 2700, height = 1600, units = 'px')
 
 rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed',
                             'colours')]) ; gc()
@@ -1895,6 +1936,9 @@ rm(list = ls()[!ls() %in% c('eigen0_uniform.2','eigensightings_uniform.2',
 ggsave(filename = 'eigen_outputs_unconditional_noinset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
+ggsave(filename = 'eigen_outputs_unconditional_noinset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 2400, height = 1600, units = 'px')
 
 ## set up insets
 uniform_eigen0_inset <- wrap_elements(eigen0_uniform.2 + 
@@ -1917,6 +1961,9 @@ skewed_eigen0_inset <- wrap_elements(eigen0_skewed.2 +
 ggsave(filename = 'eigen_outputs_unconditional_inset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
+ggsave(filename = 'eigen_outputs_unconditional_inset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 2400, height = 1600, units = 'px')
 
 #---------------- 10) Create Conditional BISoN plots for paper ####
 ######## Conditional Prior  ####
@@ -1952,6 +1999,9 @@ data <- data.frame(x = x,
 ggsave(filename = 'prior_conditional.png',
        path = 'methods_paper/outputs/ines_suggestions/',
        plot = prior_conditional, device = 'png', width = 1200, height = 600, units = 'px')
+ggsave(filename = 'prior_conditional.svg',
+       path = 'methods_paper/outputs/ines_suggestions/',
+       plot = prior_conditional, device = 'svg', width = 1200, height = 600, units = 'px')
 
 inset_conditional <- ggplot(data)+
   geom_line(aes(x = x, y = y, colour = together, linetype = together),
@@ -1969,7 +2019,6 @@ inset_conditional <- ggplot(data)+
 # clean up
 rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
-
 
 ######## Conditional Outputs: posterior and edge_vs_sightings ####
 #### Posterior distribution                                   ####
@@ -2109,6 +2158,9 @@ combined <- (post_nolegend + edgesightings_conditional.3) +
 ggsave(filename = 'outputs_conditional_noinset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1700, height = 1000, units = 'px')
+ggsave(filename = 'outputs_conditional_noinset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 1700, height = 1000, units = 'px')
 
 ## add prior as inset
 conditional_posterior_inset <- wrap_elements(posterior_conditional.2 + 
@@ -2122,6 +2174,9 @@ combined <- (conditional_posterior_inset + edgesightings_conditional.3) +
 ggsave(filename = 'outputs_conditional_inset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1680, height = 700, units = 'px')
+ggsave(filename = 'outputs_conditional_inset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 1680, height = 700, units = 'px')
 
 # clean up
 rm(list = ls()[!ls() %in% c('inset_conditional','colours')]) ; gc()
@@ -2273,6 +2328,9 @@ rm(list = ls()[!ls() %in% c('eigen0_sri.2','eigensightings_sri.2',
 ggsave(filename = 'eigen_outputs_conditional_noinset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
+ggsave(filename = 'eigen_outputs_conditional_noinset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 1600, height = 700, units = 'px')
 
 conditional_eigensightings_inset <- wrap_elements(eigensightings_conditional.2 + 
                                                     inset_element(inset_sri,
@@ -2284,6 +2342,9 @@ conditional_eigensightings_inset <- wrap_elements(eigensightings_conditional.2 +
 ggsave(filename = 'eigen_outputs_conditional_inset.png',
        path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
+ggsave(filename = 'eigen_outputs_conditional_inset.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 1600, height = 700, units = 'px')
 
 #---------------- 11) Supplementary material: simulation -- 6 facet plot of 10 sightings vs 2 sightings, never together vs half together vs always together ####
 rm(list = ls()) ; gc()
@@ -2388,9 +2449,12 @@ true_values <- data.frame(x = rep(c(0.1,0.5,0.9), each = 2),
                                 'Bayesian posterior distribution'='#21918c'))+
     theme(legend.position = 'bottom')
 )
-ggsave(filename = 'example_sri_vs_bison.png',
+ggsave(filename = 'simulation.png',
        path = 'methods_paper/outputs/',
        plot = figure1, device = 'png', width = 2100, height = 1600, units = 'px')
+ggsave(filename = 'simulation.svg',
+       path = 'methods_paper/outputs/',
+       plot = figure1, device = 'svg', width = 2100, height = 1600, units = 'px')
 
 # clean up
 rm(list = ls()) ; gc()
