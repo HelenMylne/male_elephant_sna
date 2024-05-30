@@ -15,17 +15,22 @@
 # install.packages(data.table, lib = '../packages')
 # install.packages(spatsoc, lib = '../packages')
 # install.packages(igraph, lib = '../packages/')
+# install.packages('patchwork, lib = '../packages/'')
+# install.packages('svglite, lib = '../packages/'')
 
-## load packages needed
-library(cmdstanr, lib.loc = '../packages/')  # run models
-library(tidyverse, lib.loc = '../packages')  # data manipulation
-library(lubridate, lib.loc = '../packages')  # sort date columns out
-library(janitor, lib.loc = '../packages')    # clean up data frame names
-library(hms, lib.loc = '../packages')        # sort time columns out
-library(readxl, lib.loc = '../packages')     # read in .xlxs files
-library(data.table, lib.loc = '../packages') # convert data frames to data tables
-library(spatsoc, lib.loc = '../packages')    # create social network data
-library(igraph, lib.loc = '../packages/')    # extract eigenvector centralities
+## load packages needed -- library(cmdstanr) ; library(tidyverse) ; library(lubridate) ; library(janitor) ; library(hms) ; library(readxl) ; library(data.table) ; library(spatsoc) ; library(igraph) ; library(patchwork) ; library(svglite)
+library(cmdstanr, lib.loc = '../packages/')      # run models
+library(tidyverse, lib.loc = '../packages')      # data manipulation
+library(lubridate, lib.loc = '../packages')      # sort date columns out
+library(janitor, lib.loc = '../packages')        # clean up data frame names
+library(hms, lib.loc = '../packages')            # sort time columns out
+library(readxl, lib.loc = '../packages')         # read in .xlxs files
+library(data.table, lib.loc = '../packages')     # convert data frames to data tables
+library(spatsoc, lib.loc = '../packages')        # create social network data
+library(igraph, lib.loc = '../packages/')        # extract eigenvector centralities
+library(patchwork, lib.loc = '../packages/')     # plot multiple graphs together
+library(svglite, lib.loc = '../packages/')       # save plots as SVG files for adding to paper
+library(LaplacesDemon, lib.loc = '../packages/') # logit and invlogit functions
 
 ### set stan path
 set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0')
@@ -71,7 +76,7 @@ colnames(id)[109:368] <- days  # label day columns with readable dates
 id <- janitor::clean_names(id) # convert names to snake case
 
 ### in columns of when elephant was seen or not, replace NA (not seen) with 0 and "Yes" (seen) with 1
-for(i in 11:368){ 
+for(i in 11:368){
   id[i] <- ifelse(is.na(id[i]), 0, 1)
 }
 
@@ -150,7 +155,7 @@ id <- id[id$id_no != 'F0157',] ; ages <- ages[ages$id_no != 'F0157',]
 id <- id[is.na(id$comments),]
 
 ### Write out processed data
-write_delim(id, "../data_processed/step1_dataprocessing/motnp_id.csv", delim = ",", col_names = T)
+write_delim(id, "methods_paper/data_processed/motnp_id.csv", delim = ",", col_names = T)
 
 ### Clear Environment
 rm(ages, days.numbers, id, id.raw, names, nkash, days, i, months, weeks)
@@ -215,8 +220,16 @@ d$gps_e[480] <- d$gps_e[480]*10 # value was 254665 -- 2546650 puts it within clu
 d$gps_s[672] <- d$gps_s[672]*10 # value was 175296 -- 1752960 puts it within cluster of all other points (assume Excel treated as shorter number)
 d$gps_e[624] <- d$gps_e[624]+800000 # value started 17 rather than 25 (1745269), but then matched format of other east coordinates -- 2545269 puts it within cluster of all other points
 
+## convert character "NA" to actual NA
+for(j in 2:ncol(d)){
+  for(i in 1:nrow(d)){
+    d[i,j] <- ifelse(d[i,j] == 'NA',NA,d[i,j])
+  }
+}
+str(d)
+
 ### write initial csv -- to be overwritten later on following generation of long format data
-write_delim(d, '../data_processed/step1_dataprocessing/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
+write_delim(d, 'methods_paper/data_processed/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
 
 ### clear environment, leave d for mapping
 rm(counts, e, plus, group.size, i, j)
@@ -272,14 +285,14 @@ eles_long$elephant[which(eles_long$elephant == 'D128')] <- 'F128'  # row 2297
 eles_long$elephant[which(eles_long$elephant == 'N40')] <- 'M40'    # row 1859
 
 ### write to csv for later use
-write_delim(eles_long, '../data_processed/step1_dataprocessing/motnp_eles_long.csv',col_names = T, delim = ',')
+write_delim(eles_long, 'methods_paper/data_processed/motnp_eles_long.csv',col_names = T, delim = ',')
 
 ### clear environment
 rm(d, typ1, typNA, first, i, j)
 
 ######## Create nodes data frame                              ####
 ### nodes data frame
-ele_nodes <- read_delim('../data_processed/step1_dataprocessing/motnp_id.csv', delim = ',')  # read in ID data
+ele_nodes <- read_delim('methods_paper/data_processed/motnp_id.csv', delim = ',')  # read in ID data
 ele_nodes <- ele_nodes[,c(1:7,11:12)]                                         # select desired columns
 
 ### make long (zero-padded) label for each elephant in eles_long to match ele_nodes
@@ -299,10 +312,10 @@ ele_nodes$id  <- paste(ele_nodes$sex,ele_nodes$num,sep='')                # reco
 ### cleaning
 ele_nodes <- ele_nodes[which(ele_nodes$id_no != 'M0175'),] # remove M0175 from nodes -- doesn't exist in sightings
 
-### Insert column for count of sightings
+### insert column for count of sightings
 ele_nodes$count <- NA
 for(i in 1:nrow(ele_nodes)){
-  ele_nodes$count[i] <- sum(eles_long$id_no == ele_nodes$id_no[i]) # count all instances of individual presence
+  ele_nodes$count[i] <- sum(eles_long$elephant == ele_nodes$id[i]) # count all instances of individual presence
 }
 
 ### create column for combined age and sex in both data frames
@@ -312,170 +325,7 @@ ele_nodes$dem_class <- paste0(ifelse(ele_nodes$age_class == 'Adult','A',
                               ele_nodes$sex)
 
 ### write CSV file
-write_delim(ele_nodes, path = '../data_processed/step1_dataprocessing/motnp_elenodes.csv', delim = ',', col_names = T)
-
-######## Correct herd type in encounter data                  ####
-d <- read_csv('../data_processed/step1_dataprocessing/motnp_encounters.csv')
-for(j in 2:ncol(d)){
-  for(i in 1:nrow(d)){
-    d[i,j] <- ifelse(d[i,j] == 'NA',NA,d[i,j]) # convert character "NA" to actual NA
-  }
-}
-str(d)
-
-# In MO sightings: "F102" "F104" "F107" "F19"  "F21"  "F57"  "F63"  "F64"  "F68"  "F99"
-d$unique <- 1:nrow(d)
-
-mo <- d[d$type == 'MO',] # any females recorded in MO sighting should be changed to MX.
-sort(unique(mo$e1))    # F102, F19, F63, F68, U66
-sort(unique(mo$e2))    # F107, F57, F64
-sort(unique(mo$e3))    # F21, F99
-sort(unique(mo$e4))    # F104
-sort(unique(mo$e5))    # No more females -- Females always recorded in spreadsheet first so will come through in first columns. If none by e5, will be none with higher e values.
-which(mo$e1 == 'F102') # 238
-which(mo$e2 == 'F57')  # 238
-which(mo$e1 == 'F19')  # 286
-which(mo$e3 == 'F21')  # 286
-which(mo$e4 == 'F104') # 286
-which(mo$e1 == 'F63')  # 26
-which(mo$e2 == 'F64')  # 26
-which(mo$e3 == 'F99')  # 26
-which(mo$e1 == 'F68')  # 41
-which(mo$e1 == 'U66')  # 403
-which(mo$e2 == 'F107') # 118, 119
-
-mo$unique[which(mo$e1 == 'F63')]  # 50
-mo$unique[which(mo$e2 == 'F64')]  # 50
-mo$unique[which(mo$e3 == 'F99')]  # 50
-mo$unique[which(mo$e1 == 'F68')]  # 88
-mo$unique[which(mo$e2 == 'F107')] # 276 277
-mo$unique[which(mo$e1 == 'F102')] # 628
-mo$unique[which(mo$e2 == 'F57')]  # 628
-mo$unique[which(mo$e1 == 'F19')]  # 736
-mo$unique[which(mo$e3 == 'F21')]  # 736
-mo$unique[which(mo$e4 == 'F104')] # 736
-mo$unique[which(mo$e1 == 'U66')]  # 1006
-
-d$type[which(d$unique == 50)]   <- 'MX'  # 3 females + 5 males
-d$type[which(d$unique == 88)]   <- 'MX'  # adult female + adult male
-d$type[which(d$unique == 276)]  <- 'MX'  # 6 males + female
-d$type[which(d$unique == 277)]  <- 'MX'  # 6 males + female
-d$type[which(d$unique == 628)]  <- 'BH'  # adult female + calf
-d$type[which(d$unique == 736)]  <- 'BH'  # breeding herd 3 + additional female
-d$type[which(d$unique == 1006)] <- 'UK'  # a calf with a whole group of males -- this is too unclear to reassign
-
-#View(d[c(50,88,276,277,628,736,1006),]) # still an issue with 50 -- 1 elephant, but 8 identified, suggests that these may have got scrambled together somehow, but nothing to be done about it
-
-bh <- d[d$type == 'BH',]
-eles_bh <- eles_long[eles_long$type == 'BH',]
-sort(unique(eles_bh$elephant)) # "M103" "M12"  "M120" "M126" "M137" "M139" "M148" "M160" "M164" "M174" "M176" "M179" "M180" "M182" "M187" "M189" "M19"  "M190" "M191" "M2"   "M203" "M204" "M206" "M215" "M217" "M225" "M23"  "M238" "M24"  "M240" "M245" "M248" "M249" "M26" "M6"   "M60"  "M69"  "M7"   "M71"  "M72"  "M84"  "M86"  "M87"  "M88"  "M9"   "M96"  "M97" 
-# check which of these are adult males and therefore shouldn't be in BH:
-ele_nodes[which(ele_nodes$id_no == 'M0103'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0012'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0120'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0126'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0137'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0139'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0148'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0160'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0164'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0174'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0176'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0179'),c(4,5)] # Juvenile -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0180'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0182'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0187'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0189'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0019'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0190'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0191'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0002'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0203'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0204'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0206'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0215'),c(4,5)] # Juvenile -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0217'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0225'),c(4,5)] # Juvenile -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0023'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0238'),c(4,5)] # Juvenile -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0024'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0240'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0245'),c(4,5)] # Juvenile -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0248'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0249'),c(4,5)] # Juvenile -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0026'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0006'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0069'),c(4,5)] # Juvenile -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0007'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0071'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0072'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0084'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0086'),c(4,5)] # Calf -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0087'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0088'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0009'),c(4,5)] # Adult -- change to MX
-ele_nodes[which(ele_nodes$id_no == 'M0096'),c(4,5)] # Pubescent -- fine
-ele_nodes[which(ele_nodes$id_no == 'M0097'),c(4,5)] # Pubescent -- fine
-# adult males listed in sightings of breeding herds = M12, M120, M139, M174, M190, M191, M2, M203, M217, M88, M9
-
-which(eles_bh$elephant == 'M12')  # 461
-which(eles_bh$elephant == 'M120') # 501
-which(eles_bh$elephant == 'M139') # 477
-which(eles_bh$elephant == 'M174') # 484
-which(eles_bh$elephant == 'M190') # 493
-which(eles_bh$elephant == 'M191') # 496
-which(eles_bh$elephant == 'M2')   # 433
-which(eles_bh$elephant == 'M203') # 480
-which(eles_bh$elephant == 'M217') # 502
-which(eles_bh$elephant == 'M88')  # 435
-which(eles_bh$elephant == 'M9')   # 382
-
-eles_bh$number[which(eles_bh$elephant == 'M9')]   # 382, e5
-eles_bh$number[which(eles_bh$elephant == 'M2')]   # 433, e7
-eles_bh$number[which(eles_bh$elephant == 'M88')]  # 435, e7
-eles_bh$number[which(eles_bh$elephant == 'M12')]  # 461, e8
-eles_bh$number[which(eles_bh$elephant == 'M139')] # 477, e10
-eles_bh$number[which(eles_bh$elephant == 'M203')] # 480, e10
-eles_bh$number[which(eles_bh$elephant == 'M174')] # 484, e11
-eles_bh$number[which(eles_bh$elephant == 'M190')] # 493, e14
-eles_bh$number[which(eles_bh$elephant == 'M191')] # 496, e15
-eles_bh$number[which(eles_bh$elephant == 'M120')] # 501, e17
-eles_bh$number[which(eles_bh$elephant == 'M217')] # 502, e18
-
-bh$unique[which(bh$e7  == 'M2')]    # 73, 382
-bh$unique[which(bh$e10 == 'M139')]  # 73, 382
-bh$unique[which(bh$e11 == 'M174')]  # 73, 382
-bh$unique[which(bh$e14 == 'M190')]  # 73, 382
-bh$unique[which(bh$e15 == 'M191')]  # 73, 382
-bh$unique[which(bh$e7  == 'M88')]   # 80, 396
-bh$unique[which(bh$e17 == 'M120')]  # 147 148, 721 722
-bh$unique[which(bh$e18 == 'M217')]  # 147 148, 721 722
-bh$unique[which(bh$e5  == 'M9')]    # 156, 759
-bh$unique[which(bh$e10 == 'M203')]  # 157 158 159, 769 770 771
-bh$unique[which(bh$e8  == 'M12')]   # 175, 947
-
-d$type[which(d$unique == 382)] <- 'MX'
-d$type[which(d$unique == 396)] <- 'MX'
-d$type[which(d$unique == 721)] <- 'MX'
-d$type[which(d$unique == 722)] <- 'MX'
-d$type[which(d$unique == 759)] <- 'MX'
-d$type[which(d$unique == 769)] <- 'MX'
-d$type[which(d$unique == 770)] <- 'MX'
-d$type[which(d$unique == 771)] <- 'MX'
-d$type[which(d$unique == 947)] <- 'MX'
-
-bh <- d[d$type == 'BH',]
-which(bh$e5 == 'M9')   # none
-
-mo <- d[d$type == 'MO',]
-which(mo$e1 == 'F102') # none
-
-unique(d$type) # "MO" "BH" "MX" "UK"
-
-colnames(d)[14] <- 'herd_type'
-
-### overwrite csv with corrected herd types
-write_delim(d, '../data_processed/step1_dataprocessing/motnp_encounters.csv', na = 'NA', col_names = T, delim = ',')
+write_delim(ele_nodes, path = 'methods_paper/data_processed/motnp_elenodes.csv', delim = ',', col_names = T)
 
 ### clear environment
 rm(list = ls()) ; gc()
@@ -483,24 +333,39 @@ rm(list = ls()) ; gc()
 #---------------- 2) Create dyadic data frame of sightings    ##########
 ######## Import data                                          ####
 ## elephant encounters
-eles <- read_delim(file = '../data_processed/step1_dataprocessing/motnp_eles_long.csv', delim = ',')
-eles$location <- paste(eles$gps_s, eles$gps_e, sep = '_') # make single variable for unique locations
-eles <- eles[,c(1,16,2,3,17,4,5,14,7,8,10,13)]            # rearrange variables
+eles <- read_delim(file = 'methods_paper/data_processed/motnp_eles_long.csv', delim = ',') %>%
+  mutate(location = paste(gps_s, gps_e, sep = '_')) %>%  # make single variable for unique locations
+  dplyr::select('encounter','elephant','number','date','time','location','type','total_elephants','total_males','perc_id_hkm')  # rearrange variables
 str(eles)
 
 ## nodes
-nodes <- read_delim(file = '../data_processed/step1_dataprocessing/motnp_elenodes.csv', delim = ',') # read in node data
+nodes <- read_delim(file = 'methods_paper/data_processed/motnp_elenodes.csv', delim = ',') # read in node data
 colnames(nodes)
 str(nodes)
 
+## filter down to adult and pubescent males only
+nodes <- nodes %>%
+  filter(sex == 'M') %>%
+  filter(age_category %in% c("9-10","10-15","15-19","20-25","25-40","40+"))
+
+## remove individuals with incorrect data or which died during the observation period
+nodes <- nodes %>%
+  filter(! id %in% c('M51','M113')) %>%
+  filter(! id %in% c('M13','M21','M125','M138','M223','M227'))
+
 ######## Create group-by-individual matrix                    ####
-eles_asnipe <- eles[,c(3,4,2,5)]                                       # date, time, elephant, location
+eles_asnipe <- eles[,c(4,5,2,6)]                                       # date, time, elephant, location
 eles_asnipe$Date <- as.integer(eles_asnipe$date)                       # make date numeric
 eles_asnipe$Date <- 1+eles_asnipe$Date - min(eles_asnipe$Date)         # start from 1, not 1st January 1970
 eles_asnipe$Time <- ifelse(eles_asnipe$time > 1, NA, eles_asnipe$time) # time = proportion of day so anything >1 has to be wrong
 eles_asnipe$Time <- eles_asnipe$Time*(24*60*60)                        # convert time values to seconds through day
-which(is.na(eles_asnipe$Time))                                         # 161 698 1122 1469 1770
-eles_asnipe[c(161,698,1122,1469,1770),]                                # all 1 sighting of B7+M44
+
+## filter down to only males
+eles_asnipe <- eles_asnipe %>%
+  filter(elephant %in% nodes$id)
+
+which(is.na(eles_asnipe$Time))                                         # 719
+eles_asnipe[719,]                                                      # one sighting of M44
 
 eles_asnipe <- eles_asnipe[,c(5,6,3,4)]                                # create data frame to produce gbi matrix from
 colnames(eles_asnipe) <- c('Date','Time','ID','Location')              # rename variables for get_gbi
@@ -511,7 +376,7 @@ str(eles_asnipe)
 eles_asnipe$d_pad <- str_pad(eles_asnipe$Date, 3, pad = '0')  # 0-pad dates
 eles_asnipe$encounter <- paste(eles_asnipe$d_pad, eles_asnipe$Time, eles_asnipe$Location, sep = '_') # unique value for each sighting
 eles_asnipe$group <- as.integer(as.factor(eles_asnipe$encounter)) # unique factor for every sighting
-max(eles_asnipe$group)                         # 574 -- agrees with number of different sightings for which elephants were identified
+max(eles_asnipe$group)                         # 481 -- agrees with number of different sightings for which elephants were identified
 eles_asnipe <- eles_asnipe[,c(3,7)]            # create data table for gbi matrix
 eles_asnipe <- data.table::setDT(eles_asnipe)  # create data table for gbi matrix
 gbi_matrix <- spatsoc::get_gbi(DT = eles_asnipe, group = 'group', id = 'ID')  # create gbi matrix
@@ -542,28 +407,32 @@ for (obs_id in 1:nrow(gbi_matrix)) {              # run through every sighting i
   if(obs_id %% 10 == 0) {print(Sys.time())}
 }
 gbi_df # check structure of gbi_df
-write_delim(gbi_df, '../data_processed/step1_dataprocessing/motnp_bayesian_bernoullipairwiseevents.csv', delim = ',')
+write_delim(gbi_df, 'methods_paper/data_processed/motnp_bayesian_bernoullipairwiseevents.csv', delim = ',')
 
 ######## Clean up dyadic data frame                           ####
+# gbi_df <- read_csv('methods_paper/data_processed/motnp_bayesian_bernoullipairwiseevents.csv')
+
 ## add elephant ID numbers to assigned index factors
 str(gbi_df)
-gbi_id <- data.frame(id_1 = colnames(gbi_matrix), node_1 = as.numeric(1:472))
+gbi_id <- data.frame(id_1 = colnames(gbi_matrix), node_1 = as.numeric(1:nrow(nodes)))#472))
 gbi_check <- left_join(x = gbi_df, y = gbi_id, by = 'node_1')
-gbi_id <- data.frame(id_2 = colnames(gbi_matrix), node_2 = as.numeric(1:472))
+gbi_id <- data.frame(id_2 = colnames(gbi_matrix), node_2 = as.numeric(1:nrow(nodes)))#472))
 gbi_check <- left_join(x = gbi_check, y = gbi_id, by = 'node_2')
 
 ## correct obs_id to match encounter numbers in other spreadsheets (some encounters have missing data: encounter numbers 1,2,3,5,6,8... where obs_id 1,2,3,4,5,6...). Warning: this step can take quite a lot of memory - may need to clear some things from environment
-eles$obs_id <- as.integer(as.factor(eles$encounter)) ; eles <- eles[,c(1,13,2:12)] # create factor variable per encounter
-gbi_encounter <- left_join(x = gbi_check, y = eles, by = 'obs_id')  # add sighting information to gbi_df
-length(unique(gbi_encounter$encounter)) # 574 -- correct
+eles$obs_id <- as.integer(as.factor(eles$encounter)) ; eles <- eles[,c(1,11,2:10)] # create factor variable per encounter
+gbi_encounter <- left_join(x = gbi_check, y = eles,             # add sighting information to gbi_df
+                           relationship = 'many-to-many',       # x = all pairs 1/0 so observations repeated many times, y = all individuals present so observations repeated however many elephants were identified
+                           by = 'obs_id')
+length(unique(gbi_encounter$encounter)) # 481 -- correct
 
 ## remove duplicate rows where an dyad is recorded as being observed together twice during the same sighting
 gbi_encounter$unique <- paste(gbi_encounter$node_1, gbi_encounter$node_2, gbi_encounter$social_event, gbi_encounter$obs_id, sep = '_') # create unique variable for every dyad and encounter
-gbi_distinct <- dplyr::distinct(gbi_encounter) # 40708781 obs
+gbi_distinct <- dplyr::distinct(gbi_encounter) # 3106535 obs
 colnames(gbi_distinct) # "node_1","node_2","social_event","obs_id","id_1","id_2","encounter","elephant","date","time","location","gps_s","gps_e",'herd_type","total_elephants_numeric","total_elephants_uncert","total_id_hkm","perc_id_hkm","unique"
 head(gbi_distinct, 10)
-gbi_distinct <- gbi_distinct[,c(1:7,9:18)]                                   # rearrange columns
-colnames(gbi_distinct)[c(7,16:17)] <- c('encounter_id','total_id','perc_id') # rename columns
+gbi_distinct <- gbi_distinct[,c(1:7,10:17)]                                   # rearrange columns
+colnames(gbi_distinct)[c(7,12,14)] <- c('encounter_id','total_id','perc_id') # rename columns
 
 ## convert to Bernoulli model data format -- can't actually use Bernoulli as would require too much computing power
 gbi_distinct$dyad <- paste(gbi_distinct$id_1, gbi_distinct$id_2, sep = '_') # create character variable unique to each dyad
@@ -575,10 +444,12 @@ head(gbi_distinct)
 ######## Aggregate sightings to gambit-of-the-group format    ####
 ## convert to Binomial model data format
 df_agg <- gbi_distinct %>%
-  group_by(id_1, id_2) %>%  # group by dyad pair
-  summarise(event_count=sum(social_event), dyad_id=cur_group_id()) %>% # count total number of times dyad were seen together
-  mutate(node_1_id=as.integer(as.factor(id_1)), node_2_id=as.integer(as.factor(id_2))) # record node IDs
-length(df_agg$id_1) == cumsum(1:471)[471] # check have correct number of dyads -- number will be the (n-1)th value of the triangular number sequence in which n = total number of elephants in analysis (472). If TRUE, correct number of pairs.
+  group_by(id_1, id_2) %>%                           # group by dyad pair
+  summarise(event_count = sum(social_event),
+            dyad_id = cur_group_id()) %>%            # count total number of times dyad were seen together
+  mutate(node_1_id = as.integer(as.factor(id_1)),
+         node_2_id = as.integer(as.factor(id_2)))    # record node IDs
+nrow(df_agg) == cumsum(1:nrow(nodes))[nrow(nodes)-1] # check have correct number of dyads -- number will be the (n-1)th value of the triangular number sequence in which n = total number of elephants in analysis. If TRUE, correct number of pairs.
 head(df_agg) ; tail(df_agg)
 
 ## correct values in node_1_id and node_2_id using factor values.
@@ -593,150 +464,97 @@ colnames(nodes)
 nodes <- nodes[,c(1,3:5,9,11:13)]                      # select desired columns
 nodes$id_1 <- nodes$id ; nodes$id_2 <- nodes$id        # add columns for combining datasets
 colnames(nodes) ; colnames(df_agg)
-dyads <- left_join(x = df_agg, y = nodes, by = 'id_1') # add all information about elephant 1
-colnames(dyads)[c(2,7:15)] <- c('id_2','id_pad_1','name_1','age_class_1','age_category_1','sex_1','id1_deletecolumn','count_1','dem_class_1','deletecolumn1')
-dyads <- left_join(x = dyads, y = nodes, by = 'id_2')  # add all information about elephant 2
-colnames(dyads)[c(1,16:24)] <- c('id_1','id_pad_2','name_2','age_class_2','age_category_2','sex_2','id2_deletecolumn','count_2','dem_class_2','deletecolumn2')
-dyads <- dyads[,c(4,1,2,5,6,3,7,16,8,17,9,18,10,19,11,20,13,22,14,23)] # rearrange variables
+dyads <- left_join(x = df_agg,
+                   y = nodes[,c('id_no','name','age_class','age_category',
+                                'sex','count','dem_class','id_1')],
+                   by = 'id_1') # add all information about elephant 1
+colnames(dyads)[c(7:13)] <- c('id_pad_1','name_1','age_class_1','age_category_1',
+                              'sex_1','count_1','dem_class_1')
+dyads <- left_join(x = dyads,
+                   y = nodes[,c('id_no','name','age_class','age_category',
+                                'sex','count','dem_class','id_2')],
+                   by = 'id_2')  # add all information about elephant 2
+colnames(dyads)[c(14:20)] <- c('id_pad_2','name_2','age_class_2','age_category_2',
+                               'sex_2','count_2','dem_class_2')
+dyads <- dyads[,c('dyad_id','id_1','id_2','node_1','node_2',
+                  'event_count','count_1','count_2',
+                  'id_pad_1','id_pad_2','name_1','name_2',
+                  'age_class_1','age_class_2','age_category_1','age_category_2',
+                  'sex_1','sex_2','dem_class_1','dem_class_2')]  # rearrange variables
 head(dyads)
 
-## remove any elephants from whom their is disagreement in the different data frames regarding their names or ID numbers
-unique(gbi_distinct$id_1) # 155 females, 250 males, 65 unknowns
-unique(nodes$id_1)        # 151 females, 245 males, 66 unknowns
-length(which(is.na(dyads$id_pad_1)))                 # 2639 entries where elephants have no information
-unique(dyads$id_1[which(is.na(dyads$id_pad_1))])     # "F157" "F158" "F176" "M125" "M13"  "M138" "M21"  "M223" "M227"
-length(which(is.na(dyads$id_pad_2)))                 # 1600 entries where elephants have no information
-unique(dyads$node_2[which(is.na(dyads$id_pad_1))])   # 412 elephants -- all individuals that come after F157 in the sequence
-# all of these should be removed -- these are sightings of elephants which were deleted previously from the ele_nodes and ele_links data frames due to very high uncertainty in their identity, and so their sightings are unreliable.
+## create ordered categorical variable for age of ele 1
+unique(dyads$age_category_1) # "25-40" "20-25" "15-19" "10-15" "40+" "9-10" --> <5 = 1, 5-10 = 2, 10-15 = 3, 15-19 = 4, 20-25 = 5, 25-40 = 6, 40+ = 7
+dyads$age_cat_id_1 <- ifelse(dyads$age_category_1 == '9-10', 2,
+                             ifelse(dyads$age_category_1 == '10-15', 3,
+                                    ifelse(dyads$age_category_1 == '15-19', 4,
+                                           ifelse(dyads$age_category_1 == '20-25', 5,
+                                                  ifelse(dyads$age_category_1 == '25-40', 6,
+                                                         ifelse(dyads$age_category_1 == '40+', 7,
+                                                                99))))))
+max(dyads$age_cat_id_1) # 7 -- none are 99 and therefore unknown
+dyads$age_class_1 <- ifelse(dyads$age_cat_id_1 == 2, 'Juvenile',
+                            ifelse(dyads$age_cat_id_1 > 4, 'Adult','Pubescent'))
 
-dyads <- dyads[dyads$id_1 != "F157" & dyads$id_1 != "F158" & dyads$id_1 != "F176" & 
-                 dyads$id_1 != "M125" & dyads$id_1 != "M13" & dyads$id_1 !=  "M138" & 
-                 dyads$id_1 != "M21" & dyads$id_1 != "M223" & dyads$id_1 != "M227", ] # remove individuals with incorrect data
-dyads <- dyads[dyads$id_2 != "F157" & dyads$id_2 != "F158" & dyads$id_2 != "F176" & 
-                 dyads$id_2 != "M125" & dyads$id_2 != "M13" & dyads$id_2 !=  "M138" & 
-                 dyads$id_2 != "M21" & dyads$id_2 != "M223" & dyads$id_2 != "M227", ] # remove individuals with incorrect data
-length(which(is.na(dyads$id_pad_1)))                 # 0 entries where elephants have no information
-length(which(is.na(dyads$id_pad_2)))                 # 0 entries where elephants have no information
-
-## correct sex_1, which has loaded in as a logical vector not a character/factor
-unique(dyads$sex_1) # FALSE or NA
-sex_1 <- data.frame(sex_1 = dyads$id_1)
-sex_1 <- sex_1 %>% separate(sex_1, c("sex", "number"), sep = 1, remove = FALSE) ; unique(sex_1$sex) # F, M, U
-dyads$sex_1 <- as.character(sex_1$sex) ; rm(sex_1) ; gc()
-str(dyads)  # sex_1 still comes up as logical, but now contains the right levels
-
-## create variable for age difference
-unique(dyads$age_category_1) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA --> convert anything <5 to cat 1, and anything 5-10 to cat 2
-dyads$age_cat_id_1 <- ifelse(dyads$age_category_1 == '0-3', 1,
-                                 ifelse(dyads$age_category_1 == '3-4', 1,
-                                        ifelse(dyads$age_category_1 == '4-5', 1,
-                                               ifelse(dyads$age_category_1 == '5-6', 2,
-                                                      ifelse(dyads$age_category_1 == '6-7', 2,
-                                                             ifelse(dyads$age_category_1 == '7-8', 2,
-                                                                    ifelse(dyads$age_category_1 == '8-9', 2,
-                                                                           ifelse(dyads$age_category_1 == '9-10', 2,
-                                                                                  ifelse(dyads$age_category_1 == '10-15', 3,
-                                                                                         ifelse(dyads$age_category_1 == '15-19', 4,
-                                                                                                ifelse(dyads$age_category_1 == '20-25', 5,
-                                                                                                       ifelse(dyads$age_category_1 == '20-35', 5,
-                                                                                                              ifelse(dyads$age_category_1 == '25-40', 6,
-                                                                                                                     ifelse(dyads$age_category_1 == '35-50', 6,
-                                                                                                                            ifelse(dyads$age_category_1 == '40+', 7,
-                                                                                                                                   ifelse(dyads$age_category_1 == '50+', 7, dyads$age_category_1))))))))))))))))
-dyads$age_cat_id_1[which(is.na(dyads$age_cat_id_1))] <- 1 # U8 doesn't have an age but not a problem -- won't be part of the main analysis. Is a calf so age_cat_id = 1
-
-dyads$age_class_1 <- ifelse(dyads$age_cat_id_1 == 1, 'Calf',
-                                ifelse(dyads$age_cat_id_1 == 2, 'Juvenile',
-                                       ifelse(dyads$age_cat_id_1 > 4, 'Adult','Pubescent')))
-
-unique(dyads$age_category_2) # "0-3","1-2","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-15","15-19","20-25","20-35","25-40","35-50","40+","50+",NA 
-dyads$age_cat_id_2 <- ifelse(dyads$age_category_2 == '0-3', 1,
-                                 ifelse(dyads$age_category_2 == '3-4', 1,
-                                        ifelse(dyads$age_category_2 == '4-5', 1,
-                                               ifelse(dyads$age_category_2 == '5-6', 2,
-                                                      ifelse(dyads$age_category_2 == '6-7', 2,
-                                                             ifelse(dyads$age_category_2 == '7-8', 2,
-                                                                    ifelse(dyads$age_category_2 == '8-9', 2,
-                                                                           ifelse(dyads$age_category_2 == '9-10', 2,
-                                                                                  ifelse(dyads$age_category_2 == '10-15', 3,
-                                                                                         ifelse(dyads$age_category_2 == '15-19', 4,
-                                                                                                ifelse(dyads$age_category_2 == '20-25', 5,
-                                                                                                       ifelse(dyads$age_category_2 == '20-35', 5,
-                                                                                                              ifelse(dyads$age_category_2 == '25-40', 6,
-                                                                                                                     ifelse(dyads$age_category_2 == '35-50', 6,
-                                                                                                                            ifelse(dyads$age_category_2 == '40+', 7,
-                                                                                                                                   ifelse(dyads$age_category_2 == '50+', 7, dyads$age_category_2))))))))))))))))
-dyads$age_cat_id_2[which(is.na(dyads$age_cat_id_2))] <- 1   # U8 doesn't have an age but not a problem -- won't be part of the main analysis. Is a calf so age_cat_id = 1
-
-dyads$age_class_2 <- ifelse(dyads$age_cat_id_2 == 1, 'Calf',
-                                ifelse(dyads$age_cat_id_2 == 2, 'Juvenile',
-                                       ifelse(dyads$age_cat_id_2 > 4, 'Adult','Pubescent')))
+## create ordered categorical variable for age of ele 1
+unique(dyads$age_category_2) # "25-40" "20-25" "15-19" "10-15" "40+" "9-10" --> <5 = 1, 5-10 = 2, 10-15 = 3, 15-19 = 4, 20-25 = 5, 25-40 = 6, 40+ = 7
+dyads$age_cat_id_2 <- ifelse(dyads$age_category_2 == '9-10', 2,
+                             ifelse(dyads$age_category_2 == '10-15', 3,
+                                    ifelse(dyads$age_category_2 == '15-19', 4,
+                                           ifelse(dyads$age_category_2 == '20-25', 5,
+                                                  ifelse(dyads$age_category_2 == '25-40', 6,
+                                                         ifelse(dyads$age_category_2 == '40+', 7,
+                                                                99))))))
+max(dyads$age_cat_id_2) # 7 -- none are 99 and therefore unknown
+dyads$age_class_2 <- ifelse(dyads$age_cat_id_2 == 2, 'Juvenile',
+                            ifelse(dyads$age_cat_id_2 > 4, 'Adult','Pubescent'))
 
 ## correct dem_class with corrected age classes
-dyads$dem_class_1 <- ifelse(dyads$age_class_1 == 'Adult', paste('A',dyads$sex_1, sep = ''),
-                                ifelse(dyads$age_class_1 == 'Pubescent', paste('P',dyads$sex_1, sep = ''),
-                                       ifelse(dyads$age_class_1 == 'Juvenile', paste('J',dyads$sex_1, sep = ''),
-                                              paste('C',dyads$sex_1, sep = ''))))
-dyads$dem_class_2 <- ifelse(dyads$age_class_2 == 'Adult', paste('A',dyads$sex_2, sep = ''),
-                                ifelse(dyads$age_class_2 == 'Pubescent', paste('P',dyads$sex_2, sep = ''),
-                                       ifelse(dyads$age_class_2 == 'Juvenile', paste('J',dyads$sex_2, sep = ''),
-                                              paste('C',dyads$sex_2, sep = ''))))
+dyads$dem_class_1 <- ifelse(dyads$age_class_1 == 'Adult',
+                            paste('A',dyads$sex_1, sep = ''),
+                            ifelse(dyads$age_class_1 == 'Pubescent',
+                                   paste('P',dyads$sex_1, sep = ''),
+                                   paste('J',dyads$sex_1, sep = '')))
+dyads$dem_class_2 <- ifelse(dyads$age_class_2 == 'Adult',
+                            paste('A',dyads$sex_2, sep = ''),
+                            ifelse(dyads$age_class_2 == 'Pubescent',
+                                   paste('P',dyads$sex_2, sep = ''),
+                                   paste('J',dyads$sex_2, sep = '')))
 
 ## combined dem_class of dyad
 dyads$age_class_id_1 <- ifelse(dyads$age_class_1 == 'Adult',4,
-                                   ifelse(dyads$age_class_1 == 'Pubescent',3,
-                                          ifelse(dyads$age_class_1 == 'Juvenile',2,1)))
+                                   ifelse(dyads$age_class_1 == 'Pubescent',3,2))
 dyads$age_class_id_2 <- ifelse(dyads$age_class_2 == 'Adult',4,
-                                   ifelse(dyads$age_class_2 == 'Pubescent',3,
-                                          ifelse(dyads$age_class_2 == 'Juvenile',2,1)))
+                                   ifelse(dyads$age_class_2 == 'Pubescent',3,2))
 dyads$dem_type <- ifelse(dyads$age_class_id_1 > dyads$age_class_id_2,
-                             paste(dyads$dem_class_1, dyads$dem_class_2, sep = '_'), # when 1 is older: dc1_dc2
-                             ifelse(dyads$age_class_id_1 < dyads$age_class_id_2,
-                                    paste(dyads$dem_class_2, dyads$dem_class_1, sep = '_'), # when 2 is older: dc2_dc1
-                                    ifelse(dyads$sex_1 == 'F',                                  # when age1 = age2...
-                                           paste(dyads$dem_class_1, dyads$dem_class_2, sep = '_'), # ...when 1 is F: dc1_dc2
-                                           ifelse(dyads$sex_2 == 'F',
-                                                  paste(dyads$dem_class_2, dyads$dem_class_1, sep = '_'), # ...when 2 is F: dc2_dc1
-                                                  ifelse(dyads$sex_1 == 'M', # ...when neither are F...
-                                                         paste(dyads$dem_class_1, dyads$dem_class_2, sep = '_'), # ...when 1 is M: dc1_dc2
-                                                         paste(dyads$dem_class_2, dyads$dem_class_1, sep = '_')))))) # ...when 2 is M or both are U: dc2_dc1
+                         paste(dyads$dem_class_1, dyads$dem_class_2, sep = '_'), # when id1 is older, 1_2
+                         paste(dyads$dem_class_2, dyads$dem_class_1, sep = '_')) # when id2 is older, 2_1
 sort(unique(dyads$dem_type))
 
-## add column for age difference between dyad
-dyads$age_diff <- abs(as.numeric(dyads$age_cat_id_1) - as.numeric(dyads$age_cat_id_2))
-
 ## add column for total number of sightings per pair
-dyads$count_dyad <- (dyads$count_1 + dyads$count_2) - dyads$event_count  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings.
+dyads$count_dyad <- (dyads$count_1 + dyads$count_2) - dyads$event_count  # maximum possible sightings of pairing = sum of times see node_1 and times see node_2, but this includes the times they were seen together twice, so then subtract once the count of paired sightings
+hist(dyads$count_dyad)
+hist(dyads$event_count)
 
 ## add column for total number of sightings per pair where they were NOT together
 dyads$apart <- dyads$count_dyad - dyads$event_count
 
-## reassign dyad numbers to remove gaps
-dyads$node_1_nogaps <- as.integer(as.factor(dyads$node_1))
-dyads$node_2_nogaps <- as.integer(as.factor(dyads$node_2))+1
-
-## remove dead individuals (also removes all unknown sex calves)
-dyads <- dyads %>% 
-  filter(name_1 != 'Richard' & name_2 != 'Richard') %>% 
-  filter(name_1 != 'Gabriel' & name_2 != 'Gabriel') %>% 
-  filter(name_1 != 'Tori'    & name_2 != 'Tori')
-
-######## Filter down to only males over 10 years old          ####
-dyads <- dyads %>% 
-  filter(sex_1 == 'M') %>% 
-  filter(sex_2 == 'M') %>% 
-  filter(as.numeric(age_cat_id_1) >= 3) %>% 
+## filter down to only males over 10 years old
+dyads <- dyads %>%
+  filter(as.numeric(age_cat_id_1) >= 3) %>%
   filter(as.numeric(age_cat_id_2) >= 3)
+nodes <- nodes %>%
+  filter(age_category != '9-10')
 
 ### create nodes id variable which is 1:max(id) as currently covers all elephants, not just males
-dyads$node_1_males <- as.integer(as.factor(dyads$node_1_nogaps))
-dyads$node_2_males <- as.integer(as.factor(dyads$node_2_nogaps))+1
+dyads$node_1_males <- as.integer(as.factor(dyads$node_1))
+dyads$node_2_males <- as.integer(as.factor(dyads$node_2))+1
 
 ### standardise dyad_id for males only
 dyads$dyad_males <- as.integer(as.factor(dyads$dyad_id))
 
 ### write out data as ready to go into model
-write_csv(dyads, '../data_processed/step1_dataprocessing/motnp_binomialpairwiseevents.csv')
+write_csv(dyads, 'methods_paper/data_processed/motnp_binomialpairwiseevents.csv')
 
 ## clean up environment ready for next step
 rm(list = ls()) ; gc()
@@ -746,7 +564,7 @@ print(paste0('Data wrangling completed at ', Sys.time(), '. Ready for analysis.'
 
 #---------------- 3) SRI      ##########
 ######## Import data          ####
-counts_df <- read_csv('../data_processed/step1_dataprocessing/motnp_binomialpairwiseevents.csv') %>% 
+counts_df <- read_csv('methods_paper/data_processed/motnp_binomialpairwiseevents.csv') %>%
   dplyr::select(-sex_1, -sex_2)
 
 ######## Calculate SRI values ####
@@ -776,16 +594,16 @@ rm(list = ls()[!ls() %in% c('counts_df')]) ; gc()
 #---------------- 4) BISoN with Uniform prior ##########
 ######## Prep data for models                 ####
 ## create nodes data frame
-nodes <- data.frame(id = sort(unique(c(dyads$id_1,dyads$id_2))),  # all unique individuals
+nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
                     node = NA, age = NA, sightings = NA)          # data needed on each
 for(i in 1:nrow(nodes)){
-  ## extract data about individual from dyads data frame
-  if(nodes$id[i] %in% dyads$id_1) {
-    x <- dyads[dyads$id_1 == nodes$id[i], c('id_1','node_1','count_1','age_category_1')] %>% 
+  ## extract data about individual from counts_df data frame
+  if(nodes$id[i] %in% counts_df$id_1) {
+    x <- counts_df[counts_df$id_1 == nodes$id[i], c('id_1','node_1','count_1','age_category_1')] %>%
       distinct()
-  } else { 
-    x <- dyads[dyads$id_2 == nodes$id[i], c('id_2','node_2','count_2','age_category_2')] %>%
-      distinct() 
+  } else {
+    x <- counts_df[counts_df$id_2 == nodes$id[i], c('id_2','node_2','count_2','age_category_2')] %>%
+      distinct()
   }
   colnames(x) <- c('id','node','count','age')
   ## add individual data
@@ -798,20 +616,24 @@ rm(x,i) ; gc()
 ## create data list
 n_chains <- 4
 n_samples <- 1000
-n_dyads <- nrow(dyads)
+n_dyads <- nrow(counts_df)
 counts_ls <- list(
   n_dyads    = n_dyads,                  # total number of times one or other of the dyad was observed
-  dyad_ids   = dyads$dyad_id,            # identifier for each dyad
-  together   = dyads$event_count,        # count number of sightings seen together
-  count_dyad = dyads$count_dyad          # count total number of times seen
+  dyad_ids   = counts_df$dyad_id,            # identifier for each dyad
+  together   = counts_df$event_count,        # count number of sightings seen together
+  count_dyad = counts_df$count_dyad          # count total number of times seen
 )
 
 ######## Compile edge model                   ####
-edge_binary_uniform <- cmdstan_model('other/methods_paper/edge_binary_uniform.stan')
+edge_binary_uniform <- cmdstan_model('methods_paper/models/edge_binary_uniform.stan')
 
 ######## Run model                            ####
+### set seed
+set.seed(12345)
+
+# fit uniform model
 fit_edges_uniform <- edge_binary_uniform$sample(
-  data = counts_ls, 
+  data = counts_ls,
   chains = n_chains, parallel_chains = n_chains,
   iter_warmup = n_samples, iter_sampling = n_samples)
 
@@ -826,22 +648,26 @@ edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$
 edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
 edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
 edges <- rbind(edges1, edges2, edges3, edges4)
-n_samples <- nrow(edges)
 edge_samples1 <- edges1 %>%
   pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
 rm(edges1, edges2, edges3, edges4) ; gc()
 
 ## save model for plotting
-save.image('../outputs/sparse_network_methods_figures/model_run_uniform.RData')
-rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df')]) ; gc()
+save.image('methods_paper/r_workspaces/model_run_uniform.RData')
+rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df',
+                             'n_chains','n_samples','n_dyads')]) ; gc()
 
 #---------------- 5) BISoN with Default prior ##########
 ######## Compile edge model                   ####
-edge_binary_default <- cmdstan_model('other/methods_paper/edge_binary_gaussian.stan')
+edge_binary_default <- cmdstan_model('methods_paper/models/edge_binary_gaussian.stan')
 
 ######## Run model                            ####
+### set seed
+set.seed(12345)
+
+# fit default model
 fit_edges_default <- edge_binary_default$sample(
-  data = counts_ls, 
+  data = counts_ls,
   chains = n_chains, parallel_chains = n_chains,
   iter_warmup = n_samples, iter_sampling = n_samples)
 
@@ -856,22 +682,26 @@ edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$
 edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
 edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
 edges <- rbind(edges1, edges2, edges3, edges4)
-n_samples <- nrow(edges)
 edge_samples1 <- edges1 %>%
   pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
 rm(edges1, edges2, edges3, edges4) ; gc()
 
 ## save model for plotting
-save.image('../outputs/sparse_network_methods_figures/model_run_default.RData')
-rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df')]) ; gc()
+save.image('methods_paper/r_workspaces/model_run_default.RData')
+rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df',
+                             'n_chains','n_samples','n_dyads')]) ; gc()
 
 #---------------- 6) BISoN with Skewed prior  ##########
 ######## Compile edge model                   ####
-edge_binary_skewed <- cmdstan_model('other/methods_paper/edge_binary_skewed.stan')
+edge_binary_skewed <- cmdstan_model('methods_paper/models/edge_binary_skewed.stan')
 
 ######## Run model                            ####
+### set seed
+set.seed(12345)
+
+# fit skewed model
 fit_edges_skewed <- edge_binary_skewed$sample(
-  data = counts_ls, 
+  data = counts_ls,
   chains = n_chains, parallel_chains = n_chains,
   iter_warmup = n_samples, iter_sampling = n_samples)
 
@@ -886,54 +716,75 @@ edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$
 edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
 edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
 edges <- rbind(edges1, edges2, edges3, edges4)
-n_samples <- nrow(edges)
 edge_samples1 <- edges1 %>%
   pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
 rm(edges1, edges2, edges3, edges4) ; gc()
 
 ## save model for plotting
-save.image('../outputs/sparse_network_methods_figures/model_run_skewedß.RData')
-rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df')]) ; gc()
+save.image('methods_paper/r_workspaces/model_run_skewed.RData')
+rm(list = ls()[! ls() %in% c('counts_ls','nodes','counts_df',
+                             'n_chains','n_samples','n_dyads')]) ; gc()
 
 #---------------- 7) BISoN with Conditional prior ##########
 ######## Compile edge model                       ####
-edge_binary <- cmdstan_model("models/edge_binary_conditional.stan")
+edge_binary_conditional <- cmdstan_model("methods_paper/models/edge_binary_conditional.stan")
 
 ######## Run model                                ####
-fit_edges_motnp <- edge_binary$sample(
-  data = counts_ls, 
+### set seed
+set.seed(12345)
+
+# fit conditional model
+fit_edges_conditional <- edge_binary_conditional$sample(
+  data = counts_ls,
   chains = n_chains, parallel_chains = n_chains,
   iter_warmup = n_samples, iter_sampling = n_samples)
 
-######## Extract edges -- different code to others -- check that this definitely does the same thing! ####
-posterior_samples <- fit_edges_motnp$draws()
+######## Extract edges                            #### -- rerun with code that matches all others, but need to check that this still works with plots ####
+edges <- fit_edges_conditional$draws() %>% as.data.frame()
+edges <- edges[,(n_chains+1):ncol(edges)]        # remove lp__ columns
+edges1 <- edges[,seq(1,ncol(edges)-3, by = 4)]   # select only chain 1
+edge_names <- data.frame(name = colnames(edges1)) %>%
+  separate(name, into = c('chain','weight'), sep = '.edge_')
+colnames(edges1) <- edge_names$weight
+edges2 <- edges[,seq(2,ncol(edges)-2, by = 4)] ; colnames(edges2) <- edge_names$weight  # select only chain 2
+edges3 <- edges[,seq(3,ncol(edges)-1, by = 4)] ; colnames(edges3) <- edge_names$weight   # select only chain 3
+edges4 <- edges[,seq(4,ncol(edges)-0, by = 4)] ; colnames(edges4) <- edge_names$weight   # select only chain 4
+edges <- rbind(edges1, edges2, edges3, edges4)
+edge_samples1 <- edges1 %>%
+  pivot_longer(cols = everything(), names_to = 'parameter', values_to = 'weight')
+rm(edges1, edges2, edges3, edges4) ; gc()
 
-### break down into parameters
-edge_weights_matrix <- posterior_samples[,,2:(nrow(dyads)+1)]
-rm(posterior_samples) ; gc()
+# posterior_samples <- fit_edges_conditional$draws()
+#
+# ### break down into parameters
+# edge_weights_matrix <- posterior_samples[,,2:(nrow(counts_df)+1)]
+# rm(posterior_samples) ; gc()
+#
+# ### save edge samples -- convert from being an array where each layer is a set of 4 chains, to a data frame where all chains are saved together in long format
+# edges <- as.data.frame(edge_weights_matrix[,,1])                                          # extract matrix for first dyad
+# colnames(edges) <- c('chain1','chain2','chain3','chain4')                                 # rename columns so know which chain is which
+# edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')   # convert to long format
+# edges$dyad <- counts_ls$dyad_ids[1]                                                       # add dyad ID for first dyad
+# edges$position <- rep(1:n_samples, each = n_chains)                                       # add chain position for each dyad
+# for(i in 2:n_dyads){                                                                      # repeat for all other dyads and append
+#   x <- as.data.frame(edge_weights_matrix[,,i])
+#   colnames(x) <- c('chain1','chain2','chain3','chain4')
+#   x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
+#   x$dyad <- counts_ls$dyad_ids[i]
+#   x$position <- rep(1:n_samples, each = n_chains)
+#   edges <- rbind(edges, x)
+# }
 
-### save edge samples -- convert from being an array where each layer is a set of 4 chains, to a data frame where all chains are saved together in long format
-edges <- as.data.frame(edge_weights_matrix[,,1])                                          # extract matrix for first dyad
-colnames(edges) <- c('chain1','chain2','chain3','chain4')                                 # rename columns so know which chain is which
-edges <- pivot_longer(edges, everything(), values_to = 'edge_draw', names_to = 'chain')   # convert to long format
-edges$dyad <- counts_ls$dyad_ids[1]                                                       # add dyad ID for first dyad
-edges$position <- rep(1:n_samples, each = n_chains)                                       # add chain position for each dyad
-for(i in 2:n_dyads){                                                                      # repeat for all other dyads and append
-  x <- as.data.frame(edge_weights_matrix[,,i])
-  colnames(x) <- c('chain1','chain2','chain3','chain4')
-  x <- pivot_longer(x, everything(), values_to = 'edge_draw', names_to = 'chain')
-  x$dyad <- counts_ls$dyad_ids[i]
-  x$position <- rep(1:n_samples, each = n_chains)
-  edges <- rbind(edges, x)
-}
-save.image('../outputs/sparse_network_methods_figures/model_run_conditional.RData')
-rm(list = ls()) ; gc()
+## save model for plotting
+# save.image('methods_paper/r_workspaces/model_run_conditional.RData')
+load('methods_paper/r_workspaces/model_run_conditional.RData')
+rm(list = ls()[!ls() %in% c('counts_df')]) ; gc()
 
 #---------------- 8) Create SRI plots for paper ##########
-pdf('../outputs/sparse_network_methods_figures/all_plots.pdf')
+pdf('methods_paper/outputs/all_plots.pdf')
 colours <- c('#21918c','#440154')
 
-######## SRI Edge weights: 2 panel plot of SRI edges and edge_vs_sightings ####
+######## SRI Edge weights: edges and edge_vs_sightings ####
 #### Edge bar graph                                                        ####
 # bar plot
 (edges_sri <- ggplot()+
@@ -944,29 +795,31 @@ colours <- c('#21918c','#440154')
    scale_y_continuous(name = 'number of dyads',
                       #limits = c(0,1000),
                       expand = c(0,0))+
-   annotate('text', x = 0.44, y = 165,
-            label = paste0('+ ', length(which(counts_df$sri == 0)), ' dyads with \nSRI = 0'),
+   annotate('text', x = 0.45, y = 165,
+            label = paste0(length(which(counts_df$sri == 0)), ' dyads with \nSRI = 0'),
             size = unit(4, 'pt'),
             colour = rgb(33/255, 145/255, 140/255))+
    coord_cartesian(ylim = c(0,200))
 )
-ggsave(filename = 'edges_sri.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = edges_sri, device = 'png', width = 700, height = 700, units = 'px')
+# ggsave(filename = 'edges_sri.png',
+#        path = 'methods_paper/outputs/',
+#        plot = edges_sri, device = 'png', width = 700, height = 700, units = 'px')
+# ggsave(filename = 'edges_sri.svg',
+#        path = 'methods_paper/outputs/',
+#        plot = edges_sri, device = 'svg', width = 700, height = 700, units = 'px')
 
-# redo annotation on so that size isn't too large for multi plot
-(edges_sri <- ggplot()+
-    geom_bar(data = counts_df, aes(x = round(sri, 3)), fill = rgb(33/255, 145/255, 140/255),
-             colour = rgb(33/255, 145/255, 140/255), linewidth = 0.2)+
-    scale_x_continuous(name = 'SRI value')+
-    scale_y_continuous(name = 'number of dyads',
-                       expand = c(0,0))+
-    annotate('text', x = 0.5, y = 165,
-             label = paste0(length(which(counts_df$sri == 0)), ' dyads with \nSRI = 0'),
-             size = unit(4, 'pt'),
-             colour = rgb(33/255, 145/255, 140/255))+
-    coord_cartesian(ylim = c(0,200))
-)
+# redo annotation so that size isn't too large for multi plot
+edges_sri <- ggplot()+
+  geom_bar(data = counts_df, aes(x = round(sri, 3)), fill = rgb(33/255, 145/255, 140/255),
+           colour = rgb(33/255, 145/255, 140/255), linewidth = 0.2)+
+  scale_x_continuous(name = 'SRI value')+
+  scale_y_continuous(name = 'number of dyads',
+                     expand = c(0,0))+
+  annotate('text', x = 0.5, y = 165,
+           label = paste0(length(which(counts_df$sri == 0)), ' dyads with \nSRI = 0'),
+           size = unit(4, 'pt'),
+           colour = rgb(33/255, 145/255, 140/255))+
+  coord_cartesian(ylim = c(0,200))
 
 #### Edges vs Sightings                                                    ####
 ## basic plot
@@ -1001,16 +854,25 @@ counts_df$together <- ifelse(counts_df$event_count == 0,
           legend.key.height = unit(4, 'mm'),
           legend.title = element_text(size = 10),
           legend.text = element_text(size = 8)))
+# ggsave(filename = 'edgesightings_sri.png',
+#        path = 'methods_paper/outputs/',
+#        plot = edgesightings_sri.2, device = 'png', width = 1600, height = 700, units = 'px')
+# ggsave(filename = 'edgesightings_sri.svg',
+#        path = 'methods_paper/outputs/',
+#        plot = edgesightings_sri.2, device = 'svg', width = 1600, height = 700, units = 'px')
 
 #### Merge                                                                 ####
 (combined <- (edges_sri + edgesightings_sri.2)+
    plot_annotation(tag_levels = 'a'))
 ggsave(filename = 'outputs_sri.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2100, height = 700, units = 'px')
+ggsave(filename = 'outputs_sri.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 2100, height = 700, units = 'px')
 
-######## SRI Eigenvector Centrality: 2 panel plot of SRI eigenvector against sighting count and number of non-associations ####
-#### Individual sighting count                                                                                             ####
+######## SRI Eigenvector Centrality: eigenvector vs sighting count and non-associations ####
+#### Individual sighting count                                                          ####
 # calculate SRI and identify individuals
 counts_df$sri <- counts_df$event_count / counts_df$count_dyad
 elephants <- unique(c(counts_df$id_1, counts_df$id_2))
@@ -1065,7 +927,7 @@ eigen_sri <- eigen_sri %>%
     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
 )
 
-#### Total number of dyads where together = 0                                                                              ####
+#### Total number of dyads where together = 0                                           ####
 ## no trend line
 (eigen0_sri.1 <- ggplot(eigen_sri, aes(x = together0, y = eigen))+
    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
@@ -1084,21 +946,24 @@ eigen_sri <- eigen_sri %>%
     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
 )
 
-#### Merge                                                                                                                 ####
+#### Merge                                                                              ####
 (eigen0_sri.2 + eigensightings_sri)+
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'eigen_outputs_sri.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
-rm(eigen0_sri.2,eigensightings_sri.2) ; gc()
+ggsave(filename = 'eigen_outputs_sri.svg',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'svg', width = 1600, height = 700, units = 'px')
 
-save.image('../outputs/sparse_network_methods_figures/sri.RData')
+## save workspace
+save.image('methods_paper/r_workspaces/sri.RData')
 
 #---------------- 9) Create Unconditional BISoN plots for paper ####
-######## Unconditional Priors: 3 panel plot of uniform/default BISoN/right-skewed BISoN for priors ####
+######## Unconditional Priors ####
 x <- seq(0, 1, length = 100)
 
-#### Uniform, uniform(0,1)                                                                         ####
+#### Uniform, uniform(0,1)    ####
 # calculate probability of all values of x assuming completely flat prior
 flat_prior <- dunif(x = x, min = 0, max = 1)
 data <- data.frame(x = x, density = flat_prior)
@@ -1125,10 +990,9 @@ inset_sri <- ggplot(data)+
                      expand = c(0,0))+
   theme(axis.text = element_blank(), axis.ticks = element_blank())
 
-#### Default, normal(0,2.5)                                                                        ####
+#### Default, normal(0,2.5)   ####
 # calculate probability of all values of x assuming default bisonR prior shape
-default_prior <- get_default_priors('binary') # default edge prior = normal(0, 2.5)
-default_prior <- c(0, 2.5)
+default_prior <- c(0, 2.5) # obtained using: default_prior <- bisonR::get_default_priors('binary')
 default_prior <- dnorm(x = logit(x), mean = default_prior[1], sd = default_prior[2])
 data <- data.frame(x = x, density = default_prior)
 
@@ -1156,7 +1020,7 @@ inset_default <- ggplot(data)+
                      expand = c(0,0))+
   theme(axis.text = element_blank(), axis.ticks = element_blank())
 
-#### Skewed, beta(0.7,5)                                                                           ####
+#### Skewed, beta(0.7,5)      ####
 # calculate probability of all values of x assuming right skewed prior shape
 skewed_prior <- c(1, 5)
 skewed_prior <- dbeta(x = x, shape1 = skewed_prior[1], shape2 = skewed_prior[2])
@@ -1186,19 +1050,19 @@ inset_skewed <- ggplot(data)+
                      expand = c(0,0))+
   theme(axis.text = element_blank(), axis.ticks = element_blank())
 
-#### Merge                                                                                         ####
+#### Merge                    ####
 (priors_sri + priors_default + priors_skewed) +
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'priors_unconditional.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2100, height = 700, units = 'px')
 
 # clean up
 rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed','colours')]) ; gc()
 
-######## Unconditional Outputs: 6 panel plot of uniform/default/skewed for posterior and edge_vs_sightings ####
-#### Uniform, uniform(0,1)                                                                                 ####
-load('../outputs/sparse_network_methods_figures/model_run_uniform.RData')
+######## Unconditional Outputs: posterior and edge_vs_sightings ####
+#### Uniform, uniform(0,1)                                      ####
+load('methods_paper/r_workspaces/model_run_uniform.RData')
 
 ## plot posterior distribution
 (figure_uniform_posterior <- ggplot(data = edge_samples1)+
@@ -1208,7 +1072,7 @@ load('../outputs/sparse_network_methods_figures/model_run_uniform.RData')
     scale_y_continuous(name = 'density')
 )
 ggsave(filename = 'posterior_uniform_alldyads.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = figure_uniform_posterior, device = 'png', width = 1600, height = 700, units = 'px')
 
 ## split colours by if elephants were ever seen grouping together
@@ -1219,7 +1083,7 @@ edge_samples1 <- edge_samples1 %>%
   mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
 
 ## plot a sample of 100 randomly selected dyads
-set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
+set.seed(12345) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
 plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
 edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
 (figure_uniform_posterior <- ggplot(data = edges_subset)+
@@ -1239,7 +1103,7 @@ edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
     guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))
 )
 ggsave(filename = 'posterior_uniform_sampledyads.png',
-       path = '../outputs/sparse_network_methods_figures/in',
+       path = 'methods_paper/outputs/in',
        plot = figure_uniform_posterior, device = 'png',
        width = 1000, height = 1000, units = 'px')
 
@@ -1312,13 +1176,13 @@ averages <- averages %>%
 )
 
 ## save outputs
-save.image('../outputs/sparse_network_methods_figures/plots_bisonuniform.RData')
+save.image('methods_paper/r_workspaces/plots_bisonuniform.RData')
 rm(list = ls()[!ls() %in% c('counts_df','n_chains',
                             'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 
-#### Default, normal(0,2.5)                                                                                ####
-load('../outputs/sparse_network_methods_figures/model_run_default.RData')
+#### Default, normal(0,2.5)                                     ####
+load('methods_paper/r_workspaces/model_run_default.RData')
 
 # plot posterior distribution
 (figure_default_posterior <- ggplot(data = edge_samples1)+
@@ -1328,7 +1192,7 @@ load('../outputs/sparse_network_methods_figures/model_run_default.RData')
     scale_y_continuous(name = 'density')
 )
 ggsave(filename = 'posterior_default_alldyads.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = figure_default_posterior, device = 'png',
        width = 1600, height = 700, units = 'px')
 
@@ -1340,7 +1204,7 @@ edge_samples1 <- edge_samples1 %>%
   mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
 
 ## plot a sample of 100 randomly selected dyads
-set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
+set.seed(12345) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
 plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
 edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
 (figure_default_posterior <- ggplot(data = edges_subset)+
@@ -1432,13 +1296,13 @@ figure_default_edgesightings.2 <- ggplot()+
 )
 
 ## save outputs
-save.image('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
+save.image('methods_paper/r_workspaces/plots_bisondefault.RData')
 rm(list = ls()[!ls() %in% c('counts_df','n_chains',
                             'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
 
-#### Skewed, beta(0.7,5)                                                                                   ####
-load('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
+#### Skewed, beta(0.7,5)                                        ####
+load('methods_paper/r_workspaces/model_run_skewed.RData')
 
 # plot posterior distribution
 (figure_skewed_posterior <- ggplot(data = edge_samples1)+
@@ -1448,7 +1312,7 @@ load('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
     scale_y_continuous(name = 'density')
 )
 ggsave(filename = 'posterior_skewed_alldyads.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = figure_skewed_posterior, device = 'png', width = 1600, height = 700, units = 'px')
 
 ## split colours by if elephants were ever seen grouping together
@@ -1459,7 +1323,7 @@ edge_samples1 <- edge_samples1 %>%
   mutate(together0 = ifelse(event_count == 0, 'never together', 'together at least once'))
 
 ## plot a sample of 100 randomly selected dyads
-set.seed(15) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
+set.seed(12345) ; plot_dyads <- sample(1:nrow(counts_df), size = 100, replace = F)
 plot_dyad_ids <- unique(edge_samples1$parameter)[plot_dyads]
 edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
 (figure_skewed_posterior <- ggplot(data = edges_subset)+
@@ -1480,7 +1344,7 @@ edges_subset <- edge_samples1[edge_samples1$parameter %in% plot_dyad_ids,]
 )
 
 # clean up and save
-save.image('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
+save.image('methods_paper/r_workspaces/model_run_skewed.RData')
 
 ## create dataframe to plot mean edge weight vs dyad sighting count
 counts_df$together <- ifelse(counts_df$event_count == 0,
@@ -1558,26 +1422,26 @@ averages <- averages %>%
 )
 
 ## save outputs
-save.image('../outputs/sparse_network_methods_figures/plots_bisonskewed.RData')
+save.image('methods_paper/r_workspaces/plots_bisonskewed.RData')
 
-#### Merge                                                                                                 ####
+#### Merge                                                      ####
 #rm(list = ls()) ; gc()
-# load('../outputs/sparse_network_methods_figures/plots_bisonskewed.RData')
+# load('methods_paper/r_workspaces/plots_bisonskewed.RData')
 rm(list = ls()[!ls() %in% c('figure_skewed_posterior','figure_skewed_edgesightings.3',
                             'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
-load('../outputs/sparse_network_methods_figures/plots_bisondefault.RData')
+load('methods_paper/r_workspaces/plots_bisondefault.RData')
 rm(list = ls()[!ls() %in% c('figure_default_posterior','figure_default_edgesightings.3',
                             'figure_skewed_posterior','figure_skewed_edgesightings.3',
                             'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
-load('../outputs/sparse_network_methods_figures/plots_bisonuniform.RData')
+load('methods_paper/r_workspaces/plots_bisonuniform.RData')
 rm(list = ls()[!ls() %in% c('figure_uniform_posterior','figure_uniform_edgesightings.3',
                             'figure_default_posterior','figure_default_edgesightings.3',
                             'figure_skewed_posterior','figure_skewed_edgesightings.3',
                             'inset_sri','inset_default','inset_skewed','inset_conditional',
                             'colours')]) ; gc()
-save.image('../outputs/sparse_network_methods_figures/plots_unconditional.RData')
+save.image('methods_paper/r_workspaces/plots_unconditional.RData')
 
 (combined_top <- (figure_uniform_posterior + 
                     figure_default_posterior + 
@@ -1586,7 +1450,7 @@ save.image('../outputs/sparse_network_methods_figures/plots_unconditional.RData'
     plot_layout(guides = 'collect') &
     theme(legend.position = 'bottom'))
 ggsave(filename = 'posterior_unconditional_noinset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
 
 combined_bottom <- (figure_uniform_edgesightings.3 + figure_default_edgesightings.3 + figure_skewed_edgesightings.3)+
@@ -1594,12 +1458,12 @@ combined_bottom <- (figure_uniform_edgesightings.3 + figure_default_edgesighting
 (combined_bottom <- combined_bottom + 
     plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'edgesightings_unconditional_noinset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
 
 (combined_top / combined_bottom)
 ggsave(filename = 'outputs_unconditional_noinset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
 
 uniform_posterior_inset <- wrap_elements(figure_uniform_posterior + 
@@ -1625,20 +1489,20 @@ combined_top <- (uniform_posterior_inset + default_posterior_inset + skewed_post
     plot_layout(guides = 'collect')
 )
 ggsave(filename = 'posterior_unconditional_inset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2700, height = 700, units = 'px')
 
 (combined_top / combined_bottom)
 ggsave(filename = 'outputs_unconditional_inset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2700, height = 1600, units = 'px')
 
 rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed',
                             'colours')]) ; gc()
 
-######## Unconditional Eigenvector Centrality: 6 panel plot of eigenvector against sighting count and number of non-associations ####
-#### Uniform, uniform(0,1)                                                                                                       ####
-load('../outputs/sparse_network_methods_figures/model_run_uniform.RData')
+######## Unconditional Eigenvector Centrality: eigenvector vs sighting count and non-associations ####
+#### Uniform, uniform(0,1)                                                                        ####
+load('methods_paper/r_workspaces/model_run_uniform.RData')
 
 ## create adjacency array from uniform edge posterior
 uniform_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
@@ -1769,11 +1633,11 @@ rm(list = ls()[!ls() %in% c('eigen_uniform','averages_uniform',
                             'eigensightings_uniform.1','eigensightings_uniform.2','eigensightings_uniform.3',
                             'eigen0_uniform.1','eigen0_uniform.2','eigen0_uniform.3',
                             'inset_sri','inset_default','inset_skewed','inset_conditional','colours')]) ; gc()
-save.image('../outputs/sparse_network_methods_figures/eigen_checks_unconditional.RData')
+save.image('methods_paper/r_workspaces/eigen_checks_unconditional.RData')
 
-#### Default, normal(0,2.5)                                                                                                      ####
+#### Default, normal(0,2.5)                                                                       ####
 ## eigenvector centrality vs individual sighting count
-load('../outputs/sparse_network_methods_figures/model_run_default.RData')
+load('methods_paper/r_workspaces/model_run_default.RData')
 
 # get adjacency array for default prior
 default_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
@@ -1900,11 +1764,11 @@ rm(list = ls()[!ls() %in% c('eigen_uniform','averages_uniform',
                             'eigen0_uniform.1','eigen0_uniform.2','eigen0_uniform.3',
                             'eigen0_default.1','eigen0_default.2','eigen0_default.3',
                             'inset_sri','inset_default','inset_skewed','inset_conditional','colours')]) ; gc()
-save.image('../outputs/sparse_network_methods_figures/eigen_checks_unconditional.RData')
+save.image('methods_paper/r_workspaces/eigen_checks_unconditional.RData')
 
-#### Skewed, beta(0.7,5)                                                                                                         ####
+#### Skewed, beta(0.7,5)                                                                          ####
 ## eigenvector centrality vs individual sighting count
-load('../outputs/sparse_network_methods_figures/model_run_skewed.RData')
+load('methods_paper/r_workspaces/model_run_skewed.RData')
 
 # get adjacency array for skewed prior
 skewed_adjarr <- array(NA, dim = c(length(elephants), length(elephants), 1000),
@@ -2016,9 +1880,9 @@ rm(list = ls()[!ls() %in% c('eigen_uniform','averages_uniform',
                             'eigen0_default.1','eigen0_default.2','eigen0_default.3',
                             'eigen0_skewed.1', 'eigen0_skewed.2', 'eigen0_skewed.3',
                             'inset_sri','inset_default','inset_skewed','inset_conditional','colours')]) ; gc()
-save.image('../outputs/sparse_network_methods_figures/eigen_checks_unconditional.RData')
+save.image('methods_paper/r_workspaces/eigen_checks_unconditional.RData')
 
-#### Merge                                                                                                                       ####
+#### Merge                                                                                        ####
 rm(list = ls()[!ls() %in% c('eigen0_uniform.2','eigensightings_uniform.2',
                             'eigen0_default.2','eigensightings_default.2',
                             'eigen0_skewed.2', 'eigensightings_skewed.2',
@@ -2029,7 +1893,7 @@ rm(list = ls()[!ls() %in% c('eigen0_uniform.2','eigensightings_uniform.2',
   (eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)+
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'eigen_outputs_unconditional_noinset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
 
 ## set up insets
@@ -2051,11 +1915,11 @@ skewed_eigen0_inset <- wrap_elements(eigen0_skewed.2 +
   (eigensightings_uniform.2 + eigensightings_default.2 + eigensightings_skewed.2)+
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'eigen_outputs_unconditional_inset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 2400, height = 1600, units = 'px')
 
 #---------------- 10) Create Conditional BISoN plots for paper ####
-######## Conditional Prior: 1 panel plot of conditional prior  ####
+######## Conditional Prior  ####
 # define sequence over which to plot
 x <- seq(0, 1, length = 100)
 
@@ -2086,7 +1950,7 @@ data <- data.frame(x = x,
     theme(legend.position = 'right')
 )
 ggsave(filename = 'prior_conditional.png',
-       path = '../outputs/sparse_network_methods_figures/ines_suggestions/',
+       path = 'methods_paper/outputs/ines_suggestions/',
        plot = prior_conditional, device = 'png', width = 1200, height = 600, units = 'px')
 
 inset_conditional <- ggplot(data)+
@@ -2107,8 +1971,8 @@ rm(list = ls()[!ls() %in% c('inset_sri','inset_default','inset_skewed','inset_co
                             'colours')]) ; gc()
 
 
-######## Conditional Outputs: 2 panel plot of conditional for posterior and edge_vs_sightings ####
-#### Posterior distribution                                                                   ####
+######## Conditional Outputs: posterior and edge_vs_sightings ####
+#### Posterior distribution                                   ####
 load('motnp_edgeweights_conditionalprior.RData')
 counts_df$together <- ifelse(counts_df$event_count == 0, 'never together', 'together at least once')
 counts <- counts_df %>%
@@ -2139,7 +2003,7 @@ rm(edge_binary, edge_samples, edgelist, motnp_ages, nodes, summary, x, n_dyads, 
 )
 
 ## plot a sample of 100 randomly selected dyads
-set.seed(15) ; plot_dyads <- sample(1:nrow(counts), size = 100, replace = F)
+set.seed(12345) ; plot_dyads <- sample(1:nrow(counts), size = 100, replace = F)
 plot_dyad_ids <- unique(edges$dyad)[plot_dyads]
 edges_subset <- edges[edges$dyad %in% plot_dyad_ids,]
 edges_subset <- edges_subset[edges_subset$chain == 'chain1',]
@@ -2160,7 +2024,7 @@ edges_subset <- edges_subset[edges_subset$chain == 'chain1',]
     guides(colour = guide_legend(override.aes = list(alpha = 1, linewidth = 1)))
 )
 
-#### Mean edge weight vs dyad sightings                                                       ####
+#### Mean edge weight vs dyad sightings                       ####
 ## create dataframe to plot mean edge weight vs dyad sighting count
 averages_conditional <- edges %>%
   group_by(dyad) %>%
@@ -2229,12 +2093,12 @@ averages_conditional <- edges %>%
 )
 
 ## save outputs
-save.image('../outputs/sparse_network_methods_figures/plots_conditional.RData')
+save.image('methods_paper/r_workspaces/plots_conditional.RData')
 rm(list = ls()[ !ls() %in% c('counts_df','n_chains','colours',
                              'posterior_conditional.2','edgesightings_conditional.3',
-                             'inset_conditional','fit_edges_motnp')]) ; gc()
+                             'inset_conditional','fit_edges_conditional')]) ; gc()
 
-#### Merge                                                                                    ####
+#### Merge                                                    ####
 ## create posterior plot without legend to avoid problems with merging legends
 post_nolegend <- posterior_conditional.2 + theme(legend.position = 'none')
 
@@ -2243,7 +2107,7 @@ combined <- (post_nolegend + edgesightings_conditional.3) +
   plot_annotation(tag_levels = 'a')
 (combined + plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'outputs_conditional_noinset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1700, height = 1000, units = 'px')
 
 ## add prior as inset
@@ -2256,16 +2120,16 @@ combined <- (conditional_posterior_inset + edgesightings_conditional.3) +
   plot_annotation(tag_levels = 'a')
 (combined + plot_layout(guides = 'collect') & theme(legend.position = 'bottom'))
 ggsave(filename = 'outputs_conditional_inset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1680, height = 700, units = 'px')
 
 # clean up
 rm(list = ls()[!ls() %in% c('inset_conditional','colours')]) ; gc()
 
-#### Conditional Eigenvector Centrality: 2 panel plot of eigenvector against sighting count and number of non-associations ####
-#### Total number of dyads where together = 0                                                                              ####
+#### Conditional Eigenvector Centrality: eigenvector vs sighting count and non-associations ####
+#### Total number of dyads where together = 0                                               ####
 # get edge samples
-edge_samples <- fit_edges_motnp$draws() %>% as.data.frame()
+edge_samples <- fit_edges_conditional$draws() %>% as.data.frame()
 edge_samples <- edge_samples[,(n_chains+1):ncol(edge_samples)]
 edge_samples <- edge_samples[,seq(1,ncol(edge_samples)-3, by = 4)]
 colnames(edge_samples) <- counts_df$dyad_id
@@ -2347,7 +2211,7 @@ averages_conditional <- eigen_conditional %>%
           legend.text = element_text(size = 4))
 )
 
-#### Individual sightings                                                                                                  ####
+#### Individual sightings                                                                   ####
 (eigensightings_conditional.1 <- ggplot()+
    geom_point(data = eigen_conditional, aes(x = count, y = eigen),
               colour = rgb(253/255, 231/255, 37/255, 0.01))+
@@ -2393,10 +2257,10 @@ averages_conditional <- eigen_conditional %>%
 )
 
 # save workspace
-save.image('../outputs/sparse_network_methods_figures/eigen_checks_conditional.RData')
+save.image('methods_paper/r_workspaces/eigen_checks_conditional.RData')
 
-#### Merge                                                                                                                 ####
-#load('../outputs/sparse_network_methods_figures/eigen_checks.RData')
+#### Merge                                                                                  ####
+#load('methods_paper/r_workspaces/eigen_checks.RData')
 rm(list = ls()[!ls() %in% c('eigen0_sri.2','eigensightings_sri.2',
                             'eigen0_uniform.2','eigen0_default.2','eigen0_skewed.2',
                             'eigensightings_uniform.2','eigensightings_default.2','eigensightings_skewed.2',
@@ -2407,7 +2271,7 @@ rm(list = ls()[!ls() %in% c('eigen0_sri.2','eigensightings_sri.2',
 (eigen0_conditional.2 + eigensightings_conditional.2)+
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'eigen_outputs_conditional_noinset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
 
 conditional_eigensightings_inset <- wrap_elements(eigensightings_conditional.2 + 
@@ -2418,7 +2282,7 @@ conditional_eigensightings_inset <- wrap_elements(eigensightings_conditional.2 +
 (conditional_eigensightings_inset + eigen0_conditional.2)+
   plot_annotation(tag_levels = 'a')
 ggsave(filename = 'eigen_outputs_conditional_inset.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
 
 #---------------- 11) Supplementary material: simulation -- 6 facet plot of 10 sightings vs 2 sightings, never together vs half together vs always together ####
@@ -2525,7 +2389,7 @@ true_values <- data.frame(x = rep(c(0.1,0.5,0.9), each = 2),
     theme(legend.position = 'bottom')
 )
 ggsave(filename = 'example_sri_vs_bison.png',
-       path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/',
        plot = figure1, device = 'png', width = 2100, height = 1600, units = 'px')
 
 # clean up
