@@ -5,8 +5,8 @@ data {
   int length_dirichlet;                        // Number of unique age categories + 1
   vector[num_dyads] logit_edge_mu;             // Means of Gaussian approximation of logit edge weights
   matrix[num_dyads, num_dyads] logit_edge_cov; // Covariance matrix of Gaussian approximation of logit edge weights
-  array[num_dyads] int age_min_cat;           // age of younger dyad member
-  array[num_dyads] int age_max_cat;           // age of older dyad member
+  array[num_dyads] int age_min_cat;            // age of younger dyad member
+  array[num_dyads] int age_max_cat;            // age of older dyad member
   array[num_dyads] int node_1;                 // Node 1 IDs for multimembership terms
   array[num_dyads] int node_2;                 // Node 2 IDs for multimembership terms
   vector[num_age_cat] prior_min;               // Dirichlet prior values
@@ -49,12 +49,12 @@ transformed parameters {
 
 model {
   // priors
-  intercept ~ normal(0,1);
-  beta_age_max ~ normal(0,1);
-  beta_age_min ~ normal(0,1);
-  sigma ~ exponential(1);
+  intercept ~ normal(0,2);
+  beta_age_max ~ normal(0,1.5);
+  beta_age_min ~ normal(0,1.5);
+  sigma ~ exponential(2);
   mm_nodes ~ normal(0, sigma_mm);
-  sigma_mm ~ exponential(1);
+  sigma_mm ~ exponential(2);
   delta_min ~ dirichlet(prior_min);
   delta_max ~ dirichlet(prior_max);
 
