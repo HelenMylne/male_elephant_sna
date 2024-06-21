@@ -1,22 +1,188 @@
 # script to look at number of sightings alone per individual vs age
-# load packages
+#### load packages ####
 library(tidyverse)
+library(patchwork)
 
-# load data
-nodes <- read_csv('data_processed/motnp_elenodes_22.01.13.csv') %>% 
-  filter(dem_class == 'AM' | dem_class == 'PM')
+#### import data ####
+## import counts_df from edge weights
+load('motnp_edgeweights_conditionalprior.RData')
+rm(list = ls()[! ls() %in% c('counts_df')])
 
-sightings <- read_csv('data_processed/motnp_eles_long_22.01.13.csv') %>% 
+## load original nodes data
+nodes <- read_csv('../data_processed/step1_dataprocessing/motnp_elenodes.csv') %>% 
+  filter(dem_class == 'AM' | dem_class == 'PM') %>% 
+  filter(age_category != '9-10') %>% 
+  filter(name != 'Richard') %>% 
+  filter(name != 'Gabriel')
+
+## load original sightings data
+sightings <- read_csv('../data_processed/step1_dataprocessing/motnp_eles_long.csv') %>% 
   select (-number) %>% 
   filter(elephant %in% nodes$id)
 
-solo <- sightings[sightings$total_elephants == 1,]
-solo <- solo[solo$total_id_hkm == 1,]
-solo <- separate(solo, elephant, into = c('sex','num'), sep = 1, remove = F) %>% 
-  filter(sex == 'M') %>% 
-  select(-sex, -num)
-length(unique(solo$elephant))
+#### calculate basic values to report ####
+## count number of sightings of different types
+length(unique(sightings$encounter))                                  # 481
+length(which(sightings$total_id_hkm == 1))                           # 120
+length(which(sightings$total_elephants_numeric == 1))                # 89
+length(unique(sightings$encounter[which(sightings$total_elephants_numeric > 1 &
+                                          sightings$type == 'MO')])) # 164
+length(unique(sightings$encounter[which(sightings$total_elephants_numeric > 1 &
+                                          sightings$type == 'MX')])) # 198
+length(unique(sightings$encounter[which(sightings$total_elephants_numeric > 1 &
+                                          sightings$type == 'BH')])) # 29
+length(unique(sightings$encounter[which(sightings$total_elephants_numeric > 1 &
+                                          sightings$type == 'UK')])) # 5
 
+## correct encounter 50 which is listed as 1 elephant but 5 are identified (and 8 were originally but 3 deleted as <10 yrs)
+solo <- sightings %>% 
+  filter(total_elephants_numeric == 1)
+table(solo$encounter) # 50 has 5 sightings
+sightings <- sightings %>% 
+  mutate(total_elephants_numeric = ifelse(encounter == 50, 5, total_elephants_numeric)) %>% 
+  mutate(perc_id_hkm = ifelse(encounter == 50, NA, perc_id_hkm))
+
+#### look at which elephants were seen alone ####
+solo <- sightings %>% 
+  filter(total_elephants_numeric == 1)
+length(unique(solo$elephant)) # 41 / 84 are unique
+table(solo$elephant)
+
+## look at ages of males seen alone
+solo %>% 
+  rename(id = elephant) %>% 
+  left_join(nodes, by = 'id') %>% 
+  mutate(age_category = factor(age_category,
+                               levels = c('10-15','15-19','20-25',
+                                          '25-40','40+'))) %>% 
+  ggplot(aes(x = reorder(id, -as.numeric(age_category)),
+             fill = age_category))+
+  geom_bar()+
+  scale_fill_viridis_d()+
+  coord_flip()+
+  labs(colour = 'age category',
+       x = 'individual ID',
+       y = 'sightings alone')+
+  theme_bw()+
+  theme(legend.position = c(0.8,0.84))
+
+## compare to ages to total population
+alone <- solo %>% 
+  rename(id = elephant) %>% 
+  left_join(nodes, by = 'id') %>% 
+  mutate(age_category = factor(age_category,
+                               levels = c('10-15','15-19','20-25',
+                                          '25-40','40+'))) %>% 
+  ggplot(aes(x = age_category,
+             fill = age_category))+
+  geom_bar()+
+  scale_fill_viridis_d(begin = 0.2)+
+  scale_x_discrete(drop = F)+
+  labs(fill = 'age category',
+       x = 'age category',
+       y = 'sightings of lone individuals')+
+  theme_bw()+
+  theme(legend.position = 'none')
+total <- sightings %>% 
+  rename(id = elephant) %>% 
+  left_join(nodes, by = 'id') %>% 
+  mutate(age_category = factor(age_category,
+                               levels = c('10-15','15-19','20-25',
+                                          '25-40','40+'))) %>% 
+  ggplot(aes(x = age_category,
+             fill = age_category))+
+  geom_bar()+
+  scale_fill_viridis_d()+
+  labs(fill = 'age category',
+       x = 'age category',
+       y = 'total sightings')+
+  theme_bw()
+(alone + total)+
+  plot_annotation(tag_levels = 'a')+
+  plot_layout(guides = 'collect')
+
+#### count sightings alone ####
+nodes$count_alone <- NA
+for(i in 1:nrow(nodes)){
+  nodes$count_alone[i] <- length(which(solo$elephant == nodes$id[i]))
+}
+
+### plot individual sightings alone vs age
+ggplot(nodes, aes(x = count, y = count_alone,
+                  colour = age_category))+
+  geom_point()+
+  scale_colour_viridis_d()+
+  labs(colour = 'age category',
+       x = 'total sightings per elephant',
+       y = 'sightings alone per elephant')+
+  theme_bw()+
+  geom_abline(linetype = 2)
+nodes$prop_alone <- nodes$count_alone / nodes$count
+
+ggplot(nodes, aes(x = age_category, y = prop_alone,
+                  fill = age_category))+
+  geom_violin(alpha = 0.6)+
+  geom_jitter(pch = 21)+
+  scale_fill_viridis_d()+
+  labs(fill = 'age category',
+       x = 'age category',
+       y = 'proportion of sightings alone per elephant')+
+  theme_bw()
+
+#### repeat from counts_df instead of raw ####
+length(unique(c(counts_df$id_1, counts_df$id_2)))
+
+if(counts_df$count_2[nrow(counts_df)] != 1){
+  eles <- counts_df %>% 
+    dplyr::select(id_1, node_1, node_1_males, age_category_1, count_1, age_cat_id_1) %>% 
+    distinct() %>% 
+    filter(count_1 == 1)
+} else {
+  print('id2 only seen once -- COME BACK TO THIS BIT AND REDO IT')
+}
+
+colnames(eles) <- c('id','node','node_males','age_category','count','age_cat_id')
+
+eles$seen_alone <- NA
+for(i in 1:nrow(eles)){
+  x <- counts_df %>% 
+    filter(id_1 == eles$id[i] | id_2 == eles$id[i])
+  eles$seen_alone[i] <- ifelse(sum(x$event_count) == 0, 'yes','no')
+}
+table(eles$seen_alone)
+
+#### compare outputs -- different values for different methods because sightings data also includes female counts (total_elephants_numeric != total males) ####
+nodes$id[nodes$count_alone == 1 & nodes$count == 1] # "M195" "M201" "M214"
+eles$id[eles$seen_alone == 'yes']     # "M128" "M169" "M195" "M201" "M214"
+
+nodes$count[nodes$id == 'M128']       # 1
+nodes$count[nodes$id == 'M169']       # 1
+nodes$count_alone[nodes$id == 'M128'] # 0
+nodes$count_alone[nodes$id == 'M169'] # 0
+
+encounter128 <- sightings$encounter[sightings$elephant == 'M128']
+encounter169 <- sightings$encounter[sightings$elephant == 'M169']
+
+sightings$total_elephants_numeric[sightings$encounter == encounter128] # 30
+sightings$total_elephants_numeric[sightings$encounter == encounter169] # 5
+sightings$total_id_hkm[sightings$encounter == encounter128]            # 7
+sightings$total_id_hkm[sightings$encounter == encounter169]            # 2
+
+all_sightings <- read_csv('../data_processed/step1_dataprocessing/motnp_eles_long.csv')
+all_sightings$elephant[all_sightings$encounter == encounter128]
+all_sightings$elephant[all_sightings$encounter == encounter169]
+
+
+
+
+
+
+
+
+
+
+#
+###############
 true_ages <- readRDS('data_processed/motnp_ageestimates_mcmcoutput_22.07.13.rds')
 true_ages <- true_ages[, which(colnames(true_ages) %in% nodes$id)]
 
