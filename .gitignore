@@ -49,3 +49,4 @@ vignettes/*.pdf
 *.exec
 .RDataTmp
 /viking
+*.tiff
