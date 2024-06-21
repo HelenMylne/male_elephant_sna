@@ -70,6 +70,10 @@ edges <- edges %>%
   relocate(prediction, .after = 'edge_weight')
 
 #### plot outputs ####
+width <- 750      # min = 789, max = 2250
+height <- 700     # max = 2625
+resolution <- 300 # min = 300, max = 600, but changes depending on dimensions
+
 colours <- c('#21918c','#440154')
 edges <- edges %>% 
   mutate(weight_invlogit = invlogit(edge_weight),
@@ -153,11 +157,36 @@ ggsave(filename = 'edgesightings_mixture_twolines_changealpha.png',
        plot = edgesightings_mixture2, device = 'png', width = 700, height = 700, units = 'px')
 
 ## merge
+edges_mixture <- edges_mixture +
+  theme(text = element_text(family = 'serif'),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        # legend.title = element_blank(),
+        # legend.position = 'none',
+        legend.text = element_text(size = 10))+
+  guides(colour = guide_legend(nrow = 2, byrow = TRUE))
+edgesightings_mixture2 <- edgesightings_mixture2 +
+  theme(text = element_text(family = 'serif'),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10))+
+  guides(colour = guide_legend(nrow = 2, byrow = TRUE))
+
 (edges_mixture + edgesightings_mixture2)+
-  plot_annotation(tag_levels = 'a')
-ggsave(filename = 'outputs_mixturemodel.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 2100, height = 700, units = 'px')
+  plot_annotation(tag_levels = 'a') &
+    theme(legend.position = 'bottom',
+          text = element_text(family = 'serif'),
+          legend.text = element_text(size = 10),
+          legend.title = element_blank()) &
+    guides(colour = guide_legend(nrow = 2, byrow = TRUE))
+ggsave(filename = 'outputs_mixturemodel.tiff',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'tiff',
+       width = (width+50)*2,
+       height = height+100,
+       dpi = resolution,
+       units = 'px')
 
 #### calculate eigenvector ####
 # identify elephants
@@ -259,11 +288,31 @@ ggsave(filename = 'eigentogether0_mix_withline.png',
 save.image('../outputs/sparse_network_methods_figures/mixture_model.RData')
 
 # merge
+eigen0_mix.2 <- eigen0_mix.2 +
+  theme(text = element_text(family = 'serif'),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10))
+eigensightings_mix.2 <- eigensightings_mix.2 +
+  theme(text = element_text(family = 'serif'),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10))
+
 (eigen0_mix.2 + eigensightings_mix.2) +
   plot_annotation(tag_levels = 'a')
-ggsave(filename = 'eigen_outputs_mixture.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
+ggsave(filename = 'eigen_outputs_mixture.tiff',
+       path = 'methods_paper/outputs/',
+       plot = last_plot(), device = 'tiff',
+       width = (width+50)*2,
+       height = height,
+       dpi = resolution,
+       units = 'px')
+# ggsave(filename = 'eigen_outputs_mixture.png',
+#        path = 'methods_paper/outputs/',
+#        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
 
 # #### I think these are wrong ####
 # ## fit a zero-inflated Poisson model using glmmTMB
