@@ -76,8 +76,8 @@ for(i in 2:488){
 table(block_test$check) # should all be 0 if it has worked correctly
 
 # save as a single data file
-saveRDS(anp, '../data_processed/anp_allpairwiseevents/anp_bayesian_allpairwiseevents.RDS')
-#anp <- readRDS(file = '../data_processed/anp_allpairwiseevents/anp_bayesian_allpairwiseevents.RDS')
+saveRDS(anp, '../data_processed/step1_dataprocessing/anp_allpairwiseevents/anp_bayesian_allpairwiseevents.RDS')
+#anp <- readRDS(file = '../data_processed/step1_dataprocessing/anp_allpairwiseevents/anp_bayesian_allpairwiseevents.RDS')
 
 ## merge sightings information into dyad data
 sightings <- ate[,c('obs_id','obs_date','correct_time_hms','obs_num_std', 'grid_code')] %>% distinct()
@@ -203,13 +203,13 @@ head(data)
 data <- data[data$id_1 != data$id_2,]
 data <- data[data$node_1 < data$node_2,]
 
-readr::write_delim(data, '../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows.csv', delim = ',')
+readr::write_delim(data, '../data_processed/step1_dataprocessing/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows.csv', delim = ',')
 
 rm(data, df, df_split, dyads, events, i, x) ; gc()
 
 ### remove impossible dyads -- dyads where one individual or the other is dead/unborn before end/at start of period ####
 # import data for aggregated model (binomial)
-#counts_df <- read_delim('../data_processed/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows.csv', delim = ',')
+#counts_df <- read_delim('../data_processed/step1_dataprocessing/anp_bayesian_pairwiseevents_aggregated_allperiods_shortwindows.csv', delim = ',')
 str(counts_df)
 
 # check all dyads present
