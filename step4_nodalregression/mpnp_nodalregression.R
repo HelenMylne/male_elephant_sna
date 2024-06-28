@@ -832,17 +832,17 @@ ggplot(nodes_all)+
 
 ## for loop
 for(time_window in (n_windows-1):1){
-  # ## import workspace image
-  # load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  # 
-  # if('edge_weights_matrix' %in% ls()) {
-  #   edge_samples <- edge_weights_matrix
-  # }
-  # 
-  # rm(list = ls()[! ls() %in% c('counts_df','cdf_all','cents_all','covs_all','edge_samples','edge_samples_all','ele_ids','extract_eigen_centrality','n_age_cat','n_chains','n_dyads','n_eles','n_samples','n_windows','node_random','nodes_all','nodes_join','num_nodes_all','time_window')]) ; gc()
+  ## import workspace image
+  load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+
+  if('edge_weights_matrix' %in% ls()) {
+    edge_samples <- edge_weights_matrix
+  }
+
+  rm(list = ls()[! ls() %in% c('counts_df','cdf_all','cents_all','covs_all','edge_samples','edge_samples_all','ele_ids','extract_eigen_centrality','n_age_cat','n_chains','n_dyads','n_eles','n_samples','n_windows','node_random','nodes_all','nodes_join','num_nodes_all','time_window')]) ; gc()
   
-  ## select edge weights matrix for window
-  edge_samples <- edge_samples_all[[time_window]]
+  # ## select edge weights matrix for window
+  # edge_samples <- edge_samples_all[[time_window]]
   
   ## select randomised nodes data frame for window
   nodes <- nodes_all %>%
