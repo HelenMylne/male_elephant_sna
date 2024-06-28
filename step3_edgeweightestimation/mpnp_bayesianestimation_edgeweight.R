@@ -41,7 +41,7 @@ set_cmdstan_path('../packages/.cmdstan/cmdstan-2.31.0')
 set.seed(12345)
 
 ### create file of output graphs
-pdf('../outputs/mpnplong_edgeweights_conditionalprior.pdf', width = 20, height = 15)
+#pdf('../outputs/mpnplong_edgeweights_conditionalprior.pdf', width = 20, height = 15)
 
 ### set ggplot theme
 theme_set(theme_light())
@@ -377,7 +377,7 @@ rm(counts_df, edge_samples, edgelist, edges, fit_edges_mpnp1, nodes, summary, n_
 ### add progress marker
 print(paste0('long window completed at ', Sys.time()))
 
-################ generate loop to run through short windows 3 to end (1 and 2 to be run separately using rstan instead of cmdstanr) ################
+#### generate loop to run through short windows 3 to end (1 and 2 to be run separately using rstan instead of cmdstanr) ################
 ### set up values for running loop
 n_windows <- 5      # number of short time windows in mpnp data
 
@@ -602,17 +602,17 @@ for(time_window in 3:n_windows){
 n_windows <- 5
 for(time_window in 1:n_windows){
   pdf(paste0('../outputs/step3_edgeweightestimation/mpnpshort',time_window,'_network_0.15.png'))
-  
+
   load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  
+
   # make sure correct version of edge samples goes in
   if('edge_weights_matrix' %in% ls()){
     edge_samples <- edge_weights_matrix
     print('edge weights matrix renamed to edge samples')
   }
-  
+
   plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
-                                           label.colour = 'transparent', label.font = 'Helvetica', 
+                                           label.colour = 'transparent', label.font = 'Helvetica',
                                            node.size = 4, node.colour = 'seagreen1',
                                            link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
   {
@@ -621,8 +621,8 @@ for(time_window in 1:n_windows){
     edge_upper <- apply(edge_samples, 2, function(x) quantile(x, probs=0.975))
     edge_median <- apply(edge_samples, 2, function(x) quantile(x, probs=0.5))
     edge_list <- cbind(
-      "median"=round(edge_median, 3), 
-      "2.5%"=round(edge_lower, 3), 
+      "median"=round(edge_median, 3),
+      "2.5%"=round(edge_lower, 3),
       "97.5%"=round(edge_upper, 3)
     )
     rownames(edge_list) <- dyad_name
@@ -634,12 +634,12 @@ for(time_window in 1:n_windows){
     threshold_edges <- edgelist[edgelist$median >= threshold,]
     if(nrow(threshold_edges) == 0) { stop('No edges above threshold') }
     net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]), directed = F)
-    
+
     if(is.data.frame(node.size) == TRUE ) {
       nodes_list <- data.frame(node = rep(NA, length(unique(c(threshold_edges$node_1, threshold_edges$node_2)))), #as.numeric(names(net_all[[1]])),
                                sightings = NA)
       for(i in 1:nrow(nodes_list)){
-        nodes_all <- rep(NA, 2*nrow(threshold_edges))  
+        nodes_all <- rep(NA, 2*nrow(threshold_edges))
         for(a in 1:2){
           for(b in 1:nrow(threshold_edges)){
             nodes_all[a + (b-1)*2] <- threshold_edges[b,a]
@@ -650,12 +650,12 @@ for(time_window in 1:n_windows){
       }
       node_sightings <- nodes_list$sightings
     } else { node_sightings <- node.size }
-    
+
     if(is.data.frame(node.colour) == TRUE ) {
       nodes_list <- data.frame(node = rep(NA, length(unique(c(threshold_edges$node_1, threshold_edges$node_2)))), #as.numeric(names(net_all[[1]])),
                                age = NA)
       for(i in 1:nrow(nodes_list)){
-        nodes_all <- rep(NA, 2*nrow(threshold_edges))  
+        nodes_all <- rep(NA, 2*nrow(threshold_edges))
         for(a in 1:2){
           for(b in 1:nrow(threshold_edges)){
             nodes_all[a + (b-1)*2] <- threshold_edges[b,a]
@@ -666,7 +666,7 @@ for(time_window in 1:n_windows){
       }
       node_age <- nodes_list$age
     } else { node_age <- node.colour }
-    
+
     md <- threshold_edges[, 3]
     ub <- threshold_edges[, 5]
     coords <- igraph::layout_nicely(net)
@@ -677,27 +677,127 @@ for(time_window in 1:n_windows){
                         label.family = label.font,
                         vertex.color = ifelse(node_age < 16, '#FDE725FF',
                                               ifelse(node_age < 21, '#55C667FF',
-                                                     ifelse(node_age < 26, '#1F968BFF', 
-                                                            ifelse(node_age < 36, '#39568CFF', '#440154FF')))), 
+                                                     ifelse(node_age < 26, '#1F968BFF',
+                                                            ifelse(node_age < 36, '#39568CFF', '#440154FF')))),
                         vertex.size = node_sightings*4,
                         frame.color = NA, frame.width = 0,
                         edge.color = NA, edge.arrow.size = 0, edge.width = 0)
     igraph::plot.igraph(net, layout = coords, add = TRUE,
-                        vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                        vertex.label = NA, vertex.color = 'transparent', vertex.size = 0,
                         frame.color = NA, frame.width = 0,
                         edge.color = link.colour1, edge.arrow.size = 0, edge.width = md * lwd)
     igraph::plot.igraph(net, layout = coords, add = TRUE,
-                        vertex.label = NA, vertex.color = 'transparent', vertex.size = 0, 
+                        vertex.label = NA, vertex.color = 'transparent', vertex.size = 0,
                         frame.color = NA, frame.width = 0,
                         edge.color = link.colour2, edge.arrow.size = 0, edge.width = ub * lwd)
   }
-  
-  
+
+
   plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.15,
                               node.size = nodes, node.colour = nodes, lwd = 15)
-  
+
   dev.off()
   rm(list = ls()[!ls() %in% c('time_window','n_windows')]) ; gc()
-  
+
   print(time_window)
 }
+
+#### plot long output of 0.15 for thesis ####
+pdf('../outputs/step3_edgeweightestimation/mpnplong_network_0.15.png')
+  
+load(paste0('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData'))
+
+# make sure correct version of edge samples goes in
+if('edge_weights_matrix' %in% ls()){
+  edge_samples <- edge_weights_matrix
+  print('edge weights matrix renamed to edge samples')
+}
+
+plot_network_threshold_mpnp <- function (edge_samples, dyad_data, lwd = 2, threshold = 0.3,
+                                         label.colour = 'transparent', label.font = 'Helvetica',
+                                         node.size = 4, node.colour = 'seagreen1',
+                                         link.colour1 = 'black', link.colour2 = rgb(0, 0, 0, 0.3))
+{
+  dyad_name <- do.call(paste, c(dyad_data[c("node_1", "node_2")], sep=" <-> "))
+  edge_lower <- apply(edge_samples, 2, function(x) quantile(x, probs=0.025))
+  edge_upper <- apply(edge_samples, 2, function(x) quantile(x, probs=0.975))
+  edge_median <- apply(edge_samples, 2, function(x) quantile(x, probs=0.5))
+  edge_list <- cbind(
+    "median"=round(edge_median, 3),
+    "2.5%"=round(edge_lower, 3),
+    "97.5%"=round(edge_upper, 3)
+  )
+  rownames(edge_list) <- dyad_name
+  edgelist <- as.data.frame(edge_list)
+  edgelist$node_1 <- as.character(dyad_data$node_1)
+  edgelist$node_2 <- as.character(dyad_data$node_2)
+  edgelist <- edgelist[,c(4:5,1:3)]
+  #net_all <- igraph::graph_from_edgelist(as.matrix(edgelist[, 1:2]), directed = F)
+  threshold_edges <- edgelist[edgelist$median >= threshold,]
+  if(nrow(threshold_edges) == 0) { stop('No edges above threshold') }
+  net <- igraph::graph_from_edgelist(as.matrix(threshold_edges[, 1:2]), directed = F)
+
+  if(is.data.frame(node.size) == TRUE ) {
+    nodes_list <- data.frame(node = rep(NA, length(unique(c(threshold_edges$node_1, threshold_edges$node_2)))), #as.numeric(names(net_all[[1]])),
+                             sightings = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_all <- rep(NA, 2*nrow(threshold_edges))
+      for(a in 1:2){
+        for(b in 1:nrow(threshold_edges)){
+          nodes_all[a + (b-1)*2] <- threshold_edges[b,a]
+        }
+      }
+      nodes_list$node <- unique(nodes_all)
+      nodes_list$sightings[i] <- nodes$sightings[which(nodes$node == nodes_list$node[i])]
+    }
+    node_sightings <- nodes_list$sightings
+  } else { node_sightings <- node.size }
+
+  if(is.data.frame(node.colour) == TRUE ) {
+    nodes_list <- data.frame(node = rep(NA, length(unique(c(threshold_edges$node_1, threshold_edges$node_2)))), #as.numeric(names(net_all[[1]])),
+                             age = NA)
+    for(i in 1:nrow(nodes_list)){
+      nodes_all <- rep(NA, 2*nrow(threshold_edges))
+      for(a in 1:2){
+        for(b in 1:nrow(threshold_edges)){
+          nodes_all[a + (b-1)*2] <- threshold_edges[b,a]
+        }
+      }
+      nodes_list$node <- unique(nodes_all)
+      nodes_list$age[i] <- nodes$age[which(nodes$node == nodes_list$node[i])]
+    }
+    node_age <- nodes_list$age
+  } else { node_age <- node.colour }
+
+  md <- threshold_edges[, 3]
+  ub <- threshold_edges[, 5]
+  coords <- igraph::layout_nicely(net)
+  igraph::plot.igraph(net, layout = coords,
+                      vertex.label.color = ifelse(is.null(label.colour) == TRUE,
+                                                  ifelse(node_age < 20, 'black', 'white'),
+                                                  label.colour),
+                      label.family = label.font,
+                      vertex.color = ifelse(node_age < 16, '#FDE725FF',
+                                            ifelse(node_age < 21, '#55C667FF',
+                                                   ifelse(node_age < 26, '#1F968BFF',
+                                                          ifelse(node_age < 36, '#39568CFF', '#440154FF')))),
+                      vertex.size = node_sightings*4,
+                      frame.color = NA, frame.width = 0,
+                      edge.color = NA, edge.arrow.size = 0, edge.width = 0)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0,
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour1, edge.arrow.size = 0, edge.width = md * lwd)
+  igraph::plot.igraph(net, layout = coords, add = TRUE,
+                      vertex.label = NA, vertex.color = 'transparent', vertex.size = 0,
+                      frame.color = NA, frame.width = 0,
+                      edge.color = link.colour2, edge.arrow.size = 0, edge.width = ub * lwd)
+}
+
+
+plot_network_threshold_mpnp(edge_samples = edge_samples, dyad_data = counts_df, threshold = 0.15,
+                            node.size = nodes, node.colour = nodes, lwd = 15)
+
+dev.off()
+rm(list = ls()[!ls() %in% c('time_window','n_windows')]) ; gc()
+
