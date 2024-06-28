@@ -20,7 +20,7 @@ rm(list = ls()[! ls() %in% c('nodes','cdf_1','edges','edge_samples')]) ; gc()
 nodes_all <- nodes %>%
   mutate(window = 1)
 cdf_all <- cdf_1 %>%
-  dplyr::select(-dyad_rank) %>% 
+  dplyr::select(-dyad_rank) %>%
   mutate(window = 1)
 edges_all <- list()
 edges_all[[1]] <- edge_samples
@@ -31,7 +31,7 @@ n_windows <- 3
 for(time_window in 2:n_windows){
   ## import workspace image for time window
   load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  
+
   ## ensure all have the same names: edge weights
   if('edge_weights_matrix' %in% ls()){
     edge_samples <- edge_weights_matrix
@@ -45,13 +45,13 @@ for(time_window in 2:n_windows){
   if('counts_df' %in% ls()){
     cdf <- counts_df
   }
-  
+
   ## add window variable
   nodes <- nodes %>%
-    mutate(window = time_window) %>% 
+    mutate(window = time_window) %>%
     dplyr::select(colnames(nodes_all))
-  cdf <- cdf %>% 
-    mutate(window = time_window) %>% 
+  cdf <- cdf %>%
+    mutate(window = time_window) %>%
     dplyr::select(colnames(cdf_all))
 
   ## attach to full data frame
@@ -61,7 +61,7 @@ for(time_window in 2:n_windows){
 
   ## print progress marker
   print(time_window)
-  
+
   ## clean environment
   rm(list = ls()[! ls() %in% c('nodes_all','cdf_all','edges_all','time_window')]) ; gc()
 }
@@ -136,53 +136,54 @@ print('edges simulated')
 save.image('step5_dyadicregression/anp_simulation.RData')
 
 #### plot raw data ####
+
 cdf_all$age_cat_max <- NA ; cdf_all$age_cat_min <- NA
 for(i in 1:nrow(cdf_all)){
   cdf_all$age_cat_max[i] <- max(cdf_all$age_num_1[i], cdf_all$age_num_2[i])
   cdf_all$age_cat_min[i] <- min(cdf_all$age_num_1[i], cdf_all$age_num_2[i])
 }
 
-ggplot()+
-  geom_point(data = cdf_all, aes(x = age_min,
-                             y = mu_std,
-                             colour = as.factor(age_cat_max)),
-             shape = 19)+
-  scale_x_continuous('age of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')
-
-ggplot()+
-  geom_boxplot(data = cdf_all, aes(x = as.factor(age_cat_min),
-                               y = mu_std,
-                               fill = as.factor(age_cat_max)),
-               shape = 19)+
-  scale_x_discrete('age category of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')+
-  theme(legend.position = 'bottom')+
-  labs(fill = 'age category of older male')
-
-sim_dat_long <- sim_dat %>% 
-  as.data.frame() %>% 
-  pivot_longer(cols = everything(), names_to = 'dyad_id', values_to = 'edge_draw') %>% 
-  mutate(dyad_id = as.numeric(dyad_id)) %>% 
-  left_join(cdf_all, by = 'dyad_id')
-ggplot()+
-  geom_violin(data = cdf_all_dat_long,
-              aes(x = as.factor(age_cat_min),
-                  y = edge_draw,
-                  fill = as.factor(age_cat_max)),
-              #shape = 19,
-              alpha = 0.5)+
-  geom_point(data = cdf_all,
-             aes(x = as.factor(age_cat_min), y = mu_std,
-                 group = as.factor(age_cat_max)),
-             shape = 19,
-             #colour = 'white',
-             size = 1)+
-  scale_x_discrete('age category of younger dyad member')+
-  scale_y_continuous('mean estimated edge weight')+
-  theme(legend.position = 'bottom')+
-  labs(fill = 'age category of older elephant')
-
+# ggplot()+
+#   geom_point(data = cdf_all, aes(x = age_min,
+#                              y = mu_std,
+#                              colour = as.factor(age_cat_max)),
+#              shape = 19)+
+#   scale_x_continuous('age of younger dyad member')+
+#   scale_y_continuous('mean estimated edge weight')
+# 
+# ggplot()+
+#   geom_boxplot(data = cdf_all, aes(x = as.factor(age_cat_min),
+#                                y = mu_std,
+#                                fill = as.factor(age_cat_max)),
+#                shape = 19)+
+#   scale_x_discrete('age category of younger dyad member')+
+#   scale_y_continuous('mean estimated edge weight')+
+#   theme(legend.position = 'bottom')+
+#   labs(fill = 'age category of older male')
+# 
+# sim_dat_long <- sim_dat %>% 
+#   as.data.frame() %>% 
+#   pivot_longer(cols = everything(), names_to = 'dyad_id', values_to = 'edge_draw') %>% 
+#   mutate(dyad_id = as.numeric(dyad_id)) %>% 
+#   left_join(cdf_all, by = 'dyad_id')
+# ggplot()+
+#   geom_violin(data = cdf_all_dat_long,
+#               aes(x = as.factor(age_cat_min),
+#                   y = edge_draw,
+#                   fill = as.factor(age_cat_max)),
+#               #shape = 19,
+#               alpha = 0.5)+
+#   geom_point(data = cdf_all,
+#              aes(x = as.factor(age_cat_min), y = mu_std,
+#                  group = as.factor(age_cat_max)),
+#              shape = 19,
+#              #colour = 'white',
+#              size = 1)+
+#   scale_x_discrete('age category of younger dyad member')+
+#   scale_y_continuous('mean estimated edge weight')+
+#   theme(legend.position = 'bottom')+
+#   labs(fill = 'age category of older elephant')
+# 
 ## print progress marker
 print('edges plotted')
 
@@ -195,8 +196,30 @@ logit_edge_draws_cov <- list()
 for(time_window in 1:n_windows){
   window_edges <- sim_dat[,which(cdf_all$window == time_window)]
   logit_edge_draws_mu[[time_window]] <- apply(window_edges, 2, mean)
-  logit_edge_draws_cov[[time_window]] <- cov(window_edges)
+  # logit_edge_draws_cov[[time_window]] <- cov(window_edges)
+  print(paste0('mean calculated for window ',time_window, ' at ',Sys.time()))
 }
+
+## parallelise making covariance matrix
+library(foreach)
+library(doParallel)
+
+#setup parallel backend to use many processors
+cores = detectCores()
+cl <- makeCluster(cores)
+registerDoParallel(cl)
+
+finalMatrix <- foreach(time_window = 1:n_windows,
+                       .combine=cbind) %dopar% {
+  tempMatrix = cov(sim_dat[,which(cdf_all$window == time_window)])
+  colnames(tempMatrix) = paste0(cdf_all$dyad_id[cdf_all$window == time_window],
+                                '_',time_window)
+  tempMatrix
+                       }
+
+#stop cluster
+stopCluster(cl)
+print('multivariate Gaussian complete')
 
 ## randomly select samples to examine
 num_check <- 20
@@ -337,224 +360,224 @@ save.image('step5_dyadicregression/anp_dyadic_simulation.RData')
 ## print progress marker
 print('model run')
 
-# #### check outputs ####
-# # obtain summary
-# fit_dyadreg_cdf_all$summary() %>% 
-#   filter(variable %in% c('beta_age_max','beta_age_min','intercept',
-#                          'delta_min[1]','delta_min[2]','delta_min[3]','delta_min[4]','delta_min[5]',
-#                          'delta_max[1]','delta_max[2]','delta_max[3]','delta_max[4]','delta_max[5]'))
-# 
-# ## extract model fit
-# summary <- fit_dyadreg_cdf_all$summary()
-# par(mfrow = c(3,1))
-# hist(summary$rhat, breaks = 50)
-# hist(summary$ess_bulk, breaks = 50)
-# hist(summary$ess_tail, breaks = 50)
-# par(mfrow = c(1,1))
-# 
-# ## extract draws
-# draws <- fit_dyadreg_cdf_all$draws(format = 'df')
-# 
-# ## extract dyadic regression slopes
-# b_max <- draws$beta_age_max
-# b_min <- draws$beta_age_min
-# intercept <- draws$intercept
-# sigma <- draws$sigma
-# delta_min <- draws[,c('delta_min[1]','delta_min[2]','delta_min[3]','delta_min[4]','delta_min[5]')] ; colnames(delta_min) <- 1:n_age_cat
-# delta_max <- draws[,c('delta_max[1]','delta_max[2]','delta_max[3]','delta_max[4]','delta_max[5]')] ; colnames(delta_min) <- 1:n_age_cat
-# delta_j_min <- draws[,c('delta_j_min[1]','delta_j_min[2]','delta_j_min[3]','delta_j_min[4]','delta_j_min[5]','delta_j_min[6]')] ; colnames(delta_j_min) <- 1:(n_age_cat+1)
-# delta_j_max <- draws[,c('delta_j_max[1]','delta_j_max[2]','delta_j_max[3]','delta_j_max[4]','delta_j_max[5]','delta_j_max[6]')] ; colnames(delta_j_max) <- 1:(n_age_cat+1)
-# parameters <- data.frame(beta_age_max = b_max,
-#                          beta_age_min = b_min,
-#                          intercept = intercept,
-#                          sigma = sigma) %>% 
-#   mutate(chain = rep(1:4, each = 1000),
-#          position = rep(1:1000, 4)) %>% 
-#   pivot_longer(cols = c('beta_age_max','beta_age_min','sigma','intercept'),
-#                names_to = 'parameter', values_to = 'slope_draw')
-# 
-# ## traceplots -- quite wandery, but well mixed with one another -- could just be because there isn't much data?
-# ggplot(data = parameters)+
-#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
-#   theme(legend.position = 'none')+
-#   scale_colour_viridis_d()+
-#   facet_wrap(. ~ parameter , scales = 'free_y')
-# delta_min %>%  as.data.frame() %>% 
-#   mutate(chain = rep(1:4, each = 1000),
-#          position = rep(1:1000, 4)) %>% 
-#   pivot_longer(cols = all_of(1:n_age_cat),
-#                names_to = 'parameter', values_to = 'slope_draw') %>% 
-#   ggplot()+
-#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
-#   theme(legend.position = 'none')+
-#   scale_colour_viridis_d()+
-#   facet_wrap(. ~ parameter , scales = 'free_y')
-# delta_max %>% as.data.frame() %>% 
-#   mutate(chain = rep(1:4, each = 1000),
-#          position = rep(1:1000, 4)) %>% 
-#   pivot_longer(cols = all_of(1:n_age_cat),
-#                names_to = 'parameter', values_to = 'slope_draw') %>% 
-#   ggplot()+
-#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
-#   theme(legend.position = 'none')+
-#   scale_colour_viridis_d()+
-#   facet_wrap(. ~ parameter , scales = 'free_y')
-# delta_j_min %>% as.data.frame() %>% 
-#   mutate(chain = rep(1:4, each = 1000),
-#          position = rep(1:1000, 4)) %>% 
-#   pivot_longer(cols = all_of(2:(n_age_cat+1)),
-#                names_to = 'parameter', values_to = 'slope_draw') %>% 
-#   ggplot()+
-#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
-#   theme(legend.position = 'none')+
-#   scale_colour_viridis_d()+
-#   facet_wrap(. ~ parameter , scales = 'free_y')
-# delta_j_max %>% as.data.frame(delta_j_max) %>% 
-#   mutate(chain = rep(1:4, each = 1000),
-#          position = rep(1:1000, 4)) %>% 
-#   pivot_longer(cols = all_of(2:(n_age_cat+1)),
-#                names_to = 'parameter', values_to = 'slope_draw') %>% 
-#   ggplot()+
-#   geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
-#   theme(legend.position = 'none')+
-#   scale_colour_viridis_d()+
-#   facet_wrap(. ~ parameter , scales = 'free_y')
-# 
-# ## print progress marker
-# print('outputs checked')
-# 
-# #### plot predictions ####
-# ## posterior predictive check
-# plot(density(as.numeric(sim_dat[1, ])),
-#      main = "Posterior predictive density of edge weights:\nblack = measured edge, red = predicted edge",
-#      ylim = c(0, 1), col = rgb(0, 0, 0, 0.25), las = 1)
-# for (i in 1:100) {
-#   j <- sample(1:1000, 1)
-#   
-#   mu_plot <- rep(NA, n_dyads)
-#   for(k in 1:n_dyads){
-#     mu_plot[k] <- intercept[j] + b_min[j]*sum(delta_j_min[j,(1:dyad_data$age_min_cat[k])]) + b_max[j]*sum(delta_j_max[j,(1:dyad_data$age_max_cat[k])])
-#   }
-#   
-#   sigma_plot <- dyad_data$logit_edge_cov + diag(rep(sigma[j], n_dyads))
-#   mv_norm <- MASS::mvrnorm(1, mu_plot, sigma_plot)
-#   
-#   lines(density(as.numeric(sim_dat[j, ])), col = rgb(0, 0, 0, 0.25)) # black lines for edge samples
-#   lines(density(mv_norm), col = rgb(1, 0, 0, 0.25))                  # red lines for predictions
-#   
-# }
-# 
-# save.image('step5_dyadicregression/anp_dyadic_simulation.RData')
-# 
-# ## create predictive data frame
-# pred <- data.frame(age_min = rep(rep(unique(cdf_all$age_min), each = length(unique(cdf_all$age_max))),
-#                                  n_chains*n_samples),
-#                    age_max = rep(rep(unique(cdf_all$age_max), length(unique(cdf_all$age_min))),
-#                                  n_chains*n_samples),
-#                    intcp = rep(intercept, each = length(unique(cdf_all$age_max))*length(unique(cdf_all$age_min))),
-#                    beta_min = rep(b_min, each = length(unique(cdf_all$age_max))*length(unique(cdf_all$age_min))),
-#                    beta_max = rep(b_max, each = length(unique(cdf_all$age_max))*length(unique(cdf_all$age_min))),
-#                    delta_j_min = NA, delta_j_max = NA) #%>%
-# #filter(age_min <= age_max)
-# for(i in 1:(n_samples*n_chains)){
-#   for(j in 1:ncol(delta_j_max)){
-#     pred$delta_j_min[pred$age_min == j] <- rowSums(delta_j_min[i,1:j])
-#     pred$delta_j_max[pred$age_max == j] <- rowSums(delta_j_max[i,1:j])
-#   }
-# }
-# 
-# ## calculate predictions
-# pred$pred <- pred$intcp + pred$beta_min * pred$delta_j_min + pred$beta_max * pred$delta_j_max
-# 
-# ## convert to unstandardised scale
-# pred$pred_unstd <- pred$pred*sd(cdf_all$mu) + mean(cdf_all$mu)
-# 
-# ## summarise
-# pred_summary_all <- pred %>% 
-#   group_by(age_min, age_max) %>% 
-#   mutate(pred_lwr = quantile(pred, probs = 0.025),
-#          pred_mean = mean(pred),
-#          pred_upr = quantile(pred, probs = 0.975),
-#          pred_unstd_lwr = quantile(pred_unstd, probs = 0.025),
-#          pred_unstd_mean = mean(pred_unstd),
-#          pred_unstd_upr = quantile(pred_unstd, probs = 0.975)) %>% 
-#   ungroup() %>% 
-#   select(age_min, age_max,
-#          pred_lwr, pred_mean, pred_upr,
-#          pred_unstd_lwr, pred_unstd_mean, pred_unstd_upr) %>% 
-#   distinct()
-# pred_summary_possible <- pred %>% 
-#   filter(age_min <= age_max) %>% 
-#   group_by(age_min, age_max) %>% 
-#   mutate(pred_lwr = quantile(pred, probs = 0.025),
-#          pred_mean = mean(pred),
-#          pred_upr = quantile(pred, probs = 0.975),
-#          pred_unstd_lwr = quantile(pred_unstd, probs = 0.025),
-#          pred_unstd_mean = mean(pred_unstd),
-#          pred_unstd_upr = quantile(pred_unstd, probs = 0.975)) %>% 
-#   ungroup() %>% 
-#   select(age_min, age_max,
-#          pred_lwr, pred_mean, pred_upr,
-#          pred_unstd_lwr, pred_unstd_mean, pred_unstd_upr) %>% 
-#   distinct()
-# 
-# ## plot
-# ggplot()+
-#   geom_ribbon(data = pred_summary_possible,
-#               aes(x = age_min,
-#                   #ymin = pred_lwr, ymax = pred_upr,
-#                   ymin = invlogit(pred_lwr), ymax = invlogit(pred_upr),
-#                   group = as.factor(age_max), fill = as.factor(age_max)),
-#               alpha = 0.3)+
-#   geom_line(data = pred_summary_possible,
-#             aes(x = age_min,
-#                 #y = pred_mean,
-#                 y = invlogit(pred_mean),
-#                 colour = as.factor(age_max), group = as.factor(age_max)),
-#             linewidth = 1)+
-#   scale_colour_viridis_d(direction = -1)+ scale_fill_viridis_d(direction = -1)+
-#   geom_point(data = cdf_all, aes(x = age_min, y = invlogit(mu_std), colour = as.factor(age_max)))+
-#   scale_x_continuous('age of younger dyad member')+
-#   scale_y_continuous('mean estimated edge weight')+
-#   theme(axis.text = element_text(size = 14),
-#         axis.title = element_text(size = 18),
-#         legend.title = element_text(size = 14),
-#         legend.text = element_text(size = 12))+
-#   labs(colour = 'maximum age', fill = 'maximum age')
-# 
-# raw_summary <- sim %>% 
-#   select(age_min, age_max, mu, mu_std) %>% 
-#   group_by(age_min, age_max) %>% 
-#   mutate(mu_mean = mean(mu),
-#          mu_std_mean = mean(mu_std)) %>% 
-#   ungroup() %>% 
-#   select(-mu, -mu_std) %>% 
-#   distinct() %>% 
-#   mutate(age_pair = paste0(age_min, '_', age_max))
-# compare <- pred_summary_possible %>% 
-#   mutate(age_pair = paste0(age_min, '_', age_max)) %>% 
-#   left_join(raw_summary[,c('mu_mean','mu_std_mean','age_pair')], by = 'age_pair') %>% 
-#   rename(raw_unstd = mu_mean, raw_std = mu_std_mean) %>% 
-#   select(age_min, age_max, raw_unstd, pred_unstd_mean, raw_std, pred_mean, pred_lwr, pred_unstd_lwr, pred_upr, pred_unstd_upr)
-# ggplot(compare)+
-#   geom_ribbon(aes(x = raw_unstd,
-#                   ymin = pred_unstd_lwr, ymax = pred_unstd_upr),
-#               alpha = 0.3)+
-#   geom_line(aes(x = raw_unstd, y = pred_unstd_mean),
-#             linewidth = 1)+
-#   geom_line(data = data.frame(x = c(min(cdf_all$mu),max(cdf_all$mu)),
-#                               y = c(min(cdf_all$mu),max(cdf_all$mu))),
-#             aes(x = x, y = y),
-#             linewidth = 0.5, colour = 'red')+
-#   scale_x_continuous('raw mean')+
-#   scale_y_continuous('predicted mean')+
-#   theme(axis.text = element_text(size = 14),
-#         axis.title = element_text(size = 18),
-#         legend.title = element_text(size = 14),
-#         legend.text = element_text(size = 12))
-# 
-# dev.off()
-# save.image('step5_dyadicregression/anp_dyadic_simulation.RData')
-# 
-# ## print progress marker
-# print('predictions complete')
+#### check outputs ####
+# obtain summary
+fit_dyadreg_cdf_all$summary() %>%
+  filter(variable %in% c('beta_age_max','beta_age_min','intercept',
+                         'delta_min[1]','delta_min[2]','delta_min[3]','delta_min[4]','delta_min[5]',
+                         'delta_max[1]','delta_max[2]','delta_max[3]','delta_max[4]','delta_max[5]'))
+
+## extract model fit
+summary <- fit_dyadreg_cdf_all$summary()
+par(mfrow = c(3,1))
+hist(summary$rhat, breaks = 50)
+hist(summary$ess_bulk, breaks = 50)
+hist(summary$ess_tail, breaks = 50)
+par(mfrow = c(1,1))
+
+## extract draws
+draws <- fit_dyadreg_cdf_all$draws(format = 'df')
+
+## extract dyadic regression slopes
+b_max <- draws$beta_age_max
+b_min <- draws$beta_age_min
+intercept <- draws$intercept
+sigma <- draws$sigma
+delta_min <- draws[,c('delta_min[1]','delta_min[2]','delta_min[3]','delta_min[4]','delta_min[5]')] ; colnames(delta_min) <- 1:n_age_cat
+delta_max <- draws[,c('delta_max[1]','delta_max[2]','delta_max[3]','delta_max[4]','delta_max[5]')] ; colnames(delta_min) <- 1:n_age_cat
+delta_j_min <- draws[,c('delta_j_min[1]','delta_j_min[2]','delta_j_min[3]','delta_j_min[4]','delta_j_min[5]','delta_j_min[6]')] ; colnames(delta_j_min) <- 1:(n_age_cat+1)
+delta_j_max <- draws[,c('delta_j_max[1]','delta_j_max[2]','delta_j_max[3]','delta_j_max[4]','delta_j_max[5]','delta_j_max[6]')] ; colnames(delta_j_max) <- 1:(n_age_cat+1)
+parameters <- data.frame(beta_age_max = b_max,
+                         beta_age_min = b_min,
+                         intercept = intercept,
+                         sigma = sigma) %>%
+  mutate(chain = rep(1:4, each = 1000),
+         position = rep(1:1000, 4)) %>%
+  pivot_longer(cols = c('beta_age_max','beta_age_min','sigma','intercept'),
+               names_to = 'parameter', values_to = 'slope_draw')
+
+## traceplots -- quite wandery, but well mixed with one another -- could just be because there isn't much data?
+ggplot(data = parameters)+
+  geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+  theme(legend.position = 'none')+
+  scale_colour_viridis_d()+
+  facet_wrap(. ~ parameter , scales = 'free_y')
+delta_min %>%  as.data.frame() %>%
+  mutate(chain = rep(1:4, each = 1000),
+         position = rep(1:1000, 4)) %>%
+  pivot_longer(cols = all_of(1:n_age_cat),
+               names_to = 'parameter', values_to = 'slope_draw') %>%
+  ggplot()+
+  geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+  theme(legend.position = 'none')+
+  scale_colour_viridis_d()+
+  facet_wrap(. ~ parameter , scales = 'free_y')
+delta_max %>% as.data.frame() %>%
+  mutate(chain = rep(1:4, each = 1000),
+         position = rep(1:1000, 4)) %>%
+  pivot_longer(cols = all_of(1:n_age_cat),
+               names_to = 'parameter', values_to = 'slope_draw') %>%
+  ggplot()+
+  geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+  theme(legend.position = 'none')+
+  scale_colour_viridis_d()+
+  facet_wrap(. ~ parameter , scales = 'free_y')
+delta_j_min %>% as.data.frame() %>%
+  mutate(chain = rep(1:4, each = 1000),
+         position = rep(1:1000, 4)) %>%
+  pivot_longer(cols = all_of(2:(n_age_cat+1)),
+               names_to = 'parameter', values_to = 'slope_draw') %>%
+  ggplot()+
+  geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+  theme(legend.position = 'none')+
+  scale_colour_viridis_d()+
+  facet_wrap(. ~ parameter , scales = 'free_y')
+delta_j_max %>% as.data.frame(delta_j_max) %>%
+  mutate(chain = rep(1:4, each = 1000),
+         position = rep(1:1000, 4)) %>%
+  pivot_longer(cols = all_of(2:(n_age_cat+1)),
+               names_to = 'parameter', values_to = 'slope_draw') %>%
+  ggplot()+
+  geom_line(aes(x = position, y = slope_draw, colour = as.factor(chain)))+
+  theme(legend.position = 'none')+
+  scale_colour_viridis_d()+
+  facet_wrap(. ~ parameter , scales = 'free_y')
+
+## print progress marker
+print('outputs checked')
+
+#### plot predictions ####
+## posterior predictive check
+plot(density(as.numeric(sim_dat[1, ])),
+     main = "Posterior predictive density of edge weights:\nblack = measured edge, red = predicted edge",
+     ylim = c(0, 1), col = rgb(0, 0, 0, 0.25), las = 1)
+for (i in 1:100) {
+  j <- sample(1:1000, 1)
+
+  mu_plot <- rep(NA, n_dyads)
+  for(k in 1:n_dyads){
+    mu_plot[k] <- intercept[j] + b_min[j]*sum(delta_j_min[j,(1:dyad_data$age_min_cat[k])]) + b_max[j]*sum(delta_j_max[j,(1:dyad_data$age_max_cat[k])])
+  }
+
+  sigma_plot <- dyad_data$logit_edge_cov + diag(rep(sigma[j], n_dyads))
+  mv_norm <- MASS::mvrnorm(1, mu_plot, sigma_plot)
+
+  lines(density(as.numeric(sim_dat[j, ])), col = rgb(0, 0, 0, 0.25)) # black lines for edge samples
+  lines(density(mv_norm), col = rgb(1, 0, 0, 0.25))                  # red lines for predictions
+
+}
+
+save.image('step5_dyadicregression/anp_dyadic_simulation.RData')
+
+## create predictive data frame
+pred <- data.frame(age_min = rep(rep(unique(cdf_all$age_min), each = length(unique(cdf_all$age_max))),
+                                 n_chains*n_samples),
+                   age_max = rep(rep(unique(cdf_all$age_max), length(unique(cdf_all$age_min))),
+                                 n_chains*n_samples),
+                   intcp = rep(intercept, each = length(unique(cdf_all$age_max))*length(unique(cdf_all$age_min))),
+                   beta_min = rep(b_min, each = length(unique(cdf_all$age_max))*length(unique(cdf_all$age_min))),
+                   beta_max = rep(b_max, each = length(unique(cdf_all$age_max))*length(unique(cdf_all$age_min))),
+                   delta_j_min = NA, delta_j_max = NA) #%>%
+#filter(age_min <= age_max)
+for(i in 1:(n_samples*n_chains)){
+  for(j in 1:ncol(delta_j_max)){
+    pred$delta_j_min[pred$age_min == j] <- rowSums(delta_j_min[i,1:j])
+    pred$delta_j_max[pred$age_max == j] <- rowSums(delta_j_max[i,1:j])
+  }
+}
+
+## calculate predictions
+pred$pred <- pred$intcp + pred$beta_min * pred$delta_j_min + pred$beta_max * pred$delta_j_max
+
+## convert to unstandardised scale
+pred$pred_unstd <- pred$pred*sd(cdf_all$mu) + mean(cdf_all$mu)
+
+## summarise
+pred_summary_all <- pred %>%
+  group_by(age_min, age_max) %>%
+  mutate(pred_lwr = quantile(pred, probs = 0.025),
+         pred_mean = mean(pred),
+         pred_upr = quantile(pred, probs = 0.975),
+         pred_unstd_lwr = quantile(pred_unstd, probs = 0.025),
+         pred_unstd_mean = mean(pred_unstd),
+         pred_unstd_upr = quantile(pred_unstd, probs = 0.975)) %>%
+  ungroup() %>%
+  select(age_min, age_max,
+         pred_lwr, pred_mean, pred_upr,
+         pred_unstd_lwr, pred_unstd_mean, pred_unstd_upr) %>%
+  distinct()
+pred_summary_possible <- pred %>%
+  filter(age_min <= age_max) %>%
+  group_by(age_min, age_max) %>%
+  mutate(pred_lwr = quantile(pred, probs = 0.025),
+         pred_mean = mean(pred),
+         pred_upr = quantile(pred, probs = 0.975),
+         pred_unstd_lwr = quantile(pred_unstd, probs = 0.025),
+         pred_unstd_mean = mean(pred_unstd),
+         pred_unstd_upr = quantile(pred_unstd, probs = 0.975)) %>%
+  ungroup() %>%
+  select(age_min, age_max,
+         pred_lwr, pred_mean, pred_upr,
+         pred_unstd_lwr, pred_unstd_mean, pred_unstd_upr) %>%
+  distinct()
+
+## plot
+ggplot()+
+  geom_ribbon(data = pred_summary_possible,
+              aes(x = age_min,
+                  #ymin = pred_lwr, ymax = pred_upr,
+                  ymin = invlogit(pred_lwr), ymax = invlogit(pred_upr),
+                  group = as.factor(age_max), fill = as.factor(age_max)),
+              alpha = 0.3)+
+  geom_line(data = pred_summary_possible,
+            aes(x = age_min,
+                #y = pred_mean,
+                y = invlogit(pred_mean),
+                colour = as.factor(age_max), group = as.factor(age_max)),
+            linewidth = 1)+
+  scale_colour_viridis_d(direction = -1)+ scale_fill_viridis_d(direction = -1)+
+  geom_point(data = cdf_all, aes(x = age_min, y = invlogit(mu_std), colour = as.factor(age_max)))+
+  scale_x_continuous('age of younger dyad member')+
+  scale_y_continuous('mean estimated edge weight')+
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))+
+  labs(colour = 'maximum age', fill = 'maximum age')
+
+raw_summary <- sim %>%
+  select(age_min, age_max, mu, mu_std) %>%
+  group_by(age_min, age_max) %>%
+  mutate(mu_mean = mean(mu),
+         mu_std_mean = mean(mu_std)) %>%
+  ungroup() %>%
+  select(-mu, -mu_std) %>%
+  distinct() %>%
+  mutate(age_pair = paste0(age_min, '_', age_max))
+compare <- pred_summary_possible %>%
+  mutate(age_pair = paste0(age_min, '_', age_max)) %>%
+  left_join(raw_summary[,c('mu_mean','mu_std_mean','age_pair')], by = 'age_pair') %>%
+  rename(raw_unstd = mu_mean, raw_std = mu_std_mean) %>%
+  select(age_min, age_max, raw_unstd, pred_unstd_mean, raw_std, pred_mean, pred_lwr, pred_unstd_lwr, pred_upr, pred_unstd_upr)
+ggplot(compare)+
+  geom_ribbon(aes(x = raw_unstd,
+                  ymin = pred_unstd_lwr, ymax = pred_unstd_upr),
+              alpha = 0.3)+
+  geom_line(aes(x = raw_unstd, y = pred_unstd_mean),
+            linewidth = 1)+
+  geom_line(data = data.frame(x = c(min(cdf_all$mu),max(cdf_all$mu)),
+                              y = c(min(cdf_all$mu),max(cdf_all$mu))),
+            aes(x = x, y = y),
+            linewidth = 0.5, colour = 'red')+
+  scale_x_continuous('raw mean')+
+  scale_y_continuous('predicted mean')+
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+dev.off()
+save.image('step5_dyadicregression/anp_dyadic_simulation.RData')
+
+## print progress marker
+print('predictions complete')
