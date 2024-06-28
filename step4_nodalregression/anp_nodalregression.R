@@ -176,6 +176,10 @@ for(time_window in 2:n_windows){
 ggplot(nodes_all)+
   geom_point(aes(x = node, y = window, colour = age))
 
+## remove any elephants that are too young from nodes_all data frame
+nodes_all <- nodes_all %>%
+  filter(age >= 10)
+
 ## create data frame in which node is randomised
 nodes_random <- nodes_all %>%
   dplyr::select(node) %>%
@@ -206,6 +210,9 @@ print('node data created')
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 rm(list = ls()[! ls() %in% c('nodes_all', 'cdf_1', 'edge_samples','n_windows','extract_eigen_centrality','traceplot','post_pred_check', 'get_mean_predictions')]) ; gc()
 
+## rename edge_samples to match cdf_1 dyad_id
+colnames(edge_samples) <- cdf_1$dyad_id
+
 ## select nodes data frame for window 1 -- do this from nodes_all, not the nodes data frame already in the saved workspace, so now working from randomised node ID, not original ID
 nodes <- nodes_all %>%
   filter(window == 1) %>%
@@ -219,8 +226,13 @@ nodes_all <- nodes_all %>%
 
 ## randomise node IDs in dyads data frame
 cdf_1 <- cdf_1 %>%
+  filter(id_1 %in% nodes$id) %>%
+  filter(id_2 %in% nodes$id) %>%
   left_join(nodes[,c('node_1','node_1_randomised')], by = 'node_1') %>%
   left_join(nodes[,c('node_2','node_2_randomised')], by = 'node_2')
+
+## filter down edge samples to only the dyads in cdf_1
+edge_samples <- edge_samples[,as.character(cdf_1$dyad_id)]
 
 ## extract centrality for window 1
 cents_all <- extract_eigen_centrality(nodes_df = nodes,
@@ -256,6 +268,9 @@ for(time_window in 2:n_windows){
   load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
   rm(list = ls()[! ls() %in% c('nodes', 'cdf', 'edge_samples','n_windows','nodes_all','covs_all','cents_all','time_window','extract_eigen_centrality','traceplot','post_pred_check', 'get_mean_predictions')]) ; gc()
 
+  ## rename edge_samples to match cdf_1 dyad_id
+  colnames(edge_samples) <- cdf$dyad_id
+  
   ## select randomised nodes data frame for window
   nodes <- nodes_all %>%
     filter(window == time_window) %>%
@@ -267,9 +282,14 @@ for(time_window in 2:n_windows){
 
   ## randomise node IDs in dyads data frame
   cdf <- cdf %>%
+    filter(id_1 %in% nodes$id) %>%
+    filter(id_2 %in% nodes$id) %>%
     left_join(nodes[,c('node_1','node_1_randomised')], by = 'node_1') %>%
     left_join(nodes[,c('node_2','node_2_randomised')], by = 'node_2')
 
+  ## filter down edge samples to only the dyads in cdf
+  edge_samples <- edge_samples[,as.character(cdf$dyad_id)]
+  
   ## extract centrality
   cent_new <- extract_eigen_centrality(nodes_df = nodes,
                                        dyads_df = cdf,
@@ -299,6 +319,7 @@ for(time_window in 2:n_windows){
 
 ## clean up and save workspace
 rm(cdf, cent_cov, cent_new, edge_samples, nodes, cent_mu, time_window, extract_eigen_centrality) ; gc()
+write_csv(nodes_all, '../data_processed/step4_nodalregression/anp_allnodes_short.csv')
 save.image('anp_nodalregression/anp_short_nodal.RData')
 print('data imported')
 
@@ -320,8 +341,36 @@ ggplot(data = df_plot, aes(x = centrality, fill = age, group = node_window)) +
         axis.text.x = element_text(angle = 0, size = 12, debug = FALSE),
         axis.title.x = element_text(size = 12),
         plot.margin = unit(c(0.2,0.2,0.2,0.2), "cm"))
-print('centralities plotted')
 
+nodes_all$outlier <- NA
+window_mid <- rep(NA, length(unique(nodes_all$window)))
+window_iqr <- rep(NA, length(unique(nodes_all$window)))
+for(i in 1:length(window_mid)){
+  window_mid[i] <- median(nodes_all$mean_eigen[nodes_all$window == i])
+  window_iqr[i] <- quantile(nodes_all$mean_eigen[nodes_all$window == i], probs = 0.75) - quantile(nodes_all$mean_eigen[nodes_all$window == i], probs = 0.25)
+}
+for(i in 1:nrow(nodes_all)){
+  nodes_all$outlier[i] <- ifelse(nodes_all$mean_eigen[i] > (window_mid[nodes_all$window[i]] +
+                                                              window_iqr[nodes_all$window[i]]),
+                                 'outlier',
+                                 ifelse(nodes_all$mean_eigen[i] < (window_mid[nodes_all$window[i]] -
+                                                                     window_iqr[nodes_all$window[i]]),
+                                        'outlier',
+                                        'not an outlier'))
+}
+
+nodes_all %>% 
+  ggplot()+
+  geom_point(mapping = aes(x = age,
+                           y = mean_eigen,
+                           size = sightings,
+                           fill = outlier),
+             pch = 21, colour = 'black')+
+  facet_wrap(. ~ window)+
+  scale_fill_viridis_d(begin = 0.5)
+
+print('centralities plotted')
+# 
 #### check normal approximation #####
 par(mfrow = c(3,3))
 for(time_window in 1:n_windows){
@@ -916,10 +965,10 @@ print('short windows complete')
 
 #### smooth plot -- I think this should replace the code chunk above, but check before deleting ####
 # load('anp_nodalregression/anp_short_nodal.RData')
-rm(cent_cov, compare_plot, contrast, contrast_std, fake_mean, fake_pred, fit_anp_nodal, full_predictions, full_predictions_newdata, model_data_list, mu_predictions, mu_predictions_newdata, newdata, nodal_regression, rand_node, rand_window, summary, colour, shapes) ; gc()
+rm(cent_cov, compare_plot, contrast, contrast_std, fake_mean, fake_pred, fit_anp_nodal, full_predictions, full_predictions_newdata, model_data_list, mu_predictions, mu_predictions_newdata, newdata, nodal_regression, summary, colour, shapes) ; gc()
 
 ## create age categorical variables to match MOTNP
-nodes_all <- nodes_all %>% 
+nodes_all <- nodes_all %>%
   mutate(age_cat = ifelse(age < 15, 1,
                           ifelse(age < 20, 2,
                                  ifelse(age < 25, 3,
@@ -930,7 +979,7 @@ nodes_all <- nodes_all %>%
                                         ifelse(age < 40,
                                                '25-40 yrs',
                                                '>40 yrs')))))
-         
+
 ## predict from raw data but exclude window and node effects (except for in sigma_window as I think that's unavoidable)
 set.seed(12345) ; draws <- sample(x = 1:n_samples, size = 125, replace = F)
 pred_mean_norandom <- get_mean_predictions(predict_df = nodes_all,
@@ -953,15 +1002,15 @@ norandom_summary <- nodes_all %>%
 for(i in 1:nrow(norandom_summary)){
   ## select only columns that refer to elephants of that age
   mean_predictions_per_age <- pred_mean_norandom[,which(nodes_all$age == norandom_summary$age[i])]
-  
+
   ## calculate values for mean line
   norandom_summary$predict_mean_logit[i] <- mean(mean_predictions_per_age)
   norandom_summary$predict_mean_invlogit[i] <- mean(invlogit(mean_predictions_per_age))
-  
+
   ## calculate standard deviation
   norandom_summary$predict_sd_logit[i] <- sd(mean_predictions_per_age)
   norandom_summary$predict_sd_invlogit[i] <- sd(invlogit(mean_predictions_per_age))
-  
+
   ## calculate values for shaded ribbon
   norandom_summary$predict_mean_lwr_logit[i] <- quantile(mean_predictions_per_age,
                                                          prob = 0.025)
@@ -991,16 +1040,16 @@ for(time_window in 1:n_windows){
 ## add CI of predicted data points to input data frame for comparison
 for(i in 1:nrow(norandom_summary)){
   ## select only columns that refer to elephants of that age
-  mean_predictions_per_age <- pred_full_norandom[,which(nodes_all$age == norandom_summary$age[i])]
-  
+  full_predictions_per_age <- pred_full_norandom[,which(nodes_all$age == norandom_summary$age[i])]
+
   ## calculate values for shaded ribbon
-  norandom_summary$predict_full_lwr_logit[i] <- quantile(mean_predictions_per_age, 
+  norandom_summary$predict_full_lwr_logit[i] <- quantile(full_predictions_per_age,
                                                         prob = 0.025)
-  norandom_summary$predict_full_lwr_invlogit[i] <- quantile(invlogit(mean_predictions_per_age),
+  norandom_summary$predict_full_lwr_invlogit[i] <- quantile(invlogit(full_predictions_per_age),
                                                             prob = 0.025)
-  norandom_summary$predict_full_upr_logit[i] <- quantile(mean_predictions_per_age,
+  norandom_summary$predict_full_upr_logit[i] <- quantile(full_predictions_per_age,
                                                          prob = 0.975)
-  norandom_summary$predict_full_upr_invlogit[i] <- quantile(invlogit(mean_predictions_per_age),
+  norandom_summary$predict_full_upr_invlogit[i] <- quantile(invlogit(full_predictions_per_age),
                                                             prob = 0.975)
 }
 
@@ -1011,6 +1060,8 @@ for(i in 1:nrow(norandom_summary)){
 #   left_join(nodes_all[,c('node_window','age','window')], by = 'node_window')
 
 ## faceted by window
+# m5 <- nodes_all %>%
+#   filter(node_random == 267)
 (faceted <- ggplot()+
     geom_ribbon(data = newdat_summary,
                 aes(ymin = invlogit(predict_pred_lwr),
@@ -1039,6 +1090,11 @@ for(i in 1:nrow(norandom_summary)){
                    size = sightings
                ),
                alpha = 0.5)+      # original mean data points
+    # geom_point(data = m5,
+    #            aes(x = age,
+    #                y = invlogit(mean_eigen),
+    #                size = sightings
+    #            ), pch = 1)+
     geom_line(data = newdat,
               aes(x = age,
                   y = invlogit(predict_mean),
@@ -1081,6 +1137,11 @@ ggsave(plot = faceted, device = 'png', width = 2400, height = 2400, units = 'px'
                                               '>40 yrs')),
                    size = sightings),
                alpha = 0.5)+
+    # geom_point(data = m5,
+    #            aes(x = age,
+    #                y = invlogit(mean_eigen),
+    #                size = sightings),
+    #            shape = 1)+
     geom_ribbon(data = norandom_summary,
                 aes(x = age,
                     ymin = predict_mean_lwr_invlogit, #ymin = predict_mean_lwr_logit,
@@ -1109,18 +1170,19 @@ ggsave(plot = overall, device = 'png', width = 2400, height = 1800, units = 'px'
        path = '../outputs/step4_nodalregression/')
 
 save.image('anp_nodalregression/anp_short_nodal.RData')
-rm(list = ls()) ; gc()
+write_csv(nodes_all, '../data_processed/step4_nodalregression/anp_short_nodes_all.csv')
+rm(list = ls()[! ls() %in% c('extract_eigen_centrality','traceplot','post_pred_check','get_mean_predictions')]) ; gc()
 
 # ## create dummy dataset -- CAN ONLY PLOT MEAN SHADING FROM THIS, NOT OVERALL PREDICTIONS 95% CI: PREDICTIONS USE MVRNORM WHICH REQUIRES THE SIGMA MATRIX TO HAVE THE SAME NUMBER OF COLUMNS AS THERE ARE ELEPHANTS IN THE TIME WINDOW, SO CAN'T MAKE ALL WINDOWS CONTAIN ALL ELEPHANTS FOR THE SAKE OF A NICE HYPOTHETICAL PLOT
 # newdat <- expand_grid(unique(nodes_all$node_random),
 #                       unique(nodes_all$age_std),
-#                       unique(nodes_all$window)) %>% 
+#                       unique(nodes_all$window)) %>%
 #   rename(node_random = `unique(nodes_all$node_random)`,
 #          age_std = `unique(nodes_all$age_std)`,
-#          window = `unique(nodes_all$window)`) %>% 
-#   left_join(distinct(nodes_all[,c('age','age_std','age_cat')]), by = 'age_std') %>% 
+#          window = `unique(nodes_all$window)`) %>%
+#   left_join(distinct(nodes_all[,c('age','age_std','age_cat')]), by = 'age_std') %>%
 #   mutate(node_window = paste0(node_random, '_', window))
-# 
+#
 # ## get mean predictions
 # set.seed(12345) ; draws <- sample(x = 1:n_samples, size = 125, replace = F)
 # fake_mean <- get_mean_predictions(predict_df = newdat,
@@ -1129,11 +1191,11 @@ rm(list = ls()) ; gc()
 #                                                         draws+2000,
 #                                                         draws+3000),],
 #                                   include_window = FALSE, include_node = FALSE)
-# 
+#
 # ## create data frame for smooth predictions
-# fake_summary <- newdat %>% 
-#   dplyr::select(age, age_std, age_cat) %>% 
-#   distinct() %>% 
+# fake_summary <- newdat %>%
+#   dplyr::select(age, age_std, age_cat) %>%
+#   distinct() %>%
 #   mutate(predict_mean = NA,
 #          predict_sd = NA,
 #          predict_mean_lwr = NA,
@@ -1145,14 +1207,14 @@ rm(list = ls()) ; gc()
 #   fake_summary$predict_mean_lwr[i] <- quantile(mean_predictions_per_age, prob = 0.025)
 #   fake_summary$predict_mean_upr[i] <- quantile(mean_predictions_per_age, prob = 0.975)
 # }
-# 
+#
 # ## plot mean of means
 # fake_summary$age_cat_full <- ifelse(fake_summary$age_cat == 1, '10-15 yrs',
 #                                     ifelse(fake_summary$age_cat == 2, '16-20 yrs',
 #                                            ifelse(fake_summary$age_cat == 3, '21-25 yrs',
 #                                                   ifelse(fake_summary$age_cat == 4, '25-40 yrs',
 #                                                          '>40 yrs'))))
-# 
+#
 # #### just take the mean of all raw predictions -- DOESN'T WORK TO GIVE A SMOOTH LINE BECAUSE TOO MCUH VARIATION FROM INDIVIDUALS AND WINDOWS STILL
 # smooth_mean <- data.frame(age = min(nodes_all$age):max(nodes_all$age),
 #                           mean = NA, lwr_mu = NA, upr_mu = NA,
@@ -1166,12 +1228,48 @@ rm(list = ls()) ; gc()
 #   smooth_mean$lwr_full[i] <- quantile(age_full_pred, prob = 0.025)
 #   smooth_mean$upr_full[i] <- quantile(age_full_pred, prob = 0.975)
 # }
-# 
+#
 #################### LONG WINDOWS ####################
 set.seed(12345)
 
 ## define PDF output
 pdf('../outputs/step4_nodalregression/anplong_nodalregression_modelprep.pdf')
+
+## redefine function because it deletes at some point and I CANNOT FIND WHERE OR WHY!
+extract_eigen_centrality <- function(nodes_df, dyads_df, edgeweight_matrix, logit = TRUE, window){
+  ## calculate data size parameters
+  num_nodes <- nrow(nodes_df)
+  num_dyads <- nrow(dyads_df)
+  num_samples <- nrow(edgeweight_matrix)
+
+  ## build adjacency tensor
+  dyads_df$node_1_id <- as.integer(as.factor(dyads_df$node_1_randomised))
+  dyads_df$node_2_id <- as.integer(as.factor(dyads_df$node_2_randomised))+1
+  adj_tensor <- array(0, c(num_samples, num_nodes, num_nodes),
+                      dimnames = list(NULL, nodes_df$node_window, nodes_df$node_window))
+
+  ## fill adjacency tensor
+  for (dyad_id in 1:num_dyads) {
+    dyad_row <- dyads_df[dyad_id, ]
+    adj_tensor[, dyad_row$node_1_id, dyad_row$node_2_id] <- edgeweight_matrix[, dyad_id]
+    adj_tensor[, dyad_row$node_2_id, dyad_row$node_1_id] <- edgeweight_matrix[, dyad_id]
+  }
+
+  ## calculate centrality and store posterior samples in a matrix
+  centrality_samples_invlogit <- matrix(0, num_samples, num_nodes,
+                                        dimnames = list(NULL, nodes_df$node_window))
+  for(i in 1:(num_samples)){
+    centrality_samples_invlogit[i, ] <- sna::evcent(adj_tensor[i,,], gmode = 'graph')
+  }
+
+  ## convert to logit scale
+  if(logit == TRUE) {
+    centrality_samples <- logit(centrality_samples_invlogit)
+    return(centrality_samples)
+  } else {
+    return(centrality_samples_invlogit)
+  }
+}
 
 #### import data and randomise node IDs -- ensures that the model is not reading a correlation between node ID and age and partitioning too much of the variance to node ID #####
 ## load time window 1 and remove additional data
@@ -1204,6 +1302,10 @@ for(time_window in 2:n_windows){
 ggplot(nodes_all)+
   geom_point(aes(x = node, y = window, colour = age))
 
+## remove any elephants that are too young from nodes_all data frame
+nodes_all <- nodes_all %>%
+  filter(age >= 10)
+
 ## create data frame in which node is randomised
 nodes_random <- nodes_all %>%
   dplyr::select(node) %>%
@@ -1234,6 +1336,9 @@ print('node data created')
 load('anp_edgecalculations/anplong1_edgeweights_conditionalprior.RData')
 rm(list = ls()[! ls() %in% c('nodes_all', 'cdf', 'edge_samples','n_windows','extract_eigen_centrality','traceplot','post_pred_check', 'get_mean_predictions')]) ; gc()
 
+## rename edge_samples to match cdf dyad_id
+colnames(edge_samples) <- cdf$dyad_id
+
 ## select nodes data frame for window 1 -- do this from nodes_all, not the nodes data frame already in the saved workspace, so now working from randomised node ID, not original ID
 nodes <- nodes_all %>%
   filter(window == 1) %>%
@@ -1247,8 +1352,13 @@ nodes_all <- nodes_all %>%
 
 ## randomise node IDs in dyads data frame
 cdf <- cdf %>%
+  filter(id_1 %in% nodes$id) %>%
+  filter(id_2 %in% nodes$id) %>%
   left_join(nodes[,c('node_1','node_1_randomised')], by = 'node_1') %>%
   left_join(nodes[,c('node_2','node_2_randomised')], by = 'node_2')
+
+## filter down edge samples to only the dyads in cdf
+edge_samples <- edge_samples[,as.character(cdf$dyad_id)]
 
 ## extract centrality for window 1
 cents_all <- extract_eigen_centrality(nodes_df = nodes,
@@ -1284,6 +1394,9 @@ for(time_window in 2:n_windows){
   load(paste0('anp_edgecalculations/anplong',time_window,'_edgeweights_conditionalprior.RData'))
   rm(list = ls()[! ls() %in% c('nodes', 'cdf', 'edge_samples','n_windows','nodes_all','covs_all','cents_all','time_window','extract_eigen_centrality','traceplot','post_pred_check', 'get_mean_predictions')]) ; gc()
 
+  ## rename edge_samples to match cdf dyad_id
+  colnames(edge_samples) <- cdf$dyad_id
+
   ## select randomised nodes data frame for window
   nodes <- nodes_all %>%
     filter(window == time_window) %>%
@@ -1295,8 +1408,13 @@ for(time_window in 2:n_windows){
 
   ## randomise node IDs in dyads data frame
   cdf <- cdf %>%
+    filter(id_1 %in% nodes$id) %>%
+    filter(id_2 %in% nodes$id) %>%
     left_join(nodes[,c('node_1','node_1_randomised')], by = 'node_1') %>%
     left_join(nodes[,c('node_2','node_2_randomised')], by = 'node_2')
+
+  ## filter down edge samples to only the dyads in cdf
+  edge_samples <- edge_samples[,as.character(cdf$dyad_id)]
 
   ## extract centrality
   cent_new <- extract_eigen_centrality(nodes_df = nodes,
@@ -1767,10 +1885,10 @@ print('long windows complete')
 
 #### smooth plot -- I think this should replace the code chunk above, but check before deleting ####
 # load('anp_nodalregression/anp_long_nodal.RData')
-rm(cent_cov, compare_plot, contrast, contrast_std, fake_mean, fake_pred, fit_anp_nodal, full_predictions, full_predictions_newdata, model_data_list, mu_predictions, mu_predictions_newdata, newdata, nodal_regression, rand_node, rand_window, summary, colour) ; gc()
+rm(cent_cov, compare_plot, contrast, contrast_std, fake_mean, fake_pred, fit_anp_nodal, full_predictions, full_predictions_newdata, model_data_list, mu_predictions, mu_predictions_newdata, newdata, nodal_regression, summary, colour) ; gc()
 
 ## create age categorical variables to match MOTNP
-nodes_all <- nodes_all %>% 
+nodes_all <- nodes_all %>%
   mutate(age_cat = ifelse(age < 15, 1,
                           ifelse(age < 20, 2,
                                  ifelse(age < 25, 3,
@@ -1804,15 +1922,15 @@ norandom_summary <- nodes_all %>%
 for(i in 1:nrow(norandom_summary)){
   ## select only columns that refer to elephants of that age
   mean_predictions_per_age <- pred_mean_norandom[,which(nodes_all$age == norandom_summary$age[i])]
-  
+
   ## calculate values for mean line
   norandom_summary$predict_mean_logit[i] <- mean(mean_predictions_per_age)
   norandom_summary$predict_mean_invlogit[i] <- mean(invlogit(mean_predictions_per_age))
-  
+
   ## calculate standard deviation
   norandom_summary$predict_sd_logit[i] <- sd(mean_predictions_per_age)
   norandom_summary$predict_sd_invlogit[i] <- sd(invlogit(mean_predictions_per_age))
-  
+
   ## calculate values for shaded ribbon
   norandom_summary$predict_mean_lwr_logit[i] <- quantile(mean_predictions_per_age,
                                                          prob = 0.025)
@@ -1843,9 +1961,9 @@ for(time_window in 1:n_windows){
 for(i in 1:nrow(norandom_summary)){
   ## select only columns that refer to elephants of that age
   mean_predictions_per_age <- pred_full_norandom[,which(nodes_all$age == norandom_summary$age[i])]
-  
+
   ## calculate values for shaded ribbon
-  norandom_summary$predict_full_lwr_logit[i] <- quantile(mean_predictions_per_age, 
+  norandom_summary$predict_full_lwr_logit[i] <- quantile(mean_predictions_per_age,
                                                          prob = 0.025)
   norandom_summary$predict_full_lwr_invlogit[i] <- quantile(invlogit(mean_predictions_per_age),
                                                             prob = 0.025)
@@ -1962,23 +2080,23 @@ ggsave(plot = overall, device = 'png', width = 2400, height = 1800, units = 'px'
 dev.off()
 
 #################### RANDOM EFFECTS ####################
-#### LONG: calculate proportion of variation explained by window random effect ####
+#### LONG:  calculate proportion of variation explained by window random effect ####
 ## calculate values
 mean_window_logit_long <- apply(rand_window, 2, mean)
 stdv_window_logit_long <- apply(rand_window, 2, sd)
 
 ## convert to data frame
-mean_window_logit_long <- mean_window_logit_long %>% 
-  as.data.frame() %>% 
+mean_window_logit_long <- mean_window_logit_long %>%
+  as.data.frame() %>%
   mutate(eles_per_window = as.vector(unlist(model_data_list[grep(pattern = 'num_nodes_window',
-                                                                 x = names(model_data_list))]))) %>% 
-  mutate(window = 1:7) %>% 
-  relocate(window) %>% 
+                                                                 x = names(model_data_list))]))) %>%
+  mutate(window = 1:7) %>%
+  relocate(window) %>%
   mutate(stdv_effect = as.vector(stdv_window_logit_long))
 colnames(mean_window_logit_long)[2] <- 'mean_effect'
 
 ## plot
-mean_window_logit_long %>% 
+mean_window_logit_long %>%
   ggplot()+
   geom_errorbar(aes(x = eles_per_window,
                     ymax = mean_effect + stdv_effect,
@@ -2013,27 +2131,27 @@ ggsave(plot = last_plot(), device = 'svg',
        path = '../outputs/step4_nodalregression/',
        height = 1800, width = 2400, units = 'px')
 
-#### LONG: calculate proportion of variation explained by node random effect ####
+#### LONG:  calculate proportion of variation explained by node random effect ####
 ## calculate values
 mean_node_logit_long <- apply(rand_node, 2, mean)
 stdv_node_logit_long <- apply(rand_node, 2, sd)
 
 ## convert to data frame
-counts_long <- nodes_all %>% 
-  mutate(observed = ifelse(sightings == 0, 0, 1)) %>% 
-  group_by(node) %>% 
+counts_long <- nodes_all %>%
+  mutate(observed = ifelse(sightings == 0, 0, 1)) %>%
+  group_by(node) %>%
   summarise(total_sightings = sum(sightings),
             total_windows = sum(observed))
-mean_node_logit_long <- mean_node_logit_long %>% 
-  as.data.frame() %>% 
-  mutate(node = sort(unique(nodes_all$node))) %>% 
-  relocate(node) %>% 
-  left_join(counts_long, by = 'node') %>% 
+mean_node_logit_long <- mean_node_logit_long %>%
+  as.data.frame() %>%
+  mutate(node = sort(unique(nodes_all$node))) %>%
+  relocate(node) %>%
+  left_join(counts_long, by = 'node') %>%
   mutate(stdv_effect = as.vector(stdv_node_logit_long))
 colnames(mean_node_logit_long)[2] <- 'mean_effect'
 
 ## plot
-mean_node_logit_long %>% 
+mean_node_logit_long %>%
   ggplot()+
   geom_errorbar(aes(x = total_sightings,#total_windows,
                     colour = node,
@@ -2066,11 +2184,11 @@ ggsave(plot = last_plot(), device = 'svg',
        height = 1800, width = 2400, units = 'px')
 
 ## plot both
-random_effects_long <- mean_node_logit_long %>% 
-  select(-node, -total_sightings, -total_windows) %>% 
+random_effects_long <- mean_node_logit_long %>%
+  select(-node, -total_sightings, -total_windows) %>%
   mutate(type = 'node')
-window_effect_long <- mean_window_logit_long %>% 
-  select(-window, -eles_per_window) %>% 
+window_effect_long <- mean_window_logit_long %>%
+  select(-window, -eles_per_window) %>%
   mutate(type = 'window')
 random_effects_long <- rbind(random_effects_long,window_effect_long)
 rm(window_effect_long)
@@ -2084,9 +2202,9 @@ ggplot()+
 
 #### SHORT: calculate proportion of variation explained by window random effect ####
 rm(list = ls()[!ls() %in% c('mean_node_logit_long','mean_window_logit_long')])
-mean_node_logit_long <- mean_node_logit_long %>% 
+mean_node_logit_long <- mean_node_logit_long %>%
   mutate(window_length = 'long')
-mean_window_logit_long <- mean_window_logit_long %>% 
+mean_window_logit_long <- mean_window_logit_long %>%
   mutate(window_length = 'long')
 load('anp_nodalregression/anp_short_nodal.RData')
 
@@ -2095,17 +2213,17 @@ mean_window_logit_short <- apply(rand_window, 2, mean)
 stdv_window_logit_short <- apply(rand_window, 2, sd)
 
 ## convert to data frame
-mean_window_logit_short <- mean_window_logit_short %>% 
-  as.data.frame() %>% 
+mean_window_logit_short <- mean_window_logit_short %>%
+  as.data.frame() %>%
   mutate(eles_per_window = as.vector(unlist(model_data_list[grep(pattern = 'num_nodes_window',
-                                                                 x = names(model_data_list))]))) %>% 
-  mutate(window = 1:36) %>% 
-  relocate(window) %>% 
+                                                                 x = names(model_data_list))]))) %>%
+  mutate(window = 1:36) %>%
+  relocate(window) %>%
   mutate(stdv_effect = as.vector(stdv_window_logit_short))
 colnames(mean_window_logit_short)[2] <- 'mean_effect'
 
 ## plot
-mean_window_logit_short %>% 
+mean_window_logit_short %>%
   ggplot()+
   geom_errorbar(aes(x = eles_per_window,
                     ymax = mean_effect + stdv_effect,
@@ -2146,21 +2264,21 @@ mean_node_logit_short <- apply(rand_node, 2, mean)
 stdv_node_logit_short <- apply(rand_node, 2, sd)
 
 ## convert to data frame
-counts_short <- nodes_all %>% 
-  mutate(observed = ifelse(sightings == 0, 0, 1)) %>% 
-  group_by(node) %>% 
+counts_short <- nodes_all %>%
+  mutate(observed = ifelse(sightings == 0, 0, 1)) %>%
+  group_by(node) %>%
   summarise(total_sightings = sum(sightings),
             total_windows = sum(observed))
-mean_node_logit_short <- mean_node_logit_short %>% 
-  as.data.frame() %>% 
-  mutate(node = sort(unique(nodes_all$node))) %>% 
-  relocate(node) %>% 
-  left_join(counts_short, by = 'node') %>% 
+mean_node_logit_short <- mean_node_logit_short %>%
+  as.data.frame() %>%
+  mutate(node = sort(unique(nodes_all$node))) %>%
+  relocate(node) %>%
+  left_join(counts_short, by = 'node') %>%
   mutate(stdv_effect = as.vector(stdv_node_logit_short))
 colnames(mean_node_logit_short)[2] <- 'mean_effect'
 
 ## plot
-mean_node_logit_short %>% 
+mean_node_logit_short %>%
   ggplot()+
   geom_errorbar(aes(x = total_sightings,#total_windows,
                     colour = node,
@@ -2193,11 +2311,11 @@ ggsave(plot = last_plot(), device = 'svg',
        height = 1800, width = 2400, units = 'px')
 
 ## plot both
-random_effects_short <- mean_node_logit_short %>% 
-  select(-node, -total_sightings, -total_windows) %>% 
+random_effects_short <- mean_node_logit_short %>%
+  select(-node, -total_sightings, -total_windows) %>%
   mutate(type = 'node')
-window_effect_short <- mean_window_logit_short %>% 
-  select(-window, -eles_per_window) %>% 
+window_effect_short <- mean_window_logit_short %>%
+  select(-window, -eles_per_window) %>%
   mutate(type = 'window')
 random_effects_short <- rbind(random_effects_short,window_effect_short)
 rm(window_effect_short)
@@ -2212,9 +2330,9 @@ ggplot()+
 #### plot together ####
 rm(list = ls()[!ls() %in% c('mean_node_logit_long','mean_window_logit_long',
                             'mean_node_logit_short','mean_window_logit_short')])
-mean_node_logit_short <- mean_node_logit_short %>% 
+mean_node_logit_short <- mean_node_logit_short %>%
   mutate(window_length = 'short')
-mean_window_logit_short <- mean_window_logit_short %>% 
+mean_window_logit_short <- mean_window_logit_short %>%
   mutate(window_length = 'short')
 save.image('anp_nodalregression/plot_random_effects.RData')
 
@@ -2223,7 +2341,7 @@ node <- rbind(mean_node_logit_long, mean_node_logit_short)
 window <- rbind(mean_window_logit_long, mean_window_logit_short)
 
 ## plot
-node %>% 
+node %>%
   ggplot()+
   geom_errorbar(aes(x = total_sightings,#total_windows,
                     colour = node,
@@ -2257,7 +2375,7 @@ ggsave(plot = last_plot(), device = 'svg',
        height = 1800, width = 2400, units = 'px')
 
 ## plot
-window %>% 
+window %>%
   ggplot()+
   geom_errorbar(aes(x = eles_per_window,
                     ymax = mean_effect + stdv_effect,
