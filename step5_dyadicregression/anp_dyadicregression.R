@@ -3,12 +3,10 @@
 # runs through dyadic regression as specified by Jordan Hart in BISoN examples (https://github.com/JHart96/bison_examples/blob/main/examples/dyadic_regression_stan.md)
 
 #### set up ####
-#library(tidyverse) ; library(LaplacesDemon) ; library(car) ; library(cmdstanr) ; library(bisonR) ; library(brms)
+# library(cmdstanr) ; library(tidyverse) ; library(car) ; library(LaplacesDemon)
 library(cmdstanr, lib.loc = '../packages/')  # library(cmdstanr)
 library(tidyverse, lib.loc = '../packages/') # library(tidyverse)
 library(car, lib.loc = '../packages/')       # library(car)
-#library(bisonR, lib.loc = '../packages/')    # library(bisonR)
-#library(brms, lib.loc = '../packages/')      # library(brms)
 library(LaplacesDemon, lib.loc = '../packages/')
 
 set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan2/cmdstan-2.33.1/')
