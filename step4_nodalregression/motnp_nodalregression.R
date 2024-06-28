@@ -174,7 +174,7 @@ for(i in 1:length(to_plot)){
 }
 par(mfrow = c(1,1), mai = c(1,1,1,1))
 
-save.image('motnp_nodalregression.RData')
+save.image('step4_nodalregression/motnp_nodalregression.RData')
 
 #### prior predictive check ####
 ## set values
@@ -223,9 +223,9 @@ fit_motnp_eigen <- sampling(nodal_regression,
                             chains = n_chains)
 
 ## save output (get it saved, then clean it up once it hasn't crashed, then save the cleaner version!)
-save.image('motnp_nodalregression.RData')
+save.image('step4_nodalregression/motnp_nodalregression.RData')
 rm(edge_samples, adj_tensor, i, to_plot, draw,summary,centrality_samples_sim, dyad_row) ; gc()
-save.image('motnp_nodalregression.RData')
+save.image('step4_nodalregression/motnp_nodalregression.RData')
 
 #### check outputs ####
 # load('motnp_nodalregression.RData')
@@ -372,7 +372,7 @@ ggplot(nodes)+
   theme_classic()
 
 ## save image
-save.image('motnp_nodalregression.RData')
+save.image('step4_nodalregression/motnp_nodalregression.RData')
 
 ## summarise predictions -- all the same for all nodes in the same category because age is the only predictor
 nodes_full <- sim_full %>% 
@@ -393,54 +393,110 @@ nodes_full <- sim_full %>%
          pred_full_mid_invlogit = quantile(invlogit_pred, probs = 0.5),
          pred_full_upr_invlogit = quantile(invlogit_pred, probs = 0.975))
 
+## plot on logit scale
 ggplot()+
   geom_violin(data = nodes_full,
-              aes(x = age_cat_fct, y = node_pred,
-                  fill = factor(age_cat_chr, 
-                                levels = c('10-15', '15-19', '20-25',
-                                           '25-40','40+'))),
-              alpha = 0.5)+
-  geom_boxplot(data = nodes_full,
-               aes(x = age_cat_fct, y = pred_full_mid, 
-                   fill = age_cat_chr))+
-  geom_jitter(data = nodes,
-              aes(x = age_cat_fct, y = mu_raw, 
-                  fill = age_cat_chr, size = sightings),
-              width = 0.2, pch = 21)+
-  scale_fill_viridis_d()+
-  #scale_colour_viridis_d()+
-  labs(fill = 'age category',
-       #colour = 'age category',
-       x = 'age category',
-       y = 'predicted eigenvector centrality')
-ggsave(file = '../outputs/step4_nodalregression/motnp_nodal_violin_logit.png', device = 'png',
-       plot = last_plot(), width = 2100, height = 1600, units = 'px')
-
-ggplot()+
-  geom_violin(data = nodes_full,
-              aes(x = age_cat_fct, y = invlogit_pred,
+              aes(x = factor(age_cat_chr,
+                             levels = c('10-15', '15-19', '20-25',
+                                        '25-40','40+')),
+                  y = node_pred,
                   fill = factor(age_cat_chr,
                                 levels = c('10-15', '15-19', '20-25',
-                                           '25-40','40+'))),
-              alpha = 0.5)+
+                                           '25-40','40+'))
+              ),
+              alpha = 0.6,
+              show.legend = F,
+              #fill = 'grey90'
+  )+
   geom_boxplot(data = nodes_full,
-               aes(x = age_cat_fct, y = pred_full_mid_invlogit,
-                   fill = age_cat_chr))+
+               aes(x = factor(age_cat_chr,
+                              levels = c('10-15', '15-19', '20-25',
+                                         '25-40','40+')),
+                   y = pred_full_mid#, fill = age_cat_chr
+               ))+
   geom_jitter(data = nodes,
-              aes(x = age_cat_fct, y = mu_raw_invlogit,
-                  fill = age_cat_chr, size = sightings),
-              width = 0.2, pch = 21)+
-  scale_fill_viridis_d()+
+              aes(x = factor(age_cat_chr,
+                             levels = c('10-15', '15-19', '20-25',
+                                        '25-40','40+')),
+                  y = mu_raw,
+                  fill = age_cat_chr,
+                  size = sightings),
+              width = 0.2,
+              #fill = 'grey60',
+              #show.legend = F,
+              pch = 21)+
+  scale_fill_viridis_d(direction = -1)+
+  labs(fill = 'age category',
+       x = 'age category',
+       y = 'eigenvector centrality')+
+  theme(legend.position = 'bottom',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 18))+
+  guides(size = guide_legend(override.aes = list(fill='grey80')),
+         fill = 'none')
+ggsave(plot = last_plot(), device = 'svg', width = 2400, height = 1800, units = 'px',
+       filename = 'motnp_nodal_violin_logit.svg',
+       path = '../outputs/step4_nodalregression/')
+ggsave(plot = last_plot(), device = 'png', width = 2400, height = 1800, units = 'px',
+       filename = 'motnp_nodal_violin_logit.png',
+       path = '../outputs/step4_nodalregression/')
+
+## plot on outcome scale
+ggplot()+
+  geom_violin(data = nodes_full,
+              aes(x = factor(age_cat_chr,
+                             levels = c('10-15', '15-19', '20-25',
+                                        '25-40','40+')),
+                  y = invlogit_pred,
+                  fill = factor(age_cat_chr,
+                                levels = c('10-15', '15-19', '20-25',
+                                           '25-40','40+'))
+                  ),
+              alpha = 0.6,
+              show.legend = F,
+              #fill = 'grey90'
+              )+
+  geom_boxplot(data = nodes_full,
+               aes(x = factor(age_cat_chr,
+                              levels = c('10-15', '15-19', '20-25',
+                                         '25-40','40+')),
+                   y = pred_full_mid_invlogit#, fill = age_cat_chr
+                   ))+
+  geom_jitter(data = nodes,
+              aes(x = factor(age_cat_chr,
+                             levels = c('10-15', '15-19', '20-25',
+                                        '25-40','40+')),
+                  y = mu_raw_invlogit,
+                  fill = age_cat_chr,
+                  size = sightings),
+              width = 0.2,
+              #fill = 'grey60',
+              #show.legend = F,
+              pch = 21)+
+  scale_fill_viridis_d(direction = -1)+
   #scale_colour_viridis_d()+
   labs(fill = 'age category',
        #colour = 'age category',
        x = 'age category',
-       y = 'predicted eigenvector centrality')
-ggsave(file = '../outputs/step4_nodalregression/motnp_nodal_violin.png', device = 'png',
-       plot = last_plot(), width = 2100, height = 1600, units = 'px')
+       y = 'eigenvector centrality')+
+  theme(legend.position = 'bottom',
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 18))+
+  guides(size = guide_legend(override.aes = list(fill='grey80')),
+         fill = 'none')
+ggsave(plot = last_plot(), device = 'svg', width = 2400, height = 1800, units = 'px',
+       filename = 'motnp_nodal_violin.svg',
+       path = '../outputs/step4_nodalregression/')
+ggsave(plot = last_plot(), device = 'png', width = 2400, height = 1800, units = 'px',
+       filename = 'motnp_nodal_violin.png',
+       path = '../outputs/step4_nodalregression/')
 
 ## save output
-save.image('motnp_nodalregression.RData')
+save.image('step4_nodalregression/motnp_nodalregression.RData')
 
 #### extract contrasts from predictions ####
 ## extract raw values
@@ -532,7 +588,7 @@ ggplot()+
   coord_flip()
 
 ## save
-save.image('motnp_nodalregression.RData')
+save.image('step4_nodalregression/motnp_nodalregression.RData')
 
 # #### plot nicely ####
 # ## clean data frame
@@ -572,9 +628,9 @@ save.image('motnp_nodalregression.RData')
 # 
 # ## add node data
 # df_long <- df_long %>%
-#   mutate(centrality_invlogit = LaplacesDemon::invlogit(centrality)) %>% 
-#   left_join(nodes, by = 'node_rank') %>% 
-#   dplyr::select(-age_cat_num.x) %>% 
+#   mutate(centrality_invlogit = LaplacesDemon::invlogit(centrality)) %>%
+#   left_join(nodes, by = 'node_rank') %>%
+#   dplyr::select(-age_cat_num.x) %>%
 #   rename(age_cat_num = age_cat_num.y)
 # 
 # ## plot on logit scale
@@ -670,5 +726,6 @@ save.image('motnp_nodalregression.RData')
 #        plot = last_plot(), width = 2800, height = 1600, units = 'px')
 # 
 #### save ####
-save.image('motnp_nodalregression.RData')
+save.image('step4_nodalregression/motnp_nodalregression.RData')
 dev.off()
+
