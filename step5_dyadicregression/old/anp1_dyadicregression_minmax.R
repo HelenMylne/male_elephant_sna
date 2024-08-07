@@ -16,7 +16,7 @@ set_cmdstan_path('R:/rsrch/df525/phd/hkm513/packages/.cmdstan2/cmdstan-2.33.1/')
 load('anp_edgecalculations/anpshort1_edgeweights_conditionalprior.RData')
 # rm(edgelist, edge_binary, nodes) ; gc()
 
-pdf('../outputs/anp1_dyadicregression_plots.pdf')
+pdf('../outputs/anp1_dyadicregression_interaction.pdf')
 
 #### prior predictive check ####
 age_min <- 5:50
@@ -89,7 +89,7 @@ for (i in selected_samples) {
 par(mfrow=c(1,1))
 
 # save image so far
-save.image('anpshort1_dyadicregression_minmax.RData')
+save.image('anpshort1_dyadicregression_minmax_interaction.RData')
 
 # add time marker
 print(paste0('multivariate Gaussian approximation fitted at ', Sys.time()))
@@ -126,7 +126,7 @@ dyad_data <- list(
 )
 
 ## load dyadic regression model
-dyadic_regression <- cmdstan_model('models/dyadic_regression.stan')
+dyadic_regression <- cmdstan_model('models/dyadic_regression_interaction.stan')
 
 # add time marker
 print(paste0('start model run at ', Sys.time()))
@@ -138,8 +138,11 @@ fit_dyadreg_anp1 <- dyadic_regression$sample(
   parallel_chains = n_chains)
 
 # save image so far
-save.image('anpshort1_dyadicregression_minmax.RData')
+save.image('anpshort1_dyadicregression_minmax_interaction.RData')
+dev.off()
 
 # add time marker
 print(paste0('finish model run at ', Sys.time()))
+
+############################# as far as here, I know it definitely works ##############################
 
