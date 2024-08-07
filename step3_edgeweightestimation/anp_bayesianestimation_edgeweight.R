@@ -538,7 +538,7 @@ for(time_window in 2:n_windows){
 }
 
 ## clean up for long windows
-rm(list = ls()[! ls() %in% c('make_edgelist','plot_network_threshold','n_samples','n_chains','edge_binary')])
+rm(list = ls()[! ls() %in% c('make_edgelist','plot_network_threshold_anp','n_samples','n_chains','edge_binary')])
 
 ################ generate loop to run through long windows ################
 ### import aggregated counts of sightings together and apart, and info about individuals
