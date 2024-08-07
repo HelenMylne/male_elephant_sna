@@ -35,13 +35,14 @@ data {
   matrix[num_nodes_window7, num_nodes_window7] centrality_cov_7;  // standard deviations of centrality estimates, time window 7
   
   // node IDs for all time windows
-  array[num_nodes_window1] int nodes_window1;             // Node IDs, time window 1
-  array[num_nodes_window2] int nodes_window2;             // Node IDs, time window 2
-  array[num_nodes_window3] int nodes_window3;             // Node IDs, time window 3
-  array[num_nodes_window4] int nodes_window4;             // Node IDs, time window 4
-  array[num_nodes_window5] int nodes_window5;             // Node IDs, time window 5
-  array[num_nodes_window6] int nodes_window6;             // Node IDs, time window 6
-  array[num_nodes_window7] int nodes_window7;             // Node IDs, time window 7
+  array[num_data] int node_id;                               // Node IDs, all time windows
+  // array[num_nodes_window1] int nodes_window1;             // Node IDs, time window 1
+  // array[num_nodes_window2] int nodes_window2;             // Node IDs, time window 2
+  // array[num_nodes_window3] int nodes_window3;             // Node IDs, time window 3
+  // array[num_nodes_window4] int nodes_window4;             // Node IDs, time window 4
+  // array[num_nodes_window5] int nodes_window5;             // Node IDs, time window 5
+  // array[num_nodes_window6] int nodes_window6;             // Node IDs, time window 6
+  // array[num_nodes_window7] int nodes_window7;             // Node IDs, time window 7
 
   // node ages for all individuals
   array[num_data] real node_age;         // Node ages (years)
@@ -55,7 +56,6 @@ parameters {
   real beta_age;
   // variance and degrees of freedom
   real<lower=0> sigma;
-  // real<lower=1,upper=5> nu;
   // random effects
   vector[num_windows] rand_window;
   real<lower=0> sigma_window;
@@ -73,31 +73,31 @@ transformed parameters {
   // linear model
   vector[num_nodes_window1] predictor_window1;
   for(i in 1:num_nodes_window1) {
-    predictor_window1[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[1])] + window_random_effect[1] + node_random_effect[nodes_window1[i]];
+    predictor_window1[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[1])] + window_random_effect[1] + node_random_effect[node_id[(i + num_nodes_prev_windows[1])]];
   }
   vector[num_nodes_window2] predictor_window2;
   for(i in 1:num_nodes_window2) {
-    predictor_window2[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[2])] + window_random_effect[2] + node_random_effect[nodes_window2[i]];
+    predictor_window2[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[2])] + window_random_effect[2] + node_random_effect[node_id[(i + num_nodes_prev_windows[2])]];
   }
   vector[num_nodes_window3] predictor_window3;
   for(i in 1:num_nodes_window3) {
-    predictor_window3[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[3])] + window_random_effect[3] + node_random_effect[nodes_window3[i]];
+    predictor_window3[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[3])] + window_random_effect[3] + node_random_effect[node_id[(i + num_nodes_prev_windows[3])]];
   }
   vector[num_nodes_window4] predictor_window4;
   for(i in 1:num_nodes_window4) {
-    predictor_window4[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[4])] + window_random_effect[4] + node_random_effect[nodes_window4[i]];
+    predictor_window4[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[4])] + window_random_effect[4] + node_random_effect[node_id[(i + num_nodes_prev_windows[4])]];
   }
   vector[num_nodes_window5] predictor_window5;
   for(i in 1:num_nodes_window5) {
-    predictor_window5[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[5])] + window_random_effect[5] + node_random_effect[nodes_window5[i]];
+    predictor_window5[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[5])] + window_random_effect[5] + node_random_effect[node_id[(i + num_nodes_prev_windows[5])]];
   }
   vector[num_nodes_window6] predictor_window6;
   for(i in 1:num_nodes_window6) {
-    predictor_window6[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[6])] + window_random_effect[6] + node_random_effect[nodes_window6[i]];
+    predictor_window6[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[6])] + window_random_effect[6] + node_random_effect[node_id[(i + num_nodes_prev_windows[6])]];
   }
   vector[num_nodes_window7] predictor_window7;
   for(i in 1:num_nodes_window7) {
-    predictor_window7[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[7])] + window_random_effect[7] + node_random_effect[nodes_window7[i]];
+    predictor_window7[i] = intercept + beta_age * node_age[(i + num_nodes_prev_windows[7])] + window_random_effect[7] + node_random_effect[node_id[(i + num_nodes_prev_windows[7])]];
   }
 }
 
@@ -120,13 +120,6 @@ model {
   centrality_mu_5 ~ multi_normal(predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
   centrality_mu_6 ~ multi_normal(predictor_window6, centrality_cov_6 + diag_matrix(rep_vector(sigma, num_nodes_window6)));
   centrality_mu_7 ~ multi_normal(predictor_window7, centrality_cov_7 + diag_matrix(rep_vector(sigma, num_nodes_window7)));
-  // centrality_mu_1 ~ multi_student_t(nu, predictor_window1, centrality_cov_1 + diag_matrix(rep_vector(sigma, num_nodes_window1)));
-  // centrality_mu_2 ~ multi_student_t(nu, predictor_window2, centrality_cov_2 + diag_matrix(rep_vector(sigma, num_nodes_window2)));
-  // centrality_mu_3 ~ multi_student_t(nu, predictor_window3, centrality_cov_3 + diag_matrix(rep_vector(sigma, num_nodes_window3)));
-  // centrality_mu_4 ~ multi_student_t(nu, predictor_window4, centrality_cov_4 + diag_matrix(rep_vector(sigma, num_nodes_window4)));
-  // centrality_mu_5 ~ multi_student_t(nu, predictor_window5, centrality_cov_5 + diag_matrix(rep_vector(sigma, num_nodes_window5)));
-  // centrality_mu_6 ~ multi_student_t(nu, predictor_window6, centrality_cov_6 + diag_matrix(rep_vector(sigma, num_nodes_window6)));
-  // centrality_mu_7 ~ multi_student_t(nu, predictor_window7, centrality_cov_7 + diag_matrix(rep_vector(sigma, num_nodes_window7)));
 
 }
 
