@@ -37,8 +37,8 @@ gbi_males <- gbi_matrix[,colnames(gbi_matrix) %in% sort(unique(c(counts_df$id_1,
 gbi_males <- gbi_males[rowSums(gbi_males) > 0,] # remove female-only sightings
 
 #### calculate number of permtuations to run ####
-#( num_permute <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )
-num_permute <- 455216741
+( num_permute <- aninet::gbi_MCMC_iters(gbi = gbi_males, target_samples = 1000, quiet = FALSE) )
+#num_permute <- 455216741
 num_permute <- round_any(num_permute, 1000, f = ceiling)
 
 #### functions to print out Rhat at the end of the permutation ####
