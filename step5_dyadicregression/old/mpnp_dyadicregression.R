@@ -117,7 +117,8 @@ gc()
 ## create covariance matrix -- much more complicated than planned as "logit_edge_draws_cov <- cov(logit_edge_draws)" is not possible due to extent of matrix produced: too big for himem_week nodes on Viking, and takes too long for himem01 node
 #logit_edge_draws_cov <- cov(logit_edge_draws)
 
-# test <- edge_samples[,1:10] # test <- matrix(0, 20, 10) ; colnames(test) <- 1:10 ; for(i in 1:10){ test[,i] <- rnorm(20, rnorm(1,0,0.5), 1) }
+# # test <- edge_samples[,1:10]
+# test <- matrix(0, 20, 10) ; colnames(test) <- 1:10 ; for(i in 1:10){ test[,i] <- rnorm(20, rnorm(1,0,0.5), 1) }
 # round(cov(test),2)
 # test_cov <- matrix(NA, nrow = 10, ncol = 10)
 # for(i in 1:nrow(test_cov)){
@@ -132,14 +133,15 @@ gc()
 #                                        which(as.numeric(colnames(cov_breakdown)) == j)])
 #         test_cov[j,i] <-  test_cov[i,j]
 #       }
-#       if(i %% 2 == 0) {
+#       if(j %% 2 == 0) {
 #         rm(test_breakdown, cov_breakdown) ; gc()
-#         print(i)
+#         print(paste0('column = ',j,', row = ',i))
 #         }
 #     }
 #   }
 # }
 # which(cov(test) != test_cov)
+
 logit_edge_draws_cov <- matrix(data = 0, nrow = n_dyads, ncol = n_dyads)
 print('empty cov matrix created')
 
