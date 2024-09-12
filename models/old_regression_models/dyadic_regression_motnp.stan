@@ -30,9 +30,9 @@ parameters {
 }
 
 transformed parameters {
-  // //  Cholesky factor of the covariance matrix
-  // matrix[num_dyads, num_dyads] L_cov;
-  // L_cov = cholesky_decompose(logit_edge_cov + diag_matrix(rep_vector(sigma, num_dyads)));
+  //  Cholesky factor of the covariance matrix
+  matrix[num_dyads, num_dyads] L_cov;
+  L_cov = cholesky_decompose(logit_edge_cov + diag_matrix(rep_vector(sigma, num_dyads)));
   
   // create prior for cumulative probability of each age category
   vector[length_dirichlet] delta_j_min;
@@ -59,7 +59,6 @@ model {
   delta_max ~ dirichlet(prior_max);
 
   // likelihood using Cholesky decomposition
-  // logit_edge_mu ~ multi_normal_cholesky(predictor, L_cov);
-  logit_edge_mu ~ multi_normal(predictor, logit_edge_cov + diag_matrix(rep_vector(sigma, num_dyads)));
+  logit_edge_mu ~ multi_normal_cholesky(predictor, L_cov);
   
 }
