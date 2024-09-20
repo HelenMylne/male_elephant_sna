@@ -303,13 +303,13 @@ n_samples <- 1000
 
 ## fit dyadic regression
 print(paste0('start model at ',Sys.time()))
-# fit_dyadreg_simdiff <- sampling(dyadic_regression,
-#                                 data = dyad_data,
-#                                 iter = n_samples*3, warmup = n_samples*2,
-#                                 chains = n_chains, cores = n_chains
-# )
+fit_dyadreg_simdiff <- sampling(dyadic_regression,
+                                data = dyad_data,
+                                iter = n_samples*3, warmup = n_samples*2,
+                                chains = n_chains, cores = n_chains
+)
 
-fit_dyadreg_simdiff <- vb(dyadic_regression, data = dyad_data)
+# fit_dyadreg_simdiff <- vb(dyadic_regression, data = dyad_data)
 
 # fit_dyadreg_simdiff <- dyadic_regression$sample(
 #   data = dyad_data,
