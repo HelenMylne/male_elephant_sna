@@ -103,13 +103,14 @@ sim <- sim %>%
 print('data loaded')
 
 #### simulate age effect ####
-sim_int <- 5
+#sim_int <- 5
 sim_diff <- 0.8
 sim_nodes <- rnorm(n = n_nodes, mean = 0, sd = 0.4)
 
 sim$mu <- NA # simulate mean centrality on normal scale
 for(i in 1:nrow(sim)){
-  sim$mu[i] <- sim_int + sim$age_diff[i] * sim_diff + sim_nodes[sim$node_rand_1[i]] + sim_nodes[sim$node_rand_2[i]]
+  sim$mu[i] <- #sim_int + 
+    sim$age_diff[i] * sim_diff + sim_nodes[sim$node_rand_1[i]] + sim_nodes[sim$node_rand_2[i]]
 }
 
 sim$age_diff_cat <- as.factor(sim$age_diff + 1)
@@ -289,7 +290,7 @@ print('data list created')
 save.image('step5_dyadicregression/motnp_dyadic_simulation_agediff_nointercept.RData')
 
 ## load dyadic regression model
-dyadic_regression <- stan_model('models/dyadic_regression_motnp_agediff_nointercept.stan')
+dyadic_regression <- stan_model('models/dyadic_regression_motnp_agediff.stan')
 #dyadic_regression <- cmdstan_model('models/dyadic_regression_motnp_agediff.stan')
 dyadic_regression
 
