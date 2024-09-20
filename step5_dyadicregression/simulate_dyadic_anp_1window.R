@@ -435,7 +435,7 @@ get_full_predictions <- function(mu_matrix, sigma){
     for(draw in 1:nrow(predictions)){
       predictions[draw, dyad] <- rnorm(n = 1,
                                        mean = mu_matrix[draw, dyad],
-                                       sd = logit_edge_sd[dyad] + sigma[draw])
+                                       sd = dyad_data$logit_edge_sd[dyad] + sigma[draw])
     }
   }
   return(predictions)
@@ -660,7 +660,7 @@ save.image('step5_dyadicregression/anp_dyadic_simulation_1window.RData')
 #### final clean plots ####
 # load('step5_dyadicregression/anp_dyadic_simulation_1window.RData')
 
-rm(list = ls()[! ls() %in% c('edge_summary','get_mean_predictions','get_full_predictions','draws')]) ; gc()
+rm(list = ls()[! ls() %in% c('edge_summary','get_mean_predictions','get_full_predictions','draws','dyad_data')]) ; gc()
 
 ## create counterfactual data frame for plotting from: minimum age on x
 fake_data <- expand.grid(dyad_random = unique(edge_summary$dyad_random),
