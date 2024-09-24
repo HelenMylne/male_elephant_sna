@@ -347,14 +347,14 @@ print('outputs checked')
 #### predict from raw data ####
 dev.off()
 pdf('../outputs/step5_dyadicregression/motnp_dyadicregression_predictions.pdf')
-#load('step5_dyadicregression/motnp_dyadicregression.RData')
+# load('step5_dyadicregression/motnp_dyadicregression.RData')
 
 ## create predictive data frame
 pred <- counts_df %>%
   mutate(dyad_rank = 1:n_dyads,
-         age_diff_num = as.numeric(age_diff)) %>%
-  relocate(dyad_rank, .after = 'dyad_males') %>% 
-  relocate(age_diff_num, .after = 'age_diff')
+         age_num_diff = as.numeric(age_diff)) %>%
+  relocate(dyad_rank, .after = 'dyad_males') %>%
+  relocate(age_num_diff, .after = 'age_diff')
 pred$raw_mu <- logit_edge_draws_mu
 
 ## create function for predicting mean
@@ -365,22 +365,24 @@ get_mean_predictions <- function(prediction_df, new){
                ncol = nrow(counts_df),
                dimnames = list(1:(n_samples*n_chains),
                                prediction_df$dyad_rank))
-  
+
   if(is.null(new) == FALSE){
+    prediction_df <- prediction_df %>%
+      dplyr::select(-age_num_diff)
     if(new == TRUE){
-      prediction_df <- prediction_df %>% 
+      prediction_df <- prediction_df %>%
         rename(age_num_diff = age_diff_new)
     } else {
       prediction_df <- prediction_df %>%
         rename(age_num_diff = age_diff_org)
     }
   }
-  
+
   for(dyad in 1:ncol(mu)){
-    node_effects <- mm_nodes[,paste0('mm_nodes[',prediction_df$node_random_1[dyad],']')] + 
+    node_effects <- mm_nodes[,paste0('mm_nodes[',prediction_df$node_random_1[dyad],']')] +
       mm_nodes[,paste0('mm_nodes[',prediction_df$node_random_2[dyad],']')]
     for(draw in 1:nrow(mu)){
-      mu[draw, dyad] <- #intercept[draw] + 
+      mu[draw, dyad] <- #intercept[draw] +
         b_diff[draw]*sum(delta_j_diff[draw,(1:prediction_df$age_num_diff[dyad])]) + node_effects[draw]
     }
   }
@@ -481,7 +483,8 @@ ggplot()+
   scale_fill_viridis_d()+
   labs(x = 'difference in age categories',
        y = 'logit edge weight',
-       fill = 'difference in\nage categories')
+       fill = 'difference in\nage categories')+
+  theme(legend.position = 'bottom')
 ggsave(plot = last_plot(), device = 'svg', width = 2400, height = 1800, units = 'px',
        filename = 'motnp_dyadic_logit.svg',
        path = '../outputs/step5_dyadicregression/')
@@ -529,7 +532,8 @@ ggplot()+
   scale_fill_viridis_d()+
   labs(x = 'difference in age categories',
        y = 'edge weight',
-       fill = 'difference in\nage categories')
+       fill = 'difference in\nage categories')+
+  theme(legend.position = 'bottom')
 ggsave(plot = last_plot(), device = 'svg', width = 2400, height = 1800, units = 'px',
        filename = 'motnp_dyadic_invlogit.svg',
        path = '../outputs/step5_dyadicregression/')
@@ -543,58 +547,59 @@ save.image('step5_dyadicregression/motnp_dyadicregression.RData')
 print('predictions complete')
 
 #### extract original slope values ####
-load('step5_dyadicregression/motnp_dyadicregression.RData')
+# load('step5_dyadicregression/motnp_dyadicregression.RData')
 dev.off()
 pdf('../outputs/step5_dyadicregression/motnp_dyadicregression_contrasts.pdf')
 
 ## calculate predictions from altered data frames
 pred_new <- pred %>%
-  mutate(age_diff_org = as.integer(age_diff),
-         age_diff_new = ifelse(age_diff == 5, 1, as.integer(age_diff) + 1))
+  mutate(age_diff_org = age_num_diff,
+         age_diff_new = ifelse(age_num_diff == 5, 1, age_num_diff + 1))
 
-# ## create function for predicting mean
-# get_mean_predictions <- function(prediction_df, new){
-#   prediction_df$dyad_rank <- 1:nrow(prediction_df)
-#   mu <- matrix(NA,
-#                nrow = 100,#n_samples*n_chains,
-#                ncol = nrow(counts_df),
-#                dimnames = list(1:100,#(n_samples*n_chains),
-#                                prediction_df$dyad_rank))
-#   if(new == TRUE){
-#     prediction_df <- prediction_df %>% 
-#       rename(age_num_diff = age_diff_new)
-#   }
-#   if(new == FALSE){
-#     prediction_df <- prediction_df %>%
-#       rename(age_num_diff = age_diff_org)
-#   }
-#   
-#   for(dyad in 1:ncol(mu)){
-#     node_effects <- mm_nodes[,paste0('mm_nodes[',prediction_df$node_random_1[dyad],']')] + 
-#       mm_nodes[,paste0('mm_nodes[',prediction_df$node_random_2[dyad],']')]
-#     for(draw in 1:nrow(mu)){
-#       mu[draw, dyad] <- #intercept[draw] + 
-#         b_diff[draw]*sum(delta_j_diff[draw,(1:prediction_df$age_num_diff[dyad])]) + node_effects[draw]
-#     }
-#   }
-#   return(mu)
-# }
-# 
-# ## create function for predicting full distribution
-# get_full_predictions <- function(mu_matrix, sigma, sd){
-#   predictions <- mu_matrix
-#   for(dyad in 1:ncol(predictions)){
-#     for(draw in 1:nrow(predictions)){
-#       predictions[draw, dyad] <- rnorm(n = 1,
-#                                        mean = mu_matrix[draw, dyad],
-#                                        sd = sigma[draw] + sd[dyad])
-#     }
-#   }
-#   return(predictions)
-# }
-# 
-# ## add progress marker
-# print('functions created')
+
+
+
+
+
+
+## create function for predicting mean
+get_mean_predictions <- function(prediction_df, new){
+  prediction_df$dyad_rank <- 1:nrow(prediction_df)
+  mu <- matrix(NA,
+               nrow = n_samples*n_chains,
+               ncol = nrow(counts_df),
+               dimnames = list(1:(n_samples*n_chains),
+                               prediction_df$dyad_rank))
+  
+  if(is.null(new) == FALSE){
+    prediction_df <- prediction_df %>% 
+      dplyr::select(-age_num_diff)
+    if(new == TRUE){
+      prediction_df <- prediction_df %>%
+        rename(age_num_diff = age_diff_new)
+    } else {
+      prediction_df <- prediction_df %>%
+        rename(age_num_diff = age_diff_org)
+    }
+  }
+  
+  for(dyad in 1:ncol(mu)){
+    node_effects <- mm_nodes[,paste0('mm_nodes[',prediction_df$node_random_1[dyad],']')] +
+      mm_nodes[,paste0('mm_nodes[',prediction_df$node_random_2[dyad],']')]
+    for(draw in 1:nrow(mu)){
+      mu[draw, dyad] <- #intercept[draw] +
+        b_diff[draw]*sum(delta_j_diff[draw,(1:prediction_df$age_num_diff[dyad])]) + node_effects[draw]
+    }
+  }
+  return(mu)
+}
+
+
+
+
+
+
+
 
 ## calculate mean predictions
 pred_mu_org <- get_mean_predictions(prediction_df = pred_new, new = FALSE)
@@ -657,8 +662,12 @@ contrast_summary <- contrasts_long %>%
   summarise(mean_contrast = mean(contrast)) %>% 
   left_join(pred_new[,c('dyad_rank','age_diff_org','age_diff_new')]) %>% 
   mutate(change = paste0(age_diff_org-1, ' -> ', age_diff_new-1))
+
+library(ggridges, lib.loc = '../packages/')
 ggplot(data = contrast_summary)+
-  geom_density_ridges(aes(x = mean_contrast, y = change, fill = change))+
+  geom_density_ridges(aes(x = mean_contrast,
+                          y = change,
+                          fill = change))+
   scale_fill_viridis_d()+
   labs(x = 'contrast in logit(probability of associating)',
        y = 'change in age difference',
