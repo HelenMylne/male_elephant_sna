@@ -110,11 +110,11 @@ ggplot(edge_summary)+
   geom_point(aes(x = age_diff, y = mu, colour = age_mean))
 print('mean edge simulated')
 
-## standardise edges
-edge_summary$mu_std <- ( edge_summary$mu - mean(edge_summary$mu) ) / sd(edge_summary$mu)
-ggplot(edge_summary)+
-  geom_point(aes(x = age_diff, y = mu_std, colour = age_mean))
-print('mean edge standardised')
+# ## standardise edges
+# edge_summary$mu_std <- ( edge_summary$mu - mean(edge_summary$mu) ) / sd(edge_summary$mu)
+# ggplot(edge_summary)+
+#   geom_point(aes(x = age_diff, y = mu_std, colour = age_mean))
+# print('mean edge standardised')
 
 ## simulate full distribution of samples per node
 sim_dat <- matrix(data = NA, nrow = 1000, ncol = n_data,
@@ -928,7 +928,7 @@ dyad_data <- list(
   num_data = n_data,                         # number of edges measured
   num_dyads = n_dyads,                       # number of dyads
   num_nodes = n_nodes,                       # number of nodes
-  num_windows = n_windows,                   # number of time windows measured
+  # num_windows = n_windows,                   # number of time windows measured
   
   # Gaussian approximation of edge weights
   logit_edge_mu = logit_edge_draws_mu,       # Means of Gaussian approximation of logit edge weights
@@ -939,10 +939,10 @@ dyad_data <- list(
   
   # multimembership terms
   node_1 = edge_summary$node_1_random,       # Node 1 IDs for multimembership terms
-  node_2 = edge_summary$node_2_random,       # Node 2 IDs for multimembership terms
+  node_2 = edge_summary$node_2_random#,       # Node 2 IDs for multimembership terms
   
-  # time window
-  window = edge_summary$window               # Window ID random effect
+  # # time window
+  # window = edge_summary$window               # Window ID random effect
 )
 
 ## print progress marker
@@ -957,7 +957,7 @@ print('model loaded in')
 
 ## define parameters
 n_chains <- 4
-n_samples <- 1000
+n_samples <- 2500
 
 ## fit dyadic regression
 print(paste0('start model at ',Sys.time()))
@@ -982,7 +982,7 @@ save.image('step5_dyadicregression/anp_dyadic_simulation_agemean.RData')
 print('model run')
 
 #### check outputs ####
-load('step5_dyadicregression/anp_dyadic_simulation_agemean.RData')
+# load('step5_dyadicregression/anp_dyadic_simulation_agemean.RData')
 
 ## extract model fit
 # summary <- fit_dyadreg_simmean$summary()
@@ -1090,21 +1090,7 @@ save.image('step5_dyadicregression/anp_dyadic_simulation_agemean.RData')
 print('posterior predictive check complete')
 
 #### predict from raw data ####
-load('step5_dyadicregression/anp_dyadic_simulation_agemean.RData')
-
-# ## create predictive data frame
-# age_mean_length <- length(unique(dyad_data$age_mean))
-# pred <- data.frame(age_mean_std = rep(unique(dyad_data$age_mean),
-#                                       n_chains*n_samples),
-#                    age_mean = rep(unique(edge_summary$age_mean),
-#                                   n_chains*n_samples),
-#                    intcp = rep(intercept,
-#                                each = age_mean_length),
-#                    beta_mean = rep(b_mean,
-#                                    each = age_mean_length))
-#
-# ## calculate predictions
-# pred$pred_mu <- pred$intcp + pred$beta_mean * pred$age_mean_std
+# load('step5_dyadicregression/anp_dyadic_simulation_agemean.RData')
 
 ## create function for predicting mean
 get_mean_predictions <- function(prediction_df, draws_list){
@@ -1139,13 +1125,13 @@ edge_summary$pred_mean_lwr <- apply(pred_mean, 2, quantile, prob = 0.025)
 edge_summary$pred_mean_upr <- apply(pred_mean, 2, quantile, prob = 0.975)
 
 ## create function for predicting full distribution
-get_full_predictions <- function(mu_matrix, sigma, sd){
+get_full_predictions <- function(mu_matrix, sigma, stdev){
   predictions <- mu_matrix
   for(dyad in 1:ncol(predictions)){
     for(draw in 1:nrow(predictions)){
       predictions[draw, dyad] <- rnorm(n = 1,
                                        mean = mu_matrix[draw, dyad],
-                                       sd = sigma[draw] + sd[dyad])
+                                       sd = sigma[draw] + stdev[dyad])
     }
   }
   return(predictions)
@@ -1153,8 +1139,8 @@ get_full_predictions <- function(mu_matrix, sigma, sd){
 
 ## predict full distribution
 pred_full <- get_full_predictions(mu_matrix = pred_mean,
-                                  sigma = draws$sigma,
-                                  sd = logit_edge_draws_sd)
+                                  sigma = draws$tau_sigma,
+                                  stdev = logit_edge_draws_sd)
 
 ## summarise full distribution
 edge_summary$pred_full_lwr <- apply(pred_full, 2, quantile, prob = 0.025)
@@ -1343,9 +1329,9 @@ pred_new_mean_mean <- get_mean_predictions(prediction_df = pred_new_mean,
 
 ## predict full distribution
 pred_org_mean_full <- get_full_predictions(mu_matrix = pred_org_mean_mean,
-                                           sigma = draws$sigma)
+                                           sigma = draws$tau_sigma)
 pred_new_mean_full <- get_full_predictions(mu_matrix = pred_new_mean_mean,
-                                           sigma = draws$sigma)
+                                           sigma = draws$tau_sigma)
 
 ## convert to unstandardised scale
 pred_org_mean_full_ustd <- pred_org_mean_full * sd(edge_summary$mu) + mean(edge_summary$mu)
@@ -1386,7 +1372,7 @@ length(which(is.na(fake_mean) == TRUE))
 print('mean values extracted')
 
 ## predict full distribution
-fake_full <- get_full_predictions(mu_matrix = fake_mean, sigma = draws$sigma)
+fake_full <- get_full_predictions(mu_matrix = fake_mean, sigma = draws$tau_sigma, stdev = logit_edge_draws_sd)
 warnings()
 print('full values extracted')
 length(which(is.na(fake_full) == TRUE))
