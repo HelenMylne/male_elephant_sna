@@ -41,7 +41,7 @@ parameters {
   // random effect correlations
   vector<lower=0>[2] sigma_rand;           // random effects standard deviations
   cholesky_factor_corr[2] chol_corr_rand;  // Cholesky factor of correlation matrix
-  matrix[num_nodes,num_windows] mtx_rand;          // random effect matrix
+  matrix[num_nodes,num_windows] mtx_rand;  // random effect matrix
 }
 transformed parameters {
   // random effects

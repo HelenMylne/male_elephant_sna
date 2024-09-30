@@ -289,7 +289,148 @@ ggplot(nodes)+
 #### fit dyadic regression ####
 #load('step5_dyadicregression/anp_dyadic_simulation_agediff_correlatedrandom.RData')
 
-## create data list
+## simulate correlated random effects ####
+library(brms)
+n_nodes_test <- 10
+n_windows_test <- 4
+eles_per_window_test <- c(5,8,6,4)
+
+node_test <- data.frame(node = 1:n_nodes_test,
+                        age = round(runif(n_nodes_test, 10, 50)))
+node_window_test <- data.frame(node = c(sample(size = eles_per_window_test[1],
+                                               x = 1:n_nodes_test,
+                                               replace = F),
+                                        sample(size = eles_per_window_test[2],
+                                               x = 1:n_nodes_test,
+                                               replace = F),
+                                        sample(size = eles_per_window_test[3],
+                                               x = 1:n_nodes_test,
+                                               replace = F),
+                                        sample(size = eles_per_window_test[4],
+                                               x = 1:n_nodes_test,
+                                               replace = F)),
+                               window = c(rep('W1',eles_per_window_test[1]),
+                                          rep('W2',eles_per_window_test[2]),
+                                          rep('W3',eles_per_window_test[3]),
+                                          rep('W4',eles_per_window_test[4])
+                               )) %>% 
+  left_join(node_test, by = 'node') %>% 
+  mutate(age = ifelse(window == 'W2', age + 2,
+                      ifelse(window == 'W3', age + 4,
+                             ifelse(window == 'W4', age + 6, age))))
+
+data <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W1'],
+                    node_2 = node_window_test$node[node_window_test$window == 'W1']) %>% 
+  filter(node_1 < node_2) %>% 
+  mutate(window = 'W1')
+data2 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W2'],
+                     node_2 = node_window_test$node[node_window_test$window == 'W2']) %>% 
+  filter(node_1 < node_2) %>% 
+  mutate(window = 'W2')
+data3 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W3'],
+                     node_2 = node_window_test$node[node_window_test$window == 'W3']) %>% 
+  filter(node_1 < node_2) %>% 
+  mutate(window = 'W3')
+data4 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W4'],
+                     node_2 = node_window_test$node[node_window_test$window == 'W4']) %>% 
+  filter(node_1 < node_2) %>% 
+  mutate(window = 'W4')
+data <- rbind(data, data2, data3, data4)
+rm(data2, data3, data4) ; gc()
+
+data <- data %>% 
+  rename(node = node_1) %>% 
+  left_join(node_window_test, by = c('node', 'window')) %>% 
+  rename(node_1 = node,
+         age_1 = age) %>% 
+  rename(node = node_2) %>% 
+  left_join(node_window_test, by = c('node', 'window')) %>% 
+  rename(node_2 = node,
+         age_2 = age) %>% 
+  mutate(age_diff = abs(age_1 - age_2))
+data$logit_edge_mu <- rnorm(nrow(data), mean = -3, sd = 1.5)
+
+mod <- brm(logit_edge_mu ~ -1 + age_diff + 
+             (0 + age_diff | window) +
+             # ( mm(node_1, node_2) | window) + 
+             (0 + age_diff | mm(node_1,node_2) ),
+    data = data)#, prior = prior("constant(cholesky_decompose([[1,0.5],[0.5,1]]))", class = "cor", group = "window"))
+mod$model
+# data {
+#   int<lower=1> N;  // total number of observations
+#   vector[N] Y;  // response variable
+#   int<lower=1> K;  // number of population-level effects
+#   matrix[N, K] X;  // population-level design matrix
+#   
+#   // data for group-level effects of ID 1
+#   int<lower=1> N_1;  // number of grouping levels
+#   int<lower=1> M_1;  // number of coefficients per level
+#   int<lower=1> J_1_1[N];  // grouping indicator per observation
+#   real W_1_1[N];  // multi-membership weights
+#   int<lower=1> J_1_2[N];  // grouping indicator per observation
+#   real W_1_2[N];  // multi-membership weights
+#   
+#   // group-level predictor values
+#   vector[N] Z_1_1_1;
+#   vector[N] Z_1_1_2;
+#   
+#   // data for group-level effects of ID 2
+#   int<lower=1> N_2;  // number of grouping levels
+#   int<lower=1> M_2;  // number of coefficients per level
+#   int<lower=1> J_2[N];  // grouping indicator per observation
+#   
+#   // group-level predictor values
+#   vector[N] Z_2_1;
+#   int prior_only;  // should the likelihood be ignored?
+# }
+# parameters {
+#   vector[K] b;  // population-level effects
+#   real<lower=0> sigma;  // dispersion parameter
+#   vector<lower=0>[M_1] sd_1;  // group-level standard deviations
+#   vector[N_1] z_1[M_1];  // standardized group-level effects
+#   vector<lower=0>[M_2] sd_2;  // group-level standard deviations
+#   vector[N_2] z_2[M_2];  // standardized group-level effects
+# }
+# transformed parameters {
+#   vector[N_1] r_1_1;  // actual group-level effects
+#   vector[N_2] r_2_1;  // actual group-level effects
+#   real lprior = 0;  // prior contributions to the log posterior
+#   r_1_1 = (sd_1[1] * (z_1[1]));
+#   r_2_1 = (sd_2[1] * (z_2[1]));
+#   lprior += student_t_lpdf(sigma | 3, 0, 2.5)
+#   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+#   lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
+#   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+#   lprior += student_t_lpdf(sd_2 | 3, 0, 2.5)
+#   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+# }
+# model {
+#   // likelihood including constants
+#   if (!prior_only) {
+#     // initialize linear predictor term
+#     vector[N] mu = rep_vector(0.0, N);
+#     for (n in 1:N) {
+#       // add more terms to the linear predictor
+#       mu[n] += W_1_1[n] * r_1_1[J_1_1[n]] * Z_1_1_1[n] + W_1_2[n] * r_1_1[J_1_2[n]] * Z_1_1_2[n] + r_2_1[J_2[n]] * Z_2_1[n];
+#     }
+#     target += normal_id_glm_lpdf(Y | X, mu, b, sigma);
+#   }
+#   // priors including constants
+#   target += lprior;
+#   target += std_normal_lpdf(z_1[1]);
+#   target += std_normal_lpdf(z_2[1]);
+# }
+
+
+
+
+
+
+
+
+
+##
+## create data list ####
 dyad_data <- list(
   # global data size
   num_data = n_data,                         # number of edges measured
@@ -315,7 +456,7 @@ dyad_data <- list(
 ## print progress marker
 print('data list created')
 
-## load dyadic regression model
+## load dyadic regression model ####
 dyadic_regression <- stan_model('models/dyadic_regression_anp_agediff_correlatedrandom.stan')
 
 ## print progress marker
@@ -325,7 +466,7 @@ print('model loaded in')
 n_chains <- 4
 n_samples <- 1000
 
-## fit dyadic regression
+## fit dyadic regression ####
 print(paste0('start model at ',Sys.time()))
 fit_dyadreg_simdiff <- sampling(dyadic_regression,
                                 data = dyad_data,
