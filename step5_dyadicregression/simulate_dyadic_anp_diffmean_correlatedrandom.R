@@ -211,225 +211,225 @@ load('step5_dyadicregression/anp_dyadic_simulation_dataprep_9windows.RData')
 # dev.off()
 pdf('step5_dyadicregression/simulate_dyadic_anp_diff_correlatedrandom.pdf')
 
-#### prior predictive check ####
-n <- 100
-beta_age_diff <- rnorm(n, 0, 1)
-tau_sigma_raw <- rnorm(n, 0, 2)
-
-mu_mm <- rnorm(n, 0, 0.5)
-rand_mm <- rnorm(n, 0, 1)
-tau_mm <- rnorm(n, 0, 0.5) # rcauchy(n, 0, 0.5)
-raw_sigma <- rnorm(n, 0, 1)
-
-node_mean <- mu_mm + rand_mm * tau_mm
-
-tau_sigma <- exp(tau_sigma_raw)
-node_sigma <- exp(raw_sigma)
-
-mu_window <- rnorm(n,0,0.4)
-rand_window <- rnorm(n,0,1)
-sigma_window <- rexp(n,1)
-
-window_random_effect <- mu_window + rand_window * sigma_window
-
-mm_nodes <- matrix(NA, nrow = n, ncol = n)
-for(i in 1:ncol(mm_nodes)){
-  mm_nodes[,i] <- rnorm(n, mean = node_mean[i], sd = node_sigma[i])
-}
-
-plot(NULL, las = 1, xlab = 'age difference', ylab = 'logit edge weight (standardised)',
-     ylim = c(min(logit_edge_draws_mu)-10, max(logit_edge_draws_mu)+10),
-     xlim = c(min(edge_summary$age_diff_std), max(edge_summary$age_diff_std)))
-abline(h = min(logit_edge_draws_mu), lty = 2)
-abline(h = max(logit_edge_draws_mu), lty = 2)
-
-x <- c(min(edge_summary$age_diff_std), max(edge_summary$age_diff_std))
-for(i in 1:n){
-  y <- rep(NA, length(x))
-  nodes_sample <- sample(1:n, size = 2, replace = F)
-  for(j in 1:length(x)){
-    y[j] <- beta_age_diff[i]*x[j] + 
-      window_random_effect[i] +
-      mm_nodes[i,nodes_sample[1]] + mm_nodes[i,nodes_sample[2]]
-  }
-  lines(x = x, y = y, col = rgb(0,0,1,0.4))
-}
-
-rm(n, beta_age_diff,tau_sigma_raw,mu_mm,rand_mm,tau_mm,raw_sigma,node_mean,tau_sigma,node_sigma,mu_window,rand_window,sigma_window,window_random_effect,mm_nodes, i, y, j, x) ; gc()
-
-## print progress marker
-print('prior predictive complete')
-save.image('step5_dyadicregression/anp_dyadic_simulation_agediff_correlatedrandom.RData')
-
-#### check for correlation in random effects -- strong correlation: colours = individuals -- tend to stick in clumps so definitely showing co-occurrence between individuals ####
-nodes <- expand.grid(id = unique(node_data$id),
-                     window = unique(node_data$window))
-node_data$id_window <- paste0(node_data$id, '_', node_data$window)
-nodes$present <- NA ; for(i in 1:nrow(nodes)){
-  if(paste0(nodes$id[i], '_', nodes$window[i]) %in% node_data$id_window){
-    nodes$present[i] <- 1
-  } else {
-    nodes$present[i] <- 0
-  }
-}
-
-jitter <- position_dodge(1)
-nodes$present2 <- nodes$present + rnorm(nrow(nodes),0,0.1)
-ggplot(nodes)+
-  geom_point(aes(x = as.factor(window),
-                  y = present2,
-                  colour = id),
-             position = jitter)+
-  geom_line(aes(x = window,
-                y = present2,
-                colour = id),
-            position = jitter)+
-  theme(legend.position = 'none')
-
+# #### prior predictive check ####
+# n <- 100
+# beta_age_diff <- rnorm(n, 0, 1)
+# tau_sigma_raw <- rnorm(n, 0, 2)
+# 
+# mu_mm <- rnorm(n, 0, 0.5)
+# rand_mm <- rnorm(n, 0, 1)
+# tau_mm <- rnorm(n, 0, 0.5) # rcauchy(n, 0, 0.5)
+# raw_sigma <- rnorm(n, 0, 1)
+# 
+# node_mean <- mu_mm + rand_mm * tau_mm
+# 
+# tau_sigma <- exp(tau_sigma_raw)
+# node_sigma <- exp(raw_sigma)
+# 
+# mu_window <- rnorm(n,0,0.4)
+# rand_window <- rnorm(n,0,1)
+# sigma_window <- rexp(n,1)
+# 
+# window_random_effect <- mu_window + rand_window * sigma_window
+# 
+# mm_nodes <- matrix(NA, nrow = n, ncol = n)
+# for(i in 1:ncol(mm_nodes)){
+#   mm_nodes[,i] <- rnorm(n, mean = node_mean[i], sd = node_sigma[i])
+# }
+# 
+# plot(NULL, las = 1, xlab = 'age difference', ylab = 'logit edge weight (standardised)',
+#      ylim = c(min(logit_edge_draws_mu)-10, max(logit_edge_draws_mu)+10),
+#      xlim = c(min(edge_summary$age_diff_std), max(edge_summary$age_diff_std)))
+# abline(h = min(logit_edge_draws_mu), lty = 2)
+# abline(h = max(logit_edge_draws_mu), lty = 2)
+# 
+# x <- c(min(edge_summary$age_diff_std), max(edge_summary$age_diff_std))
+# for(i in 1:n){
+#   y <- rep(NA, length(x))
+#   nodes_sample <- sample(1:n, size = 2, replace = F)
+#   for(j in 1:length(x)){
+#     y[j] <- beta_age_diff[i]*x[j] + 
+#       window_random_effect[i] +
+#       mm_nodes[i,nodes_sample[1]] + mm_nodes[i,nodes_sample[2]]
+#   }
+#   lines(x = x, y = y, col = rgb(0,0,1,0.4))
+# }
+# 
+# rm(n, beta_age_diff,tau_sigma_raw,mu_mm,rand_mm,tau_mm,raw_sigma,node_mean,tau_sigma,node_sigma,mu_window,rand_window,sigma_window,window_random_effect,mm_nodes, i, y, j, x) ; gc()
+# 
+# ## print progress marker
+# print('prior predictive complete')
+# save.image('step5_dyadicregression/anp_dyadic_simulation_agediff_correlatedrandom.RData')
+# 
+# #### check for correlation in random effects -- strong correlation: colours = individuals -- tend to stick in clumps so definitely showing co-occurrence between individuals ####
+# nodes <- expand.grid(id = unique(node_data$id),
+#                      window = unique(node_data$window))
+# node_data$id_window <- paste0(node_data$id, '_', node_data$window)
+# nodes$present <- NA ; for(i in 1:nrow(nodes)){
+#   if(paste0(nodes$id[i], '_', nodes$window[i]) %in% node_data$id_window){
+#     nodes$present[i] <- 1
+#   } else {
+#     nodes$present[i] <- 0
+#   }
+# }
+# 
+# jitter <- position_dodge(1)
+# nodes$present2 <- nodes$present + rnorm(nrow(nodes),0,0.1)
+# ggplot(nodes)+
+#   geom_point(aes(x = as.factor(window),
+#                   y = present2,
+#                   colour = id),
+#              position = jitter)+
+#   geom_line(aes(x = window,
+#                 y = present2,
+#                 colour = id),
+#             position = jitter)+
+#   theme(legend.position = 'none')
+# 
 #### fit dyadic regression ####
 #load('step5_dyadicregression/anp_dyadic_simulation_agediff_correlatedrandom.RData')
 
-## simulate correlated random effects ####
-library(brms)
-n_nodes_test <- 10
-n_windows_test <- 4
-eles_per_window_test <- c(5,8,6,4)
-
-node_test <- data.frame(node = 1:n_nodes_test,
-                        age = round(runif(n_nodes_test, 10, 50)))
-node_window_test <- data.frame(node = c(sample(size = eles_per_window_test[1],
-                                               x = 1:n_nodes_test,
-                                               replace = F),
-                                        sample(size = eles_per_window_test[2],
-                                               x = 1:n_nodes_test,
-                                               replace = F),
-                                        sample(size = eles_per_window_test[3],
-                                               x = 1:n_nodes_test,
-                                               replace = F),
-                                        sample(size = eles_per_window_test[4],
-                                               x = 1:n_nodes_test,
-                                               replace = F)),
-                               window = c(rep('W1',eles_per_window_test[1]),
-                                          rep('W2',eles_per_window_test[2]),
-                                          rep('W3',eles_per_window_test[3]),
-                                          rep('W4',eles_per_window_test[4])
-                               )) %>% 
-  left_join(node_test, by = 'node') %>% 
-  mutate(age = ifelse(window == 'W2', age + 2,
-                      ifelse(window == 'W3', age + 4,
-                             ifelse(window == 'W4', age + 6, age))))
-
-data <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W1'],
-                    node_2 = node_window_test$node[node_window_test$window == 'W1']) %>% 
-  filter(node_1 < node_2) %>% 
-  mutate(window = 'W1')
-data2 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W2'],
-                     node_2 = node_window_test$node[node_window_test$window == 'W2']) %>% 
-  filter(node_1 < node_2) %>% 
-  mutate(window = 'W2')
-data3 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W3'],
-                     node_2 = node_window_test$node[node_window_test$window == 'W3']) %>% 
-  filter(node_1 < node_2) %>% 
-  mutate(window = 'W3')
-data4 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W4'],
-                     node_2 = node_window_test$node[node_window_test$window == 'W4']) %>% 
-  filter(node_1 < node_2) %>% 
-  mutate(window = 'W4')
-data <- rbind(data, data2, data3, data4)
-rm(data2, data3, data4) ; gc()
-
-data <- data %>% 
-  rename(node = node_1) %>% 
-  left_join(node_window_test, by = c('node', 'window')) %>% 
-  rename(node_1 = node,
-         age_1 = age) %>% 
-  rename(node = node_2) %>% 
-  left_join(node_window_test, by = c('node', 'window')) %>% 
-  rename(node_2 = node,
-         age_2 = age) %>% 
-  mutate(age_diff = abs(age_1 - age_2))
-data$logit_edge_mu <- rnorm(nrow(data), mean = -3, sd = 1.5)
-
-mod <- brm(logit_edge_mu ~ -1 + age_diff + 
-             (0 + age_diff | window) +
-             # ( mm(node_1, node_2) | window) + 
-             (0 + age_diff | mm(node_1,node_2) ),
-    data = data)#, prior = prior("constant(cholesky_decompose([[1,0.5],[0.5,1]]))", class = "cor", group = "window"))
-mod$model
-# data {
-#   int<lower=1> N;  // total number of observations
-#   vector[N] Y;  // response variable
-#   int<lower=1> K;  // number of population-level effects
-#   matrix[N, K] X;  // population-level design matrix
-#   
-#   // data for group-level effects of ID 1
-#   int<lower=1> N_1;  // number of grouping levels
-#   int<lower=1> M_1;  // number of coefficients per level
-#   int<lower=1> J_1_1[N];  // grouping indicator per observation
-#   real W_1_1[N];  // multi-membership weights
-#   int<lower=1> J_1_2[N];  // grouping indicator per observation
-#   real W_1_2[N];  // multi-membership weights
-#   
-#   // group-level predictor values
-#   vector[N] Z_1_1_1;
-#   vector[N] Z_1_1_2;
-#   
-#   // data for group-level effects of ID 2
-#   int<lower=1> N_2;  // number of grouping levels
-#   int<lower=1> M_2;  // number of coefficients per level
-#   int<lower=1> J_2[N];  // grouping indicator per observation
-#   
-#   // group-level predictor values
-#   vector[N] Z_2_1;
-#   int prior_only;  // should the likelihood be ignored?
-# }
-# parameters {
-#   vector[K] b;  // population-level effects
-#   real<lower=0> sigma;  // dispersion parameter
-#   vector<lower=0>[M_1] sd_1;  // group-level standard deviations
-#   vector[N_1] z_1[M_1];  // standardized group-level effects
-#   vector<lower=0>[M_2] sd_2;  // group-level standard deviations
-#   vector[N_2] z_2[M_2];  // standardized group-level effects
-# }
-# transformed parameters {
-#   vector[N_1] r_1_1;  // actual group-level effects
-#   vector[N_2] r_2_1;  // actual group-level effects
-#   real lprior = 0;  // prior contributions to the log posterior
-#   r_1_1 = (sd_1[1] * (z_1[1]));
-#   r_2_1 = (sd_2[1] * (z_2[1]));
-#   lprior += student_t_lpdf(sigma | 3, 0, 2.5)
-#   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-#   lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
-#   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-#   lprior += student_t_lpdf(sd_2 | 3, 0, 2.5)
-#   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-# }
-# model {
-#   // likelihood including constants
-#   if (!prior_only) {
-#     // initialize linear predictor term
-#     vector[N] mu = rep_vector(0.0, N);
-#     for (n in 1:N) {
-#       // add more terms to the linear predictor
-#       mu[n] += W_1_1[n] * r_1_1[J_1_1[n]] * Z_1_1_1[n] + W_1_2[n] * r_1_1[J_1_2[n]] * Z_1_1_2[n] + r_2_1[J_2[n]] * Z_2_1[n];
-#     }
-#     target += normal_id_glm_lpdf(Y | X, mu, b, sigma);
-#   }
-#   // priors including constants
-#   target += lprior;
-#   target += std_normal_lpdf(z_1[1]);
-#   target += std_normal_lpdf(z_2[1]);
-# }
-
-
-
-
-
-
-
-
-
-##
+# ## simulate correlated random effects ####
+# library(brms)
+# n_nodes_test <- 10
+# n_windows_test <- 4
+# eles_per_window_test <- c(5,8,6,4)
+# 
+# node_test <- data.frame(node = 1:n_nodes_test,
+#                         age = round(runif(n_nodes_test, 10, 50)))
+# node_window_test <- data.frame(node = c(sample(size = eles_per_window_test[1],
+#                                                x = 1:n_nodes_test,
+#                                                replace = F),
+#                                         sample(size = eles_per_window_test[2],
+#                                                x = 1:n_nodes_test,
+#                                                replace = F),
+#                                         sample(size = eles_per_window_test[3],
+#                                                x = 1:n_nodes_test,
+#                                                replace = F),
+#                                         sample(size = eles_per_window_test[4],
+#                                                x = 1:n_nodes_test,
+#                                                replace = F)),
+#                                window = c(rep('W1',eles_per_window_test[1]),
+#                                           rep('W2',eles_per_window_test[2]),
+#                                           rep('W3',eles_per_window_test[3]),
+#                                           rep('W4',eles_per_window_test[4])
+#                                )) %>% 
+#   left_join(node_test, by = 'node') %>% 
+#   mutate(age = ifelse(window == 'W2', age + 2,
+#                       ifelse(window == 'W3', age + 4,
+#                              ifelse(window == 'W4', age + 6, age))))
+# 
+# data <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W1'],
+#                     node_2 = node_window_test$node[node_window_test$window == 'W1']) %>% 
+#   filter(node_1 < node_2) %>% 
+#   mutate(window = 'W1')
+# data2 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W2'],
+#                      node_2 = node_window_test$node[node_window_test$window == 'W2']) %>% 
+#   filter(node_1 < node_2) %>% 
+#   mutate(window = 'W2')
+# data3 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W3'],
+#                      node_2 = node_window_test$node[node_window_test$window == 'W3']) %>% 
+#   filter(node_1 < node_2) %>% 
+#   mutate(window = 'W3')
+# data4 <- expand.grid(node_1 = node_window_test$node[node_window_test$window == 'W4'],
+#                      node_2 = node_window_test$node[node_window_test$window == 'W4']) %>% 
+#   filter(node_1 < node_2) %>% 
+#   mutate(window = 'W4')
+# data <- rbind(data, data2, data3, data4)
+# rm(data2, data3, data4) ; gc()
+# 
+# data <- data %>% 
+#   rename(node = node_1) %>% 
+#   left_join(node_window_test, by = c('node', 'window')) %>% 
+#   rename(node_1 = node,
+#          age_1 = age) %>% 
+#   rename(node = node_2) %>% 
+#   left_join(node_window_test, by = c('node', 'window')) %>% 
+#   rename(node_2 = node,
+#          age_2 = age) %>% 
+#   mutate(age_diff = abs(age_1 - age_2))
+# data$logit_edge_mu <- rnorm(nrow(data), mean = -3, sd = 1.5)
+# 
+# mod <- brm(logit_edge_mu ~ -1 + age_diff + 
+#              (0 + age_diff | window) +
+#              # ( mm(node_1, node_2) | window) + 
+#              (0 + age_diff | mm(node_1,node_2) ),
+#     data = data)#, prior = prior("constant(cholesky_decompose([[1,0.5],[0.5,1]]))", class = "cor", group = "window"))
+# mod$model
+# # data {
+# #   int<lower=1> N;  // total number of observations
+# #   vector[N] Y;  // response variable
+# #   int<lower=1> K;  // number of population-level effects
+# #   matrix[N, K] X;  // population-level design matrix
+# #   
+# #   // data for group-level effects of ID 1
+# #   int<lower=1> N_1;  // number of grouping levels
+# #   int<lower=1> M_1;  // number of coefficients per level
+# #   int<lower=1> J_1_1[N];  // grouping indicator per observation
+# #   real W_1_1[N];  // multi-membership weights
+# #   int<lower=1> J_1_2[N];  // grouping indicator per observation
+# #   real W_1_2[N];  // multi-membership weights
+# #   
+# #   // group-level predictor values
+# #   vector[N] Z_1_1_1;
+# #   vector[N] Z_1_1_2;
+# #   
+# #   // data for group-level effects of ID 2
+# #   int<lower=1> N_2;  // number of grouping levels
+# #   int<lower=1> M_2;  // number of coefficients per level
+# #   int<lower=1> J_2[N];  // grouping indicator per observation
+# #   
+# #   // group-level predictor values
+# #   vector[N] Z_2_1;
+# #   int prior_only;  // should the likelihood be ignored?
+# # }
+# # parameters {
+# #   vector[K] b;  // population-level effects
+# #   real<lower=0> sigma;  // dispersion parameter
+# #   vector<lower=0>[M_1] sd_1;  // group-level standard deviations
+# #   vector[N_1] z_1[M_1];  // standardized group-level effects
+# #   vector<lower=0>[M_2] sd_2;  // group-level standard deviations
+# #   vector[N_2] z_2[M_2];  // standardized group-level effects
+# # }
+# # transformed parameters {
+# #   vector[N_1] r_1_1;  // actual group-level effects
+# #   vector[N_2] r_2_1;  // actual group-level effects
+# #   real lprior = 0;  // prior contributions to the log posterior
+# #   r_1_1 = (sd_1[1] * (z_1[1]));
+# #   r_2_1 = (sd_2[1] * (z_2[1]));
+# #   lprior += student_t_lpdf(sigma | 3, 0, 2.5)
+# #   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+# #   lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
+# #   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+# #   lprior += student_t_lpdf(sd_2 | 3, 0, 2.5)
+# #   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+# # }
+# # model {
+# #   // likelihood including constants
+# #   if (!prior_only) {
+# #     // initialize linear predictor term
+# #     vector[N] mu = rep_vector(0.0, N);
+# #     for (n in 1:N) {
+# #       // add more terms to the linear predictor
+# #       mu[n] += W_1_1[n] * r_1_1[J_1_1[n]] * Z_1_1_1[n] + W_1_2[n] * r_1_1[J_1_2[n]] * Z_1_1_2[n] + r_2_1[J_2[n]] * Z_2_1[n];
+# #     }
+# #     target += normal_id_glm_lpdf(Y | X, mu, b, sigma);
+# #   }
+# #   // priors including constants
+# #   target += lprior;
+# #   target += std_normal_lpdf(z_1[1]);
+# #   target += std_normal_lpdf(z_2[1]);
+# # }
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# ##
 ## create data list ####
 dyad_data <- list(
   # global data size
@@ -437,13 +437,14 @@ dyad_data <- list(
   num_dyads = n_dyads,                       # number of dyads
   num_nodes = n_nodes,                       # number of nodes
   num_windows = n_windows,                   # number of time windows measured
+  max_age_diff = max(edge_summary$age_diff) - min(edge_summary$age_diff),
 
   # Gaussian approximation of edge weights
   logit_edge_mu = logit_edge_draws_mu,       # Means of Gaussian approximation of logit edge weights
   logit_edge_sd = logit_edge_draws_sd,       # SD of Gaussian approximation of logit edge weights
 
   # explanatory variables
-  age_diff = edge_summary$age_diff_std,      # age of younger dyad member
+  age_diff_plus1 = as.integer(edge_summary$age_diff_std) + 1,      # age difference bewteen dyad, +1 so can be indexed (no one = 0)
 
   # multimembership terms
   node_1 = edge_summary$node_1_random,       # Node 1 IDs for multimembership terms
