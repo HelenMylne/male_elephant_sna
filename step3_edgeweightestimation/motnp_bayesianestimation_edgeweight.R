@@ -208,6 +208,34 @@ write_csv(counts_df, '../data_processed/step1_dataprocessing/motnp_binomialpairw
 ### add time marker
 print(paste0('data read in at ', Sys.time()))
 
+#### check over SRI values ####
+sri <- data.frame(min_sightings = c(1,3,5,8,10,15,20),
+                  n_dyads = NA,
+                  n_sri0 = NA,
+                  p_sri0 = NA)
+for(i in 1:nrow(sri)){
+  counts_df_sri <- counts_df %>% 
+    filter(count_1 >= sri$min_sightings[i]) %>% 
+    filter(count_2 >= sri$min_sightings[i])
+  sri$n_dyads[i] <- nrow(counts_df_sri)
+  sri$n_sri0[i]  <- length(which(counts_df_sri$event_count == 0))
+}
+sri$p_sri0 <- 100 * (sri$n_sri0 / sri$n_dyads)
+plot(sri$min_sightings, sri$p_sri0, las = 1,
+     xlab = 'sightings threshold', ylab = 'proportion 0')
+
+counts_15 <- counts_df %>% 
+  filter(period_count_1 > 14,
+         period_count_2 > 14)
+for(i in 1:nrow(sri)){
+  sri$n_dyads_15[i] <- length(which(counts_15$period == sri$window[i]))
+  sri$n_sri0_15[i]  <- length(which(counts_15$period == sri$window[i] & 
+                                      counts_15$event_count == 0))
+}
+sri$p_sri0_15 <- 100 * (sri$n_sri0_15 / sri$n_dyads_15)
+range(sri$p_sri0_15[sri$n_dyads_15 > 0])
+rm(sri, counts_15) ; gc()
+
 #### create data list ####
 ### create nodes data frame
 nodes <- data.frame(id = sort(unique(c(counts_df$id_1,counts_df$id_2))),  # all unique individuals
