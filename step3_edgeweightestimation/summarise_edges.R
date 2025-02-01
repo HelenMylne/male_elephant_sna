@@ -1,164 +1,84 @@
 #### set up ####
 library(tidyverse)
-
 theme_set(theme_bw())
 
-#### count nodes ANP short ####
-nodes <- read_csv('../data_processed/step4_nodalregression/anp_allnodes.csv')
-
-counts <- data.frame(window = sort(unique(nodes$window)),
-                     count = NA)
-for(i in 1:nrow(counts)){
-  x <- nodes %>%
-    filter(window == counts$window[i])
-  counts$count[i] <- length(unique(x$id))
-}
-
-rm(list = ls()) ; gc()
-
-#### count nodes MPNP short ####
-counts <- data.frame(window = 1:5,
-                     count = NA)
-
-for(time_window in 1:5){
-  ages <- readRDS(paste0('../data_processed/step2_ageestimation/mpnp',
-                         time_window,'_ageestimates_mcmcoutput.rds'))
-  counts$count[time_window] <- ncol(ages)
-}
-
-rm(list = ls()) ; gc()
-
-#### count nodes ANP long ####
-counts <- data.frame(window = 1:7,
-                     count = NA)
-
-for(time_window in 1:7){
-  eigen <- readRDS(paste0('../data_processed/step4_nodalregression/anplong',
-                         time_window,'eigenvectorestimates.rds'))
-  counts$count[time_window] <- length(unique(eigen$node))
-}
-
-#### summarise edge weights ####
-## load in MOTNP data
-load('motnp_edgeweights_conditionalprior.RData')
-motnp_edges <- edge_samples
-motnp_summary <- summary
-rm(list = ls()[!ls() %in% c('motnp_edges','motnp_summary')]) ; gc()
-
-## load in MPNP long data
-load('mpnp_edgecalculations/mpnplong_edgeweights_conditionalprior.RData')
-mpnplong_edges <- edge_samples
-mpnplong_summary <- summary
-rm(list = ls()[!ls() %in% c('motnp_edges','motnp_summary',
-                            'mpnplong_edges','mpnplong_summary')]) ; gc()
-
-# ## load in MPNP short data
-# mpnpshort_edges <- list()
-# mpnpshort_summary <- list()
-# for(time_window in 1:5){
-#   load(paste0('mpnp_edgecalculations/mpnpshort',time_window,'_edgeweights_conditionalprior.RData'))
+# #### summarise edge weights ####
+# ## load in MOTNP data
+# load('motnp_edgeweights_conditionalprior.RData')
+# motnp_edges <- edge_samples
+# motnp_summary <- summary
+# rm(list = ls()[!ls() %in% c('motnp_edges','motnp_summary')]) ; gc()
+# 
+# ## load in ANP short data
+# anpshort_edges <- list()
+# anpshort_summary <- list()
+# for(time_window in 1:36){
+#   load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
 #   if('edge_weights_matrix' %in% ls()){
 #     edge_samples <- edge_weights_matrix
 #   }
-#   mpnpshort_edges[[time_window]] <- edge_samples
-#   mpnpshort_summary[[time_window]] <- summary
+#   anpshort_edges[[time_window]] <- edge_samples
+#   anpshort_summary[[time_window]] <- summary
 #   rm(list = ls()[!ls() %in% c('motnp_edges','motnp_summary',
-#                               'mpnplong_edges','mpnplong_summary',
-#                               'mpnpshort_edges','mpnpshort_summary','time_window')]) ; gc()
+#                               'anpshort_edges','anpshort_summary','time_window')]) ; gc()
 # }
-
-## load in ANP short data
-anpshort_edges <- list()
-anpshort_summary <- list()
-for(time_window in 1:36){
-  load(paste0('anp_edgecalculations/anpshort',time_window,'_edgeweights_conditionalprior.RData'))
-  if('edge_weights_matrix' %in% ls()){
-    edge_samples <- edge_weights_matrix
-  }
-  anpshort_edges[[time_window]] <- edge_samples
-  anpshort_summary[[time_window]] <- summary
-  rm(list = ls()[!ls() %in% c('motnp_edges','motnp_summary',
-                              'mpnplong_edges','mpnplong_summary',
-                              'mpnpshort_edges','mpnpshort_summary',
-                              'anpshort_edges','anpshort_summary','time_window')]) ; gc()
-}
-
-## load in ANP long data
-anplong_edges <- list()
-anplong_summary <- list()
-for(time_window in 1:7){
-  load(paste0('anp_edgecalculations/anplong',time_window,'_edgeweights_conditionalprior.RData'))
-  if('edge_weights_matrix' %in% ls()){
-    edge_samples <- edge_weights_matrix
-  }
-  anplong_edges[[time_window]] <- edge_samples
-  anplong_summary[[time_window]] <- summary
-  rm(list = ls()[!ls() %in% c('motnp_edges','motnp_summary',
-                              'mpnplong_edges','mpnplong_summary',
-                              'mpnpshort_edges','mpnpshort_summary',
-                              'anpshort_edges','anpshort_summary',
-                              'anplong_edges','anplong_summary','time_window')]) ; gc()
-}
-rm(time_window) ; gc()
-
-## combine data together
-summary <- motnp_summary %>%
-  select(dyad_id, node_1, node_2, median, `2.5%`, `97.5%`) %>%
-  mutate(period = 1,
-         population = 'Mosi-Oa-Tunya',
-         duration = 'Short') %>%
-  relocate(duration) %>%
-  relocate(population)
-
-# x <- mpnplong_summary %>%
+# 
+# ## load in ANP long data
+# anplong_edges <- list()
+# anplong_summary <- list()
+# for(time_window in 1:7){
+#   load(paste0('anp_edgecalculations/anplong',time_window,'_edgeweights_conditionalprior.RData'))
+#   if('edge_weights_matrix' %in% ls()){
+#     edge_samples <- edge_weights_matrix
+#   }
+#   anplong_edges[[time_window]] <- edge_samples
+#   anplong_summary[[time_window]] <- summary
+#   rm(list = ls()[!ls() %in% c('motnp_edges','motnp_summary',
+#                               'anpshort_edges','anpshort_summary',
+#                               'anplong_edges','anplong_summary','time_window')]) ; gc()
+# }
+# rm(time_window) ; gc()
+# 
+# save.image('step3_edgeweightestimation/allpopulations_summarydata.RData')
+# 
+# ## combine data together
+# summary <- motnp_summary %>%
 #   select(dyad_id, node_1, node_2, median, `2.5%`, `97.5%`) %>%
 #   mutate(period = 1,
-#          population = 'Makgadikgadi Pans',
-#          duration = 'Long') %>%
+#          population = 'Mosi-Oa-Tunya',
+#          duration = 'Short') %>%
 #   relocate(duration) %>%
 #   relocate(population)
 # 
-# summary <- rbind(summary, x)
-# 
-# for(time_window in 1:length(mpnpshort_summary)){
-#   x <- mpnpshort_summary[[time_window]] %>%
+# for(time_window in 1:length(anplong_summary)){
+#   x <- anplong_summary[[time_window]] %>%
 #     select(dyad_id, node_1, node_2, median, `2.5%`, `97.5%`, period) %>%
-#     mutate(population = 'Makgadikgadi Pans',
+#     mutate(population = 'Amboseli',
+#            duration = 'Long') %>%
+#     relocate(duration) %>%
+#     relocate(population)
+#   summary <- rbind(summary, x)
+# }
+# 
+# for(time_window in 1:length(anpshort_summary)){
+#   x <- anpshort_summary[[time_window]] %>%
+#     select(dyad_id, node_1, node_2, median, `2.5%`, `97.5%`, period) %>%
+#     mutate(population = 'Amboseli',
 #            duration = 'Short') %>%
 #     relocate(duration) %>%
 #     relocate(population)
 #   summary <- rbind(summary, x)
 # }
-
-for(time_window in 1:length(anplong_summary)){
-  x <- anplong_summary[[time_window]] %>%
-    select(dyad_id, node_1, node_2, median, `2.5%`, `97.5%`, period) %>%
-    mutate(population = 'Amboseli',
-           duration = 'Long') %>%
-    relocate(duration) %>%
-    relocate(population)
-  summary <- rbind(summary, x)
-}
-
-for(time_window in 1:length(anpshort_summary)){
-  x <- anpshort_summary[[time_window]] %>%
-    select(dyad_id, node_1, node_2, median, `2.5%`, `97.5%`, period) %>%
-    mutate(population = 'Amboseli',
-           duration = 'Short') %>%
-    relocate(duration) %>%
-    relocate(population)
-  summary <- rbind(summary, x)
-}
-rm(x) ; gc()
-
-save.image('step3_edgeweightestimation/allpopulations_summarydata.RData')
-saveRDS(summary, '../data_processed/step3_edgeweightestimation/allpopulations_summarydata.RDS')
-
+# rm(x) ; gc()
+# 
+# save.image('step3_edgeweightestimation/allpopulations_summarydata.RData')
+# saveRDS(summary, '../data_processed/step3_edgeweightestimation/allpopulations_summarydata.RDS')
+# 
 #### values to report ####
 ## prep data
 summary <- readRDS('../data_processed/step3_edgeweightestimation/allpopulations_summarydata.RDS')
 summary$population <- factor(summary$population,
-                             levels = c('Amboseli','Makgadikgadi Pans','Mosi-Oa-Tunya'))
+                             levels = c('Amboseli','Mosi-Oa-Tunya'))
 summary$duration <- factor(summary$duration, levels = c('Short','Long'))
 
 ## split into populations
@@ -166,8 +86,6 @@ anp <- summary %>%
   filter(population == 'Amboseli')
 motnp <- summary %>%
   filter(population == 'Mosi-Oa-Tunya')
-mpnp <- summary %>%
-  filter(population == 'Makgadikgadi Pans')
 
 ## median bond strength: ANP
 anp_short <- anp %>%
@@ -281,19 +199,25 @@ summary <- summary %>%
                                       ifelse(duration == 'Short',
                                              'ANP, short ',
                                              'ANP, long '),
-                                      ifelse(population == 'Makgadikgadi Pans',
-                                             ifelse(duration == 'Short',
-                                                    'MPNP, short ',
-                                                    'MPNP, long '),
-                                             'MOTNP'))) %>%
+                                      'MOTNP')) %>%
   mutate(window = ifelse(population_duration == 'MOTNP',
                          'MOTNP',
                          paste0(population_duration, period))) %>%
   mutate(window = factor(window,
-                         levels = unique(summary$window)))
+                         levels = c('MOTNP',
+                                    'ANP, short 1','ANP, short 2','ANP, short 3','ANP, short 4','ANP, short 5',
+                                    'ANP, short 6','ANP, short 7','ANP, short 8','ANP, short 9','ANP, short 10',
+                                    'ANP, short 11','ANP, short 12','ANP, short 13','ANP, short 14','ANP, short 15',
+                                    'ANP, short 16','ANP, short 17','ANP, short 18','ANP, short 19','ANP, short 20',
+                                    'ANP, short 21','ANP, short 22','ANP, short 23','ANP, short 24','ANP, short 25',
+                                    'ANP, short 26','ANP, short 27','ANP, short 28','ANP, short 29','ANP, short 30',
+                                    'ANP, short 31','ANP, short 32','ANP, short 33','ANP, short 34','ANP, short 35',
+                                    'ANP, short 36',
+                                    'ANP, long 1','ANP, long 2','ANP, long 3','ANP, long 4','ANP, long 5',
+                                    'ANP, long 6','ANP, long 7')))
 
 ggplot()+
-  geom_boxplot(data = summary[summary$population != 'Makgadikgadi Pans',],
+  geom_boxplot(data = summary,
                aes(y = fct_rev(window),
                    x = median,
                    fill = population_duration))+
@@ -314,31 +238,18 @@ ggsave(filename = 'anp_motnp_mediandistributions.png',
        path = '../outputs/step3_edgeweightestimation/',
        device = 'png', width = 1800, height = 3600, units = 'px')
 
-## median bond strength: MPNP
-min(tapply(mpnp$median, mpnp$period, median))
-max(tapply(mpnp$median, mpnp$period, median))
-mean(mpnp$median)
-sd(mpnp$median)
-
 #### plot edge weight density plots ####
 ## make colours prettier
 summary$period_new <- ifelse(summary$population == 'Mosi-Oa-Tunya',
                          14,
-                         ifelse(summary$population == 'Makgadikgadi Pans',
-                                ifelse(summary$duration == 'Long',
-                                       14,
-                                       ifelse(summary$period == 1, 1,
-                                              ifelse(summary$period == 2, 10,
-                                                     ifelse(summary$period == 3, 19,
-                                                            ifelse(summary$period == 4, 27, 36))))),
-                                ifelse(summary$duration == 'Long',
-                                       ifelse(summary$period == 1, 1,
-                                              ifelse(summary$period == 2, 7,
-                                                     ifelse(summary$period == 3, 13,
-                                                            ifelse(summary$period == 4, 19,
-                                                                   ifelse(summary$period == 5, 24,
-                                                                          ifelse(summary$period == 6, 30, 36)))))),
-                                       summary$period)))
+                         ifelse(summary$duration == 'Long',
+                                ifelse(summary$period == 1, 1,
+                                       ifelse(summary$period == 2, 7,
+                                              ifelse(summary$period == 3, 13,
+                                                     ifelse(summary$period == 4, 19,
+                                                            ifelse(summary$period == 5, 24,
+                                                                   ifelse(summary$period == 6, 30, 36)))))),
+                                summary$period))
 
 ## plot
 (p <- ggplot(summary)+
@@ -365,51 +276,6 @@ ggsave('../outputs/step3_edgeweightestimation/compare_populations_all.png',
        plot = p, device = 'png', height = 1600, width = 2400, units = 'px')
 ggsave('../outputs/step3_edgeweightestimation/compare_populations_all.svg',
        plot = p, device = 'svg', height = 1600, width = 2400, units = 'px')
-
-
-## remove MPNP as potentially no longer including
-summary <- summary %>%
-  filter(population != 'Makgadikgadi Pans') %>%
-  mutate(population = factor(population, levels = c('Amboseli','Mosi-Oa-Tunya')))
-
-## combine population and duration
-summary <- summary %>%
-  mutate(pop_durn = ifelse(population == 'Mosi-Oa-Tunya',
-                           'Mosi-Oa-Tunya (504 days)',
-                           ifelse(duration == 'Long',
-                                  'Amboseli (2571 days)',
-                                  'Amboseli (500 days)'))) %>%
-  mutate(pop_durn = factor(pop_durn,
-                           levels = c('Mosi-Oa-Tunya (504 days)',
-                                      'Amboseli (2571 days)',
-                                      'Amboseli (500 days)')))
-
-## plot without MPNP
-(p <- ggplot(summary)+
-    geom_density(aes(x = median, colour = as.factor(period_new))) +
-    facet_wrap(. ~ pop_durn) +
-    scale_colour_viridis_d()+
-    labs(colour = 'Time window',
-         x = 'Median of dyad edge distribution',
-         y = 'Density')
-)
-(p <- p +
-    theme_bw()+
-    theme(legend.position = 'none',#legend.position = 'inside', #legend.position = c(1, 0),
-          #legend.position.inside = c(0.9, 0.1),
-          #legend.justification = c(1, 0),
-          legend.text = element_text(size = 10),
-          axis.text = element_text(size = 10),
-          axis.title = element_text(size = 12),
-          strip.text = element_text(size = 12),
-          strip.background = element_rect(fill = 'white'))
-)
-
-ggsave('../outputs/step3_edgeweightestimation/compare_populations_nompnp.png',
-       plot = p, device = 'png', height = 800, width = 2400, units = 'px')
-ggsave('../outputs/step3_edgeweightestimation/compare_populations_nompnp.svg',
-       plot = p, device = 'svg', height = 800, width = 2400, units = 'px')
-
 
 #### plot edge weight density ridges ####
 library(ggridges)
@@ -457,23 +323,23 @@ count <- summary %>%
                         round(mu,3),' ± ',
                         round(sd,3)))
 
-count$label <- ifelse(count$label == '52: 0.044 ± 0.047',
-                      ' 52: 0.044 ± 0.047', count$label)
-count$label <- ifelse(count$label == '31: 0.041 ± 0.044',
-                      ' 31: 0.041 ± 0.044', count$label)
-count$label <- ifelse(count$label == '92: 0.03 ± 0.028',
-                      ' 92: 0.030 ± 0.028', count$label)
-count$label <- ifelse(count$label == '99: 0.04 ± 0.036',
-                      ' 99: 0.040 ± 0.036', count$label)
+count <- count %>% 
+  mutate(label = case_when(label == '50: 0.044 ± 0.047' ~ ' 50: 0.044 ± 0.047',
+                           label == '29: 0.042 ± 0.046' ~ ' 29: 0.042 ± 0.046',
+                           label == '89: 0.03 ± 0.028'  ~ ' 89: 0.030 ± 0.028',
+                           label == '94: 0.041 ± 0.037' ~ ' 94: 0.041 ± 0.037',
+                           label == '104: 0.04 ± 0.036' ~ '104: 0.040 ± 0.036',
+                           label == '178: 0.023 ± 0.02' ~ '178: 0.023 ± 0.020',
+                           label == '194: 0.026 ± 0.02' ~ '194: 0.026 ± 0.020',
+                           label == '86: 0.035 ± 0.029' ~ ' 86: 0.035 ± 0.029',
+                           .default = label))
 
-count$label <- ifelse(count$label == '181: 0.023 ± 0.02',
-                      '181: 0.023 ± 0.020', count$label)
-count$label <- ifelse(count$label == '144: 0.028 ± 0.02',
-                      '144: 0.028 ± 0.020', count$label)
-count$label <- ifelse(count$label == '177: 0.024 ± 0.02',
-                      '177: 0.024 ± 0.020', count$label)
-count$label <- ifelse(count$label == '194: 0.026 ± 0.02',
-                      '194: 0.026 ± 0.020', count$label)
+summary <- summary %>%
+  dplyr::select(-population) %>%
+  left_join(count[,c('model','population','lwr','upr')],
+            by = 'model') %>% 
+  filter(median > lwr) %>% 
+  filter(median < upr)
 
 summary %>% 
   ggplot()+
@@ -486,19 +352,19 @@ summary %>%
                       alpha = 0.6)+
   geom_label(data = count,
             aes(y = model,
-                x = 0.38,
+                x = 0.19,
                 label = label,
                 fill = population,
                 colour = population),
             label.size = 0,
             family = 'mono')+
   scale_x_continuous(name = 'median edge weight per dyad',
-                     limits = c(0,0.45))+
-  scale_y_discrete(name = 'population and time window',
+                     limits = c(0,0.22))+
+  scale_y_discrete(name = 'time window',
                    limits = rev,
                    drop = F)+
-  scale_fill_viridis_d(name = 'time window')+
-  scale_colour_manual(name = 'time window', values = c('white','white','black'))+
+  scale_fill_viridis_d(name = 'population')+
+  scale_colour_manual(name = 'population', values = c('white','white','black'))+
   theme(legend.position = 'bottom')+
   guides(colour = guide_legend(override.aes = list(size = 0) ) )
 ggsave(plot = last_plot(), device = 'png',
@@ -506,19 +372,13 @@ ggsave(plot = last_plot(), device = 'png',
        path = '../outputs/step3_edgeweightestimation/',
        height = 2700, width = 1800, unit = 'px')
 
-summary <- summary %>%
-  dplyr::select(-population) %>%
-  left_join(count[,c('model','population','lwr','upr')],
-            by = 'model') %>% 
-  filter(median > lwr) %>% 
-  filter(median < upr)
 summary %>% 
   ggplot()+
   geom_density_ridges(data = summary,
                       aes(x = median,
                           y = model,
                           fill = population),
-                      #rel_min_height = 0.001,
+                      rel_min_height = 0.001,
                       scale = 3,
                       alpha = 0.6)+
   geom_label(data = count,
@@ -531,11 +391,11 @@ summary %>%
              family = 'mono')+
   scale_x_continuous(name = 'median edge weight per dyad',
                      limits = c(0,0.23))+
-  scale_y_discrete(name = 'population and time window',
+  scale_y_discrete(name = 'time window',
                    limits = rev,
                    drop = F)+
-  scale_fill_viridis_d(name = 'time window')+
-  scale_colour_manual(name = 'time window', values = c('white','white','black'))+
+  scale_fill_viridis_d(name = 'population')+
+  scale_colour_manual(name = 'population', values = c('white','white','black'))+
   theme(legend.position = 'bottom')+
   guides(colour = guide_legend(override.aes = list(size = 0) ) )
 ggsave(plot = last_plot(), device = 'png',
@@ -543,6 +403,86 @@ ggsave(plot = last_plot(), device = 'png',
        path = '../outputs/step3_edgeweightestimation/',
        height = 2700, width = 1800, unit = 'px')
 
+### repeat but with 95% CI instead of mean ± SD
+count$ci95 <- paste0('[',round(count$lwr,3),':',round(count$upr,3),']')
+count$label_ci <- paste0(count$n_nodes, ': ', round(count$mu,3), ' ', count$ci95)
 
+count <- count %>% 
+  mutate(label_ci = case_when(model == 'ANP S1' ~ ' 50: 0.044 [0.019:0.134]',
+                              model == 'ANP S2' ~ ' 29: 0.042 [0.026:0.035]',
+                              model == 'ANP S3' ~ ' 89: 0.030 [0.011:0.069]',
+                              model == 'ANP S4' ~ ' 94: 0.041 [0.008:0.099]',
+                              model == 'ANP S5' ~ '104: 0.040 [0.007:0.098]',
+                              model == 'ANP S8' ~ '137: 0.026 [0.010:0.039]',
+                              model == 'ANP S9' ~ '164: 0.022 [0.006:0.060]',
+                              model == 'ANP S23' ~ '178: 0.023 [0.009:0.050]',
+                              model == 'ANP S25' ~ '192: 0.023 [0.010:0.034]',
+                              model == 'ANP S30' ~ '197: 0.024 [0.010:0.034]',
+                              model == 'ANP L1' ~ ' 86: 0.035 [0.004:0.081]',
+                              .default = label_ci))
 
+summary %>% 
+  ggplot()+
+  geom_density_ridges(data = summary,
+                      aes(x = median,
+                          y = model,
+                          fill = population),
+                      scale = 3,
+                      alpha = 0.6)+
+  geom_label(data = count,
+             aes(y = model,
+                 x = 0.19,
+                 label = label_ci,
+                 fill = population,
+                 colour = population),
+             label.size = 0,
+             vjust = -0.01,
+             family = 'mono')+
+  scale_x_continuous(name = 'median edge weight per dyad',
+                     limits = c(0,0.22))+
+  scale_y_discrete(name = 'time window',
+                   limits = rev,
+                   drop = F,
+                   expand = c(0,0))+
+  scale_fill_viridis_d(name = 'population')+
+  scale_colour_manual(name = 'population', values = c('white','white','black'))+
+  theme(legend.position = 'bottom')+
+  guides(colour = guide_legend(override.aes = list(size = 0) ) )
+ggsave(plot = last_plot(), device = 'png',
+       filename = 'median_distributions_motnp_anp_fulldist_labelci.png',
+       path = '../outputs/step3_edgeweightestimation/',
+       height = 2700, width = 2200, unit = 'px')
+
+summary %>% 
+  ggplot()+
+  geom_density_ridges(data = summary,
+                      aes(x = median,
+                          y = model,
+                          fill = population),
+                      rel_min_height = 0.001,
+                      scale = 3,
+                      alpha = 0.6)+
+  geom_label(data = count,
+             aes(y = model,
+                 x = 0.19,
+                 label = label_ci,
+                 fill = population,
+                 colour = population),
+             label.size = 0,
+             vjust = -0.01,
+             family = 'mono')+
+  scale_x_continuous(name = 'median edge weight per dyad',
+                     limits = c(0,0.23))+
+  scale_y_discrete(name = 'time window',
+                   limits = rev,
+                   drop = F,
+                   expand = c(0,0))+
+  scale_fill_viridis_d(name = 'population')+
+  scale_colour_manual(name = 'population', values = c('white','white','black'))+
+  theme(legend.position = 'bottom')+
+  guides(colour = guide_legend(override.aes = list(size = 0) ) )
+ggsave(plot = last_plot(), device = 'png',
+       filename = 'median_distributions_motnp_anp_95percent_labelci.png',
+       path = '../outputs/step3_edgeweightestimation/',
+       height = 2700, width = 2100, unit = 'px')
 
