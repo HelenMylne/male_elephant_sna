@@ -53,6 +53,31 @@ counts_df <- counts_df %>%
   filter(age_start_1 > 9) %>%
   filter(age_start_2 > 9)
 
+### run loop to calculate proportion SRI = 0 for each window
+sri <- data.frame(window = 1:max(counts_df$period),
+                  n_dyads = NA,
+                  n_sri0 = NA,
+                  p_sri0 = NA)
+for(i in 1:nrow(sri)){
+  sri$n_dyads[i] <- length(which(counts_df$period == sri$window[i]))
+  sri$n_sri0[i]  <- length(which(counts_df$period == sri$window[i] & 
+                                   counts_df$event_count == 0))
+}
+sri$p_sri0 <- 100 * (sri$n_sri0 / sri$n_dyads)
+hist(sri$p_sri0, breaks = 61, xlim = c(40,101))
+
+counts_15 <- counts_df %>% 
+  filter(period_count_1 > 14,
+         period_count_2 > 14)
+for(i in 1:nrow(sri)){
+  sri$n_dyads_15[i] <- length(which(counts_15$period == sri$window[i]))
+  sri$n_sri0_15[i]  <- length(which(counts_15$period == sri$window[i] & 
+                                      counts_15$event_count == 0))
+}
+sri$p_sri0_15 <- 100 * (sri$n_sri0_15 / sri$n_dyads_15)
+range(sri$p_sri0_15[sri$n_dyads_15 > 0])
+rm(sri, counts_15) ; gc()
+
 ### set up values for running loop
 periods <- sort(unique(c(counts_df$period_start, counts_df$period_end)))  # dates  of short time windows in ANP data
 n_windows <- length(unique(counts_df$period))                             # number of short time windows in ANP data
@@ -548,6 +573,30 @@ counts_df <- read_csv('../data_processed/step1_dataprocessing/anp_bayesian_pairw
 counts_df <- counts_df %>% 
   filter(age_start_1 > 9) %>% 
   filter(age_start_2 > 9)
+
+### run loop to calculate proportion SRI = 0 for each window
+sri <- data.frame(window = 1:max(counts_df$period),
+                  n_dyads = NA, n_sri0 = NA, p_sri0 = NA,
+                  n_dyads_15 = NA, n_sri0_15 = NA, p_sri0_15 = NA)
+for(i in 1:nrow(sri)){
+  sri$n_dyads[i] <- length(which(counts_df$period == sri$window[i]))
+  sri$n_sri0[i]  <- length(which(counts_df$period == sri$window[i] & 
+                                   counts_df$event_count == 0))
+}
+sri$p_sri0 <- 100 * (sri$n_sri0 / sri$n_dyads)
+hist(sri$p_sri0, breaks = 101, xlim = c(0,101))
+
+counts_15 <- counts_df %>% 
+  filter(count_period_1 > 14,
+         count_period_2 > 14)
+for(i in 1:nrow(sri)){
+  sri$n_dyads_15[i] <- length(which(counts_15$period == sri$window[i]))
+  sri$n_sri0_15[i]  <- length(which(counts_15$period == sri$window[i] & 
+                                   counts_15$event_count == 0))
+}
+sri$p_sri0_15 <- 100 * (sri$n_sri0_15 / sri$n_dyads_15)
+
+rm(sri, counts_15) ; gc()
 
 ### set up values for running loop
 periods <- sort(unique(c(counts_df$period_start, counts_df$period_end)))  # dates  of long time windows in ANP data
