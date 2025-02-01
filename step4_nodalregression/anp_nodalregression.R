@@ -965,11 +965,15 @@ head(contrast[,1:5])      # check matrix looks right
 # [4,]  0.006984069  0.010066711 -0.027861798  0.010377933  0.0159579190
 # [5,]  0.005795318 -0.005017024 -0.034535982 -0.041761681 -0.0307519193
 # [6,]  0.005000085  0.044869123  0.007263970  0.023240820  0.0317058156
-mean(contrast)            # effect size on outcome scale: -0.002632508
-sd(contrast)              # size of uncertainty on outcome scale:  0.02706189
-quantile(contrast, prob = c(0.025, 0.975))      # very wide
-#          2.5%       97.5% 
-#   -0.05570634  0.05044728
+mean(contrast)            # effect size on outcome scale
+# [1] -0.002637487
+sd(contrast)              # size of uncertainty on outcome scale
+# [1] 0.02705883
+quantile(contrast, prob = c(0.025, 0.5, 0.975))      # very wide
+#         2.5%          50%        97.5% 
+# -0.055687148 -0.002637545  0.050435915 
+length(which(contrast < 0)) / length(contrast)
+# [1] 0.5391646
 
 ## save workspace
 save.image('anp_nodalregression/anp_short_nodal.RData')
@@ -2084,11 +2088,15 @@ head(contrast[,1:5])                                  # check matrix looks right
 # [4,] -0.06502915 -0.12238552  0.018097120 -0.04281475  0.068176144
 # [5,] -0.09429062 -0.04895093 -0.093517378  0.09796666  0.034882744
 # [6,] -0.11367512  0.05873033  0.008745904 -0.13132264 -0.041612895
-mean(contrast)     # output parameter direct from model: 0.0005151116
-sd(contrast)       # size of uncertainty on outcome scale: 0.0671307
-quantile(contrast, prob = c(0.025, 0.975))            # very wide
-#       2.5%      97.5% 
-# -0.1311042  0.1318677
+mean(contrast)     # output parameter direct from model
+# [1] 0.000552411
+sd(contrast)       # size of uncertainty on outcome scale
+# [1] 0.06730919
+quantile(contrast, prob = c(0.025, 0.5, 0.975))            # very wide
+#          2.5%           50%         97.5%
+# -0.1312336553  0.0005947526  0.1322751366
+length(which(contrast < 0)) / length(contrast)
+# [1] 0.4964199
 
 ## save workspace
 save.image('anp_nodalregression/anp_long_nodal.RData')
@@ -2220,9 +2228,6 @@ save.image('anp_nodalregression/anp_long_nodal.RData')
 dev.off()
 pdf('../outputs/step4_nodalregression/anplong_nodalregression_niceplots.pdf')
 
-## clean up and save workspace
-save.image('anp_nodalregression/anp_short_nodal.RData')
-dev.off()
 #### smooth plot ####
 pdf('../outputs/step4_nodalregression/anplong_nodalregression_niceplots.pdf')
 # load('anp_nodalregression/anp_long_nodal.RData')
@@ -2461,5 +2466,5 @@ ggsave(plot = overall, device = 'png', width = 2400, height = 2100, units = 'px'
 
 ## save outputs
 dev.off()
-save.image('anp_nodalregression/anp_long_nodal.RData')
+save.image('anp_nodalregression/anp_long_nodal_plot.RData')
 print('long windows complete')
