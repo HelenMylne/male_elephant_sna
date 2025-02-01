@@ -518,7 +518,7 @@ lines(density(beta_diff_34), col = 'blue')
 lines(density(beta_diff_45), col = 'purple')
 abline(v=0, lty=2)
 
-## predict for age categroy + 1
+## predict for age category + 1
 pred_data_new <- nodes[order(nodes$age_cat_num),] %>% 
     mutate(age_cat_num_original = age_cat_num,
            age_cat_fct_original = age_cat_fct,
@@ -537,28 +537,33 @@ quantile(contrast, prob = c(0.025, 0.975))
 
 ## calculate contrast -- 1 vs 2
 contrast12 <- contrast[,which(nodes$age_cat_fct == 1)]
-mean(contrast12)
-quantile(contrast12, prob = c(0.025, 0.975))
+mean(contrast12) ; sd(contrast12)
+quantile(contrast12, prob = c(0.025, 0.5, 0.975))
+length(which(contrast12 < 0)) / length(contrast12)
 
 ## calculate contrast -- 2 vs 3
 contrast23 <- contrast[,which(nodes$age_cat_fct == 2)]
-mean(contrast23)
-quantile(contrast23, prob = c(0.025, 0.975))
+mean(contrast23) ; sd(contrast23)
+quantile(contrast23, prob = c(0.025, 0.5, 0.975))
+length(which(contrast23 < 0)) / length(contrast23)
 
 ## calculate contrast -- 3 vs 4
 contrast34 <- contrast[,which(nodes$age_cat_fct == 3)]
-mean(contrast34)
-quantile(contrast34, prob = c(0.025, 0.975))
+mean(contrast34) ; sd(contrast34)
+quantile(contrast34, prob = c(0.025, 0.5, 0.975))
+length(which(contrast34 < 0)) / length(contrast34)
 
 ## calculate contrast -- 4 vs 5
 contrast45 <- contrast[,which(nodes$age_cat_fct == 4)]
-mean(contrast45)
-quantile(contrast45, prob = c(0.025, 0.975))
+mean(contrast45) ; sd(contrast45)
+quantile(contrast45, prob = c(0.025, 0.5, 0.975))
+length(which(contrast45 < 0)) / length(contrast45)
 
 ## calculate contrast -- 5 vs 1
-contrast51 <- contrast[,which(nodes$age_cat_fct == 5)]
-mean(contrast51)
-quantile(contrast51, prob = c(0.025, 0.975))
+contrast51 <- contrast[,which(nodes$age_cat_fct == 5)]*(-1)
+mean(contrast51) ; sd(contrast51)
+quantile(contrast51, prob = c(0.025, 0.5, 0.975))
+length(which(contrast51 < 0)) / length(contrast51)
 
 ## plot contrasts
 contrasts <- data.frame(contrast = c('1 vs 2', '2 vs 3', '3 vs 4', '4 vs 5'),
