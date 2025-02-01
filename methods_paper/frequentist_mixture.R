@@ -285,7 +285,7 @@ ggsave(filename = 'eigentogether0_mix_withline.png',
 )
 
 # save workspace
-save.image('../outputs/sparse_network_methods_figures/mixture_model.RData')
+save.image('methods_paper/r_workspaces/mixture_model.RData')
 
 # merge
 eigen0_mix.2 <- eigen0_mix.2 +
