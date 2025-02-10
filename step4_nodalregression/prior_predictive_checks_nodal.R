@@ -10,7 +10,6 @@ library(patchwork)
 set.seed(12345)
 
 n <- 100
-beta_age <- rnorm(n, 0, 0.8)
 window <- rnorm(n, 0, 1)
 node <- rnorm(n, 0, 1)
 
@@ -21,6 +20,7 @@ rm(list = ls()[!ls() %in% c('nodes','centrality_mu','n','beta_age','window','nod
 intercept  <- rnorm(n, logit(0.05), 1)
 n_age_cat <- length(unique(nodes$age_cat_fct))
 age_dirichlet <- rdirichlet(n, c(1,1,1,1,1))
+beta_age <- rnorm(n, 0, 2)
 
 ## plot
 plot(NULL, las = 1, xlab = 'age category', ylab = 'logit eigenvector',
@@ -59,10 +59,11 @@ sim_mot <- sim_mot %>%
          min_raw = min(centrality_mu),
          max_raw = max(centrality_mu))
 
-rm(list = ls()[!ls() %in% c('n','beta_age','window','node','motnp','sim_mot')]) ; gc()
+rm(list = ls()[!ls() %in% c('n','window','node','motnp','sim_mot')]) ; gc()
 
 #### anp short ####
 load('anp_nodalregression/anp_short_nodal_modelprep.RData')
+beta_age <- rnorm(n, 0, 0.8)
 n_data <- nrow(nodes_all)
 n_nodes <- length(unique(nodes_all$node_random))
 n_windows <- length(unique(nodes_all$window))
