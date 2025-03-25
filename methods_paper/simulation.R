@@ -880,20 +880,31 @@ plot_results <- sim_dyads %>%
 )
 
 ## add error bars
-
 (mu2 <- plot_results %>% 
-    filter(average == 'mean' | average == 'sri') %>% 
+    filter(average != 'median') %>% 
     ggplot()+
-    geom_errorbar(aes(x = true_edge, ymin = conditional_lwr, ymax = conditional_upr, colour = method),
-                  alpha = 0.1)+
-    geom_point(aes(x = true_edge, y = edge_estimate, colour = method),
-               alpha = 0.1)+
-    geom_smooth(aes(x = true_edge, y = edge_estimate, colour = method), method = 'lm')+
-    geom_abline(slope = 1, intercept = 0)+
+    geom_errorbar(data = plot_results[plot_results$average == 'mean' & plot_results$method == 'uniform',],
+                  aes(x = true_edge, ymin = uniform_lwr, ymax = uniform_upr),
+                  alpha = 0.1, colour = colours[1])+
+    geom_errorbar(data = plot_results[plot_results$average == 'mean' & plot_results$method == 'default',],
+                  aes(x = true_edge, ymin = default_lwr, ymax = default_upr),
+                  alpha = 0.1, colour = colours[4])+
+    geom_errorbar(data = plot_results[plot_results$average == 'mean' & plot_results$method == 'skewed',],
+                  aes(x = true_edge, ymin = skewed_lwr, ymax = skewed_upr),
+                  alpha = 0.1, colour = colours[3])+
+    geom_errorbar(data = plot_results[plot_results$average == 'mean' & plot_results$method == 'conditional',],
+                  aes(x = true_edge, ymin = conditional_lwr, ymax = conditional_upr),
+                  alpha = 0.1, colour = colours[5])+
+    geom_point(aes(x = true_edge, y = edge_estimate),
+               alpha = 0.1, shape = 1)+
+    geom_smooth(aes(x = true_edge, y = edge_estimate, group = method), method = 'lm', colour = 'black')+
+    geom_abline(slope = 1, intercept = 0, linetype = 2)+
     labs(x = 'true edge weight',
          y = 'estimated edge weight')+
     scale_colour_viridis_d()+
     facet_wrap(. ~ method)
 )
-
+ggsave(plot = mu2, device = 'png', width = 3500, height = 2200, unit = 'px',
+       filename = 'sim_compare_outputs_to_true.png',
+       path = 'methods_paper/simulation_outputs/')
 
