@@ -15,6 +15,7 @@ set.seed(1)
 ## set plotting aesthetics
 theme_set(theme_bw(base_size = 12))
 
+######## empirical elephant data ########
 #### load data ####
 load('motnp_edgeweights_conditionalprior.RData')
 rm(list = ls()[! ls() %in% c('counts_df')])
@@ -344,3 +345,5 @@ ggsave(filename = 'eigen_outputs_mixture.tiff',
 # hist(invlogit(predictions), breaks = 50) # all the same
 # predictions <- predict(object = mixture_fit_together, newdata = counts_df)
 # hist(predictions)
+
+######## simulated data ########
