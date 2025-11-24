@@ -27,6 +27,12 @@ mixture_fit_joint_random <- glmmTMB(cbind(event_count, apart) ~ (1|dyad_males),
                                     data = counts_df,
                                     family = binomial(link = 'logit'))
 
+# mixture_fit_joint_random <- glmmTMB(cbind(event_count, apart) ~ (1|dyad_males),
+#                                     ziformula = ~ (1|dyad_males),
+#                                     data = counts_df,
+#                                     family = binomial(link = 'logit'))
+
+
 ## summary of the model
 (summary <- summary(mixture_fit_joint_random))
 invlogit(summary$coefficients$cond[1]) # estimate
@@ -43,20 +49,44 @@ mixture_fit_joint_random$fit
 edges <- mixture_fit_joint_random$fit$parfull %>% 
   as.data.frame()
 colnames(edges) <- 'edge_weight'
-rownames(edges) <- c('beta','betazi',counts_df$dyad_males,'theta')
+unique(names(mixture_fit_joint_random$fit$parfull))
+which(names(mixture_fit_joint_random$fit$parfull) == 'theta')
+# rownames(edges) <- c('beta','betazi',counts_df$dyad_males,'theta')
+rownames(edges) <- c('beta','betazi', paste0('edge',counts_df$dyad_males),
+                     paste0('zi',counts_df$dyad_males), 'theta','thetazi')
+# edges <- edges %>% 
+  # mutate(parameter = c('beta','betazi',counts_df$dyad_males,'theta'))
+edges <- edges %>%
+  mutate(parameter = c('beta','betazi',paste0('edge',counts_df$dyad_males),
+                       paste0('zi',counts_df$dyad_males), 'theta','thetazi'))
+(params <- edges %>% 
+    filter(parameter %in% c('beta','betazi',
+                            'thetazi',
+                            'theta')) )
+mixture_fit_joint_random$sdr   # check matches above -- if not then you've done something wrong in extracting parameter values
+# edges <- edges %>% 
+#   anti_join(params) %>% 
+#   rename(dyad_males = parameter) %>%
+#   mutate(dyad_males = as.integer(dyad_males)) %>% 
+#   left_join(counts_df, by = 'dyad_males')
 edges <- edges %>% 
-  mutate(parameter = c('beta','betazi',counts_df$dyad_males,'theta'))
-params <- edges %>% 
-  filter(parameter %in% c('beta','betazi','theta'))
-edges <- edges %>% 
-  anti_join(params) %>% 
-  rename(dyad_males = parameter) %>% 
+  anti_join(params)
+edges_main <- edges[grep(pattern = 'edge', x = edges$parameter),] %>% 
+  separate(parameter, into = c('e','dyad_males'), remove = F, sep = 'dge') %>% 
   mutate(dyad_males = as.integer(dyad_males)) %>% 
+  select(-e) %>% 
   left_join(counts_df, by = 'dyad_males')
-
-## extract standard error
-mixture_fit_joint_random$sdr
-
+edges_zi <- edges[grep(pattern = 'zi', x = edges$parameter),] %>% 
+  separate(parameter, into = c('z','dyad_males'), remove = F, sep = 'i') %>% 
+  mutate(dyad_males = as.integer(dyad_males)) %>% 
+  rename(zi = edge_weight) %>% 
+  select(-z,-parameter)
+edges <- edges_main %>% 
+  left_join(edges_zi, by = 'dyad_males') %>% 
+  relocate(zi, .after = edge_weight) %>% 
+  mutate(zi_edge = edge_weight * zi) %>% 
+  relocate(zi_edge, .after = zi)
+  
 ## extract predictions
 predictions <- predict(object = mixture_fit_joint_random, newdata = counts_df)
 hist(invlogit(predictions), breaks = 50) # all low
@@ -81,7 +111,7 @@ edges <- edges %>%
          prdctn_invlogit = invlogit(prediction))
 
 ## basic plots
-plot(edges$prediction ~ edges$edge_weight)      # exactly match, just at different scale values
+plot(edges$prediction ~ edges$edge_weight)      # prediction includes average, edge weight is dyad deviation from average
 plot(edges$weight_invlogit ~ edges$count_dyad)  # looks decent, just too high
 plot(edges$prdctn_invlogit ~ edges$count_dyad)  # looks similar to other plots
 
@@ -91,25 +121,30 @@ plot(edges$prdctn_invlogit ~ edges$count_dyad)  # looks similar to other plots
              fill = rgb(33/255, 145/255, 140/255),
              colour = rgb(33/255, 145/255, 140/255), linewidth = 0.2)+
     scale_x_continuous(name = 'mixture model weight',
-                       breaks = c(0.00,0.10,0.20))+
+                       breaks = c(0.00,0.05,0.10,0.15,0.20,0.25))+
+    scale_y_continuous(name = 'number of dyads',
+                       expand = c(0,0),
+                       limits = c(0, 5700))
+)
+edges <- edges %>% 
+  mutate(together = ifelse(event_count == 0, 'never together', 'together at least once'))
+(edges_mixture <- ggplot(edges)+
+    geom_bar(aes(x = round(prdctn_invlogit, 3),
+                 fill = as.factor(together),
+                 colour = as.factor(together)),
+             linewidth = 0.2)+
+    scale_x_continuous(name = 'mixture model weight',
+                       breaks = c(0.00,0.05,0.10,0.15,0.20,0.25))+
     scale_y_continuous(name = 'number of dyads',
                        expand = c(0,0))+
-    coord_cartesian(ylim = c(0,5300))
+    scale_fill_viridis_d(end = 0.5, direction = -1)+
+    scale_colour_viridis_d(end = 0.5, direction = -1)+
+    coord_cartesian(ylim = c(0,5700))+
+    labs(colour = 'ever together',
+         fill = 'ever together')
 )
 
 ## nice plot edgesightings
-(edgesightings_mixture1 <- ggplot(edges,
-       aes(x = count_dyad, y = prdctn_invlogit))+
-  geom_point(colour = rgb(33/255, 145/255, 140/255, 0.1),
-             size = 0.5, shape = 19)+
-  geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-  scale_x_continuous(name = 'total dyad sightings')+
-  scale_y_continuous(name = 'mixture model weight', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'edgesightings_mixturemodel_withline_changealpha.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = edgesightings_mixture1, device = 'png', width = 700, height = 700, units = 'px')
-
 edges$hack_linetype_all <- 'all values'
 edges$hack_linetype_together <- 'together at least once'
 
@@ -153,9 +188,10 @@ edges$together <- ifelse(counts_df$event_count == 0,
           legend.title = element_text(size = 10),
           legend.text = element_text(size = 8))
 )
-ggsave(filename = 'edgesightings_mixture_twolines_changealpha.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = edgesightings_mixture2, device = 'png', width = 700, height = 700, units = 'px')
+ggsave(filename = 'edgesightings_freqmix.png',
+       # path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/new_version/',
+       plot = edgesightings_mixture2, device = 'png', width = 1600, height = 700, units = 'px')
 
 ## merge
 edges_mixture <- edges_mixture +
@@ -177,13 +213,14 @@ edgesightings_mixture2 <- edgesightings_mixture2 +
 (edges_mixture + edgesightings_mixture2)+
   plot_annotation(tag_levels = 'a') &
     theme(legend.position = 'bottom',
-          text = element_text(family = 'serif'),
+          # text = element_text(family = 'serif'),
           legend.text = element_text(size = 10),
           legend.title = element_blank()) &
     guides(colour = guide_legend(nrow = 2, byrow = TRUE))
-ggsave(filename = 'outputs_mixturemodel.tiff',
-       path = 'methods_paper/outputs/',
-       plot = last_plot(), device = 'tiff',
+ggsave(filename = 'edges_freqmix.png',
+       # path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/new_version/',
+       plot = last_plot(), device = 'png',
        width = (width+50)*2,
        height = height+100,
        dpi = resolution,
@@ -237,113 +274,73 @@ eigen_mix <- eigen_mix %>%
   left_join(counts, by = 'id')
 
 # plot
-(eigensightings_mix.1 <- ggplot(eigen_mix, aes(x = count, y = eigen))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'total node sightings')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'eigensightings_mix_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = eigensightings_mix.1, device = 'png', width = 1600, height = 700, units = 'px')
-
-(eigensightings_mix.2 <- ggplot(eigen_mix, aes(x = count, y = eigen))+
+(eigensightings_mix <- ggplot(eigen_mix, aes(x = count, y = eigen))+
     geom_point(colour = rgb(33/255, 145/255, 140/255),
                size = 0.5, shape = 19)+
     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
     scale_x_continuous(name = 'total node sightings')+
     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
 )
-ggsave(filename = 'eigensightings_mix_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = eigensightings_mix.2, device = 'png', width = 1600, height = 700, units = 'px')
+ggsave(filename = 'eigensightings_freqmix.png',
+       # path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/new_version/',
+       plot = eigensightings_mix, device = 'png', width = 1600, height = 700, units = 'px')
 
-(eigen0_mix.1 <- ggplot(eigen_mix, aes(x = together0, y = eigen))+
-    geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
-    scale_x_continuous(name = 'dyads together = 0')+
-    scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
-)
-ggsave(filename = 'eigentogether0_mix_noline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = eigen0_mix.1, device = 'png', width = 1600, height = 700, units = 'px')
-
-(eigen0_mix.2 <- ggplot(eigen_mix, aes(x = together0, y = eigen))+
+eigen_mix <- eigen_mix %>% 
+  mutate(together1 = 212 - together0)
+(eigen0_mix <- ggplot(eigen_mix, aes(x = together1, y = eigen))+
     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'dyads together = 0')+
+    scale_x_continuous(name = 'observed group partners')+
     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
 )
-ggsave(filename = 'eigentogether0_mix_withline.png',
-       path = '../outputs/sparse_network_methods_figures/',
-       plot = eigen0_mix.2, device = 'png', width = 1600, height = 700, units = 'px')
+ggsave(filename = 'eigentogether1_freqmix.png',
+       # path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/new_version/',
+       plot = eigen0_mix, device = 'png', width = 1600, height = 700, units = 'px')
 
 ## change line breaks
-(eigen0_mix.2 <- ggplot(eigen_mix, aes(x = together0, y = eigen))+
+(eigen0_mix <- ggplot(eigen_mix, aes(x = together1, y = eigen))+
     geom_point(colour = rgb(33/255, 145/255, 140/255), size = 0.5, shape = 19)+
     geom_smooth(colour = rgb(68/255, 1/255, 84/255))+
-    scale_x_continuous(name = 'dyads together = 0',
-                       breaks = c(100,150,200))+
+    scale_x_continuous(name = 'observed group partners',
+                       breaks = c(0,50,100,150))+
     scale_y_continuous(name = 'node centrality', limits = c(-0.02,1.02), expand = c(0,0))
 )
 
 # save workspace
-save.image('methods_paper/r_workspaces/mixture_model.RData')
+# save.image('methods_paper/r_workspaces/mixture_model.RData')
+save.image('methods_paper/frequentist_zeroinf_motnpoutputs.RData')
 
 # merge
-eigen0_mix.2 <- eigen0_mix.2 +
+eigen0_mix <- eigen0_mix +
   theme(text = element_text(family = 'serif'),
         axis.title = element_text(size = 12),
         axis.text = element_text(size = 10),
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 10))
-eigensightings_mix.2 <- eigensightings_mix.2 +
+eigensightings_mix <- eigensightings_mix +
   theme(text = element_text(family = 'serif'),
         axis.title = element_text(size = 12),
         axis.text = element_text(size = 10),
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 10))
 
-(eigen0_mix.2 + eigensightings_mix.2) +
+(eigen0_mix + eigensightings_mix) +
   plot_annotation(tag_levels = 'a')
-ggsave(filename = 'eigen_outputs_mixture.tiff',
-       path = 'methods_paper/outputs/',
-       plot = last_plot(), device = 'tiff',
+ggsave(filename = 'eigen_freqmix.png',
+       # path = '../outputs/sparse_network_methods_figures/',
+       path = 'methods_paper/outputs/new_version/',
+       plot = last_plot(), device = 'png',
        width = (width+50)*2,
        height = height,
        dpi = resolution,
        units = 'px')
-# ggsave(filename = 'eigen_outputs_mixture.png',
-#        path = 'methods_paper/outputs/',
-#        plot = last_plot(), device = 'png', width = 1600, height = 700, units = 'px')
 
-# #### I think these are wrong ####
-# ## fit a zero-inflated Poisson model using glmmTMB
-# mixture_fit_joint <- glmmTMB(cbind(event_count, apart) ~ 1,
-#                              ziformula = ~1, data = counts_df, family = binomial(link = 'logit'))
-# mixture_fit_together <- glmmTMB(event_count ~ count_dyad,
-#                                 ziformula = ~1, data = counts_df, family = poisson)
-# mixture_fit_together_random <- glmmTMB(event_count ~ count_dyad,
-#                                        ziformula = ~1, data = counts_df, family = poisson)
-# 
-# ## summary of the model
-# summary(mixture_fit_joint)
-# summary(mixture_fit_together)
-# 
-# ## view data used for model
-# head(mixture_fit_joint$frame)
-# View(mixture_fit_together$frame) # takes data from both variables
-# 
-# ## extract fit
-# mixture_fit_joint$fit
-# mixture_fit_together$fit
-# 
-# ## extract standard error
-# mixture_fit_joint$sdr
-# mixture_fit_together$sdr
-# 
-# ## extract edges
-# predictions <- predict(object = mixture_fit_joint, newdata = counts_df)
-# hist(invlogit(predictions), breaks = 50) # all the same
-# predictions <- predict(object = mixture_fit_together, newdata = counts_df)
-# hist(predictions)
+#### calculate values to report ####
+summary(edges$prdctn_invlogit)
+sd(edges$prdctn_invlogit)
 
-######## simulated data ########
+summary(edges$prediction)
+sd(edges$prediction)
+
