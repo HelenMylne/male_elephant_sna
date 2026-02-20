@@ -2,8 +2,12 @@
 # run Bayesian mixture model using first simulated then empirical data
 
 ######## set up ########
-# library(cmdstanr) ; library(tidyverse) ; library(LaplacesDemon) ; library(patchwork) ; library(igraph)
-library(cmdstanr, lib.loc = '../packages/')
+# library(rstan) ; library(StanHeaders)
+# library(tidyverse) ; library(LaplacesDemon) ; library(patchwork) ; library(igraph)
+# library(cmdstanr)
+# library(cmdstanr, lib.loc = '../packages/')
+library(StanHeaders, lib.loc = '../packages/')
+library(rstan, lib.loc = '../packages/')
 library(tidyverse, lib.loc = '../packages/')
 library(LaplacesDemon, lib.loc = '../packages/')
 library(patchwork, lib.loc = '../packages/')
@@ -18,7 +22,8 @@ n_draws <- 1000
 theme_set(theme_bw(base_size = 12))
 
 #### load model ####
-mod <- cmdstan_model('methods_paper/models/edge_mixture_bayesian3.stan')
+# mod <- cmdstan_model('methods_paper/models/edge_mixture_bayesian3.stan')
+mod <- stan_model('methods_paper/models/edge_mixture_bayesian3.stan')
 
 # ######## simulation ########
 # #### load data ####
@@ -184,40 +189,47 @@ counts_dl <- list(n_dyads = n_dyads,
                   total_sightings = counts_df$count_dyad)
 
 #### fit model ####
-fit <- mod$sample(data = counts_dl, seed = 12345,
-                  chains = n_chains, parallel_chains = n_chains,
-                  iter_warmup = n_draws, iter_sampling = n_draws)
+# fit <- mod$sample(data = counts_dl, seed = 12345,
+#                   chains = n_chains, parallel_chains = n_chains,
+#                   iter_warmup = n_draws, iter_sampling = n_draws)
+fit <- rstan::sampling(mod, data = counts_dl, seed = 12345,
+                  chains = n_chains, cores = n_chains,
+                  iter = n_draws, warmup = n_draws/2)
 
 ## save output
 save.image('methods_paper/motnp_fit_bayesian_mixture.RData') # load('methods_paper/motnp_fit_bayesian_mixture.RData')
 
 ## summary
-fit$summary()
+# fit$summary()
+fit
 
 #### extract draws ####
 ## extract
-draws <- as.data.frame(fit$draws())
-
-## put all chains into single column: separate out chains
-draws1 <- draws[,seq(1, ncol(draws), by = 4)]
-draws2 <- draws[,seq(2, ncol(draws), by = 4)]
-draws3 <- draws[,seq(3, ncol(draws), by = 4)]
-draws4 <- draws[,seq(4, ncol(draws), by = 4)]
-
-## bind 4 chains into single data frame
-colnames(draws2) <- colnames(draws3) <- colnames(draws4) <- colnames(draws1)
-draws <- rbind(draws1, draws2, draws3, draws4)
-rm(draws1, draws2, draws3, draws4) ; gc()
+draws <- as.data.frame(rstan::extract(fit))
+# draws <- as.data.frame(fit$draws())
+# 
+# ## put all chains into single column: separate out chains
+# draws1 <- draws[,seq(1, ncol(draws), by = 4)]
+# draws2 <- draws[,seq(2, ncol(draws), by = 4)]
+# draws3 <- draws[,seq(3, ncol(draws), by = 4)]
+# draws4 <- draws[,seq(4, ncol(draws), by = 4)]
+# 
+# ## bind 4 chains into single data frame
+# colnames(draws2) <- colnames(draws3) <- colnames(draws4) <- colnames(draws1)
+# draws <- rbind(draws1, draws2, draws3, draws4)
+# rm(draws1, draws2, draws3, draws4) ; gc()
 
 ## rename without "1." on start
-params <- data.frame(param = colnames(draws)) %>% 
-  mutate(param = str_remove(pattern = '1.', string = param))
+params <- data.frame(param = colnames(draws)) #%>%
+  # mutate(param = str_remove(pattern = '1.', string = param))
 colnames(draws) <- params$param
 
 ## add columns for draw/chain
-draws <- draws %>% 
-  mutate(draw = rep(1:n_draws, n_chains),
-         chain = rep(1:n_chains, each = n_draws))
+draws <- draws %>%
+  # mutate(draw = rep(1:(n_draws), n_chains),
+  #        chain = rep(1:n_chains, each = n_draws))
+  mutate(draw = rep(1:(n_draws/2), n_chains),
+         chain = rep(1:n_chains, each = n_draws/2))
 
 #### check fit ####
 ## function traceplot
@@ -238,35 +250,28 @@ trace <- function(draws_dataframe, parameter_type, dyads = NULL){
 }
 
 ## split into parameter types for checking
-global <- params[params$param %in% c('lp__','logit_together','average_edge','prob_together'),]
+global <- params[params$param %in% c('lp__','average_edge','prob_0'),]
 dyad_effects <- params[grep(x = params$param, pattern = 'dyad_effect'),]
-logit_edges <- params[grep(x = params$param, pattern = 'logit_edge'),]
 edge_weights <- params[grep(x = params$param, pattern = 'edge_weight'),]
-nrow(params) == length(global) + length(dyad_effects) + length(hypothetical) + length(logit_edges) + length(edge_weights)
-global <- global[2:4]
+nrow(params) == length(global) + length(dyad_effects) + length(edge_weights)
+global <- global[global != 'lp__']
 
 ## traceplot global parameters
-trace(draws, global)
+trace(draws_dataframe = draws, parameter_type = global)
 
 ## sample dyads for plotting dyad-level parameters
 plot_dyads <- sample(1:n_dyads, 12, F)
 
 ## dyad-level parameters
 trace(draws, dyad_effects, plot_dyads)
-trace(draws, logit_edges, plot_dyads)
 trace(draws, edge_weights, plot_dyads)
 rm(global,dyad_effects,logit_edges) ; gc()
 
-#### plot edges -- NOT ACTUALLY SURE WHICH ONE EVEN IS THE EDGE WEIGHT IN THE END!! ####
+#### plot edges ####
 ## extract estimates
 ew <- draws %>% 
   select(all_of(edge_weights))
 ew_mat <- as.matrix(ew)
-
-# ## add probability together??
-# for(i in 1:n_dyads){
-#   ew_mat[,i] <- ew_mat[,i] + draws$prob_together
-# }
 
 ## calculate average values
 counts_df <- counts_df %>% 
@@ -292,8 +297,10 @@ ggplot()+
   labs(x = 'SRI edge weight',
        y = 'mean edge estimate',
        colour = 'ever seen\ntogether')+
-  annotate('text', x = 0.05, y = 0.125, label = 'zero-inflated higher')+
-  annotate('text', x = 0.3, y = 0.025, label = 'SRI higher')+
+  annotate('text', x = 0.1, y = 0.23, label = 'zero-inflated higher')+
+  annotate('text', x = 0.7, y = 0.23, label = 'SRI higher')+
+  # annotate('text', x = 0.15, y = 0.21, label = 'zero-inflated higher', angle = 82.5)+
+  # annotate('text', x = 0.26, y = 0.21, label = 'SRI higher', angle = 82.5)+
   scale_x_continuous(expand = c(0,0), limits = c(-0.01,1))+
   scale_y_continuous(expand = c(0,0), limits = c(0,0.25))+
   scale_colour_viridis_d()+
@@ -308,8 +315,10 @@ ggplot()+
   labs(x = 'SRI edge weight',
        y = 'median edge estimate',
        colour = 'ever seen\ntogether')+
-  annotate('text', x = 0.05, y = 0.125, label = 'zero-inflated higher')+
-  annotate('text', x = 0.3, y = 0.025, label = 'SRI higher')+
+  annotate('text', x = 0.1, y = 0.23, label = 'zero-inflated higher')+
+  annotate('text', x = 0.7, y = 0.23, label = 'SRI higher')+
+  # annotate('text', x = 0.15, y = 0.21, label = 'zero-inflated higher', angle = 82.5)+
+  # annotate('text', x = 0.26, y = 0.21, label = 'SRI higher', angle = 82.5)+
   scale_x_continuous(expand = c(0,0), limits = c(-0.01, 1))+
   scale_y_continuous(expand = c(0,0), limits = c(0,0.25))+
   scale_colour_viridis_d()+
@@ -388,6 +397,8 @@ ggsave(filename = 'edgedistributions_bayesmix.png',
        plot = edge_dist, device = 'png',
        width = 1600, height = 700, units = 'px')
 
+## save output
+save.image('methods_paper/motnp_fit_bayesian_mixture.RData') # load('methods_paper/motnp_fit_bayesian_mixture.RData')
 
 #### eigenvector output checks ####
 ## get adjacency array

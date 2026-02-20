@@ -22,7 +22,9 @@ transformed parameters {
  
   // edge weight
   array[n_dyads] real edge_weight;
-  edge_weight = inv_logit(average_edge + dyad_effect);
+  for(i in 1:n_dyads){
+    edge_weight[i] = inv_logit(average_edge + dyad_effect[i]);
+  }
   
 }
 
